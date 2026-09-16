@@ -222,3 +222,20 @@ def delete_project_transcripts(cwd: str, directory: Optional[Path] = None) -> in
             del _cache[cached_path]
 
     return len(dirs)
+
+
+def delete_transcript(session_id: str, directory: Optional[Path] = None) -> bool:
+    """Delete a single session's transcript file by session_id.
+
+    Returns True if the transcript was found and deleted.
+    """
+    for transcript in load_transcripts(directory):
+        if transcript.session_id != session_id:
+            continue
+        try:
+            transcript.path.unlink()
+        except OSError:
+            return False
+        _cache.pop(transcript.path, None)
+        return True
+    return False

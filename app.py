@@ -9,7 +9,7 @@ from streamlit import config as st_config
 
 from claude_projects import delete_project, load_projects
 from claude_sessions import load_sessions
-from claude_transcripts import delete_project_transcripts, load_transcripts
+from claude_transcripts import delete_project_transcripts, delete_transcript, load_transcripts
 
 _THEME_PREF_PATH = Path(__file__).parent / ".streamlit" / "theme_pref.json"
 
@@ -164,12 +164,61 @@ def render_transcripts_table() -> None:
         st.caption(
             f"Last refreshed: {st.session_state.transcripts_refreshed_at:%H:%M:%S}"
         )
+        st.toggle("Select rows to delete", key="transcripts_delete_mode")
 
     df = st.session_state.transcripts_df
     if df.empty:
         st.write("No Claude session transcripts found.")
-    else:
+        return
+
+    if not st.session_state.transcripts_delete_mode:
         st.dataframe(df, use_container_width=True, hide_index=True)
+        return
+
+    event = st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="multi-row",
+        key="transcripts_table",
+    )
+    selected_rows = event.selection.rows if event else []
+    selected_ids = list(df.iloc[selected_rows]["Session ID"]) if selected_rows else []
+
+    # Live sessions are still being written to by a running process, so
+    # they can't be deleted even if their row gets selected.
+    live_ids = {s.session_id for s in load_sessions()}
+    live_selected = [sid for sid in selected_ids if sid in live_ids]
+    selected_ids = [sid for sid in selected_ids if sid not in live_ids]
+
+    if live_selected:
+        st.caption(
+            f"{len(live_selected)} selected session(s) are still live and can't be deleted."
+        )
+
+    if selected_ids:
+        if st.button(f"🗑️ Delete {len(selected_ids)} selected session(s)"):
+            st.session_state.confirm_delete_transcripts = selected_ids
+
+    confirm_ids = st.session_state.get("confirm_delete_transcripts")
+    if confirm_ids:
+        st.warning(
+            f"Delete {len(confirm_ids)} selected session transcript(s)? "
+            "This cannot be undone."
+        )
+        with st.container(horizontal=True):
+            if st.button("Confirm delete", type="primary", key="confirm_delete_transcripts_btn"):
+                for session_id in confirm_ids:
+                    delete_transcript(session_id)
+                st.session_state.transcripts_df = _transcripts_dataframe()
+                st.session_state.transcripts_refreshed_at = datetime.now()
+                st.session_state.pop("confirm_delete_transcripts", None)
+                st.session_state.pop("transcripts_table", None)
+                st.rerun()
+            if st.button("Cancel", key="cancel_delete_transcripts_btn"):
+                st.session_state.pop("confirm_delete_transcripts", None)
+                st.rerun()
 
 
 @st.fragment(run_every="2s")
