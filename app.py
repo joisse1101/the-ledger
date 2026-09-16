@@ -1,12 +1,25 @@
+import re
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from streamlit import config as st_config
 
 from claude_projects import load_projects
 from claude_sessions import load_sessions
 from claude_transcripts import load_transcripts
+
+_CONFIG_PATH = Path(__file__).parent / ".streamlit" / "config.toml"
+
+
+def _persist_theme(theme: str) -> None:
+    text = _CONFIG_PATH.read_text()
+    new_text = re.sub(r'(?m)^base\s*=\s*".*"$', f'base = "{theme}"', text)
+    if new_text != text:
+        _CONFIG_PATH.write_text(new_text)
+
 
 def _sessions_dataframe() -> pd.DataFrame:
     sessions = load_sessions()
@@ -110,11 +123,15 @@ def render_transcripts_table() -> None:
 
 @st.fragment(run_every="2s")
 def render_sessions_table() -> None:
+    if "sessions_df" not in st.session_state:
+        st.session_state.sessions_df = _sessions_dataframe()
+        st.session_state.sessions_refreshed_at = datetime.now()
+
     with st.container(horizontal=True, vertical_alignment="center"):
         st.toggle("Auto-refresh", value=True, key="auto_refresh")
         st.caption(f"Last refreshed: {st.session_state.sessions_refreshed_at:%H:%M:%S}")
 
-    if st.session_state.auto_refresh or "sessions_df" not in st.session_state:
+    if st.session_state.auto_refresh:
         st.session_state.sessions_df = _sessions_dataframe()
         st.session_state.sessions_refreshed_at = datetime.now()
 
@@ -137,6 +154,18 @@ def main() -> None:
             st.session_state.page = "sessions"
         if st.button("Projects", use_container_width=True):
             st.session_state.page = "projects"
+        st.divider()
+        dark_mode = st.toggle(
+            "Dark mode",
+            value=st_config.get_option("theme.base") == "dark",
+            key="dark_mode",
+        )
+
+    desired_theme = "dark" if dark_mode else "light"
+    if st_config.get_option("theme.base") != desired_theme:
+        st_config.set_option("theme.base", desired_theme)
+        _persist_theme(desired_theme)
+        st.rerun()
 
     if st.session_state.page == "sessions":
         st.header("Sessions")
