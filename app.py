@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -6,15 +7,9 @@ import streamlit as st
 from claude_sessions import load_sessions
 
 
-@st.fragment(run_every="2s")
-def render_sessions_table() -> None:
+def _sessions_dataframe() -> pd.DataFrame:
     sessions = load_sessions()
-
-    if not sessions:
-        st.write("No Claude sessions found.")
-        return
-
-    df = pd.DataFrame(
+    return pd.DataFrame(
         [
             {
                 "Name": s.name,
@@ -29,7 +24,23 @@ def render_sessions_table() -> None:
             for s in sessions
         ]
     )
-    st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+@st.fragment(run_every="2s")
+def render_sessions_table() -> None:
+    st.toggle("Auto-refresh", value=True, key="auto_refresh")
+
+    if st.session_state.auto_refresh or "sessions_df" not in st.session_state:
+        st.session_state.sessions_df = _sessions_dataframe()
+        st.session_state.sessions_refreshed_at = datetime.now()
+
+    st.caption(f"Last refreshed: {st.session_state.sessions_refreshed_at:%H:%M:%S}")
+
+    df = st.session_state.sessions_df
+    if df.empty:
+        st.write("No Claude sessions found.")
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 def main() -> None:

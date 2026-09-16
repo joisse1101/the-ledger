@@ -64,17 +64,47 @@ def _parse_session_file(path: Path) -> Optional[ClaudeSession]:
     )
 
 
+# path -> (mtime at last parse, parsed session)
+_cache: dict[Path, tuple[float, ClaudeSession]] = {}
+
+
 def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
-    """Read and parse every session file, newest-updated first."""
+    """Read and parse every session file, newest-updated first.
+
+    Files not changed since the last call are served from
+    an in-memory cache instead of being re-read and re-parsed.
+    """
     directory = directory or sessions_dir()
     if not directory.is_dir():
+        _cache.clear()
         return []
 
-    sessions = [
-        session
-        for path in directory.glob("*.json")
-        if (session := _parse_session_file(path)) is not None
-    ]
+    seen_paths: set[Path] = set()
+    sessions: list[ClaudeSession] = []
+
+    for path in directory.glob("*.json"):
+        seen_paths.add(path)
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+
+        cached = _cache.get(path)
+        if cached is not None and cached[0] == mtime:
+            sessions.append(cached[1])
+            continue
+
+        session = _parse_session_file(path)
+        if session is None:
+            _cache.pop(path, None)
+            continue
+
+        _cache[path] = (mtime, session)
+        sessions.append(session)
+
+    for stale_path in _cache.keys() - seen_paths:
+        del _cache[stale_path]
+
     sessions.sort(
         key=lambda s: s.updated_at or datetime.min,
         reverse=True,
