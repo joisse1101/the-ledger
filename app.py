@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from claude_projects import load_projects
 from claude_sessions import load_sessions
 
 
@@ -24,6 +25,38 @@ def _sessions_dataframe() -> pd.DataFrame:
             for s in sessions
         ]
     )
+
+
+def _projects_dataframe() -> pd.DataFrame:
+    projects = load_projects()
+    return pd.DataFrame(
+        [
+            {
+                "Name": p.name,
+                "Path": p.path,
+                "Trusted": p.trust_accepted,
+                "Last Session": p.last_session_id,
+                "Version": p.last_version,
+                "Last Cost ($)": p.last_cost,
+                "Last Started": p.last_start_time,
+                "Lines +/-": (
+                    f"+{p.lines_added}/-{p.lines_removed}"
+                    if p.lines_added is not None or p.lines_removed is not None
+                    else None
+                ),
+                "MCP Servers": ", ".join(p.mcp_servers) if p.mcp_servers else None,
+            }
+            for p in projects
+        ]
+    )
+
+
+def render_projects_table() -> None:
+    df = _projects_dataframe()
+    if df.empty:
+        st.write("No Claude projects found.")
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 @st.fragment(run_every="2s")
@@ -61,7 +94,7 @@ def main() -> None:
         render_sessions_table()
     else:
         st.header("Projects")
-        st.write("Projects page (placeholder).")
+        render_projects_table()
 
 
 if __name__ == "__main__":

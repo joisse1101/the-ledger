@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A Streamlit app, currently a minimal starting-point scaffold (single-page app with a sidebar name input).
+A Streamlit app for viewing your local Claude Code sessions and projects. Sidebar-navigated pages (Sessions, Projects); both are live.
 
 ## Setup & Run
 
@@ -21,6 +21,10 @@ There are no lint, test, or build commands configured yet.
 
 ## Architecture
 
-- `app.py` is the entire app (single-file Streamlit script, run top-to-bottom on every interaction).
+- `app.py` is the Streamlit entry point (run top-to-bottom on every interaction), with sidebar nav switching between pages via `st.session_state.page`.
+- `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json` (one file per Claude process; see a live example by reading any file in that directory). `load_sessions()` returns `ClaudeSession` dataclasses sorted by `updated_at` descending, with a module-level cache keyed by each file's mtime — unchanged files are served from cache instead of being re-read/re-parsed. Note: dead PIDs' files may linger, so entries aren't guaranteed to reflect live processes.
+- The Sessions page (`render_sessions_table` in `app.py`) is an `@st.fragment(run_every="2s")`, so it polls and redraws independently of the rest of the page. It has an "Auto-refresh" toggle (`st.session_state.auto_refresh`) — when off, the fragment still ticks on schedule but skips re-reading sessions and just redisplays the cached `st.session_state.sessions_df`.
+- `claude_projects.py` parses Claude Code's global config at `~/.claude.json`, specifically its top-level `projects` map (one entry per directory Claude Code has been run/trusted in). `load_projects()` returns `ClaudeProject` dataclasses sorted by `last_start_time` descending, with a module-level cache keyed by the config file's mtime. Each entry reflects only that project's *last* session (no historical/cumulative data): trust status, last session ID, CLI version, cost, start time, lines added/removed, and any project-scoped MCP servers.
+- The Projects page (`render_projects_table` in `app.py`) is a plain (non-fragment) render — it re-reads `~/.claude.json` on every app rerun, relying on `load_projects()`'s mtime cache to skip re-parsing when the file hasn't changed.
 - `.streamlit/config.toml` holds Streamlit config (theme, server settings). `.streamlit/secrets.toml`, if created, is gitignored — put secrets there, accessed via `st.secrets`.
-- `requirements.txt` currently lists `streamlit` and `pandas`.
+- `requirements.txt` currently lists `streamlit` and `pandas` (unpinned — `st.fragment(run_every=...)` requires Streamlit ≥1.37).
