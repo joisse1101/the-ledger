@@ -97,3 +97,27 @@ def load_projects(path: Optional[Path] = None) -> list[ClaudeProject]:
 
     _cache = (mtime, projects)
     return projects
+
+
+def delete_project(project_path: str, path: Optional[Path] = None) -> bool:
+    """Remove a project entry from ~/.claude.json.
+
+    Returns True if the entry was found and removed, False otherwise.
+    Invalidates the module-level cache so the next load_projects() call
+    re-reads the file.
+    """
+    global _cache
+
+    path = path or config_path()
+    if not path.is_file():
+        return False
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    projects_data = data.get("projects", {})
+    if project_path not in projects_data:
+        return False
+
+    del projects_data[project_path]
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    _cache = None
+    return True

@@ -8,6 +8,7 @@ run, including ones whose process has since exited.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -202,3 +203,22 @@ def load_transcripts(directory: Optional[Path] = None) -> list[ClaudeTranscript]
         reverse=True,
     )
     return transcripts
+
+
+def delete_project_transcripts(cwd: str, directory: Optional[Path] = None) -> int:
+    """Delete the on-disk transcript directory/directories for a given cwd.
+
+    Matches transcripts by their recorded `cwd` field rather than
+    re-deriving Claude Code's directory-name sanitization, so it stays
+    correct even if that scheme changes. Returns the number of
+    directories removed.
+    """
+    transcripts = load_transcripts(directory)
+    dirs = {t.path.parent for t in transcripts if t.cwd == cwd}
+
+    for d in dirs:
+        shutil.rmtree(d, ignore_errors=True)
+        for cached_path in [p for p in _cache if p.parent == d]:
+            del _cache[cached_path]
+
+    return len(dirs)

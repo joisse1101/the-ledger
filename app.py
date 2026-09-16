@@ -7,9 +7,9 @@ import pandas as pd
 import streamlit as st
 from streamlit import config as st_config
 
-from claude_projects import load_projects
+from claude_projects import delete_project, load_projects
 from claude_sessions import load_sessions
-from claude_transcripts import load_transcripts
+from claude_transcripts import delete_project_transcripts, load_transcripts
 
 _THEME_PREF_PATH = Path(__file__).parent / ".streamlit" / "theme_pref.json"
 
@@ -91,6 +91,16 @@ def _projects_dataframe() -> pd.DataFrame:
     )
 
 
+def _clear_project(project_path: str) -> None:
+    """Remove a project's ~/.claude.json entry and its on-disk transcripts."""
+    delete_project(project_path)
+    delete_project_transcripts(project_path)
+    st.session_state.projects_df = _projects_dataframe()
+    st.session_state.projects_refreshed_at = datetime.now()
+    st.session_state.pop("confirm_delete_project", None)
+    st.session_state.pop("projects_table", None)
+
+
 def render_projects_table() -> None:
     if "projects_df" not in st.session_state:
         st.session_state.projects_df = _projects_dataframe()
@@ -101,12 +111,45 @@ def render_projects_table() -> None:
             st.session_state.projects_df = _projects_dataframe()
             st.session_state.projects_refreshed_at = datetime.now()
         st.caption(f"Last refreshed: {st.session_state.projects_refreshed_at:%H:%M:%S}")
+        st.toggle("Select rows to delete", key="projects_delete_mode")
 
     df = st.session_state.projects_df
     if df.empty:
         st.write("No Claude projects found.")
-    else:
+        return
+
+    if not st.session_state.projects_delete_mode:
         st.dataframe(df, use_container_width=True, hide_index=True)
+        return
+
+    event = st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="projects_table",
+    )
+    selected_rows = event.selection.rows if event else []
+
+    if selected_rows:
+        selected_path = df.iloc[selected_rows[0]]["Path"]
+        if st.button(f"🗑️ Delete '{selected_path}'"):
+            st.session_state.confirm_delete_project = selected_path
+
+    confirm_path = st.session_state.get("confirm_delete_project")
+    if confirm_path:
+        st.warning(
+            f"Delete project '{confirm_path}' from ~/.claude.json and remove all "
+            "of its on-disk session transcripts? This cannot be undone."
+        )
+        with st.container(horizontal=True):
+            if st.button("Confirm delete", type="primary"):
+                _clear_project(confirm_path)
+                st.rerun()
+            if st.button("Cancel"):
+                st.session_state.pop("confirm_delete_project", None)
+                st.rerun()
 
 
 def render_transcripts_table() -> None:
