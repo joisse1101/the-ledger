@@ -6,7 +6,7 @@ import streamlit as st
 
 from claude_projects import load_projects
 from claude_sessions import load_sessions
-
+from claude_transcripts import load_transcripts
 
 def _sessions_dataframe() -> pd.DataFrame:
     sessions = load_sessions()
@@ -23,6 +23,25 @@ def _sessions_dataframe() -> pd.DataFrame:
                 "Session ID": s.session_id,
             }
             for s in sessions
+        ]
+    )
+
+
+def _transcripts_dataframe() -> pd.DataFrame:
+    transcripts = load_transcripts()
+    return pd.DataFrame(
+        [
+            {
+                "Project": t.project,
+                "Session ID": t.session_id,
+                "Started": t.started_at,
+                "Last Updated": t.updated_at,
+                "Messages": t.message_count,
+                "Est. Cost ($)": t.cost,
+                "Version": t.version,
+                "Git Branch": t.git_branch,
+            }
+            for t in transcripts
         ]
     )
 
@@ -69,6 +88,26 @@ def render_projects_table() -> None:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 
+def render_transcripts_table() -> None:
+    if "transcripts_df" not in st.session_state:
+        st.session_state.transcripts_df = _transcripts_dataframe()
+        st.session_state.transcripts_refreshed_at = datetime.now()
+
+    with st.container(horizontal=True, vertical_alignment="center"):
+        if st.button("⟳", key="transcripts_refresh"):
+            st.session_state.transcripts_df = _transcripts_dataframe()
+            st.session_state.transcripts_refreshed_at = datetime.now()
+        st.caption(
+            f"Last refreshed: {st.session_state.transcripts_refreshed_at:%H:%M:%S}"
+        )
+
+    df = st.session_state.transcripts_df
+    if df.empty:
+        st.write("No Claude session transcripts found.")
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+
 @st.fragment(run_every="2s")
 def render_sessions_table() -> None:
     with st.container(horizontal=True, vertical_alignment="center"):
@@ -101,7 +140,12 @@ def main() -> None:
 
     if st.session_state.page == "sessions":
         st.header("Sessions")
+        st.subheader("Live")
         render_sessions_table()
+
+        st.subheader("All")
+        render_transcripts_table()
+
     else:
         st.header("Projects")
         render_projects_table()
