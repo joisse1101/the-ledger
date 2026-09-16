@@ -15,10 +15,20 @@ _CONFIG_PATH = Path(__file__).parent / ".streamlit" / "config.toml"
 
 
 def _persist_theme(theme: str) -> None:
-    text = _CONFIG_PATH.read_text()
-    new_text = re.sub(r'(?m)^base\s*=\s*".*"$', f'base = "{theme}"', text)
-    if new_text != text:
-        _CONFIG_PATH.write_text(new_text)
+    def _replace_base(match: re.Match) -> str:
+        header, body = match.group(1), match.group(2)
+        new_body = re.sub(r'(?m)^base\s*=\s*".*"$', f'base = "{theme}"', body, count=1)
+        return f"{header}{new_body}"
+
+    try:
+        text = _CONFIG_PATH.read_text()
+        new_text = re.sub(
+            r'(?m)(^\[theme\]\s*\n)([\s\S]*?)(?=^\[|\Z)', _replace_base, text, count=1
+        )
+        if new_text != text:
+            _CONFIG_PATH.write_text(new_text)
+    except OSError:
+        pass
 
 
 def _sessions_dataframe() -> pd.DataFrame:
@@ -123,7 +133,8 @@ def render_transcripts_table() -> None:
 
 @st.fragment(run_every="2s")
 def render_sessions_table() -> None:
-    if "sessions_df" not in st.session_state:
+    first_load = "sessions_df" not in st.session_state
+    if first_load:
         st.session_state.sessions_df = _sessions_dataframe()
         st.session_state.sessions_refreshed_at = datetime.now()
 
@@ -131,7 +142,7 @@ def render_sessions_table() -> None:
         st.toggle("Auto-refresh", value=True, key="auto_refresh")
         st.caption(f"Last refreshed: {st.session_state.sessions_refreshed_at:%H:%M:%S}")
 
-    if st.session_state.auto_refresh:
+    if not first_load and st.session_state.auto_refresh:
         st.session_state.sessions_df = _sessions_dataframe()
         st.session_state.sessions_refreshed_at = datetime.now()
 
