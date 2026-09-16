@@ -1,4 +1,4 @@
-import re
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -11,22 +11,20 @@ from claude_projects import load_projects
 from claude_sessions import load_sessions
 from claude_transcripts import load_transcripts
 
-_CONFIG_PATH = Path(__file__).parent / ".streamlit" / "config.toml"
+_THEME_PREF_PATH = Path(__file__).parent / ".streamlit" / "theme_pref.json"
+
+
+def _load_theme_pref() -> str:
+    try:
+        data = json.loads(_THEME_PREF_PATH.read_text())
+        return "dark" if data.get("dark") else "light"
+    except (OSError, ValueError):
+        return st_config.get_option("theme.base")
 
 
 def _persist_theme(theme: str) -> None:
-    def _replace_base(match: re.Match) -> str:
-        header, body = match.group(1), match.group(2)
-        new_body = re.sub(r'(?m)^base\s*=\s*".*"$', f'base = "{theme}"', body, count=1)
-        return f"{header}{new_body}"
-
     try:
-        text = _CONFIG_PATH.read_text()
-        new_text = re.sub(
-            r'(?m)(^\[theme\]\s*\n)([\s\S]*?)(?=^\[|\Z)', _replace_base, text, count=1
-        )
-        if new_text != text:
-            _CONFIG_PATH.write_text(new_text)
+        _THEME_PREF_PATH.write_text(json.dumps({"dark": theme == "dark"}))
     except OSError:
         pass
 
@@ -168,7 +166,7 @@ def main() -> None:
         st.divider()
         dark_mode = st.toggle(
             "Dark mode",
-            value=st_config.get_option("theme.base") == "dark",
+            value=_load_theme_pref() == "dark",
             key="dark_mode",
         )
 
