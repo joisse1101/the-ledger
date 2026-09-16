@@ -6,6 +6,32 @@ import streamlit as st
 from claude_sessions import load_sessions
 
 
+@st.fragment(run_every="2s")
+def render_sessions_table() -> None:
+    sessions = load_sessions()
+
+    if not sessions:
+        st.write("No Claude sessions found.")
+        return
+
+    df = pd.DataFrame(
+        [
+            {
+                "Name": s.name,
+                "Project": s.project,
+                "Status": s.status,
+                "Kind": s.kind,
+                "PID": s.pid,
+                "Started": s.started_at,
+                "Last Updated": s.updated_at,
+                "Session ID": s.session_id,
+            }
+            for s in sessions
+        ]
+    )
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+
 def main() -> None:
     st.set_page_config(page_title="Claude Manager", page_icon="🤖", layout="wide")
 
@@ -21,27 +47,7 @@ def main() -> None:
 
     if st.session_state.page == "sessions":
         st.header("Sessions")
-        sessions = load_sessions()
-
-        if not sessions:
-            st.write("No Claude sessions found.")
-        else:
-            df = pd.DataFrame(
-                [
-                    {
-                        "Name": s.name,
-                        "Project": s.project,
-                        "Status": s.status,
-                        "Kind": s.kind,
-                        "PID": s.pid,
-                        "Started": s.started_at,
-                        "Last Updated": s.updated_at,
-                        "Session ID": s.session_id,
-                    }
-                    for s in sessions
-                ]
-            )
-            st.dataframe(df, use_container_width=True, hide_index=True)
+        render_sessions_table()
     else:
         st.header("Projects")
         st.write("Projects page (placeholder).")
