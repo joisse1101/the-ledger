@@ -52,7 +52,17 @@ def _projects_dataframe() -> pd.DataFrame:
 
 
 def render_projects_table() -> None:
-    df = _projects_dataframe()
+    if "projects_df" not in st.session_state:
+        st.session_state.projects_df = _projects_dataframe()
+        st.session_state.projects_refreshed_at = datetime.now()
+
+    with st.container(horizontal=True, vertical_alignment="center"):
+        if st.button("⟳"):
+            st.session_state.projects_df = _projects_dataframe()
+            st.session_state.projects_refreshed_at = datetime.now()
+        st.caption(f"Last refreshed: {st.session_state.projects_refreshed_at:%H:%M:%S}")
+
+    df = st.session_state.projects_df
     if df.empty:
         st.write("No Claude projects found.")
     else:
@@ -61,13 +71,13 @@ def render_projects_table() -> None:
 
 @st.fragment(run_every="2s")
 def render_sessions_table() -> None:
-    st.toggle("Auto-refresh", value=True, key="auto_refresh")
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.toggle("Auto-refresh", value=True, key="auto_refresh")
+        st.caption(f"Last refreshed: {st.session_state.sessions_refreshed_at:%H:%M:%S}")
 
     if st.session_state.auto_refresh or "sessions_df" not in st.session_state:
         st.session_state.sessions_df = _sessions_dataframe()
         st.session_state.sessions_refreshed_at = datetime.now()
-
-    st.caption(f"Last refreshed: {st.session_state.sessions_refreshed_at:%H:%M:%S}")
 
     df = st.session_state.sessions_df
     if df.empty:
