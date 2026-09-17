@@ -137,19 +137,8 @@ def _render_summary_stats(transcripts: Sequence[ClaudeTranscript]) -> None:
         st.metric("Est. total cost", f"${total_cost:,.2f}")
 
 
-def render_overview_page() -> None:
-    st.subheader("Sessions by project")
-
-    transcripts = load_transcripts()
-    if not transcripts:
-        st.write("No Claude session transcripts found.")
-        return
-
-    df = _project_session_counts_dataframe(transcripts)
-    chart_col, stats_col = st.columns([1, 1])
-
-    with stats_col:
-        _render_summary_stats(transcripts)
+def _render_project_sessions_chart(df: pd.DataFrame) -> None:
+    st.subheader("Sessions by Project")
 
     is_dark = st_config.get_option("theme.base") == "dark"
     hues = _CATEGORICAL_DARK if is_dark else _CATEGORICAL_LIGHT
@@ -222,5 +211,21 @@ def render_overview_page() -> None:
             },
         ],
     }
+
+    st.vega_lite_chart(spec, width="stretch")
+
+
+def render_overview_page() -> None:
+    transcripts = load_transcripts()
+    if not transcripts:
+        st.write("No Claude session transcripts found.")
+        return
+
+    df = _project_session_counts_dataframe(transcripts)
+    chart_col, stats_col = st.columns([1, 1])
+
+    with stats_col:
+        _render_summary_stats(transcripts)
+
     with chart_col:
-        st.vega_lite_chart(spec, width="stretch")
+        _render_project_sessions_chart(df)
