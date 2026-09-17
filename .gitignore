@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 .streamlit/theme_pref.json
+.streamlit/ledger.db*
 .env
 run_log.txt

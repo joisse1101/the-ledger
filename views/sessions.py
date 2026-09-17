@@ -68,9 +68,6 @@ def render_sessions_table() -> None:
 
 
 def render_transcripts_table() -> None:
-    if "transcripts_df" not in st.session_state:
-        st.session_state.transcripts_df = _transcripts_dataframe()
-        st.session_state.transcripts_refreshed_at = datetime.now()
     # st.dataframe's selection can only be reset via session_state before the
     # widget with this key is (re-)instantiated below, not after (Streamlit
     # raises StreamlitWidgetAlreadyInstantiatedError) - hence the flag/rerun.
@@ -79,16 +76,9 @@ def render_transcripts_table() -> None:
             "selection": {"rows": [], "columns": []}
         }
 
-    with st.container(horizontal=True, vertical_alignment="center"):
-        if st.button("⟳", key="transcripts_refresh"):
-            st.session_state.transcripts_df = _transcripts_dataframe()
-            st.session_state.transcripts_refreshed_at = datetime.now()
-        st.caption(
-            f"Last refreshed: {st.session_state.transcripts_refreshed_at:%H:%M:%S}"
-        )
-        st.toggle("Edit mode", key="transcripts_delete_mode")
+    st.toggle("Edit mode", key="transcripts_delete_mode")
 
-    df = st.session_state.transcripts_df
+    df = _transcripts_dataframe()
     if df.empty:
         st.write("No Claude session transcripts found.")
         return
@@ -133,8 +123,6 @@ def render_transcripts_table() -> None:
             if st.button("Confirm delete", type="primary", key="confirm_delete_transcripts_btn"):
                 for session_id in confirm_ids:
                     delete_transcript(session_id)
-                st.session_state.transcripts_df = _transcripts_dataframe()
-                st.session_state.transcripts_refreshed_at = datetime.now()
                 st.session_state.pop("confirm_delete_transcripts", None)
                 st.session_state.clear_transcripts_table_selection = True
                 st.rerun()

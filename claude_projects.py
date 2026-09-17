@@ -1,17 +1,20 @@
-"""Parser for Claude Code's global config (~/.claude.json), which tracks
-every project directory Claude Code has been trusted/run in."""
+"""Claude Code project data.
+
+Reads from the local SQLite snapshot (see claude_db.py) rather than parsing
+~/.claude.json directly - claude_db.refresh() does that parsing; this module
+just queries the result and builds ClaudeProject dataclasses from it.
+"""
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-
-def config_path() -> Path:
-    return Path.home() / ".claude.json"
+import claude_db
 
 
 @dataclass
@@ -25,90 +28,41 @@ class ClaudeProject:
     last_duration_ms: Optional[int]
     lines_added: Optional[int]
     lines_removed: Optional[int]
-    mcp_servers: list[str] = field(default_factory=list)
-    raw: dict[str, Any] = field(repr=False, default_factory=dict)
+    mcp_servers: list[str]
 
     @property
     def name(self) -> str:
         return Path(self.path).name
 
 
-def _parse_timestamp(value: Any) -> Optional[datetime]:
-    if not isinstance(value, (int, float)):
-        return None
-    return datetime.fromtimestamp(value / 1000)
-
-
-def _parse_project(path: str, data: dict[str, Any]) -> ClaudeProject:
+def _row_to_project(row: sqlite3.Row) -> ClaudeProject:
     return ClaudeProject(
-        path=path,
-        trust_accepted=bool(data.get("hasTrustDialogAccepted", False)),
-        last_session_id=data.get("lastSessionId"),
-        last_version=data.get("lastVersionBase", ""),
-        last_cost=data.get("lastCost"),
-        last_start_time=_parse_timestamp(data.get("lastStartTime")),
-        last_duration_ms=data.get("lastDuration"),
-        lines_added=data.get("lastLinesAdded"),
-        lines_removed=data.get("lastLinesRemoved"),
-        mcp_servers=sorted(data.get("mcpServers", {}).keys()),
-        raw=data,
+        path=row["path"],
+        trust_accepted=bool(row["trust_accepted"]),
+        last_session_id=row["last_session_id"],
+        last_version=row["last_version"],
+        last_cost=row["last_cost"],
+        last_start_time=(
+            datetime.fromisoformat(row["last_start_time"])
+            if row["last_start_time"]
+            else None
+        ),
+        last_duration_ms=row["last_duration_ms"],
+        lines_added=row["lines_added"],
+        lines_removed=row["lines_removed"],
+        mcp_servers=json.loads(row["mcp_servers"]),
     )
 
 
-# mtime at last parse, parsed projects
-_cache: tuple[float, list[ClaudeProject]] | None = None
+def load_projects() -> list[ClaudeProject]:
+    """Every project entry from the SQLite snapshot, newest-started first."""
+    return [_row_to_project(r) for r in claude_db.fetch_projects()]
 
 
-def load_projects(path: Optional[Path] = None) -> list[ClaudeProject]:
-    """Read every project entry from ~/.claude.json, newest-started first.
-
-    Cached by the config file's mtime — unchanged files are served from
-    cache instead of being re-read/re-parsed.
-    """
-    global _cache
-
-    path = path or config_path()
-    if not path.is_file():
-        _cache = None
-        return []
-
-    try:
-        mtime = path.stat().st_mtime
-    except OSError:
-        return []
-
-    if _cache is not None and _cache[0] == mtime:
-        return _cache[1]
-
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    projects_data = data.get("projects", {})
-    projects = [
-        _parse_project(project_path, project_data)
-        for project_path, project_data in projects_data.items()
-    ]
-    projects.sort(
-        key=lambda p: p.last_start_time or datetime.min,
-        reverse=True,
-    )
-
-    _cache = (mtime, projects)
-    return projects
-
-
-def delete_project(project_path: str, path: Optional[Path] = None) -> bool:
-    """Remove a project entry from ~/.claude.json.
-
-    Returns True if the entry was found and removed, False otherwise.
-    Invalidates the module-level cache so the next load_projects() call
-    re-reads the file.
-    """
-    global _cache
-
-    path = path or config_path()
+def delete_project(project_path: str) -> bool:
+    """Remove a project entry from ~/.claude.json and its row from the
+    SQLite snapshot. Returns True if the entry was found and removed."""
+    path = claude_db.config_path()
     if not path.is_file():
         return False
 
@@ -119,5 +73,5 @@ def delete_project(project_path: str, path: Optional[Path] = None) -> bool:
 
     del projects_data[project_path]
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    _cache = None
+    claude_db.delete_project_row(project_path)
     return True

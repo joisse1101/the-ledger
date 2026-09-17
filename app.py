@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit as st
 from streamlit import config as st_config
 
+import claude_db
 from views.overview import render_overview_page
 from views.projects import render_projects_table
 from views.sessions import render_sessions_table, render_transcripts_table
@@ -59,6 +60,12 @@ def main() -> None:
     if "page" not in st.session_state:
         st.session_state.page = "sessions"
 
+    # Seed the shared SQLite snapshot on the very first run against a fresh
+    # .streamlit/ledger.db, so the nav bar and pages aren't empty before
+    # anyone has clicked refresh yet.
+    if claude_db.refreshed_at() is None:
+        claude_db.refresh()
+
     with st.container(horizontal=True, vertical_alignment="center"):
         st.markdown("**The Ledger**")
         # Set page via on_click (not the button's return value) so the state
@@ -91,6 +98,26 @@ def main() -> None:
             value=_load_theme_pref() == "dark",
             key="dark_mode",
         )
+
+        # The help tooltip is set from refreshed_at() *before* the button is
+        # drawn, so a click can't update its own tooltip text in the same
+        # pass - st.rerun() re-executes this block immediately after
+        # refresh() so the tooltip picks up the new timestamp right away,
+        # instead of lagging one click behind. The key is timestamp-based
+        # (not a fixed string) so that rerun also remounts the button as a
+        # fresh DOM node - otherwise React patches the existing node in
+        # place, and since the mouse never actually left it, the open
+        # tooltip's hover state has no mouseleave to reset it and gets
+        # stuck showing even after the cursor moves away.
+        if st.button("⟳", key=f"refresh_data", help="Refresh data from Claude files"):
+            claude_db.refresh()
+            st.rerun()
+        refreshed = claude_db.refreshed_at()
+        last_refreshed = (
+            f"Last refreshed: {refreshed:%H:%M:%S}" if refreshed else "Never refreshed"
+        )
+        st.caption(last_refreshed, width="content")
+
     st.divider()
 
     desired_theme = "dark" if dark_mode else "light"

@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pandas as pd
 import streamlit as st
 
@@ -35,30 +33,20 @@ def _clear_project(project_path: str) -> None:
     """Remove a project's ~/.claude.json entry and its on-disk transcripts."""
     delete_project(project_path)
     delete_project_transcripts(project_path)
-    st.session_state.projects_df = _projects_dataframe()
-    st.session_state.projects_refreshed_at = datetime.now()
     st.session_state.pop("confirm_delete_project", None)
     st.session_state.clear_projects_table_selection = True
 
 
 def render_projects_table() -> None:
-    if "projects_df" not in st.session_state:
-        st.session_state.projects_df = _projects_dataframe()
-        st.session_state.projects_refreshed_at = datetime.now()
     # st.dataframe's selection can only be reset via session_state before the
     # widget with this key is (re-)instantiated below, not after (Streamlit
     # raises StreamlitWidgetAlreadyInstantiatedError) - hence the flag/rerun.
     if st.session_state.pop("clear_projects_table_selection", False):
         st.session_state["projects_table"] = {"selection": {"rows": [], "columns": []}}
 
-    with st.container(horizontal=True, vertical_alignment="center"):
-        if st.button("⟳"):
-            st.session_state.projects_df = _projects_dataframe()
-            st.session_state.projects_refreshed_at = datetime.now()
-        st.caption(f"Last refreshed: {st.session_state.projects_refreshed_at:%H:%M:%S}")
-        st.toggle("Edit mode", key="projects_delete_mode")
+    st.toggle("Edit mode", key="projects_delete_mode")
 
-    df = st.session_state.projects_df
+    df = _projects_dataframe()
     if df.empty:
         st.write("No Claude projects found.")
         return
