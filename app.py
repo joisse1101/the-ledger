@@ -124,12 +124,12 @@ def render_projects_table() -> None:
         return
 
     if not st.session_state.projects_delete_mode:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
         return
 
     event = st.dataframe(
         df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
@@ -184,12 +184,12 @@ def render_transcripts_table() -> None:
         return
 
     if not st.session_state.transcripts_delete_mode:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
         return
 
     event = st.dataframe(
         df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="multi-row",
@@ -252,7 +252,7 @@ def render_sessions_table() -> None:
     if df.empty:
         st.write("No Claude sessions found.")
     else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
 
 _COMPACT_LAYOUT_CSS = """
@@ -282,9 +282,9 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Navigation")
-        if st.button("Sessions", use_container_width=True):
+        if st.button("Sessions", width="stretch"):
             st.session_state.page = "sessions"
-        if st.button("Projects", use_container_width=True):
+        if st.button("Projects", width="stretch"):
             st.session_state.page = "projects"
         st.divider()
         dark_mode = st.toggle(
