@@ -116,7 +116,7 @@ def render_projects_table() -> None:
             st.session_state.projects_df = _projects_dataframe()
             st.session_state.projects_refreshed_at = datetime.now()
         st.caption(f"Last refreshed: {st.session_state.projects_refreshed_at:%H:%M:%S}")
-        st.toggle("Select rows to delete", key="projects_delete_mode")
+        st.toggle("Edit mode", key="projects_delete_mode")
 
     df = st.session_state.projects_df
     if df.empty:
@@ -176,7 +176,7 @@ def render_transcripts_table() -> None:
         st.caption(
             f"Last refreshed: {st.session_state.transcripts_refreshed_at:%H:%M:%S}"
         )
-        st.toggle("Select rows to delete", key="transcripts_delete_mode")
+        st.toggle("Edit mode", key="transcripts_delete_mode")
 
     df = st.session_state.transcripts_df
     if df.empty:
