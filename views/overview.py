@@ -1,8 +1,10 @@
+from typing import Sequence
+
 import pandas as pd
 import streamlit as st
 from streamlit import config as st_config
 
-from claude_transcripts import load_transcripts
+from claude_transcripts import ClaudeTranscript, load_transcripts
 
 # Fixed-order categorical palette (validated for adjacent-pair CVD safety);
 # see the dataviz skill's references/palette.md. Slot order must never be
@@ -31,10 +33,12 @@ _MUTED_INK = "#898781"  # "Other" bucket - same in both modes
 _MAX_PROJECT_SLICES = 7  # beyond this, fold the tail into "Other"
 
 
-def _project_session_counts_dataframe(top_n: int = _MAX_PROJECT_SLICES) -> pd.DataFrame:
+def _project_session_counts_dataframe(
+    transcripts: Sequence[ClaudeTranscript], top_n: int = _MAX_PROJECT_SLICES
+) -> pd.DataFrame:
     """Session counts per project, from every on-disk transcript ever run."""
     counts: dict[str, int] = {}
-    for t in load_transcripts():
+    for t in transcripts:
         counts[t.project] = counts.get(t.project, 0) + 1
     if not counts:
         return pd.DataFrame(columns=["Project", "Sessions", "Percent"])
@@ -51,12 +55,101 @@ def _project_session_counts_dataframe(top_n: int = _MAX_PROJECT_SLICES) -> pd.Da
     return pd.DataFrame(rows)
 
 
+def _format_duration(seconds: float) -> str:
+    if seconds <= 0:
+        return "—"
+    minutes, sec = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {sec}s"
+    return f"{sec}s"
+
+
+def _render_summary_stats(transcripts: Sequence[ClaudeTranscript]) -> None:
+    num_projects = len({t.project for t in transcripts})
+    num_sessions = len(transcripts)
+    total_messages = sum(t.message_count for t in transcripts)
+
+    durations = [
+        ((t.updated_at - t.started_at).total_seconds(), t)
+        for t in transcripts
+        if t.started_at and t.updated_at
+    ]
+
+    costs = [(t.cost, t) for t in transcripts]
+
+    total = sum(d for d, _ in durations)
+    avg_seconds = total / len(durations) if durations else 0
+    longest = max(durations, key=lambda d: d[0]) if durations else None
+    shortest = min(durations, key=lambda d: d[0]) if durations else None
+
+    total_cost = sum(c for c, _ in costs)
+    most_expensive = max(costs, key=lambda c: c[0])[1] if costs else None
+    avg_cost = total_cost / len(costs) if costs else 0
+    cheapest = min(costs, key=lambda c: c[0])[1] if costs else None
+
+    def _session_help(entry: tuple[float, ClaudeTranscript] | None) -> str | None:
+        if entry is None:
+            return None
+        _, t = entry
+        # st.metric's help text renders as markdown - a bare "\n" is collapsed,
+        # so a trailing two-space "hard break" is needed for an actual line break.
+        return f"{t.project}  \n{t.session_id}"
+
+    col_one, col_two, col_three = st.columns(3)
+    with col_one:
+        st.metric("Projects", num_projects)
+        st.metric("Sessions", num_sessions)
+        st.metric("Messages", f"{total_messages:,}")
+        st.metric(
+            "Avg. messages per session",
+            f"{total_messages / num_sessions:.1f}" if num_sessions else "—",
+        )
+    with col_two:
+        st.metric("Avg. session", _format_duration(avg_seconds))
+        st.metric(
+            "Longest session",
+            _format_duration(longest[0]) if longest else _format_duration(0),
+            help=_session_help(longest),
+        )
+        st.metric(
+            "Shortest session",
+            _format_duration(shortest[0]) if shortest else _format_duration(0),
+            help=_session_help(shortest),
+        )
+        st.metric("Total", _format_duration(total))
+    with col_three:
+        st.metric("Avg. session cost", f"${avg_cost:,.2f}")
+        st.metric(
+            "Most expensive session",
+            f"${most_expensive.cost:,.2f}" if most_expensive else "$0.00",
+            help=_session_help(
+                (most_expensive.cost, most_expensive) if most_expensive else None
+            ),
+        )
+        st.metric(
+            "Cheapest session",
+            f"${cheapest.cost:,.2f}" if cheapest else "$0.00",
+            help=_session_help((cheapest.cost, cheapest) if cheapest else None),
+        )
+        st.metric("Est. total cost", f"${total_cost:,.2f}")
+
+
 def render_overview_page() -> None:
     st.subheader("Sessions by project")
-    df = _project_session_counts_dataframe()
-    if df.empty:
+
+    transcripts = load_transcripts()
+    if not transcripts:
         st.write("No Claude session transcripts found.")
         return
+
+    df = _project_session_counts_dataframe(transcripts)
+    chart_col, stats_col = st.columns([1, 1])
+
+    with stats_col:
+        _render_summary_stats(transcripts)
 
     is_dark = st_config.get_option("theme.base") == "dark"
     hues = _CATEGORICAL_DARK if is_dark else _CATEGORICAL_LIGHT
@@ -129,4 +222,5 @@ def render_overview_page() -> None:
             },
         ],
     }
-    st.vega_lite_chart(spec, width="stretch")
+    with chart_col:
+        st.vega_lite_chart(spec, width="stretch")
