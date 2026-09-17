@@ -98,13 +98,18 @@ def _clear_project(project_path: str) -> None:
     st.session_state.projects_df = _projects_dataframe()
     st.session_state.projects_refreshed_at = datetime.now()
     st.session_state.pop("confirm_delete_project", None)
-    st.session_state.pop("projects_table", None)
+    st.session_state.clear_projects_table_selection = True
 
 
 def render_projects_table() -> None:
     if "projects_df" not in st.session_state:
         st.session_state.projects_df = _projects_dataframe()
         st.session_state.projects_refreshed_at = datetime.now()
+    # st.dataframe's selection can only be reset via session_state before the
+    # widget with this key is (re-)instantiated below, not after (Streamlit
+    # raises StreamlitWidgetAlreadyInstantiatedError) - hence the flag/rerun.
+    if st.session_state.pop("clear_projects_table_selection", False):
+        st.session_state["projects_table"] = {"selection": {"rows": [], "columns": []}}
 
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button("⟳"):
@@ -156,6 +161,13 @@ def render_transcripts_table() -> None:
     if "transcripts_df" not in st.session_state:
         st.session_state.transcripts_df = _transcripts_dataframe()
         st.session_state.transcripts_refreshed_at = datetime.now()
+    # st.dataframe's selection can only be reset via session_state before the
+    # widget with this key is (re-)instantiated below, not after (Streamlit
+    # raises StreamlitWidgetAlreadyInstantiatedError) - hence the flag/rerun.
+    if st.session_state.pop("clear_transcripts_table_selection", False):
+        st.session_state["transcripts_table"] = {
+            "selection": {"rows": [], "columns": []}
+        }
 
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button("⟳", key="transcripts_refresh"):
@@ -214,7 +226,7 @@ def render_transcripts_table() -> None:
                 st.session_state.transcripts_df = _transcripts_dataframe()
                 st.session_state.transcripts_refreshed_at = datetime.now()
                 st.session_state.pop("confirm_delete_transcripts", None)
-                st.session_state.pop("transcripts_table", None)
+                st.session_state.clear_transcripts_table_selection = True
                 st.rerun()
             if st.button("Cancel", key="cancel_delete_transcripts_btn"):
                 st.session_state.pop("confirm_delete_transcripts", None)
