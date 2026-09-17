@@ -276,6 +276,10 @@ _COMPACT_LAYOUT_CSS = """
 """
 
 
+def _set_page(page: str) -> None:
+    st.session_state.page = page
+
+
 def main() -> None:
     st.set_page_config(page_title="The Ledger", page_icon="🤖", layout="wide")
     st.markdown(_COMPACT_LAYOUT_CSS, unsafe_allow_html=True)
@@ -285,16 +289,22 @@ def main() -> None:
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.markdown("**The Ledger**")
-        if st.button(
+        # Set page via on_click (not the button's return value) so the state
+        # update happens before this rerun renders the buttons - otherwise
+        # the type=primary/secondary highlight is computed from the stale
+        # pre-click page and lags one click behind.
+        st.button(
             "Sessions",
             type="primary" if st.session_state.page == "sessions" else "secondary",
-        ):
-            st.session_state.page = "sessions"
-        if st.button(
+            on_click=_set_page,
+            args=("sessions",),
+        )
+        st.button(
             "Projects",
             type="primary" if st.session_state.page == "projects" else "secondary",
-        ):
-            st.session_state.page = "projects"
+            on_click=_set_page,
+            args=("projects",),
+        )
 
         st.caption("")
 
