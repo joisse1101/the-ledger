@@ -3,3 +3,6 @@ base = "dark"
 
 [server]
 runOnSave = true
+
+[client]
+toolbarMode = "minimal"

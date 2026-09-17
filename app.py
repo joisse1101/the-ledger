@@ -255,8 +255,27 @@ def render_sessions_table() -> None:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 
+_COMPACT_LAYOUT_CSS = """
+<style>
+[data-testid="stHeader"] {
+    height: 0rem;
+}
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+[data-testid="stSidebar"] .block-container {
+    padding-top: 1rem;
+}
+</style>
+"""
+
+
 def main() -> None:
     st.set_page_config(page_title="Claude Manager", page_icon="🤖", layout="wide")
+    st.markdown(_COMPACT_LAYOUT_CSS, unsafe_allow_html=True)
 
     if "page" not in st.session_state:
         st.session_state.page = "sessions"
