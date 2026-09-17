@@ -72,13 +72,13 @@ def main() -> None:
             args=("overview",),
         )
         st.button(
-            "Sessions",
+            "Manage Sessions",
             type="primary" if st.session_state.page == "sessions" else "secondary",
             on_click=_set_page,
             args=("sessions",),
         )
         st.button(
-            "Projects",
+            "Manage Projects",
             type="primary" if st.session_state.page == "projects" else "secondary",
             on_click=_set_page,
             args=("projects",),
