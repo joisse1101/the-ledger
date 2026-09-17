@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -8,13 +8,19 @@ from streamlit import config as st_config
 from claude_transcripts import ClaudeTranscript, load_transcripts
 
 # Time-range filter options for the summary stats/chart, in display order.
-# "All time" (None) skips filtering entirely.
-_TIME_RANGES: dict[str, Optional[timedelta]] = {
+# "All time" (None) skips filtering entirely. Values are an inclusive
+# (oldest, newest) pair of "days ago" from today (local time), e.g. "Past
+# week" = (6, 0) meaning today and the 6 preceding local dates. Most ranges
+# run up to today (newest=0), but "Yesterday" is a single day that excludes
+# today (oldest=newest=1). See _filter_transcripts_by_range.
+_TIME_RANGES: dict[str, Optional[tuple[int, int]]] = {
     "All time": None,
-    "Past week": timedelta(days=7),
-    "Past month": timedelta(days=30),
-    "Past quarter": timedelta(days=90),
-    "Past year": timedelta(days=365),
+    "Today": (0, 0),
+    "Yesterday": (1, 1),
+    "Past week": (6, 0),
+    "Past month": (29, 0),
+    "Past quarter": (89, 0),
+    "Past year": (364, 0),
 }
 
 # Fixed-order categorical palette (validated for adjacent-pair CVD safety);
@@ -52,15 +58,26 @@ def _filter_transcripts_by_range(
     A session is placed by its start time (falling back to its last-updated
     time for the rare transcript with no parsed start), not its update time,
     so a still-running session is bucketed by when it began.
+
+    Ranges are aligned to *local calendar days*, not a rolling N*24h window:
+    "Today" is every session started on today's local date regardless of the
+    current time of day, "Past week" is today plus the 6 preceding local
+    dates (7 calendar days inclusive), and so on - not "the last 168 hours".
     """
-    delta = _TIME_RANGES.get(range_label)
-    if delta is None:
+    bounds = _TIME_RANGES.get(range_label)
+    if bounds is None:
         return transcripts
-    cutoff = datetime.now(timezone.utc) - delta
+    oldest_days_ago, newest_days_ago = bounds
+    today = datetime.now().astimezone().date()
+    start_date = today - timedelta(days=oldest_days_ago)
+    end_date = today - timedelta(days=newest_days_ago)
     result = []
     for t in transcripts:
         anchor = t.started_at or t.updated_at
-        if anchor is not None and anchor >= cutoff:
+        if anchor is None:
+            continue
+        anchor_date = anchor.astimezone().date()
+        if start_date <= anchor_date <= end_date:
             result.append(t)
     return result
 
