@@ -8,6 +8,13 @@ have to go digging.
 
 ## What you can do with it
 
+**Get the big picture.** The Overview page has a donut chart breaking down every
+session you've ever run by project, plus a panel of headline numbers next to it —
+total projects, sessions, and messages, how long your sessions tend to run (average,
+longest, shortest), and what they've cost (average, most expensive, cheapest, total).
+Hover the longest/shortest/cheapest/most-expensive figures to see which project and
+session they came from.
+
 **See what's running right now.** The Sessions page has a "Live" table that shows every
 Claude Code process currently running on your machine — which project it's in, what
 it's doing, when it last updated. It refreshes itself every couple of seconds, so you
