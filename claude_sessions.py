@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from claude_transcripts import load_transcripts
+
 
 def sessions_dir() -> Path:
     return Path.home() / ".claude" / "sessions"
@@ -27,10 +29,8 @@ class ClaudeSession:
     updated_at: Optional[datetime]
     status_updated_at: Optional[datetime]
     raw: dict[str, Any] = field(repr=False)
-
-    @property
-    def project(self) -> str:
-        return Path(self.cwd).name
+    # Set in load_sessions() from the transcripts table, not just this field.
+    project: str = ""
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -61,6 +61,7 @@ def _parse_session_file(path: Path) -> Optional[ClaudeSession]:
         updated_at=_parse_timestamp(data.get("updatedAt")),
         status_updated_at=_parse_timestamp(data.get("statusUpdatedAt")),
         raw=data,
+        project=Path(data.get("cwd", "")).name,
     )
 
 
@@ -104,6 +105,12 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
 
     for stale_path in _cache.keys() - seen_paths:
         del _cache[stale_path]
+
+    project_by_session_id = {t.session_id: t.project for t in load_transcripts()}
+    for s in sessions:
+        name = project_by_session_id.get(s.session_id)
+        if name:
+            s.project = name
 
     sessions.sort(
         key=lambda s: s.updated_at or datetime.min,

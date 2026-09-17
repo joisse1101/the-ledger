@@ -14,9 +14,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from claude_projects import load_projects
+
 
 def projects_dir() -> Path:
     return Path.home() / ".claude" / "projects"
+
+
+def sanitize_project_path(path: str) -> str:
+    """Convert a project directory path to Claude Code's on-disk project
+    folder name under ~/.claude/projects/, e.g.
+    "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log". Every
+    character that isn't alphanumeric becomes a dash."""
+    return "".join(ch if ch.isalnum() else "-" for ch in path)
 
 
 # model id -> (input $/1M tokens, output $/1M tokens)
@@ -75,10 +85,9 @@ class ClaudeTranscript:
     updated_at: Optional[datetime]
     message_count: int
     cost: float
-
-    @property
-    def project(self) -> str:
-        return Path(self.cwd).name if self.cwd else self.path.parent.name
+    # Set in load_transcripts() from ~/.claude.json, not just this field.
+    # Falls back to a cwd/folder-derived guess when no project entry matches.
+    project: str = ""
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -153,6 +162,7 @@ def _parse_transcript_file(path: Path) -> Optional[ClaudeTranscript]:
         updated_at=updated_at,
         message_count=message_count,
         cost=cost,
+        project=Path(cwd).name if cwd else path.parent.name,
     )
 
 
@@ -197,6 +207,14 @@ def load_transcripts(directory: Optional[Path] = None) -> list[ClaudeTranscript]
 
     for stale_path in _cache.keys() - seen_paths:
         del _cache[stale_path]
+
+    project_by_folder = {
+        sanitize_project_path(p.path): p.name for p in load_projects()
+    }
+    for t in transcripts:
+        name = project_by_folder.get(t.path.parent.name)
+        if name:
+            t.project = name
 
     transcripts.sort(
         key=lambda t: t.updated_at or datetime.min,
