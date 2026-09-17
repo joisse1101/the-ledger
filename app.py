@@ -100,7 +100,6 @@ def main() -> None:
         st.rerun()
 
     if st.session_state.page == "overview":
-        st.header("Overview")
         render_overview_page()
 
     elif st.session_state.page == "sessions":

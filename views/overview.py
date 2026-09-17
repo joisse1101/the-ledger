@@ -1,10 +1,21 @@
-from typing import Sequence
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Sequence
 
 import pandas as pd
 import streamlit as st
 from streamlit import config as st_config
 
 from claude_transcripts import ClaudeTranscript, load_transcripts
+
+# Time-range filter options for the summary stats/chart, in display order.
+# "All time" (None) skips filtering entirely.
+_TIME_RANGES: dict[str, Optional[timedelta]] = {
+    "All time": None,
+    "Past week": timedelta(days=7),
+    "Past month": timedelta(days=30),
+    "Past quarter": timedelta(days=90),
+    "Past year": timedelta(days=365),
+}
 
 # Fixed-order categorical palette (validated for adjacent-pair CVD safety);
 # see the dataviz skill's references/palette.md. Slot order must never be
@@ -31,6 +42,27 @@ _CATEGORICAL_DARK = [
 ]
 _MUTED_INK = "#898781"  # "Other" bucket - same in both modes
 _MAX_PROJECT_SLICES = 7  # beyond this, fold the tail into "Other"
+
+
+def _filter_transcripts_by_range(
+    transcripts: Sequence[ClaudeTranscript], range_label: str
+) -> Sequence[ClaudeTranscript]:
+    """Transcripts whose activity falls within the chosen time range.
+
+    A session is placed by its start time (falling back to its last-updated
+    time for the rare transcript with no parsed start), not its update time,
+    so a still-running session is bucketed by when it began.
+    """
+    delta = _TIME_RANGES.get(range_label)
+    if delta is None:
+        return transcripts
+    cutoff = datetime.now(timezone.utc) - delta
+    result = []
+    for t in transcripts:
+        anchor = t.started_at or t.updated_at
+        if anchor is not None and anchor >= cutoff:
+            result.append(t)
+    return result
 
 
 def _project_session_counts_dataframe(
@@ -221,11 +253,29 @@ def render_overview_page() -> None:
         st.write("No Claude session transcripts found.")
         return
 
-    df = _project_session_counts_dataframe(transcripts)
+    st.header("Overview")
+    range_label = (
+        st.segmented_control(
+            "Time range",
+            options=list(_TIME_RANGES),
+            default="All time",
+            key="overview_time_range",
+            label_visibility="collapsed",
+            width="stretch",
+        )
+        or "All time"
+    )
+
+    filtered = _filter_transcripts_by_range(transcripts, range_label)
+    if not filtered:
+        st.write(f"No Claude session transcripts found for {range_label.lower()}.")
+        return
+
+    df = _project_session_counts_dataframe(filtered)
     chart_col, stats_col = st.columns([1, 1])
 
     with stats_col:
-        _render_summary_stats(transcripts)
+        _render_summary_stats(filtered)
 
     with chart_col:
         _render_project_sessions_chart(df)
