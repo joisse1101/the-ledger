@@ -6,3 +6,4 @@ __pycache__/
 .streamlit/ledger.db*
 .env
 run_log.txt
+.pytest_cache/

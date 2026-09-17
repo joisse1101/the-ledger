@@ -17,7 +17,16 @@ streamlit run app.py
 
 The app opens at http://localhost:8501. `.streamlit/config.toml` sets `runOnSave = true`, so the app auto-reloads on file changes while `streamlit run` is active.
 
-There are no lint, test, or build commands configured yet.
+A `.venv` already exists at the repo root with dependencies installed — activate it (`.venv\Scripts\Activate.ps1`, or invoke `.venv\Scripts\python.exe` / `.venv\Scripts\pytest.exe` directly) rather than searching for or recreating one.
+
+## Testing
+
+```powershell
+pip install -r requirements-dev.txt  # installs requirements.txt + pytest
+pytest
+```
+
+Tests live in `tests/` (`pyproject.toml` sets `pythonpath = ["."]` and `testpaths = ["tests"]`), one file per module under test, covering the pure parsing/aggregation logic (`claude_db._message_cost`, `views/overview.py`'s time-range filtering and chart data prep, etc.) and the SQLite read/write/delete paths in `claude_db.py`/`claude_projects.py`/`claude_transcripts.py`. `tests/conftest.py`'s `isolated_db` fixture monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never touches the real `~/.claude.json` or `~/.claude/projects/`. Streamlit rendering (the `render_*` functions that call `st.*` widgets) isn't covered — only the plain functions those pages build their data from (e.g. `_projects_dataframe`, `_sessions_dataframe`).
 
 ## Architecture
 

@@ -55,6 +55,32 @@ streamlit run app.py
 
 The app will open at http://localhost:8501.
 
+## Testing
+
+Install dev dependencies (this includes `requirements.txt` plus `pytest`):
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
+Run the test suite:
+
+```powershell
+pytest
+```
+
+Tests live in `tests/`, one file per module under test (`test_claude_db.py`,
+`test_claude_projects.py`, `test_claude_transcripts.py`, `test_claude_sessions.py`,
+`test_overview.py`, `test_views.py`). They cover the pure parsing/aggregation logic
+(cost math, time-range filtering, chart data prep) and the SQLite-backed
+read/write/delete paths in `claude_db.py`, `claude_projects.py`, and
+`claude_transcripts.py` — the latter via a `isolated_db` fixture (see
+`tests/conftest.py`) that points `claude_db` at a throwaway `tmp_path` instead of your
+real `~/.claude.json` / `~/.claude/projects/`, so running the suite never touches your
+actual Claude Code data. Streamlit rendering itself (`render_*` functions that call
+`st.*` widgets) isn't covered — only the plain functions those pages build their data
+from.
+
 ## A couple of things worth knowing
 
 - Cost numbers are estimates, worked out from token counts in the transcripts — Claude
