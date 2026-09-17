@@ -266,8 +266,11 @@ _COMPACT_LAYOUT_CSS = """
     padding-left: 2rem;
     padding-right: 2rem;
 }
-[data-testid="stSidebar"] .block-container {
-    padding-top: 1rem;
+[data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] hr) {
+    height: 2rem;
+}
+[data-testid="stMarkdownContainer"] hr {
+    margin: 0.9375rem 0;
 }
 </style>
 """
@@ -280,18 +283,27 @@ def main() -> None:
     if "page" not in st.session_state:
         st.session_state.page = "sessions"
 
-    with st.sidebar:
-        st.header("Navigation")
-        if st.button("Sessions", width="stretch"):
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.markdown("**The Ledger**")
+        if st.button(
+            "Sessions",
+            type="primary" if st.session_state.page == "sessions" else "secondary",
+        ):
             st.session_state.page = "sessions"
-        if st.button("Projects", width="stretch"):
+        if st.button(
+            "Projects",
+            type="primary" if st.session_state.page == "projects" else "secondary",
+        ):
             st.session_state.page = "projects"
-        st.divider()
+
+        st.caption("")
+
         dark_mode = st.toggle(
             "Dark mode",
             value=_load_theme_pref() == "dark",
             key="dark_mode",
         )
+    st.divider()
 
     desired_theme = "dark" if dark_mode else "light"
     if st_config.get_option("theme.base") != desired_theme:
