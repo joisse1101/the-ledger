@@ -1,4 +1,4 @@
-# Claude Manager
+# The Ledger
 
 A little dashboard for keeping an eye on your Claude Code usage. If you run Claude Code
 across a bunch of projects and terminals, it's easy to lose track of what's actually

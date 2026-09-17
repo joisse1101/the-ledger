@@ -274,7 +274,7 @@ _COMPACT_LAYOUT_CSS = """
 
 
 def main() -> None:
-    st.set_page_config(page_title="Claude Manager", page_icon="🤖", layout="wide")
+    st.set_page_config(page_title="The Ledger", page_icon="🤖", layout="wide")
     st.markdown(_COMPACT_LAYOUT_CSS, unsafe_allow_html=True)
 
     if "page" not in st.session_state:
