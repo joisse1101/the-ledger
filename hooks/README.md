@@ -1,0 +1,121 @@
+# Claude Code Toast Notifications
+
+Shows a Windows toast when a Claude Code agent needs input (`Notification` hook) or finishes a task (`Stop` hook). Clicking the toast focuses the existing VS Code window for that repo, or opens a new one if it isn't already open.
+
+## How it works
+
+`New-BurntToastNotification`'s click-handling (`-ActivatedAction`) only fires if the PowerShell process that created the toast is still running — but hook scripts exit right after showing the toast, so that doesn't work here. Instead, the toast is built with a **protocol-activation** click action (`claudecode://open?path=...`), which Windows resolves independently of any PowerShell process, via a custom URI protocol registered in the registry.
+
+## 1. Scripts to share
+
+Copy this whole `hooks\` folder to the other machine:
+
+| File | Purpose |
+|---|---|
+| `scripts\Send-ClaudeToast.ps1` | Shows the toast (called by the `Notification`/`Stop` hooks). |
+| `scripts\Open-ClaudeRepoWindow.ps1` | Runs when the toast is clicked. Focuses the matching VS Code window, or opens a new one. |
+| `scripts\Open-ClaudeRepoWindow.vbs` | Silent launcher — runs the above script with no console-window flash. Locates its own folder at runtime, so it works unmodified on any machine/username as long as the two `.ps1`/`.vbs` files stay together. |
+| `Install-ClaudeHooks.ps1` | Copies everything in `scripts\` into `%USERPROFILE%\.claude\hooks\`, registers the protocol handler, and adds the hooks to `settings.json`. See section 3. |
+| `Uninstall-ClaudeHooks.ps1` | Reverses the above. See section 5. |
+
+
+## 2. What needs to be installed
+
+- **Claude Code** (already assumed installed)
+- **VS Code**, with the `code` command available on PATH (VS Code adds this
+  automatically if you check "Add to PATH" during install, or run
+  `Shell Command: Install 'code' command in PATH` from the VS Code command
+  palette)
+- **BurntToast** PowerShell module — this is what actually renders the toast:
+  ```powershell
+  Install-Module -Name BurntToast -Scope CurrentUser -Force
+  ```
+
+## 3. Run the installer
+
+```powershell
+.\hooks\Install-ClaudeHooks.ps1
+```
+
+Safe to re-run. It does the following, all scoped to the current user (no
+admin rights needed):
+
+- **Copies the 3 scripts** into `%USERPROFILE%\.claude\hooks\` (creating the
+  folder if needed).
+- **Registers the `claudecode://` protocol handler.** This teaches Windows
+  what to do when something launches a `claudecode://...` link — the toast's
+  click action (see "How it works" above). It's the same mechanism `mailto:`
+  or `slack://` links use: a registry entry (`HKCU:\Software\Classes\claudecode`)
+  maps the `claudecode` scheme to a command to run, with the clicked URI
+  passed in as `%1`. Here that command is the silent `.vbs` launcher, which
+  in turn runs `Open-ClaudeRepoWindow.ps1` to focus/open the right VS Code
+  window.
+- **Merges the `Notification`/`Stop` hooks into `settings.json`** (creating
+  the file if needed, without touching any hooks already there). The
+  `command` written into each hook is a fully resolved, literal path to
+  `Send-ClaudeToast.ps1` — the script resolves `$env:USERPROFILE` itself,
+  once, while it runs in your own PowerShell session, rather than embedding
+  an unresolved `$env:USERPROFILE`/`%USERPROFILE%` reference in the hook's
+  `command` string. That distinction matters: Claude Code runs hook commands
+  through Git Bash if it's installed, or PowerShell otherwise, and the two
+  disagree on environment-variable syntax (`$USERPROFILE` vs.
+  `$env:USERPROFILE` vs. `%USERPROFILE%`) — baking in the resolved path
+  sidesteps that ambiguity entirely.
+
+If you'd rather see exactly what it changes before running it, the script
+is short — read `Install-ClaudeHooks.ps1` directly; it's the same handful of
+`New-Item`/`Set-ItemProperty`/`ConvertTo-Json` calls this section used to
+document inline.
+
+## 4. Tests
+
+Run these on the new PC after setup, in order. Have a repo folder open in VS
+Code before testing so you can check the click-to-focus behavior.
+
+**Test 1 — BurntToast itself works:**
+```powershell
+New-BurntToastNotification -Text 'Test', 'BurntToast is working'
+```
+A toast should appear.
+
+**Test 2 — the toast script works (without clicking):**
+
+Run this from the repo folder you want the toast to point at (it uses
+`Get-Location`, so no path to edit):
+```powershell
+(@{cwd = (Get-Location).Path} | ConvertTo-Json -Compress) | powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\Send-ClaudeToast.ps1" -Title "Test Alert" -BodyTemplate "Testing in {0}!"
+```
+A toast titled "Test Alert" mentioning the current folder name should appear.
+
+**Test 3 — protocol handler + click behavior (no toast needed):**
+
+Run this from the same folder as Test 2:
+```powershell
+Start-Process "claudecode://open?path=$([System.Uri]::EscapeDataString((Get-Location).Path))"
+```
+- If that folder is already open in a VS Code window, it should be
+  focused — no duplicate window, no visible console flash.
+- If it isn't open, a new VS Code window should open for it — also no
+  console flash.
+
+**Test 4 — full end-to-end:**
+Click the toast from Test 2. Same expected behavior as Test 3.
+
+**Test 5 — real hook firing:**
+Run a Claude Code session in that repo and let it hit a real `Notification`
+(e.g. it asks a permission question) or `Stop` (it finishes a turn) event.
+The toast should appear on its own, and clicking it should focus/open VS Code
+for that repo.
+
+## 5. Uninstall
+
+```powershell
+.\hooks\Uninstall-ClaudeHooks.ps1
+```
+
+Reverses section 3: removes the `Notification`/`Stop` hook entries that
+reference `Send-ClaudeToast.ps1` from `settings.json` (leaving any other
+hooks untouched), removes the `claudecode://` protocol handler, and deletes
+just the 3 installed script files from `%USERPROFILE%\.claude\hooks\` — not
+the whole folder, in case you keep other, unrelated hook scripts there too
+(it removes the folder itself only if that leaves it empty).
