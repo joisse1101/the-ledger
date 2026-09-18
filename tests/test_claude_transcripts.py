@@ -16,6 +16,7 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
                 "version": "1.0.0",
                 "gitBranch": "main",
                 "sessionId": "s1",
+                "message": {"content": "What's causing the login bug?"},
             },
             {"type": "assistant", "timestamp": "2024-01-01T10:05:00Z"},
         ],
@@ -31,6 +32,8 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
     assert t.git_branch == "main"
     assert t.message_count == 2
     assert t.project == "proj"
+    assert t.recap == "What's causing the login bug?"
+    assert t.recap_source == "first_prompt"
 
 
 def test_delete_project_transcripts_removes_files_and_rows(

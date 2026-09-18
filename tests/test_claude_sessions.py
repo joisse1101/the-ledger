@@ -62,6 +62,8 @@ def test_load_sessions_resolves_project_from_transcripts(tmp_path, monkeypatch):
         def __init__(self, session_id, project):
             self.session_id = session_id
             self.project = project
+            self.recap = "What we did"
+            self.recap_source = "title"
 
     monkeypatch.setattr(
         claude_sessions,
@@ -72,6 +74,17 @@ def test_load_sessions_resolves_project_from_transcripts(tmp_path, monkeypatch):
 
     sessions = claude_sessions.load_sessions(tmp_path)
     assert sessions[0].project == "real-project-name"
+    assert sessions[0].recap == "What we did"
+    assert sessions[0].recap_source == "title"
+
+
+def test_load_sessions_no_transcript_match_leaves_recap_blank(tmp_path, monkeypatch):
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    _write_session_file(tmp_path / "1.json", sessionId="sess-1")
+
+    sessions = claude_sessions.load_sessions(tmp_path)
+    assert sessions[0].recap == ""
+    assert sessions[0].recap_source == ""
 
 
 def test_load_sessions_falls_back_to_cwd_when_no_transcript_match(tmp_path, monkeypatch):

@@ -31,6 +31,8 @@ class ClaudeSession:
     raw: dict[str, Any] = field(repr=False)
     # Set in load_sessions() from the transcripts table, not just this field.
     project: str = ""
+    recap: str = ""
+    recap_source: str = ""
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -102,13 +104,17 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
     for stale_path in _cache.keys() - seen_paths:
         del _cache[stale_path]
 
-    project_by_session_id = {
-        transcript.session_id: transcript.project for transcript in load_transcripts()
+    transcript_by_session_id = {
+        transcript.session_id: transcript for transcript in load_transcripts()
     }
     for session in sessions:
-        project = project_by_session_id.get(session.session_id)
-        if project:
-            session.project = project
+        transcript = transcript_by_session_id.get(session.session_id)
+        if transcript is None:
+            continue
+        if transcript.project:
+            session.project = transcript.project
+        session.recap = transcript.recap
+        session.recap_source = transcript.recap_source
 
     sessions.sort(
         key=lambda session: session.updated_at or datetime.min,

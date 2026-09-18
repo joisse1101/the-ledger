@@ -27,6 +27,8 @@ class ClaudeTranscript:
     message_count: int
     cost: float
     project: str
+    recap: str
+    recap_source: str
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -45,6 +47,8 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         message_count=row["message_count"],
         cost=row["cost"],
         project=row["project"],
+        recap=row["recap"],
+        recap_source=row["recap_source"],
     )
 
 

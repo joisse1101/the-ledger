@@ -10,6 +10,7 @@ and untouched by this module.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -81,10 +82,19 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             updated_at TEXT,
             message_count INTEGER NOT NULL,
             cost REAL NOT NULL,
-            project TEXT NOT NULL
+            project TEXT NOT NULL,
+            recap TEXT NOT NULL DEFAULT '',
+            recap_source TEXT NOT NULL DEFAULT ''
         );
         """
     )
+    # Older on-disk databases predate the recap columns - ALTER TABLE ADD
+    # COLUMN has no "IF NOT EXISTS" in SQLite, so check first.
+    existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(transcripts)")}
+    if "recap" not in existing_columns:
+        conn.execute("ALTER TABLE transcripts ADD COLUMN recap TEXT NOT NULL DEFAULT ''")
+    if "recap_source" not in existing_columns:
+        conn.execute("ALTER TABLE transcripts ADD COLUMN recap_source TEXT NOT NULL DEFAULT ''")
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +191,46 @@ def _parse_iso_timestamp(value: Any) -> Optional[datetime]:
         return None
 
 
+# Wrapper tags Claude Code (or this app's own injected context) inserts
+# around a user turn - e.g. a bare slash command's expansion, or the
+# system-reminder blob repeated at the top of most turns. None of these are
+# something the user actually typed, so they're stripped before a message is
+# considered as a "first prompt" recap fallback.
+_WRAPPER_TAG_RE = re.compile(
+    r"<(system-reminder|command-name|command-message|command-args|"
+    r"local-command-stdout|local-command-caveat)>.*?</\1>",
+    re.DOTALL,
+)
+
+
+def _extract_text(content: Any) -> Optional[str]:
+    """Plain text from a message's `content` (a string, or a list of blocks) - text
+    blocks only, tool_use/tool_result/image blocks are ignored."""
+    if isinstance(content, str):
+        return content.strip() or None
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        joined = "\n\n".join(part for part in parts if part)
+        return joined.strip() or None
+    return None
+
+
+def _clean_wrapper_tags(text: str) -> Optional[str]:
+    cleaned = _WRAPPER_TAG_RE.sub("", text).strip()
+    return cleaned or None
+
+
+def _normalize_snippet(text: str, max_len: int = 600) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) > max_len:
+        return collapsed[: max_len].rstrip() + "…"
+    return collapsed
+
+
 def _scan_transcript_file(
     path: Path, project_by_folder: dict[str, str]
 ) -> Optional[dict[str, Any]]:
@@ -193,6 +243,9 @@ def _scan_transcript_file(
     message_count = 0
     cost = 0.0
     seen_message_ids: set[str] = set()
+    ai_title: Optional[str] = None
+    last_assistant_text: Optional[str] = None
+    first_user_text: Optional[str] = None
 
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -220,6 +273,9 @@ def _scan_transcript_file(
                 if entry.get("type") in ("user", "assistant") and not entry.get("isMeta"):
                     message_count += 1
 
+                if entry.get("type") == "ai-title":
+                    ai_title = entry.get("aiTitle") or ai_title
+
                 message = entry.get("message")
                 if entry.get("type") == "assistant" and isinstance(message, dict):
                     message_id = message.get("id")
@@ -233,8 +289,37 @@ def _scan_transcript_file(
                             turn_cost = _message_cost(model, usage)
                             if turn_cost is not None:
                                 cost += turn_cost
+
+                    text = _extract_text(message.get("content"))
+                    if text:
+                        last_assistant_text = text
+
+                if (
+                    entry.get("type") == "user"
+                    and not entry.get("isMeta")
+                    and first_user_text is None
+                    and isinstance(message, dict)
+                ):
+                    text = _extract_text(message.get("content"))
+                    if text:
+                        cleaned = _clean_wrapper_tags(text)
+                        if cleaned:
+                            first_user_text = cleaned
     except OSError:
         return None
+
+    # Prefer Claude Code's own auto-generated session title, then the last
+    # thing the assistant said (a recap, a wrap-up summary, a follow-up
+    # question - whatever it naturally is), then fall back to the first
+    # thing the user actually typed.
+    if ai_title:
+        recap, recap_source = _normalize_snippet(ai_title), "title"
+    elif last_assistant_text:
+        recap, recap_source = _normalize_snippet(last_assistant_text), "last_message"
+    elif first_user_text:
+        recap, recap_source = _normalize_snippet(first_user_text), "first_prompt"
+    else:
+        recap, recap_source = "", ""
 
     # A session can `cd` partway through, leaving `cwd` pointing below the
     # real project root - trust the on-disk parent folder's project match
@@ -254,6 +339,8 @@ def _scan_transcript_file(
         "message_count": message_count,
         "cost": cost,
         "project": project,
+        "recap": recap,
+        "recap_source": recap_source,
     }
 
 
@@ -309,10 +396,10 @@ def refresh() -> datetime:
             """
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, project
+                updated_at, message_count, cost, project, recap, recap_source
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :project
+                :updated_at, :message_count, :cost, :project, :recap, :recap_source
             )
             """,
             [

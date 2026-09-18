@@ -40,6 +40,8 @@ def _transcript(**overrides):
         message_count=4,
         cost=0.5,
         project="proj",
+        recap="Fixed the login bug",
+        recap_source="title",
     )
     defaults.update(overrides)
     return ClaudeTranscript(**defaults)

@@ -74,6 +74,48 @@ def test_message_cost_defaults_bare_cache_creation_to_5m_tier():
     assert cost == 2 * 1.25
 
 
+def test_extract_text_from_string_content():
+    assert claude_db._extract_text("hello") == "hello"
+    assert claude_db._extract_text("  ") is None
+
+
+def test_extract_text_joins_text_blocks_and_ignores_others():
+    content = [
+        {"type": "text", "text": "part one"},
+        {"type": "tool_use", "name": "Read"},
+        {"type": "text", "text": "part two"},
+    ]
+    assert claude_db._extract_text(content) == "part one\n\npart two"
+
+
+def test_extract_text_returns_none_for_no_text_blocks():
+    assert claude_db._extract_text([{"type": "tool_use", "name": "Read"}]) is None
+    assert claude_db._extract_text(None) is None
+
+
+def test_clean_wrapper_tags_strips_command_and_system_reminder_tags():
+    text = (
+        "<system-reminder>context nobody typed</system-reminder>"
+        "<command-name>/clear</command-name>"
+    )
+    assert claude_db._clean_wrapper_tags(text) is None
+
+
+def test_clean_wrapper_tags_keeps_real_text_around_tags():
+    text = "<system-reminder>context</system-reminder>What I actually asked"
+    assert claude_db._clean_wrapper_tags(text) == "What I actually asked"
+
+
+def test_normalize_snippet_collapses_whitespace():
+    assert claude_db._normalize_snippet("a\n\n  b   c") == "a b c"
+
+
+def test_normalize_snippet_truncates_long_text():
+    result = claude_db._normalize_snippet("x" * 700, max_len=600)
+    assert len(result) == 601  # 600 chars + ellipsis
+    assert result.endswith("…")
+
+
 # ---------------------------------------------------------------------------
 # Transcript file scanning
 # ---------------------------------------------------------------------------
@@ -165,6 +207,103 @@ def test_scan_transcript_file_no_cwd_falls_back_to_parent_folder_name(
     row = claude_db._scan_transcript_file(path, project_by_folder={})
     assert row is not None
     assert row["project"] == "some-folder"
+
+
+def test_scan_transcript_file_recap_prefers_ai_title(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {"type": "user", "timestamp": "2024-01-01T10:00:00Z", "message": {"content": "hi"}},
+            {"type": "ai-title", "aiTitle": "Fix login bug"},
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {"content": [{"type": "text", "text": "Done, fixed it."}]},
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["recap"] == "Fix login bug"
+    assert row["recap_source"] == "title"
+
+
+def test_scan_transcript_file_recap_falls_back_to_last_assistant_text(
+    tmp_path, write_transcript
+):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {"type": "user", "timestamp": "2024-01-01T10:00:00Z", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:01:00Z",
+                "message": {"content": [{"type": "text", "text": "First reply."}]},
+            },
+            # A tool-only turn (no text block) must not blank out the recap.
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:02:00Z",
+                "message": {"content": [{"type": "tool_use", "name": "Read"}]},
+            },
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:03:00Z",
+                "message": {"content": [{"type": "text", "text": "Anything else?"}]},
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["recap"] == "Anything else?"
+    assert row["recap_source"] == "last_message"
+
+
+def test_scan_transcript_file_recap_falls_back_to_first_user_prompt(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "user",
+                "timestamp": "2024-01-01T10:00:00Z",
+                "message": {"content": "Help me fix the login bug"},
+            }
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["recap"] == "Help me fix the login bug"
+    assert row["recap_source"] == "first_prompt"
+
+
+def test_scan_transcript_file_recap_skips_command_only_first_message(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "user",
+                "timestamp": "2024-01-01T10:00:00Z",
+                "message": {"content": "<command-name>/clear</command-name>"},
+            },
+            {
+                "type": "user",
+                "timestamp": "2024-01-01T10:01:00Z",
+                "message": {"content": "Now the real question"},
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["recap"] == "Now the real question"
+    assert row["recap_source"] == "first_prompt"
+
+
+def test_scan_transcript_file_recap_blank_when_no_content(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(path, [{"type": "system", "timestamp": "2024-01-01T10:00:00Z"}])
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["recap"] == ""
+    assert row["recap_source"] == ""
 
 
 def test_scan_transcript_file_skips_malformed_lines(tmp_path, write_transcript):
