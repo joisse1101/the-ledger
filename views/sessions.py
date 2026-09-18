@@ -9,14 +9,13 @@ from claude_transcripts import delete_transcript, load_transcripts
 
 _LIVE_COLUMNS = [
     "Name",
-    "Project",
     "Title",
     "Status",
     "Kind",
     "PID",
     "Session ID",
 ]
-_LIVE_WIDTHS = [3, 3, 3, 2, 2, 1, 4]
+_LIVE_WIDTHS = [2, 4, 1, 2, 1, 4]
 
 _TRANSCRIPTS_COLUMNS = [
     "Project",
@@ -157,7 +156,21 @@ def _format_cell(value: pd.Timestamp | datetime | float | str | None) -> str:
 def _tooltip_text(row: dict) -> str:
     """Hover preview for a row's button: last message from Claude, else the
     first prompt, else a plain "nothing to show" fallback."""
-    return row["Last Message"] or row["First Prompt"] or "No information available"
+
+    session_id = row.get("Session ID")
+
+    msg_title = (
+        "Last Message"
+        if row.get("Last Message")
+        else "First Prompt" if row.get("First Prompt") else ""
+    )
+
+    msg = f"{row.get('Last Message') or row.get('First Prompt') or ''}"
+    msg = msg[:200].strip() + ("..." if len(msg) > 200 else "")
+    final_msg = f"{msg_title}:  \n{msg}" if msg else ""
+    return f"{f'[{row.get("Title")}] ' if row.get('Title') else ''}{session_id}" + (
+        f"  \n  \n{final_msg}" if final_msg else ""
+    )
 
 
 def _render_table_header(labels: Sequence[str], widths: Sequence[int], *, key: str) -> None:
@@ -199,7 +212,6 @@ def _open_session_dialog(
     *,
     source: str,
     heading: str,
-    project: str,
     session_id: str,
     title: str,
     last_message: str,
@@ -211,7 +223,6 @@ def _open_session_dialog(
     st.session_state.recap_dialog_info = {
         "source": source,
         "heading": heading,
-        "project": project,
         "session_id": session_id,
         "title": title,
         "last_message": last_message,
@@ -234,7 +245,6 @@ def _render_recap_dialog() -> None:
         return
 
     st.markdown(f"**{info['heading']}**")
-    st.caption(f"{info['project']}  \n{info['session_id']}")
 
     if info["title"] or info["last_message"] or info["first_prompt"]:
         if info["title"]:
@@ -307,27 +317,27 @@ def render_sessions_table() -> None:
         st.write("No Claude sessions found.")
     else:
         st.caption("Click a session to see what it was about.")
-        _render_table_header(_LIVE_COLUMNS, _LIVE_WIDTHS, key="table-header-live")
-        for row in df.to_dict("records"):
-            _render_table_row(
-                row,
-                _LIVE_COLUMNS,
-                _LIVE_WIDTHS,
-                key=f"sessrow-live-{row['Session ID']}",
-                tooltip=_tooltip_text(row),
-                on_click=lambda r=row: _open_session_dialog(
-                    source="live",
-                    heading=r["Name"] or r["Project"],
-                    project=r["Project"],
-                    session_id=r["Session ID"],
-                    title=r["Title"],
-                    last_message=r["Last Message"],
-                    first_prompt=r["First Prompt"],
-                    started=r["Started"],
-                    updated=r["Last Updated"],
-                    deletable=False,
-                ),
-            )
+        with st.container(gap="xxsmall"):
+            _render_table_header(_LIVE_COLUMNS, _LIVE_WIDTHS, key="table-header-live")
+            for row in df.to_dict("records"):
+                _render_table_row(
+                    row,
+                    _LIVE_COLUMNS,
+                    _LIVE_WIDTHS,
+                    key=f"sessrow-live-{row['Session ID']}",
+                    tooltip=_tooltip_text(row),
+                    on_click=lambda r=row: _open_session_dialog(
+                        source="live",
+                        heading=r["Name"] or r["Project"],
+                        session_id=r["Session ID"],
+                        title=r["Title"],
+                        last_message=r["Last Message"],
+                        first_prompt=r["First Prompt"],
+                        started=r["Started"],
+                        updated=r["Last Updated"],
+                        deletable=False,
+                    ),
+                )
 
     _maybe_render_recap_dialog("live")
 
@@ -343,26 +353,29 @@ def render_transcripts_table() -> None:
 
     st.caption("Click a session to see what it was about.")
     live_ids = {session.session_id for session in load_sessions()}
-    _render_table_header(_TRANSCRIPTS_COLUMNS, _TRANSCRIPTS_WIDTHS, key="table-header-transcripts")
-    for row in df.to_dict("records"):
-        _render_table_row(
-            row,
-            _TRANSCRIPTS_COLUMNS,
-            _TRANSCRIPTS_WIDTHS,
-            key=f"sessrow-transcripts-{row['Session ID']}",
-            tooltip=_tooltip_text(row),
-            on_click=lambda r=row: _open_session_dialog(
-                source="transcripts",
-                heading=r["Project"],
-                project=r["Project"],
-                session_id=r["Session ID"],
-                title=r["Title"],
-                last_message=r["Last Message"],
-                first_prompt=r["First Prompt"],
-                started=r["Started"],
-                updated=r["Last Updated"],
-                deletable=r["Session ID"] not in live_ids,
-            ),
+
+    with st.container(gap="xxsmall"):
+        _render_table_header(
+            _TRANSCRIPTS_COLUMNS, _TRANSCRIPTS_WIDTHS, key="table-header-transcripts"
         )
+        for row in df.to_dict("records"):
+            _render_table_row(
+                row,
+                _TRANSCRIPTS_COLUMNS,
+                _TRANSCRIPTS_WIDTHS,
+                key=f"sessrow-transcripts-{row['Session ID']}",
+                tooltip=_tooltip_text(row),
+                on_click=lambda r=row: _open_session_dialog(
+                    source="transcripts",
+                    heading=f"[{r['Project']}] {r['Git Branch']}",
+                    session_id=r["Session ID"],
+                    title=r["Title"],
+                    last_message=r["Last Message"],
+                    first_prompt=r["First Prompt"],
+                    started=r["Started"],
+                    updated=r["Last Updated"],
+                    deletable=r["Session ID"] not in live_ids,
+                ),
+            )
 
     _maybe_render_recap_dialog("transcripts")
