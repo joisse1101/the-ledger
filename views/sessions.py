@@ -14,11 +14,9 @@ _LIVE_COLUMNS = [
     "Status",
     "Kind",
     "PID",
-    "Started",
-    "Last Updated",
     "Session ID",
 ]
-_LIVE_WIDTHS = [3, 3, 3, 2, 2, 1, 3, 3, 4]
+_LIVE_WIDTHS = [3, 3, 3, 2, 2, 1, 4]
 
 _TRANSCRIPTS_COLUMNS = [
     "Project",
@@ -146,9 +144,9 @@ _ROW_CSS = """
 """
 
 
-def _format_cell(value: object) -> str:
-    if pd.isna(value):
-        return ""
+def _format_cell(value: pd.Timestamp | datetime | float | str | None) -> str:
+    if pd.isna(value) or (type(value) == str and value.strip() == ""):
+        return "--"
     if isinstance(value, (datetime, pd.Timestamp)):
         return value.strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(value, float):
@@ -196,6 +194,7 @@ def _render_table_row(
 # cancelling a delete.
 # ---------------------------------------------------------------------------
 
+
 def _open_session_dialog(
     *,
     source: str,
@@ -205,6 +204,8 @@ def _open_session_dialog(
     title: str,
     last_message: str,
     first_prompt: str,
+    started: datetime | None,
+    updated: datetime | None,
     deletable: bool,
 ) -> None:
     st.session_state.recap_dialog_info = {
@@ -215,6 +216,8 @@ def _open_session_dialog(
         "title": title,
         "last_message": last_message,
         "first_prompt": first_prompt,
+        "started": started,
+        "updated": updated,
         "deletable": deletable,
     }
 
@@ -245,6 +248,13 @@ def _render_recap_dialog() -> None:
             st.write(info["first_prompt"])
     else:
         st.caption("No information available for this session yet.")
+
+    if info["started"]:
+        st.caption("Started")
+        st.write(info["started"])
+    if info["updated"]:
+        st.caption("Last updated")
+        st.write(info["updated"])
 
     if info["source"] != "transcripts":
         return
@@ -313,6 +323,8 @@ def render_sessions_table() -> None:
                     title=r["Title"],
                     last_message=r["Last Message"],
                     first_prompt=r["First Prompt"],
+                    started=r["Started"],
+                    updated=r["Last Updated"],
                     deletable=False,
                 ),
             )
@@ -347,6 +359,8 @@ def render_transcripts_table() -> None:
                 title=r["Title"],
                 last_message=r["Last Message"],
                 first_prompt=r["First Prompt"],
+                started=r["Started"],
+                updated=r["Last Updated"],
                 deletable=r["Session ID"] not in live_ids,
             ),
         )
