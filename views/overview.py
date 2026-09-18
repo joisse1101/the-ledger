@@ -142,7 +142,7 @@ def _project_color_scale(
 
 
 def _format_hour(hour: int) -> str:
-    period = "a" if hour < 12 else "p"
+    period = "am" if hour < 12 else "pm"
     display = hour % 12 or 12
     return f"{display}{period}"
 
@@ -150,9 +150,9 @@ def _format_hour(hour: int) -> str:
 def _hourly_activity_dataframe(transcripts: Sequence[ClaudeTranscript]) -> pd.DataFrame:
     """Session/message counts per local hour of day.
 
-    - All 24 hours are always present (zero-filled), so the chart never looks
-      like it's missing a category.
+    - Only the hours with activity are included, so the chart focuses on the relevant time range.
     """
+
     sessions = [0] * 24
     messages = [0] * 24
     for transcript in transcripts:
@@ -162,11 +162,22 @@ def _hourly_activity_dataframe(transcripts: Sequence[ClaudeTranscript]) -> pd.Da
         hour = anchor.astimezone().hour
         sessions[hour] += 1
         messages[hour] += transcript.message_count
+
+    min_hour = (
+        min(hour for hour, count in enumerate(sessions) if count > 0)
+        if any(sessions)
+        else 0
+    )
+    max_hour = (
+        max(hour for hour, count in enumerate(sessions) if count > 0)
+        if any(sessions)
+        else 23
+    )
     return pd.DataFrame(
         {
-            "Label": [_format_hour(hour) for hour in range(24)],
-            "Sessions": sessions,
-            "Messages": messages,
+            "Label": [_format_hour(hour) for hour in range(min_hour, max_hour + 1)],
+            "Sessions": sessions[min_hour : max_hour + 1],
+            "Messages": messages[min_hour : max_hour + 1],
         }
     )
 

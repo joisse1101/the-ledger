@@ -145,11 +145,20 @@ def test_hourly_activity_buckets_by_local_start_hour():
         _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0), message_count=2),
     ]
     df = overview._hourly_activity_dataframe(transcripts)
-    nine_am = df[df["Label"] == "9a"].iloc[0]
+    nine_am = df[df["Label"] == "9am"].iloc[0]
     assert nine_am["Sessions"] == 2
     assert nine_am["Messages"] == 10
-    two_pm = df[df["Label"] == "2p"].iloc[0]
+    two_pm = df[df["Label"] == "2pm"].iloc[0]
     assert two_pm["Sessions"] == 1
+
+
+def test_hourly_activity_trims_to_hours_with_activity():
+    transcripts = [
+        _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0)),
+        _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0)),
+    ]
+    df = overview._hourly_activity_dataframe(transcripts)
+    assert list(df["Label"]) == [overview._format_hour(h) for h in range(9, 15)]
 
 
 def test_hourly_activity_skips_transcript_with_no_timestamps():
@@ -180,11 +189,11 @@ def test_format_duration(seconds, expected):
 @pytest.mark.parametrize(
     "hour,expected",
     [
-        (0, "12a"),
-        (9, "9a"),
-        (12, "12p"),
-        (13, "1p"),
-        (23, "11p"),
+        (0, "12am"),
+        (9, "9am"),
+        (12, "12pm"),
+        (13, "1pm"),
+        (23, "11pm"),
     ],
 )
 def test_format_hour(hour, expected):
