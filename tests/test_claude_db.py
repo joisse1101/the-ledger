@@ -110,6 +110,30 @@ def test_normalize_snippet_collapses_whitespace():
     assert claude_db._normalize_snippet("a\n\n  b   c") == "a b c"
 
 
+def test_normalize_snippet_removes_headers_and_prose_emphasis():
+    snippet = claude_db._normalize_snippet("# *A **very** useful* heading #\n\nText")
+    assert snippet == "A very useful heading Text"
+
+
+def test_normalize_snippet_preserves_inline_code_symbols_and_emoji():
+    snippet = claude_db._normalize_snippet(
+        "Use `value = left ** right` with **bold** *italic* _words_ \N{ROCKET}"
+    )
+    assert snippet == "Use `value = left ** right` with bold italic words \N{ROCKET}"
+
+
+def test_normalize_snippet_preserves_multi_backtick_inline_code():
+    snippet = claude_db._normalize_snippet("Use ``a ` symbol`` and **not this**")
+    assert snippet == "Use ``a ` symbol`` and not this"
+
+
+def test_normalize_snippet_preserves_fenced_code_formatting():
+    snippet = claude_db._normalize_snippet(
+        "## Example\n\n```python\n# Keep **this** exactly\nprint('\N{ROCKET}')\n```\n\n*Done*"
+    )
+    assert snippet == "Example\n\n```python\n# Keep **this** exactly\nprint('\N{ROCKET}')\n```\n\nDone"
+
+
 def test_normalize_snippet_truncates_long_text():
     result = claude_db._normalize_snippet("x" * 700, max_len=600)
     assert len(result) == 601  # 600 chars + ellipsis

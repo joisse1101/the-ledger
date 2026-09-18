@@ -219,11 +219,83 @@ def _clean_wrapper_tags(text: str) -> Optional[str]:
     return cleaned or None
 
 
+_FENCED_CODE_RE = re.compile(
+    r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})[^\n]*\n.*?^[ \t]{0,3}(?P=fence)[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
+_INLINE_CODE_RE = re.compile(
+    r"(?P<ticks>`+)(?!`)(?:(?!(?P=ticks)).)*?(?P=ticks)"
+)
+_BOLD_RE = re.compile(r"(?<![\\\w])(\*\*|__)(?=\S)(.*?)(?<=\S)\1(?!\w)")
+_ASTERISK_ITALIC_RE = re.compile(r"(?<![\\\w*])\*(?=\S)(.*?)(?<=\S)\*(?![\w*])")
+_UNDERSCORE_ITALIC_RE = re.compile(r"(?<![\\\w_])_(?=\S)(.*?)(?<=\S)_(?![\w_])")
+_ATX_HEADING_RE = re.compile(r"^[ \t]{0,3}#{1,6}(?:[ \t]+|$)")
+_CLOSING_HEADING_HASHES_RE = re.compile(r"(?:[ \t]+#+)[ \t]*$")
+_SETEXT_HEADING_RE = re.compile(r"^[ \t]{0,3}(?:=+|-+)[ \t]*$")
+
+
+def _strip_prose_markdown(text: str) -> str:
+    """Remove presentation-only Markdown from text outside code spans."""
+    lines = text.splitlines()
+    stripped_lines: list[str] = []
+    for index, line in enumerate(lines):
+        # Setext headings are a text line followed by === or ---.  Keep the
+        # text itself, but drop its underline so it cannot render as a header.
+        if (
+            _SETEXT_HEADING_RE.match(line)
+            and index > 0
+            and lines[index - 1].strip()
+        ):
+            continue
+
+        line = _ATX_HEADING_RE.sub("", line)
+        line = _CLOSING_HEADING_HASHES_RE.sub("", line)
+        stripped_lines.append(line)
+
+    prose = "\n".join(stripped_lines)
+    # Re-run each pattern so nested emphasis such as ***important*** is fully
+    # unwrapped.  Delimiter checks intentionally leave ordinary symbols (for
+    # example multiplication operators and identifier underscores) untouched.
+    previous = None
+    while prose != previous:
+        previous = prose
+        prose = _BOLD_RE.sub(r"\2", prose)
+        prose = _ASTERISK_ITALIC_RE.sub(r"\1", prose)
+        prose = _UNDERSCORE_ITALIC_RE.sub(r"\1", prose)
+    return prose
+
+
 def _normalize_snippet(text: str, max_len: int = 600) -> str:
-    collapsed = " ".join(text.split())
-    if len(collapsed) > max_len:
-        return collapsed[: max_len].rstrip() + "…"
-    return collapsed
+    """Create a compact Markdown snippet without prose emphasis or headings.
+
+    Code is protected before prose is normalized, so its delimiters, whitespace,
+    symbols, and emoji are retained exactly as authored.
+    """
+    code_parts: list[tuple[str, bool]] = []
+
+    def protect_fenced_code(match: re.Match[str]) -> str:
+        code_parts.append((match.group(0), True))
+        return f" \ue000{len(code_parts) - 1}\ue001 "
+
+    protected = _FENCED_CODE_RE.sub(protect_fenced_code, text)
+
+    def protect_inline_code(match: re.Match[str]) -> str:
+        code_parts.append((match.group(0), False))
+        return f"\ue000{len(code_parts) - 1}\ue001"
+
+    protected = _INLINE_CODE_RE.sub(protect_inline_code, protected)
+    collapsed = " ".join(_strip_prose_markdown(protected).split())
+
+    for index, (code, is_fenced) in enumerate(code_parts):
+        placeholder = f"\ue000{index}\ue001"
+        replacement = f"\n\n{code}\n\n" if is_fenced else code
+        collapsed = collapsed.replace(placeholder, replacement)
+
+    normalized = re.sub(r" *\n\n *", "\n\n", collapsed)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
+    if len(normalized) > max_len:
+        return normalized[: max_len].rstrip() + "…"
+    return normalized
 
 
 def _scan_transcript_file(
