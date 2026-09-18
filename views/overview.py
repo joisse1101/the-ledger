@@ -22,29 +22,31 @@ _TIME_RANGES: dict[str, Optional[tuple[int, int]]] = {
     "Past year": (364, 0),
 }
 
-# Fixed-order categorical palette (colorblind-safe for adjacent pairs; see
-# the dataviz skill's references/palette.md). Never re-sort these slots per
-# chart - only the prefix used may vary, so a given slot always means the
-# same thing everywhere.
+# Fixed-order categorical palette (Harmonized Pastel & Rose Theme)
+# Slots are strictly aligned so a given index always maps to the same hue family across themes.
+# Validated against the dataviz skill's scripts/validate_palette.js (lightness band,
+# chroma floor, CVD separation, normal-vision floor, contrast vs surface) for both
+# modes - re-run it against any future edit here rather than eyeballing a swap.
 _CATEGORICAL_LIGHT = [
-    "#2a78d6",
-    "#eb6834",
-    "#1baf7a",
-    "#eda100",
-    "#e87ba4",
-    "#008300",
-    "#4a3aa7",
-    "#e34948",
+    "#d6487e",  # 0: Brand Rose Anchor     (Fixed, matches Dark Rose)
+    "#0891b2",  # 1: Deep Cyan-Teal        (Matches Dark Teal; re-hued off rose to clear CVD)
+    "#d97706",  # 2: Soft Amber / Gold     (Matches Dark Sun Gold)
+    "#059669",  # 3: Soft Emerald          (Matches Dark Mint; moved off Lime to clear CVD)
+    "#3b82f6",  # 4: Soft Periwinkle Blue  (Matches Dark Sky Blue)
+    "#e06d53",  # 5: Pastel Coral / Orange (Matches Dark Peach-Orange)
+    "#a259ff",  # 6: Pastel Purple         (Matches Dark Lilac)
+    "#65a30d",  # 7: Leaf Green / Lime     (Matches Dark Lime)
 ]
+
 _CATEGORICAL_DARK = [
-    "#3987e5",
-    "#d95926",
-    "#199e70",
-    "#c98500",
-    "#d55181",
-    "#008300",
-    "#9085e9",
-    "#e66767",
+    "#c26d88",  # 0: Brand Rose Anchor     (Fixed, matches Light Rose)
+    "#0099ca",  # 1: Vibrant Cyan-Teal     (Matches Light Teal)
+    "#c87b00",  # 2: Soft Sun Gold         (Matches Light Amber)
+    "#009362",  # 3: Bright Soft Mint      (Matches Light Emerald)
+    "#0094da",  # 4: Electric Sky Blue     (Matches Light Blue)
+    "#e65f2a",  # 5: Pastel Peach-Orange   (Matches Light Coral)
+    "#a260df",  # 6: Pastel Lilac / Orchid (Matches Light Purple)
+    "#5a9400",  # 7: Bright Lime/Chartreuse(Matches Light Leaf Green)
 ]
 _MUTED_INK = "#898781"  # "Other" bucket - same in both modes
 _MAX_PROJECT_SLICES = 7  # beyond this, fold the tail into "Other"
@@ -148,10 +150,7 @@ def _format_hour(hour: int) -> str:
 
 
 def _hourly_activity_dataframe(transcripts: Sequence[ClaudeTranscript]) -> pd.DataFrame:
-    """Session/message counts per local hour of day.
-
-    - Only the hours with activity are included, so the chart focuses on the relevant time range.
-    """
+    """Session/message counts per local hour of day, trimmed to the hours with any activity."""
 
     sessions = [0] * 24
     messages = [0] * 24
