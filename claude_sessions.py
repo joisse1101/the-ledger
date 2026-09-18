@@ -70,11 +70,7 @@ _cache: dict[Path, tuple[float, ClaudeSession]] = {}
 
 
 def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
-    """Read and parse every session file, newest-updated first.
-
-    Files not changed since the last call are served from
-    an in-memory cache instead of being re-read and re-parsed.
-    """
+    """Every live session, newest-updated first (unchanged files are served from a cache)."""
     directory = directory or sessions_dir()
     if not directory.is_dir():
         _cache.clear()
@@ -106,14 +102,16 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
     for stale_path in _cache.keys() - seen_paths:
         del _cache[stale_path]
 
-    project_by_session_id = {t.session_id: t.project for t in load_transcripts()}
-    for s in sessions:
-        name = project_by_session_id.get(s.session_id)
-        if name:
-            s.project = name
+    project_by_session_id = {
+        transcript.session_id: transcript.project for transcript in load_transcripts()
+    }
+    for session in sessions:
+        project = project_by_session_id.get(session.session_id)
+        if project:
+            session.project = project
 
     sessions.sort(
-        key=lambda s: s.updated_at or datetime.min,
+        key=lambda session: session.updated_at or datetime.min,
         reverse=True,
     )
     return sessions

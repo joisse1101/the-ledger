@@ -1,19 +1,10 @@
 """SQLite-backed store for Claude Code project/transcript data.
 
-Consolidates what used to be independent on-disk scans in claude_projects.py
-and claude_transcripts.py (each with its own mtime cache) into one on-demand
-refresh() that rescans ~/.claude.json and ~/.claude/projects/*/*.jsonl and
-writes the result into a local SQLite database (.streamlit/ledger.db,
-gitignored like theme_pref.json). claude_projects.py and claude_transcripts.py
-now just query this database - refresh() is the only place that touches
-those disk sources, triggered by the single refresh button in the nav bar
-(app.py) instead of the two separate per-page refresh buttons it replaced.
-
-claude_sessions.py is unaffected: its "Live" table polls
-~/.claude/sessions/<pid>.json directly every 2s, a different, fast-changing
-data source this refactor doesn't touch - though it benefits anyway, since
-its call into claude_transcripts.load_transcripts() for project-name lookup
-is now a cheap SQL query instead of a full jsonl rescan.
+refresh() is the only place that reads ~/.claude.json and
+~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects.py,
+claude_transcripts.py) just queries the SQLite snapshot this writes to
+.streamlit/ledger.db. claude_sessions.py's live-session polling is separate
+and untouched by this module.
 """
 
 from __future__ import annotations
@@ -23,7 +14,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator, Optional, Generator
+from typing import Any, Generator, Optional
 
 
 def db_path() -> Path:
@@ -39,10 +30,11 @@ def projects_dir() -> Path:
 
 
 def sanitize_project_path(path: str) -> str:
-    """Convert a project directory path to Claude Code's on-disk project
-    folder name under ~/.claude/projects/, e.g.
-    "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log". Every
-    character that isn't alphanumeric becomes a dash."""
+    """Project dir path -> its ~/.claude/projects/ folder name.
+
+    - Every non-alphanumeric character becomes a dash, e.g.
+      "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log".
+    """
     return "".join(ch if ch.isalnum() else "-" for ch in path)
 
 
@@ -118,19 +110,19 @@ def _scan_projects() -> list[dict[str, Any]]:
         return []
 
     rows = []
-    for project_path, pdata in data.get("projects", {}).items():
+    for project_path, project_info in data.get("projects", {}).items():
         rows.append(
             {
                 "path": project_path,
-                "trust_accepted": bool(pdata.get("hasTrustDialogAccepted", False)),
-                "last_session_id": pdata.get("lastSessionId"),
-                "last_version": pdata.get("lastVersionBase", ""),
-                "last_cost": pdata.get("lastCost"),
-                "last_start_time": _parse_epoch_ms(pdata.get("lastStartTime")),
-                "last_duration_ms": pdata.get("lastDuration"),
-                "lines_added": pdata.get("lastLinesAdded"),
-                "lines_removed": pdata.get("lastLinesRemoved"),
-                "mcp_servers": sorted(pdata.get("mcpServers", {}).keys()),
+                "trust_accepted": bool(project_info.get("hasTrustDialogAccepted", False)),
+                "last_session_id": project_info.get("lastSessionId"),
+                "last_version": project_info.get("lastVersionBase", ""),
+                "last_cost": project_info.get("lastCost"),
+                "last_start_time": _parse_epoch_ms(project_info.get("lastStartTime")),
+                "last_duration_ms": project_info.get("lastDuration"),
+                "lines_added": project_info.get("lastLinesAdded"),
+                "lines_removed": project_info.get("lastLinesRemoved"),
+                "mcp_servers": sorted(project_info.get("mcpServers", {}).keys()),
             }
         )
     return rows
@@ -157,8 +149,7 @@ _CACHE_READ_MULTIPLIER = 0.1
 
 
 def _message_cost(model: str, usage: dict[str, Any]) -> Optional[float]:
-    """Cost of one API response given its `usage` block, or None for an
-    unrecognized model (pricing unknown)."""
+    """Dollar cost of one API response, or None if the model has no pricing entry."""
     pricing = _MODEL_PRICING.get(model)
     if pricing is None:
         return None
@@ -279,12 +270,10 @@ def _scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]
 
 
 def refresh() -> datetime:
-    """Rescan ~/.claude.json and ~/.claude/projects/*/*.jsonl from disk and
-    replace the database's contents with what's found there. Returns the
-    new refreshed-at timestamp."""
+    """Rescan disk and replace the database's contents; returns the new refreshed-at timestamp."""
     project_rows = _scan_projects()
     project_by_folder = {
-        sanitize_project_path(r["path"]): Path(r["path"]).name for r in project_rows
+        sanitize_project_path(p["path"]): Path(p["path"]).name for p in project_rows
     }
     transcript_rows = _scan_transcripts(project_by_folder)
     now = datetime.now()
@@ -305,13 +294,13 @@ def refresh() -> datetime:
             """,
             [
                 {
-                    **r,
+                    **p,
                     "last_start_time": (
-                        r["last_start_time"].isoformat() if r["last_start_time"] else None
+                        p["last_start_time"].isoformat() if p["last_start_time"] else None
                     ),
-                    "mcp_servers": json.dumps(r["mcp_servers"]),
+                    "mcp_servers": json.dumps(p["mcp_servers"]),
                 }
-                for r in project_rows
+                for p in project_rows
             ],
         )
 
@@ -328,12 +317,12 @@ def refresh() -> datetime:
             """,
             [
                 {
-                    **r,
-                    "path": str(r["path"]),
-                    "started_at": r["started_at"].isoformat() if r["started_at"] else None,
-                    "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+                    **t,
+                    "path": str(t["path"]),
+                    "started_at": t["started_at"].isoformat() if t["started_at"] else None,
+                    "updated_at": t["updated_at"].isoformat() if t["updated_at"] else None,
                 }
-                for r in transcript_rows
+                for t in transcript_rows
             ],
         )
 
@@ -349,8 +338,7 @@ def refresh() -> datetime:
 
 
 def refreshed_at() -> Optional[datetime]:
-    """When the database was last refreshed from disk, or None if it never
-    has been (e.g. a brand-new .streamlit/ledger.db)."""
+    """When the database was last refreshed, or None for a brand-new db."""
     with _connect() as conn:
         row = conn.execute("SELECT value FROM meta WHERE key = 'refreshed_at'").fetchone()
     return datetime.fromisoformat(row["value"]) if row else None
@@ -382,7 +370,7 @@ def transcript_paths_for_cwd(cwd: str) -> list[Path]:
         rows = conn.execute(
             "SELECT DISTINCT path FROM transcripts WHERE cwd = ?", (cwd,)
         ).fetchall()
-    return [Path(r["path"]) for r in rows]
+    return [Path(row["path"]) for row in rows]
 
 
 def delete_transcript_rows_by_cwd(cwd: str) -> None:

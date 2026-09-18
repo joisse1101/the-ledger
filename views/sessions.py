@@ -8,39 +8,41 @@ from claude_transcripts import delete_transcript, load_transcripts
 
 
 def _sessions_dataframe() -> pd.DataFrame:
+    """The "Live" table's rows, one per running Claude Code session."""
     sessions = load_sessions()
     return pd.DataFrame(
         [
             {
-                "Name": s.name,
-                "Project": s.project,
-                "Status": s.status,
-                "Kind": s.kind,
-                "PID": s.pid,
-                "Started": s.started_at,
-                "Last Updated": s.updated_at,
-                "Session ID": s.session_id,
+                "Name": session.name,
+                "Project": session.project,
+                "Status": session.status,
+                "Kind": session.kind,
+                "PID": session.pid,
+                "Started": session.started_at,
+                "Last Updated": session.updated_at,
+                "Session ID": session.session_id,
             }
-            for s in sessions
+            for session in sessions
         ]
     )
 
 
 def _transcripts_dataframe() -> pd.DataFrame:
+    """The "All" table's rows, one per session transcript ever recorded."""
     transcripts = load_transcripts()
     return pd.DataFrame(
         [
             {
-                "Project": t.project,
-                "Session ID": t.session_id,
-                "Started": t.started_at,
-                "Last Updated": t.updated_at,
-                "Messages": t.message_count,
-                "Est. Cost ($)": t.cost,
-                "Version": t.version,
-                "Git Branch": t.git_branch,
+                "Project": transcript.project,
+                "Session ID": transcript.session_id,
+                "Started": transcript.started_at,
+                "Last Updated": transcript.updated_at,
+                "Messages": transcript.message_count,
+                "Est. Cost ($)": transcript.cost,
+                "Version": transcript.version,
+                "Git Branch": transcript.git_branch,
             }
-            for t in transcripts
+            for transcript in transcripts
         ]
     )
 
@@ -100,7 +102,7 @@ def render_transcripts_table() -> None:
 
     # Live sessions are still being written to by a running process, so
     # they can't be deleted even if their row gets selected.
-    live_ids = {s.session_id for s in load_sessions()}
+    live_ids = {session.session_id for session in load_sessions()}
     live_selected = [sid for sid in selected_ids if sid in live_ids]
     selected_ids = [sid for sid in selected_ids if sid not in live_ids]
 

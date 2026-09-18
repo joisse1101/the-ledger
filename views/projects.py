@@ -6,25 +6,26 @@ from claude_transcripts import delete_project_transcripts
 
 
 def _projects_dataframe() -> pd.DataFrame:
+    """The Projects table's rows, one per Claude Code project."""
     projects = load_projects()
     return pd.DataFrame(
         [
             {
-                "Name": p.name,
-                "Path": p.path,
-                "Trusted": p.trust_accepted,
-                "Last Session": p.last_session_id,
-                "Version": p.last_version,
-                "Last Cost ($)": p.last_cost,
-                "Last Started": p.last_start_time,
+                "Name": project.name,
+                "Path": project.path,
+                "Trusted": project.trust_accepted,
+                "Last Session": project.last_session_id,
+                "Version": project.last_version,
+                "Last Cost ($)": project.last_cost,
+                "Last Started": project.last_start_time,
                 "Lines +/-": (
-                    f"+{p.lines_added}/-{p.lines_removed}"
-                    if p.lines_added is not None or p.lines_removed is not None
+                    f"+{project.lines_added}/-{project.lines_removed}"
+                    if project.lines_added is not None or project.lines_removed is not None
                     else None
                 ),
-                "MCP Servers": ", ".join(p.mcp_servers) if p.mcp_servers else None,
+                "MCP Servers": ", ".join(project.mcp_servers) if project.mcp_servers else None,
             }
-            for p in projects
+            for project in projects
         ]
     )
 

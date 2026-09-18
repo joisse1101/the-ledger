@@ -1,11 +1,6 @@
-"""Claude Code session transcript data.
+"""Claude Code session transcript data, read from the SQLite snapshot claude_db.py maintains.
 
-Reads from the local SQLite snapshot (see claude_db.py) rather than parsing
-~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl directly -
-claude_db.refresh() does that parsing; this module just queries the result
-and builds ClaudeTranscript dataclasses from it. Covers every session that
-has ever run, including ones whose process has since exited - unlike the
-live registry in claude_sessions.py.
+Covers every session that has ever run (unlike claude_sessions.py's live-only registry).
 """
 
 from __future__ import annotations
@@ -55,27 +50,23 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
 
 def load_transcripts() -> list[ClaudeTranscript]:
     """Every session transcript from the SQLite snapshot, newest-updated first."""
-    return [_row_to_transcript(r) for r in claude_db.fetch_transcripts()]
+    return [_row_to_transcript(row) for row in claude_db.fetch_transcripts()]
 
 
 def delete_project_transcripts(cwd: str) -> int:
-    """Delete the on-disk transcript directory/directories for a given cwd,
-    and their rows from the SQLite snapshot. Matches transcripts by their
-    recorded `cwd` field rather than re-deriving Claude Code's
-    directory-name sanitization, so it stays correct even if that scheme
-    changes. Returns the number of directories removed.
-    """
-    dirs = {p.parent for p in claude_db.transcript_paths_for_cwd(cwd)}
-    for d in dirs:
-        shutil.rmtree(d, ignore_errors=True)
+    """Delete a project's on-disk transcript dir(s) and their SQLite rows; returns dirs removed."""
+    # Matched by the recorded `cwd` field rather than re-deriving Claude
+    # Code's directory-name sanitization, so this stays correct even if
+    # that naming scheme changes.
+    transcript_dirs = {path.parent for path in claude_db.transcript_paths_for_cwd(cwd)}
+    for directory in transcript_dirs:
+        shutil.rmtree(directory, ignore_errors=True)
     claude_db.delete_transcript_rows_by_cwd(cwd)
-    return len(dirs)
+    return len(transcript_dirs)
 
 
 def delete_transcript(session_id: str) -> bool:
-    """Delete a single session's transcript file by session_id, and its row
-    from the SQLite snapshot. Returns True if it was found and deleted.
-    """
+    """Delete one session's transcript file and its SQLite row; True if it was found."""
     path = claude_db.transcript_path_for_session(session_id)
     if path is None:
         return False

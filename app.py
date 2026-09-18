@@ -59,21 +59,18 @@ _AUTO_REFRESH_INTERVAL = timedelta(minutes=10)
 
 
 def _auto_refresh_due(last: Optional[datetime], now: datetime) -> bool:
-    """Whether _auto_refresh_data should actually refresh() on this call.
-
-    False on the very first-ever call (last is None - main() already seeds
-    the snapshot before _auto_refresh_data runs, so there's nothing to redo)
-    and on any call less than _AUTO_REFRESH_INTERVAL after the last refresh.
-    """
+    """True once _AUTO_REFRESH_INTERVAL has passed since the last refresh."""
+    # `last is None` means main() just seeded the snapshot - nothing to redo yet.
     return last is not None and now - last >= _AUTO_REFRESH_INTERVAL
 
 
 @st.fragment(run_every="10m")
 def _auto_refresh_data() -> None:
-    """Silently re-run claude_db.refresh() every 10 minutes so the nav bar's
-    "Last refreshed" caption (and every page reading from the shared
-    snapshot) stays current without anyone clicking the "⟳" button.
-    """
+    """Re-run claude_db.refresh() every 10 minutes, in the background."""
+    # This fragment call happens on *every* rerun (page nav, dark-mode toggle,
+    # ...), not just its own 10m timer, so it can't unconditionally refresh()
+    # + st.rerun() - that would loop forever on the very first call. Track
+    # the last refresh ourselves and only act once the interval has elapsed.
     now = datetime.now()
     last = st.session_state.get("_last_auto_refresh")
     due = _auto_refresh_due(last, now)
@@ -102,10 +99,9 @@ def main() -> None:
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.markdown("**The Ledger**")
-        # Set page via on_click (not the button's return value) so the state
-        # update happens before this rerun renders the buttons - otherwise
-        # the type=primary/secondary highlight is computed from the stale
-        # pre-click page and lags one click behind.
+        # Set the page via on_click, not the button's return value, so the
+        # primary/secondary highlight below reflects the click immediately
+        # instead of lagging one rerun behind.
         st.button(
             "Overview",
             type="primary" if st.session_state.page == "overview" else "secondary",
@@ -133,17 +129,10 @@ def main() -> None:
             key="dark_mode",
         )
 
-        # The help tooltip is set from refreshed_at() *before* the button is
-        # drawn, so a click can't update its own tooltip text in the same
-        # pass - st.rerun() re-executes this block immediately after
-        # refresh() so the tooltip picks up the new timestamp right away,
-        # instead of lagging one click behind. The key is timestamp-based
-        # (not a fixed string) so that rerun also remounts the button as a
-        # fresh DOM node - otherwise React patches the existing node in
-        # place, and since the mouse never actually left it, the open
-        # tooltip's hover state has no mouseleave to reset it and gets
-        # stuck showing even after the cursor moves away.
-        if st.button("⟳", key=f"refresh_data", help="Refresh data from Claude files"):
+        # st.rerun() after refresh() re-runs this whole block, so the caption
+        # below picks up the new timestamp immediately instead of lagging one
+        # click behind.
+        if st.button("⟳", key="refresh_data", help="Refresh data from Claude files"):
             claude_db.refresh()
             st.rerun()
         refreshed = claude_db.refreshed_at()

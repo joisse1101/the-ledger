@@ -7,12 +7,11 @@ from streamlit import config as st_config
 
 from claude_transcripts import ClaudeTranscript, load_transcripts
 
-# Time-range filter options for the summary stats/chart, in display order.
-# "All time" (None) skips filtering entirely. Values are an inclusive
-# (oldest, newest) pair of "days ago" from today (local time), e.g. "Past
-# week" = (6, 0) meaning today and the 6 preceding local dates. Most ranges
-# run up to today (newest=0), but "Yesterday" is a single day that excludes
-# today (oldest=newest=1). See _filter_transcripts_by_range.
+# Time-range filter options, in display order:
+# - Each value is an inclusive (oldest days ago, newest days ago) pair, e.g.
+#   "Past week" = (6, 0) meaning today plus the 6 preceding local dates.
+# - "Yesterday" = (1, 1) is the one range that excludes today.
+# - "All time" (None) skips filtering entirely.
 _TIME_RANGES: dict[str, Optional[tuple[int, int]]] = {
     "All time": None,
     "Today": (0, 0),
@@ -23,9 +22,10 @@ _TIME_RANGES: dict[str, Optional[tuple[int, int]]] = {
     "Past year": (364, 0),
 }
 
-# Fixed-order categorical palette (validated for adjacent-pair CVD safety);
-# see the dataviz skill's references/palette.md. Slot order must never be
-# re-sorted per-chart - only which prefix of it is used may vary.
+# Fixed-order categorical palette (colorblind-safe for adjacent pairs; see
+# the dataviz skill's references/palette.md). Never re-sort these slots per
+# chart - only the prefix used may vary, so a given slot always means the
+# same thing everywhere.
 _CATEGORICAL_LIGHT = [
     "#2a78d6",
     "#eb6834",
@@ -53,68 +53,69 @@ _MAX_PROJECT_SLICES = 7  # beyond this, fold the tail into "Other"
 def _filter_transcripts_by_range(
     transcripts: Sequence[ClaudeTranscript], range_label: str
 ) -> Sequence[ClaudeTranscript]:
-    """Transcripts whose activity falls within the chosen time range.
+    """Transcripts falling within the chosen time range.
 
-    A session is placed by its start time (falling back to its last-updated
-    time for the rare transcript with no parsed start), not its update time,
-    so a still-running session is bucketed by when it began.
-
-    Ranges are aligned to *local calendar days*, not a rolling N*24h window:
-    "Today" is every session started on today's local date regardless of the
-    current time of day, "Past week" is today plus the 6 preceding local
-    dates (7 calendar days inclusive), and so on - not "the last 168 hours".
+    - Placed by start time, not update time, so a still-running session is
+      bucketed by when it began (falls back to last-updated time for the
+      rare transcript with no parsed start).
     """
     bounds = _TIME_RANGES.get(range_label)
     if bounds is None:
         return transcripts
     oldest_days_ago, newest_days_ago = bounds
+    # Bucketed by local calendar date, not a rolling N*24h window - "Today"
+    # means today's local date regardless of the current time of day.
     today = datetime.now().astimezone().date()
     start_date = today - timedelta(days=oldest_days_ago)
     end_date = today - timedelta(days=newest_days_ago)
     result = []
-    for t in transcripts:
-        anchor = t.started_at or t.updated_at
+    for transcript in transcripts:
+        anchor = transcript.started_at or transcript.updated_at
         if anchor is None:
             continue
         anchor_date = anchor.astimezone().date()
         if start_date <= anchor_date <= end_date:
-            result.append(t)
+            result.append(transcript)
     return result
 
 
 def _project_totals_dataframe(
     transcripts: Sequence[ClaudeTranscript], top_n: int = _MAX_PROJECT_SLICES
 ) -> pd.DataFrame:
-    """Per-project totals (sessions/messages/cost), folded into the same top-N
-    + "Other" split (ranked by session count) for every project chart on this
-    page, so a project's color/identity never shifts between charts."""
+    """Per-project totals, top-N by session count + an "Other" row for the rest.
+
+    - Every project chart on this page shares this same split, so a project's
+      color/identity never shifts between charts.
+    """
     totals: dict[str, dict] = {}
-    for t in transcripts:
-        row = totals.setdefault(t.project, {"Sessions": 0, "Messages": 0, "Cost": 0.0})
+    for transcript in transcripts:
+        row = totals.setdefault(
+            transcript.project, {"Sessions": 0, "Messages": 0, "Cost": 0.0}
+        )
         row["Sessions"] += 1
-        row["Messages"] += t.message_count
-        row["Cost"] += t.cost
+        row["Messages"] += transcript.message_count
+        row["Cost"] += transcript.cost
     if not totals:
         return pd.DataFrame(
             columns=["Project", "Sessions", "Messages", "Cost", "Percent"]
         )
 
-    ordered = sorted(totals.items(), key=lambda kv: kv[1]["Sessions"], reverse=True)
-    head, tail = ordered[:top_n], ordered[top_n:]
-    rows = [{"Project": name, **vals} for name, vals in head]
-    if tail:
+    ranked = sorted(totals.items(), key=lambda item: item[1]["Sessions"], reverse=True)
+    top_projects, rest = ranked[:top_n], ranked[top_n:]
+    rows = [{"Project": name, **values} for name, values in top_projects]
+    if rest:
         rows.append(
             {
                 "Project": "Other",
-                "Sessions": sum(v["Sessions"] for _, v in tail),
-                "Messages": sum(v["Messages"] for _, v in tail),
-                "Cost": sum(v["Cost"] for _, v in tail),
+                "Sessions": sum(values["Sessions"] for _, values in rest),
+                "Messages": sum(values["Messages"] for _, values in rest),
+                "Cost": sum(values["Cost"] for _, values in rest),
             }
         )
 
-    total_sessions = sum(r["Sessions"] for r in rows)
-    for r in rows:
-        r["Percent"] = f"{100 * r['Sessions'] / total_sessions:.1f}%"
+    total_sessions = sum(row["Sessions"] for row in rows)
+    for row in rows:
+        row["Percent"] = f"{100 * row['Sessions'] / total_sessions:.1f}%"
     return pd.DataFrame(rows)
 
 
@@ -132,12 +133,11 @@ def _theme_colors() -> tuple[bool, list[str], str, str, str, str]:
 def _project_color_scale(
     df: pd.DataFrame, hues: Sequence[str]
 ) -> tuple[list[str], list[str]]:
-    """Domain/range for a Project color encoding, shared across all project
-    charts so the same project always gets the same hue."""
+    """Domain/range for a Project color encoding, shared across charts so a project keeps its hue."""
     domain = list(df["Project"])
     has_other = "Other" in domain
-    n_named = len(domain) - (1 if has_other else 0)
-    color_range = list(hues[:n_named]) + ([_MUTED_INK] if has_other else [])
+    named_count = len(domain) - (1 if has_other else 0)
+    color_range = list(hues[:named_count]) + ([_MUTED_INK] if has_other else [])
     return domain, color_range
 
 
@@ -148,21 +148,23 @@ def _format_hour(hour: int) -> str:
 
 
 def _hourly_activity_dataframe(transcripts: Sequence[ClaudeTranscript]) -> pd.DataFrame:
-    """Per-hour-of-day totals (session count and message count), bucketed by
-    each transcript's local start time. All 24 hours are always present
-    (zero-filled) so the histogram never looks like it's missing a category."""
+    """Session/message counts per local hour of day.
+
+    - All 24 hours are always present (zero-filled), so the chart never looks
+      like it's missing a category.
+    """
     sessions = [0] * 24
     messages = [0] * 24
-    for t in transcripts:
-        anchor = t.started_at or t.updated_at
+    for transcript in transcripts:
+        anchor = transcript.started_at or transcript.updated_at
         if anchor is None:
             continue
         hour = anchor.astimezone().hour
         sessions[hour] += 1
-        messages[hour] += t.message_count
+        messages[hour] += transcript.message_count
     return pd.DataFrame(
         {
-            "Label": [_format_hour(h) for h in range(24)],
+            "Label": [_format_hour(hour) for hour in range(24)],
             "Sessions": sessions,
             "Messages": messages,
         }
@@ -182,35 +184,36 @@ def _format_duration(seconds: float) -> str:
 
 
 def _render_summary_stats(transcripts: Sequence[ClaudeTranscript]) -> None:
-    num_projects = len({t.project for t in transcripts})
+    num_projects = len({transcript.project for transcript in transcripts})
     num_sessions = len(transcripts)
-    total_messages = sum(t.message_count for t in transcripts)
+    total_messages = sum(transcript.message_count for transcript in transcripts)
 
     durations = [
-        ((t.updated_at - t.started_at).total_seconds(), t)
-        for t in transcripts
-        if t.started_at and t.updated_at
+        ((transcript.updated_at - transcript.started_at).total_seconds(), transcript)
+        for transcript in transcripts
+        if transcript.started_at and transcript.updated_at
     ]
 
-    costs = [(t.cost, t) for t in transcripts]
+    costs = [(transcript.cost, transcript) for transcript in transcripts]
 
-    total = sum(d for d, _ in durations)
+    total = sum(duration for duration, _ in durations)
     avg_seconds = total / len(durations) if durations else 0
-    longest = max(durations, key=lambda d: d[0]) if durations else None
-    shortest = min(durations, key=lambda d: d[0]) if durations else None
+    longest = max(durations, key=lambda entry: entry[0]) if durations else None
+    shortest = min(durations, key=lambda entry: entry[0]) if durations else None
 
-    total_cost = sum(c for c, _ in costs)
-    most_expensive = max(costs, key=lambda c: c[0])[1] if costs else None
+    total_cost = sum(cost for cost, _ in costs)
+    most_expensive = max(costs, key=lambda entry: entry[0])[1] if costs else None
     avg_cost = total_cost / len(costs) if costs else 0
-    cheapest = min(costs, key=lambda c: c[0])[1] if costs else None
+    cheapest = min(costs, key=lambda entry: entry[0])[1] if costs else None
 
     def _session_help(entry: tuple[float, ClaudeTranscript] | None) -> str | None:
+        """Metric tooltip text naming which project/session an extreme value belongs to."""
         if entry is None:
             return None
-        _, t = entry
-        # st.metric's help text renders as markdown - a bare "\n" is collapsed,
-        # so a trailing two-space "hard break" is needed for an actual line break.
-        return f"{t.project}  \n{t.session_id}"
+        _, transcript = entry
+        # A trailing two-space hard break, since st.metric's help text renders
+        # as markdown and a bare "\n" gets collapsed.
+        return f"{transcript.project}  \n{transcript.session_id}"
 
     col_one, col_two, col_three = st.columns(3)
     with col_one:
@@ -328,14 +331,10 @@ def _render_messages_cost_chart(
     text_secondary: str,
     grid: str,
 ) -> None:
-    """Messages and cost per project as grouped bars on one shared axis.
-
-    Messages and cost sit on very different scales, so instead of a literal
-    dual-axis chart (flagged as the #1 charting mistake - the alignment of two
-    independent scales is arbitrary and invents a correlation that isn't in
-    the data), each metric is normalized to % of its own max. Both then share
-    one 0-100% axis and stay directly comparable.
-    """
+    """Messages and cost per project as grouped bars, each normalized to % of its own max."""
+    # Messages and cost live on very different scales - normalizing each to
+    # its own max (instead of a dual-axis chart, which invents a fake
+    # correlation between independent scales) lets both share one 0-100% axis.
     st.subheader("Messages & Cost by Project")
 
     max_messages = df["Messages"].max() or 1
@@ -452,10 +451,9 @@ def _render_messages_cost_chart(
 def _render_hourly_activity_chart(
     df: pd.DataFrame, hues: Sequence[str], text_secondary: str, grid: str
 ) -> None:
-    """Sessions and messages by local hour of day, as grouped bars on one
-    shared axis - same normalize-to-%-of-max approach as the messages/cost
-    chart, so the two metrics' very different scales don't need dual axes.
-    """
+    """Sessions and messages by local hour, as grouped bars normalized to % of each metric's max."""
+    # Same normalize-to-own-max approach as _render_messages_cost_chart above,
+    # to avoid a dual-axis chart between two independently-scaled metrics.
     st.subheader("Activity by Hour of Day")
 
     hour_order = list(df["Label"])

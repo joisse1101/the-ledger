@@ -1,9 +1,4 @@
-"""Claude Code project data.
-
-Reads from the local SQLite snapshot (see claude_db.py) rather than parsing
-~/.claude.json directly - claude_db.refresh() does that parsing; this module
-just queries the result and builds ClaudeProject dataclasses from it.
-"""
+"""Claude Code project data, read from the SQLite snapshot claude_db.py maintains."""
 
 from __future__ import annotations
 
@@ -56,12 +51,11 @@ def _row_to_project(row: sqlite3.Row) -> ClaudeProject:
 
 def load_projects() -> list[ClaudeProject]:
     """Every project entry from the SQLite snapshot, newest-started first."""
-    return [_row_to_project(r) for r in claude_db.fetch_projects()]
+    return [_row_to_project(row) for row in claude_db.fetch_projects()]
 
 
 def delete_project(project_path: str) -> bool:
-    """Remove a project entry from ~/.claude.json and its row from the
-    SQLite snapshot. Returns True if the entry was found and removed."""
+    """Remove a project from ~/.claude.json and its SQLite row; True if it was found."""
     path = claude_db.config_path()
     if not path.is_file():
         return False
