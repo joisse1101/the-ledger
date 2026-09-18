@@ -9,6 +9,7 @@ and untouched by this module.
 
 from __future__ import annotations
 
+import atexit
 import json
 import re
 import sqlite3
@@ -89,17 +90,6 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    # Older on-disk databases predate the title/last_message/first_prompt
-    # columns (or still have their predecessor, the combined recap/
-    # recap_source pair) - ALTER TABLE ADD COLUMN has no "IF NOT EXISTS" in
-    # SQLite, so check first.
-    existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(transcripts)")}
-    for column in ("title", "last_message", "first_prompt"):
-        if column not in existing_columns:
-            conn.execute(f"ALTER TABLE transcripts ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
-    for column in ("recap", "recap_source"):
-        if column in existing_columns:
-            conn.execute(f"ALTER TABLE transcripts DROP COLUMN {column}")
 
 
 # ---------------------------------------------------------------------------
@@ -426,6 +416,24 @@ def refresh() -> datetime:
         )
 
     return now
+
+
+_started = False
+
+
+def startup() -> None:
+    """Wipe any on-disk snapshot left over from a previous run and rebuild it fresh.
+
+    - Database is a derived cache, never a source of truth
+    - Registers a best-effort cleanup of the same file on process exit
+    """
+    global _started
+    if _started:
+        return
+    _started = True
+    db_path().unlink(missing_ok=True)
+    refresh()
+    atexit.register(lambda: db_path().unlink(missing_ok=True))
 
 
 def refreshed_at() -> Optional[datetime]:

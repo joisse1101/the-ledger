@@ -89,11 +89,11 @@ def main() -> None:
     if "page" not in st.session_state:
         st.session_state.page = "sessions"
 
-    # Seed the shared SQLite snapshot on the very first run against a fresh
-    # .streamlit/ledger.db, so the nav bar and pages aren't empty before
-    # anyone has clicked refresh yet.
-    if claude_db.refreshed_at() is None:
-        claude_db.refresh()
+    # Wipe any leftover .streamlit/ledger.db and rebuild it fresh, once per
+    # process, so the nav bar and pages aren't empty before anyone has
+    # clicked refresh yet - and so the app never has to reason about an
+    # old-schema snapshot from a previous run.
+    claude_db.startup()
 
     _auto_refresh_data()
 
