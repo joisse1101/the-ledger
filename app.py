@@ -1,6 +1,8 @@
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 import streamlit as st
 from streamlit import config as st_config
@@ -53,6 +55,36 @@ def _set_page(page: str) -> None:
     st.session_state.page = page
 
 
+_AUTO_REFRESH_INTERVAL = timedelta(minutes=10)
+
+
+def _auto_refresh_due(last: Optional[datetime], now: datetime) -> bool:
+    """Whether _auto_refresh_data should actually refresh() on this call.
+
+    False on the very first-ever call (last is None - main() already seeds
+    the snapshot before _auto_refresh_data runs, so there's nothing to redo)
+    and on any call less than _AUTO_REFRESH_INTERVAL after the last refresh.
+    """
+    return last is not None and now - last >= _AUTO_REFRESH_INTERVAL
+
+
+@st.fragment(run_every="10m")
+def _auto_refresh_data() -> None:
+    """Silently re-run claude_db.refresh() every 10 minutes so the nav bar's
+    "Last refreshed" caption (and every page reading from the shared
+    snapshot) stays current without anyone clicking the "⟳" button.
+    """
+    now = datetime.now()
+    last = st.session_state.get("_last_auto_refresh")
+    due = _auto_refresh_due(last, now)
+    if last is not None and not due:
+        return
+    st.session_state["_last_auto_refresh"] = now
+    if due:
+        claude_db.refresh()
+        st.rerun()
+
+
 def main() -> None:
     st.set_page_config(page_title="The Ledger", page_icon="🤖", layout="wide")
     st.markdown(_COMPACT_LAYOUT_CSS, unsafe_allow_html=True)
@@ -65,6 +97,8 @@ def main() -> None:
     # anyone has clicked refresh yet.
     if claude_db.refreshed_at() is None:
         claude_db.refresh()
+
+    _auto_refresh_data()
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.markdown("**The Ledger**")
