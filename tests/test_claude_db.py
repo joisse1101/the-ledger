@@ -209,12 +209,18 @@ def test_scan_transcript_file_no_cwd_falls_back_to_parent_folder_name(
     assert row["project"] == "some-folder"
 
 
-def test_scan_transcript_file_recap_prefers_ai_title(tmp_path, write_transcript):
+def test_scan_transcript_file_stores_title_last_message_and_first_prompt_separately(
+    tmp_path, write_transcript
+):
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(
         path,
         [
-            {"type": "user", "timestamp": "2024-01-01T10:00:00Z", "message": {"content": "hi"}},
+            {
+                "type": "user",
+                "timestamp": "2024-01-01T10:00:00Z",
+                "message": {"content": "Help me fix the login bug"},
+            },
             {"type": "ai-title", "aiTitle": "Fix login bug"},
             {
                 "type": "assistant",
@@ -224,13 +230,12 @@ def test_scan_transcript_file_recap_prefers_ai_title(tmp_path, write_transcript)
         ],
     )
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["recap"] == "Fix login bug"
-    assert row["recap_source"] == "title"
+    assert row["title"] == "Fix login bug"
+    assert row["last_message"] == "Done, fixed it."
+    assert row["first_prompt"] == "Help me fix the login bug"
 
 
-def test_scan_transcript_file_recap_falls_back_to_last_assistant_text(
-    tmp_path, write_transcript
-):
+def test_scan_transcript_file_last_message_ignores_tool_only_turns(tmp_path, write_transcript):
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(
         path,
@@ -241,7 +246,7 @@ def test_scan_transcript_file_recap_falls_back_to_last_assistant_text(
                 "timestamp": "2024-01-01T10:01:00Z",
                 "message": {"content": [{"type": "text", "text": "First reply."}]},
             },
-            # A tool-only turn (no text block) must not blank out the recap.
+            # A tool-only turn (no text block) must not blank out last_message.
             {
                 "type": "assistant",
                 "timestamp": "2024-01-01T10:02:00Z",
@@ -255,28 +260,13 @@ def test_scan_transcript_file_recap_falls_back_to_last_assistant_text(
         ],
     )
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["recap"] == "Anything else?"
-    assert row["recap_source"] == "last_message"
+    assert row["last_message"] == "Anything else?"
+    assert row["title"] == ""
 
 
-def test_scan_transcript_file_recap_falls_back_to_first_user_prompt(tmp_path, write_transcript):
-    path = tmp_path / "projects" / "f" / "abc.jsonl"
-    write_transcript(
-        path,
-        [
-            {
-                "type": "user",
-                "timestamp": "2024-01-01T10:00:00Z",
-                "message": {"content": "Help me fix the login bug"},
-            }
-        ],
-    )
-    row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["recap"] == "Help me fix the login bug"
-    assert row["recap_source"] == "first_prompt"
-
-
-def test_scan_transcript_file_recap_skips_command_only_first_message(tmp_path, write_transcript):
+def test_scan_transcript_file_first_prompt_skips_command_only_first_message(
+    tmp_path, write_transcript
+):
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(
         path,
@@ -294,16 +284,18 @@ def test_scan_transcript_file_recap_skips_command_only_first_message(tmp_path, w
         ],
     )
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["recap"] == "Now the real question"
-    assert row["recap_source"] == "first_prompt"
+    assert row["first_prompt"] == "Now the real question"
 
 
-def test_scan_transcript_file_recap_blank_when_no_content(tmp_path, write_transcript):
+def test_scan_transcript_file_title_last_message_first_prompt_blank_when_no_content(
+    tmp_path, write_transcript
+):
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(path, [{"type": "system", "timestamp": "2024-01-01T10:00:00Z"}])
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["recap"] == ""
-    assert row["recap_source"] == ""
+    assert row["title"] == ""
+    assert row["last_message"] == ""
+    assert row["first_prompt"] == ""
 
 
 def test_scan_transcript_file_skips_malformed_lines(tmp_path, write_transcript):

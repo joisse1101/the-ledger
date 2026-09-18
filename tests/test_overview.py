@@ -33,8 +33,9 @@ def _transcript(started_at=None, updated_at=None, message_count=0, cost=0.0, pro
         message_count=message_count,
         cost=cost,
         project=project,
-        recap="",
-        recap_source="",
+        title="",
+        last_message="",
+        first_prompt="",
     )
 
 

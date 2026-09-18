@@ -83,18 +83,23 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             message_count INTEGER NOT NULL,
             cost REAL NOT NULL,
             project TEXT NOT NULL,
-            recap TEXT NOT NULL DEFAULT '',
-            recap_source TEXT NOT NULL DEFAULT ''
+            title TEXT NOT NULL DEFAULT '',
+            last_message TEXT NOT NULL DEFAULT '',
+            first_prompt TEXT NOT NULL DEFAULT ''
         );
         """
     )
-    # Older on-disk databases predate the recap columns - ALTER TABLE ADD
-    # COLUMN has no "IF NOT EXISTS" in SQLite, so check first.
+    # Older on-disk databases predate the title/last_message/first_prompt
+    # columns (or still have their predecessor, the combined recap/
+    # recap_source pair) - ALTER TABLE ADD COLUMN has no "IF NOT EXISTS" in
+    # SQLite, so check first.
     existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(transcripts)")}
-    if "recap" not in existing_columns:
-        conn.execute("ALTER TABLE transcripts ADD COLUMN recap TEXT NOT NULL DEFAULT ''")
-    if "recap_source" not in existing_columns:
-        conn.execute("ALTER TABLE transcripts ADD COLUMN recap_source TEXT NOT NULL DEFAULT ''")
+    for column in ("title", "last_message", "first_prompt"):
+        if column not in existing_columns:
+            conn.execute(f"ALTER TABLE transcripts ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+    for column in ("recap", "recap_source"):
+        if column in existing_columns:
+            conn.execute(f"ALTER TABLE transcripts DROP COLUMN {column}")
 
 
 # ---------------------------------------------------------------------------
@@ -308,18 +313,14 @@ def _scan_transcript_file(
     except OSError:
         return None
 
-    # Prefer Claude Code's own auto-generated session title, then the last
-    # thing the assistant said (a recap, a wrap-up summary, a follow-up
-    # question - whatever it naturally is), then fall back to the first
-    # thing the user actually typed.
-    if ai_title:
-        recap, recap_source = _normalize_snippet(ai_title), "title"
-    elif last_assistant_text:
-        recap, recap_source = _normalize_snippet(last_assistant_text), "last_message"
-    elif first_user_text:
-        recap, recap_source = _normalize_snippet(first_user_text), "first_prompt"
-    else:
-        recap, recap_source = "", ""
+    # Claude Code's own auto-generated session title, the last thing the
+    # assistant said (a recap, a wrap-up summary, a follow-up question -
+    # whatever it naturally is), and the first thing the user actually
+    # typed - stored separately rather than collapsed into one fallback
+    # chain, so callers can show whichever of these fit their context.
+    title = _normalize_snippet(ai_title) if ai_title else ""
+    last_message = _normalize_snippet(last_assistant_text) if last_assistant_text else ""
+    first_prompt = _normalize_snippet(first_user_text) if first_user_text else ""
 
     # A session can `cd` partway through, leaving `cwd` pointing below the
     # real project root - trust the on-disk parent folder's project match
@@ -339,8 +340,9 @@ def _scan_transcript_file(
         "message_count": message_count,
         "cost": cost,
         "project": project,
-        "recap": recap,
-        "recap_source": recap_source,
+        "title": title,
+        "last_message": last_message,
+        "first_prompt": first_prompt,
     }
 
 
@@ -396,10 +398,12 @@ def refresh() -> datetime:
             """
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, project, recap, recap_source
+                updated_at, message_count, cost, project, title, last_message,
+                first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :project, :recap, :recap_source
+                :updated_at, :message_count, :cost, :project, :title, :last_message,
+                :first_prompt
             )
             """,
             [

@@ -32,8 +32,9 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
     assert t.git_branch == "main"
     assert t.message_count == 2
     assert t.project == "proj"
-    assert t.recap == "What's causing the login bug?"
-    assert t.recap_source == "first_prompt"
+    assert t.title == ""
+    assert t.last_message == ""
+    assert t.first_prompt == "What's causing the login bug?"
 
 
 def test_delete_project_transcripts_removes_files_and_rows(

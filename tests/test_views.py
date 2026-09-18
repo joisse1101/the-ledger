@@ -40,8 +40,9 @@ def _transcript(**overrides):
         message_count=4,
         cost=0.5,
         project="proj",
-        recap="Fixed the login bug",
-        recap_source="title",
+        title="Fixed the login bug",
+        last_message="All done, let me know if you need anything else.",
+        first_prompt="Can you fix the login bug?",
     )
     defaults.update(overrides)
     return ClaudeTranscript(**defaults)
@@ -93,6 +94,7 @@ def test_transcripts_dataframe_maps_fields(monkeypatch):
     df = _transcripts_dataframe()
     row = df.iloc[0]
     assert row["Session ID"] == "t1"
+    assert row["Title"] == "Fixed the login bug"
     assert row["Messages"] == 4
     assert row["Est. Cost ($)"] == 0.5
     assert row["Git Branch"] == "main"

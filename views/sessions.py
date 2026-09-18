@@ -10,6 +10,7 @@ from claude_transcripts import delete_transcript, load_transcripts
 _LIVE_COLUMNS = [
     "Name",
     "Project",
+    "Title",
     "Status",
     "Kind",
     "PID",
@@ -17,10 +18,11 @@ _LIVE_COLUMNS = [
     "Last Updated",
     "Session ID",
 ]
-_LIVE_WIDTHS = [3, 3, 2, 2, 1, 3, 3, 4]
+_LIVE_WIDTHS = [3, 3, 3, 2, 2, 1, 3, 3, 4]
 
 _TRANSCRIPTS_COLUMNS = [
     "Project",
+    "Title",
     "Session ID",
     "Started",
     "Last Updated",
@@ -29,7 +31,7 @@ _TRANSCRIPTS_COLUMNS = [
     "Version",
     "Git Branch",
 ]
-_TRANSCRIPTS_WIDTHS = [3, 4, 3, 3, 2, 2, 2, 2]
+_TRANSCRIPTS_WIDTHS = [3, 3, 4, 3, 3, 2, 2, 2, 2]
 
 
 def _sessions_dataframe() -> pd.DataFrame:
@@ -40,14 +42,15 @@ def _sessions_dataframe() -> pd.DataFrame:
             {
                 "Name": session.name,
                 "Project": session.project,
+                "Title": session.title,
                 "Status": session.status,
                 "Kind": session.kind,
                 "PID": session.pid,
                 "Started": session.started_at,
                 "Last Updated": session.updated_at,
                 "Session ID": session.session_id,
-                "Recap": session.recap,
-                "Recap Source": session.recap_source,
+                "Last Message": session.last_message,
+                "First Prompt": session.first_prompt,
             }
             for session in sessions
         ]
@@ -61,6 +64,7 @@ def _transcripts_dataframe() -> pd.DataFrame:
         [
             {
                 "Project": transcript.project,
+                "Title": transcript.title,
                 "Session ID": transcript.session_id,
                 "Started": transcript.started_at,
                 "Last Updated": transcript.updated_at,
@@ -68,8 +72,8 @@ def _transcripts_dataframe() -> pd.DataFrame:
                 "Est. Cost ($)": transcript.cost,
                 "Version": transcript.version,
                 "Git Branch": transcript.git_branch,
-                "Recap": transcript.recap,
-                "Recap Source": transcript.recap_source,
+                "Last Message": transcript.last_message,
+                "First Prompt": transcript.first_prompt,
             }
             for transcript in transcripts
         ]
@@ -152,6 +156,12 @@ def _format_cell(value: object) -> str:
     return str(value)
 
 
+def _tooltip_text(row: dict) -> str:
+    """Hover preview for a row's button: last message from Claude, else the
+    first prompt, else a plain "nothing to show" fallback."""
+    return row["Last Message"] or row["First Prompt"] or "No information available"
+
+
 def _render_table_header(labels: Sequence[str], widths: Sequence[int], *, key: str) -> None:
     with st.container(key=key):
         for col, label in zip(st.columns(widths), labels):
@@ -186,30 +196,25 @@ def _render_table_row(
 # cancelling a delete.
 # ---------------------------------------------------------------------------
 
-_RECAP_SOURCE_LABELS = {
-    "title": "Session title",
-    "last_message": "Last message from Claude",
-    "first_prompt": "First prompt",
-}
-
-
 def _open_session_dialog(
     *,
     source: str,
-    title: str,
+    heading: str,
     project: str,
     session_id: str,
-    recap: str,
-    recap_source: str,
+    title: str,
+    last_message: str,
+    first_prompt: str,
     deletable: bool,
 ) -> None:
     st.session_state.recap_dialog_info = {
         "source": source,
-        "title": title,
+        "heading": heading,
         "project": project,
         "session_id": session_id,
-        "recap": recap,
-        "recap_source": recap_source,
+        "title": title,
+        "last_message": last_message,
+        "first_prompt": first_prompt,
         "deletable": deletable,
     }
 
@@ -225,16 +230,21 @@ def _render_recap_dialog() -> None:
     if not info:
         return
 
-    st.markdown(f"**{info['title']}**")
+    st.markdown(f"**{info['heading']}**")
     st.caption(f"{info['project']}  \n{info['session_id']}")
 
-    if info["recap"]:
-        label = _RECAP_SOURCE_LABELS.get(info["recap_source"])
-        if label:
-            st.caption(label)
-        st.write(info["recap"])
+    if info["title"] or info["last_message"] or info["first_prompt"]:
+        if info["title"]:
+            st.caption("Session title")
+            st.write(info["title"])
+        if info["last_message"]:
+            st.caption("Last message from Claude")
+            st.write(info["last_message"])
+        if info["first_prompt"]:
+            st.caption("First prompt")
+            st.write(info["first_prompt"])
     else:
-        st.caption("No recap available yet for this session.")
+        st.caption("No information available for this session yet.")
 
     if info["source"] != "transcripts":
         return
@@ -294,14 +304,15 @@ def render_sessions_table() -> None:
                 _LIVE_COLUMNS,
                 _LIVE_WIDTHS,
                 key=f"sessrow-live-{row['Session ID']}",
-                tooltip=row["Recap"],
+                tooltip=_tooltip_text(row),
                 on_click=lambda r=row: _open_session_dialog(
                     source="live",
-                    title=r["Name"] or r["Project"],
+                    heading=r["Name"] or r["Project"],
                     project=r["Project"],
                     session_id=r["Session ID"],
-                    recap=r["Recap"],
-                    recap_source=r["Recap Source"],
+                    title=r["Title"],
+                    last_message=r["Last Message"],
+                    first_prompt=r["First Prompt"],
                     deletable=False,
                 ),
             )
@@ -327,14 +338,15 @@ def render_transcripts_table() -> None:
             _TRANSCRIPTS_COLUMNS,
             _TRANSCRIPTS_WIDTHS,
             key=f"sessrow-transcripts-{row['Session ID']}",
-            tooltip=row["Recap"],
+            tooltip=_tooltip_text(row),
             on_click=lambda r=row: _open_session_dialog(
                 source="transcripts",
-                title=r["Project"],
+                heading=r["Project"],
                 project=r["Project"],
                 session_id=r["Session ID"],
-                recap=r["Recap"],
-                recap_source=r["Recap Source"],
+                title=r["Title"],
+                last_message=r["Last Message"],
+                first_prompt=r["First Prompt"],
                 deletable=r["Session ID"] not in live_ids,
             ),
         )

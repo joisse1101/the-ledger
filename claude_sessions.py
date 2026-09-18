@@ -31,8 +31,9 @@ class ClaudeSession:
     raw: dict[str, Any] = field(repr=False)
     # Set in load_sessions() from the transcripts table, not just this field.
     project: str = ""
-    recap: str = ""
-    recap_source: str = ""
+    title: str = ""
+    last_message: str = ""
+    first_prompt: str = ""
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -113,8 +114,9 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
             continue
         if transcript.project:
             session.project = transcript.project
-        session.recap = transcript.recap
-        session.recap_source = transcript.recap_source
+        session.title = transcript.title
+        session.last_message = transcript.last_message
+        session.first_prompt = transcript.first_prompt
 
     sessions.sort(
         key=lambda session: session.updated_at or datetime.min,
