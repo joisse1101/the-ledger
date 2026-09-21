@@ -83,8 +83,16 @@ def _render_sortable_table_header(labels: Sequence[str], widths: Sequence[int], 
                 st.rerun()
 
 
-def _render_table_row(row: dict, columns: Sequence[str], widths: Sequence[int], *, key: str, tooltip: str, on_click,
-                      formatters: Mapping[str, Callable] | None = None) -> None:
+def _render_table_row(
+    row: dict,
+    columns: Sequence[str],
+    widths: Sequence[int],
+    *,
+    key: str,
+    tooltip: str | None = None,
+    on_click,
+    formatters: Mapping[str, Callable] | None = None,
+) -> None:
     formatters = formatters or {}
     with st.container(key=key):
         for col, name in zip(st.columns(widths, vertical_alignment="center"), columns):

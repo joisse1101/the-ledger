@@ -146,9 +146,12 @@ def test_transcripts_dataframe_maps_fields(monkeypatch):
     assert row["Session ID"] == "t1"
     assert row["Title"] == "Fixed the login bug"
     assert row["Messages"] == 4
-    assert row["Est. Cost ($)"] == 0.5
+    assert row["Cost ($)"] == 0.5
     assert row["Git Branch"] == "main"
     assert row["Context"] == 120_000
+    assert (
+        row["CWD"] == "/x/proj"
+    )  # the detail dialog needs it to locate the transcript
 
 
 def test_transcripts_dataframe_context_is_numeric_so_it_sorts_and_formats_missing_as_placeholder(monkeypatch):

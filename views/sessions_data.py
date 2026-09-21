@@ -56,10 +56,11 @@ def _transcripts_dataframe() -> pd.DataFrame:
                 "Started": format_date(t.started_at),
                 "Last Updated": format_date(t.updated_at),
                 "Messages": t.message_count,
-                "Est. Cost ($)": t.cost,
+                "Cost ($)": t.cost,
                 "Context": t.context,
                 "Version": t.version,
                 "Git Branch": t.git_branch,
+                "CWD": t.cwd,
                 "Last Message": t.last_message,
                 "First Prompt": t.first_prompt,
             }

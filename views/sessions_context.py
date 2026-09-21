@@ -1,4 +1,9 @@
-"""Per-session context detail: token/cache history and what filled the context, opened from a Live row."""
+"""Per-session context detail: token/cache history and what filled the context.
+
+Opened from a Live row (`_open_context_dialog`) or an All-table row (`_open_transcript_dialog`, which
+also offers deleting the transcript). The two use separate state keys, and each opener clears the
+other's, since only one dialog can be open per script run.
+"""
 
 from typing import Any, Optional
 
@@ -6,20 +11,60 @@ import pandas as pd
 import streamlit as st
 
 from claude_context import SessionDetail, humanise_tokens, load_detail
+from claude_transcripts import delete_transcript
 from views.overview import _theme_colors
 
 
 _INFO_KEY = "context_dialog_info"
+_TRANSCRIPT_INFO_KEY = "transcript_dialog_info"
+_CONFIRM_DELETE_KEY = "confirm_delete_session"
 _KINDS = ["Cache read", "Cache written", "New"]  # stack order, bottom to top
 
 
 def _open_context_dialog(*, session_id: str, cwd: str, heading: str) -> None:
-    st.session_state.recap_dialog_info = None  # only one dialog can be open per script run
+    st.session_state[_TRANSCRIPT_INFO_KEY] = None
     st.session_state[_INFO_KEY] = {"session_id": session_id, "cwd": cwd, "heading": heading}
 
 
 def _dismiss_context_dialog() -> None:
     st.session_state[_INFO_KEY] = None
+
+
+def _open_transcript_dialog(
+    *,
+    session_id: str,
+    cwd: str,
+    heading: str,
+    title: str,
+    last_message: str,
+    first_prompt: str,
+    started: str,
+    updated: str,
+    deletable: bool,
+    messages: int,
+    context: int,
+    cost: float,
+) -> None:
+    st.session_state[_INFO_KEY] = None
+    st.session_state[_TRANSCRIPT_INFO_KEY] = {
+        "session_id": session_id,
+        "cwd": cwd,
+        "heading": heading,
+        "title": title,
+        "last_message": last_message,
+        "first_prompt": first_prompt,
+        "started": started,
+        "updated": updated,
+        "deletable": deletable,
+        "messages": messages,
+        "context": context,
+        "cost": cost,
+    }
+
+
+def _dismiss_transcript_dialog() -> None:
+    st.session_state[_TRANSCRIPT_INFO_KEY] = None
+    st.session_state.pop(_CONFIRM_DELETE_KEY, None)
 
 
 def _chart_records(detail: SessionDetail) -> list[dict[str, Any]]:
@@ -202,3 +247,75 @@ def _render_context_dialog() -> None:
 def _maybe_render_context_dialog() -> None:
     if st.session_state.get(_INFO_KEY):
         _render_context_dialog()
+
+
+def _render_recap(info: dict[str, Any]) -> None:
+    """What the session was about: title, last message (or first prompt), and when it ran."""
+    if info["title"] or info["last_message"] or info["first_prompt"]:
+        if info["title"]:
+            st.caption("Session title")
+            st.write(info["title"])
+        if info["last_message"]:
+            st.caption("Last message from Claude")
+            st.write(info["last_message"])
+        if not info["last_message"] and info["first_prompt"]:
+            st.caption("First prompt")
+            st.write(info["first_prompt"])
+    else:
+        st.caption("No information available for this session yet.")
+
+    with st.container(horizontal=True):
+        if info["started"]:
+            st.caption("Started")
+            st.write(f"*{info['started']}*")
+        if info["updated"]:
+            st.caption("Last updated")
+            st.write(f"*{info['updated']}*")
+        if info["messages"] is not None:
+            st.caption("Messages")
+            st.write(f"*{info['messages']}*")
+        if info["context"] is not None:
+            st.caption("Tokens per message")
+            st.write(f"*{round(info['context'] / info['messages'], 2)}*")
+        if info["cost"] is not None:
+            st.caption("Cost ($)")
+            st.write(f"*{round(info['cost'], 2)}*")
+    st.divider()
+
+
+def _render_delete_controls(info: dict[str, Any]) -> None:
+    st.divider()
+    if not info["deletable"]:
+        st.caption("This session is still live and can't be deleted.")
+        return
+
+    if st.session_state.get(_CONFIRM_DELETE_KEY) == info["session_id"]:
+        st.warning("Delete this session transcript? This cannot be undone.")
+        with st.container(horizontal=True):
+            if st.button(
+                "Confirm delete", type="primary", key="confirm_delete_session_btn"
+            ):
+                delete_transcript(info["session_id"])
+                _dismiss_transcript_dialog()
+                st.rerun()
+            if st.button("Cancel", key="cancel_delete_session_btn"):
+                st.session_state.pop(_CONFIRM_DELETE_KEY, None)
+                st.rerun()
+    elif st.button("🗑️ Delete this session", key="open_delete_session_btn"):
+        st.session_state[_CONFIRM_DELETE_KEY] = info["session_id"]
+
+
+@st.dialog("Session details", width="large", on_dismiss=_dismiss_transcript_dialog)
+def _render_transcript_dialog() -> None:
+    info = st.session_state.get(_TRANSCRIPT_INFO_KEY)
+    if not info:
+        return
+    st.markdown(f"**{info['heading']}**")
+    _render_recap(info)
+    _render_detail(load_detail(info["session_id"], info["cwd"]))
+    _render_delete_controls(info)
+
+
+def _maybe_render_transcript_dialog() -> None:
+    if st.session_state.get(_TRANSCRIPT_INFO_KEY):
+        _render_transcript_dialog()

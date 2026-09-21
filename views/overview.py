@@ -261,7 +261,7 @@ def _render_summary_stats(transcripts: Sequence[ClaudeTranscript]) -> None:
             f"${cheapest.cost:,.2f}" if cheapest else "$0.00",
             help=_session_help((cheapest.cost, cheapest) if cheapest else None),
         )
-        st.metric("Est. total cost", f"${total_cost:,.2f}")
+        st.metric("total cost", f"${total_cost:,.2f}")
 
 
 def _render_project_sessions_chart(df: pd.DataFrame) -> None:
