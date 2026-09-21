@@ -2,6 +2,8 @@
 
 Shows a Windows toast when a Claude Code agent needs input (`Notification` hook) or finishes a task (`Stop` hook). Clicking the toast focuses the existing VS Code window for that repo, or opens a new one if it isn't already open.
 
+The toast also shows the session's current context size as a third line (`Context 394k`): everything sent on the session's latest request (new input + cache read + cache written tokens), read from the session transcript the hook payload points to (`transcript_path`). If the transcript can't be found or read, or has no usable turn yet, the line is simply left out and the toast is otherwise unchanged. It's the same number as the Context column of the app's Live sessions table.
+
 ## How it works
 
 `New-BurntToastNotification`'s click-handling (`-ActivatedAction`) only fires if the PowerShell process that created the toast is still running — but hook scripts exit right after showing the toast, so that doesn't work here. Instead, the toast is built with a **protocol-activation** click action (`claudecode://open?path=...`), which Windows resolves independently of any PowerShell process, via a custom URI protocol registered in the registry.
@@ -12,7 +14,7 @@ Copy this whole `hooks\` folder to the other machine:
 
 | File | Purpose |
 |---|---|
-| `scripts\Send-ClaudeToast.ps1` | Shows the toast (called by the `Notification`/`Stop` hooks). |
+| `scripts\Send-ClaudeToast.ps1` | Shows the toast (called by the `Notification`/`Stop` hooks), including the `Context` line when the session transcript is readable. |
 | `scripts\Open-ClaudeRepoWindow.ps1` | Runs when the toast is clicked. Focuses the matching VS Code window, or opens a new one. |
 | `scripts\Open-ClaudeRepoWindow.vbs` | Silent launcher — runs the above script with no console-window flash. Locates its own folder at runtime, so it works unmodified on any machine/username as long as the two `.ps1`/`.vbs` files stay together. |
 | `Install-ClaudeHooks.ps1` | Copies everything in `scripts\` into `%USERPROFILE%\.claude\hooks\`, registers the protocol handler, and adds the hooks to `settings.json`. See section 3. |
@@ -37,7 +39,9 @@ Copy this whole `hooks\` folder to the other machine:
 .\hooks\Install-ClaudeHooks.ps1
 ```
 
-Safe to re-run. It does the following, all scoped to the current user (no
+Safe to re-run — and if you installed before the `Context` line existed, re-run
+it once to copy the updated `Send-ClaudeToast.ps1` over the installed one. It
+does the following, all scoped to the current user (no
 admin rights needed):
 
 - **Copies the 3 scripts** into `%USERPROFILE%\.claude\hooks\` (creating the
@@ -86,6 +90,22 @@ Run this from the repo folder you want the toast to point at (it uses
 (@{cwd = (Get-Location).Path} | ConvertTo-Json -Compress) | powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\Send-ClaudeToast.ps1" -Title "Test Alert" -BodyTemplate "Testing in {0}!"
 ```
 A toast titled "Test Alert" mentioning the current folder name should appear.
+Since this payload has no `transcript_path`, it has only those two lines, with
+no `Context` line: this is also the check that the token lookup degrades
+cleanly.
+
+**Test 2b — the `Context` line:**
+
+Same as Test 2, but the payload also names a real transcript (here, the newest
+one for the current folder, so you need to have run a Claude Code session in
+it):
+```powershell
+$transcript = Get-ChildItem "$env:USERPROFILE\.claude\projects\$((Get-Location).Path -replace '[^A-Za-z0-9]', '-')\*.jsonl" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+(@{cwd = (Get-Location).Path; transcript_path = $transcript.FullName} | ConvertTo-Json -Compress) | powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\hooks\Send-ClaudeToast.ps1" -Title "Test Alert" -BodyTemplate "Testing in {0}!"
+```
+The toast should have a third line like `Context 394k`. Pointing
+`transcript_path` at a file that doesn't exist should give the plain two-line
+toast, with no error.
 
 **Test 3 — protocol handler + click behavior (no toast needed):**
 

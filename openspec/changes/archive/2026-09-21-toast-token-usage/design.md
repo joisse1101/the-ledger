@@ -3,7 +3,7 @@
 See proposal.md for motivation. Current state and constraints:
 
 - `hooks/scripts/Send-ClaudeToast.ps1` reads the hook's JSON payload from stdin but uses only `cwd`. It builds a BurntToast with two text elements (title, body) and a protocol-activation click action, then exits. The repo copy and the installed copy in `~/.claude/hooks/` are byte-identical.
-- The hook payload is documented to include `transcript_path` and `session_id` alongside `cwd`. That is expected but not yet observed in this install.
+- The hook payload is documented to include `transcript_path` and `session_id` alongside `cwd`. Observed in this install (Claude Code 2.1.278) by capturing a real `Stop` payload: `transcript_path`, `session_id`, `cwd` are all present, so no path derivation is needed.
 - `hooks/` is a standalone utility shared as a folder to other machines, so the script can't import `claude_context.py` or depend on the app's venv. It runs under `powershell.exe` (Windows PowerShell 5.1) and already pays BurntToast's module-import cost on every fire.
 - Claude Code keeps the transcript open for appending while the session runs. Transcripts reach about 10 MB, with individual lines of several KB.
 - The number to show is the `live-context-gauge` definition of context: `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` on the latest real main-thread assistant turn. See that change's design (Decision 3).
@@ -40,9 +40,10 @@ See proposal.md for motivation. Current state and constraints:
 
 ## Risks / Trade-offs
 
-- [`transcript_path` might be absent from the payload in this install] → Verify first by dumping stdin from a real hook fire. If it's missing, derive `~/.claude/projects/<sanitized cwd>/<session_id>.jsonl` (every non-alphanumeric character becomes `-`), the same way `claude_context.py` does, and update this design.
-- [The Stop hook may fire before the last assistant line is flushed, making the number one turn stale] → Accepted. Not worth a wait-and-retry that would delay the toast. To check, compare the toast against the transcript after a real Stop.
+- [`transcript_path` might be absent from the payload in this install] → Verified present on a real `Stop` payload (see Context). If it is ever missing, derive `~/.claude/projects/<sanitized cwd>/<session_id>.jsonl` (every non-alphanumeric character becomes `-`), the same way `claude_context.py` does, and update this design.
+- [The Stop hook may fire before the last assistant line is flushed, making the number one turn stale] → Accepted. Not worth a wait-and-retry that would delay the toast. To check, compare the toast against the transcript after a real Stop. Live-fire check done: the user confirmed the real toasts show the Context line and work as expected; no stale figure was reported.
 - [The rule lives in two implementations (PowerShell and `claude_context.py`) and could drift] → Both are a few lines; each design points at the other, and if either changes, the other should be reviewed.
 - [Assumes one `iterations` entry per turn, so the top-level usage equals the final request's usage] → Sampled turns had one iteration; not checked exhaustively across all transcripts. If multi-iteration turns turn out to exist, the figure could be off for those turns only.
+- [`M` formatting can differ from the gauge on exact ties] → The PowerShell side rounds the millions tenth half-up on integers. `claude_context.humanise_tokens` uses `f"{n / 1_000_000:.1f}M"`, which rounds the binary float, so for counts that are an exact multiple of 50,000 but not of 100,000 (e.g. 1,150,000) the two can differ by 0.1M. A sweep of 21,898 values across 0–3M (every 137th) found no mismatches, and the k range matches exactly. Aligning the gauge to integer half-up rounding would remove it; that is a change to `claude_context.py`, out of scope here.
 - [Regex extraction depends on JSON key spelling] → Any mismatch omits the line rather than showing a wrong number, because a missing field means no match.
 - [Existing installs won't see the change until the installer is re-run] → One re-run of `Install-ClaudeHooks.ps1` copies the new script over the installed one (it is safe to re-run). Mention this in the README.
