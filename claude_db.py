@@ -3,7 +3,7 @@
 refresh() is the only place that reads ~/.claude.json and
 ~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects.py,
 claude_transcripts.py) just queries the SQLite snapshot this writes to
-.streamlit/ledger.db. claude_sessions.py's live-session polling is separate
+.streamlit/ledger.db (WAL mode). claude_sessions.py's live-session polling is separate
 and untouched by this module.
 """
 
@@ -17,6 +17,9 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Generator, Optional
+
+
+_BUSY_TIMEOUT_MS = 10_000
 
 
 def db_path() -> Path:
@@ -44,9 +47,13 @@ def sanitize_project_path(path: str) -> str:
 def _connect() -> Generator[sqlite3.Connection, None, None]:
     path = db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=_BUSY_TIMEOUT_MS / 1000)
     conn.row_factory = sqlite3.Row
     try:
+        # WAL lets the API's readers keep reading while refresh() commits its
+        # table replacement; the timeout makes the rare remaining collision wait.
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA journal_mode = WAL")
         _ensure_schema(conn)
         yield conn
         conn.commit()
@@ -529,19 +536,30 @@ def refresh() -> datetime:
 _started = False
 
 
+def _remove_db_files(path: Path) -> None:
+    """Delete the database and its WAL side files (best effort)."""
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            Path(f"{path}{suffix}").unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def startup() -> None:
     """Wipe any on-disk snapshot left over from a previous run and rebuild it fresh.
 
     - Database is a derived cache, never a source of truth
-    - Registers a best-effort cleanup of the same file on process exit
+    - Registers a best-effort cleanup of the same files (including the WAL's
+      `-wal`/`-shm` side files) on process exit
     """
     global _started
     if _started:
         return
     _started = True
-    db_path().unlink(missing_ok=True)
+    path = db_path()
+    _remove_db_files(path)
     refresh()
-    atexit.register(lambda: db_path().unlink(missing_ok=True))
+    atexit.register(_remove_db_files, path)
 
 
 def refreshed_at() -> Optional[datetime]:

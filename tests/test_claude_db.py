@@ -517,3 +517,49 @@ def test_transcript_lookup_and_delete_by_session_id(isolated_db, write_config, w
 
     claude_db.delete_transcript_row("s1")
     assert claude_db.fetch_transcripts() == []
+
+
+def _db_files(directory):
+    return sorted(p.name for p in directory.glob("ledger.db*"))
+
+
+def test_connect_uses_wal_mode(isolated_db):
+    with claude_db._connect() as conn:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+
+
+def test_startup_leaves_no_db_files_after_exit_hook(isolated_db, monkeypatch):
+    hooks = []
+    monkeypatch.setattr(claude_db, "_started", False)
+    monkeypatch.setattr(claude_db.atexit, "register", lambda fn, *a: hooks.append((fn, a)))
+    # A stale snapshot from a previous run, WAL side files included, is wiped.
+    for suffix in ("", "-wal", "-shm"):
+        (isolated_db / f"ledger.db{suffix}").write_text("stale")
+
+    claude_db.startup()
+    assert claude_db.refreshed_at() is not None
+
+    (fn, args), = hooks
+    fn(*args)
+    assert _db_files(isolated_db) == []
+
+
+def test_read_succeeds_while_another_connection_holds_a_write_transaction(isolated_db):
+    import sqlite3
+
+    claude_db.refresh()
+    writer = sqlite3.connect(claude_db.db_path())
+    try:
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("DELETE FROM transcripts")
+        writer.executemany(
+            "INSERT INTO transcripts (session_id, path, cwd, version, git_branch,"
+            " message_count, cost, project) VALUES (?, '', '', '', '', 0, 0, '')",
+            [(f"s{i}",) for i in range(5000)],
+        )
+        # Uncommitted: readers still see the last committed snapshot, no lock error.
+        assert claude_db.refreshed_at() is not None
+        assert claude_db.fetch_transcripts() == []
+    finally:
+        writer.rollback()
+        writer.close()
