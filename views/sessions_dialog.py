@@ -7,11 +7,11 @@ import streamlit as st
 from claude_transcripts import delete_transcript
 
 
-def _open_session_dialog(*, source: str, heading: str, session_id: str, title: str,
+def _open_session_dialog(*, heading: str, session_id: str, title: str,
                          last_message: str, first_prompt: str, started: datetime | None,
                          updated: datetime | None, deletable: bool) -> None:
     st.session_state.recap_dialog_info = {
-        "source": source, "heading": heading, "session_id": session_id,
+        "heading": heading, "session_id": session_id,
         "title": title, "last_message": last_message, "first_prompt": first_prompt,
         "started": started, "updated": updated, "deletable": deletable,
     }
@@ -50,9 +50,6 @@ def _render_recap_dialog() -> None:
             st.caption("Last updated")
             st.write(info["updated"])
 
-    if info["source"] != "transcripts":
-        return
-
     st.divider()
     if not info["deletable"]:
         st.caption("This session is still live and can't be deleted.")
@@ -73,7 +70,6 @@ def _render_recap_dialog() -> None:
         st.session_state.confirm_delete_session = info["session_id"]
 
 
-def _maybe_render_recap_dialog(expected_source: str) -> None:
-    info = st.session_state.get("recap_dialog_info")
-    if info and info.get("source") == expected_source:
+def _maybe_render_recap_dialog() -> None:
+    if st.session_state.get("recap_dialog_info"):
         _render_recap_dialog()

@@ -26,7 +26,7 @@ def render_transcripts_table() -> None:
     df = _transcripts_dataframe()
     if df.empty:
         st.write("No Claude session transcripts found.")
-        _maybe_render_recap_dialog("transcripts")
+        _maybe_render_recap_dialog()
         return
 
     st.session_state.setdefault(_TRANSCRIPTS_SORT_STATE_KEY, _TRANSCRIPTS_DEFAULT_SORT)
@@ -49,7 +49,7 @@ def render_transcripts_table() -> None:
     live_ids = {session.session_id for session in load_sessions()}
     if df.empty:
         st.write("No sessions match the current filters.")
-        _maybe_render_recap_dialog("transcripts")
+        _maybe_render_recap_dialog()
         return
 
     with st.container(gap="xxsmall"):
@@ -63,7 +63,6 @@ def render_transcripts_table() -> None:
                 key=f"sessrow-transcripts-{row['Session ID']}",
                 tooltip=_tooltip_text(row, "transcripts"),
                 on_click=lambda r=row: _open_session_dialog(
-                    source="transcripts",
                     heading=f"[{r['Project']}] {r['Git Branch']}",
                     session_id=r["Session ID"],
                     title=r["Title"],
@@ -74,4 +73,4 @@ def render_transcripts_table() -> None:
                     deletable=r["Session ID"] not in live_ids,
                 ),
             )
-    _maybe_render_recap_dialog("transcripts")
+    _maybe_render_recap_dialog()
