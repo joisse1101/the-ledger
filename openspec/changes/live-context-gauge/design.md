@@ -53,4 +53,4 @@ See proposal.md for motivation. Constraints that shape the approach:
 
 ## Open Questions
 
-- Whether the detail view is an inline panel below the table or an `st.dialog`. Either satisfies the specs and tasks. Worth checking during implementation whether a dialog survives the Live fragment's 2s reruns.
+- ~~Whether the detail view is an inline panel below the table or an `st.dialog`.~~ **Resolved: `st.dialog`.** It is opened from the Live fragment's row click and re-invoked at the end of each fragment run while its `st.session_state` entry is set, and it stays open, keeps its scroll position and updates in place across the fragment's 2s reruns (checked live for 12s+ on Streamlit 1.64). Only one dialog can be open per script run, so opening it clears the All table's recap dialog and vice versa.

@@ -5,8 +5,18 @@ from typing import Sequence
 import pandas as pd
 from views.utils import format_date
 
-from claude_sessions import load_sessions
+from claude_context import format_context, live_context
+from claude_sessions import ClaudeSession, load_sessions
 from claude_transcripts import load_transcripts
+
+
+def _context_cell(session: ClaudeSession) -> str:
+    """The session's current context size, or `--` if it can't be read (one bad session mustn't sink the table)."""
+    try:
+        context = live_context(session.session_id, session.cwd)
+    except Exception:
+        return "--"
+    return format_context(context) if context else "--"
 
 
 def _sessions_dataframe() -> pd.DataFrame:
@@ -21,6 +31,8 @@ def _sessions_dataframe() -> pd.DataFrame:
                 "Status": s.status,
                 "Kind": s.kind,
                 "PID": s.pid,
+                "Context": _context_cell(s),
+                "CWD": s.cwd,
                 "Started": format_date(s.started_at),
                 "Last Updated": format_date(s.updated_at),
                 "Session ID": s.session_id,

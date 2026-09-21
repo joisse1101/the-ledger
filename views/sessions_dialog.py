@@ -10,6 +10,7 @@ from claude_transcripts import delete_transcript
 def _open_session_dialog(*, heading: str, session_id: str, title: str,
                          last_message: str, first_prompt: str, started: datetime | None,
                          updated: datetime | None, deletable: bool) -> None:
+    st.session_state.context_dialog_info = None  # only one dialog can be open per script run
     st.session_state.recap_dialog_info = {
         "heading": heading, "session_id": session_id,
         "title": title, "last_message": last_message, "first_prompt": first_prompt,
