@@ -36,18 +36,19 @@ def _render_recap_dialog() -> None:
         if info["last_message"]:
             st.caption("Last message from Claude")
             st.write(info["last_message"])
-        if info["first_prompt"]:
+        if not info["last_message"] and info["first_prompt"]:
             st.caption("First prompt")
             st.write(info["first_prompt"])
     else:
         st.caption("No information available for this session yet.")
 
-    if info["started"]:
-        st.caption("Started")
-        st.write(info["started"])
-    if info["updated"]:
-        st.caption("Last updated")
-        st.write(info["updated"])
+    with st.container(horizontal=True):
+        if info["started"]:
+            st.caption("Started")
+            st.write(info["started"])
+        if info["updated"]:
+            st.caption("Last updated")
+            st.write(info["updated"])
 
     if info["source"] != "transcripts":
         return

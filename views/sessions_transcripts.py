@@ -32,7 +32,11 @@ def render_transcripts_table() -> None:
     st.session_state.setdefault(_TRANSCRIPTS_SORT_STATE_KEY, _TRANSCRIPTS_DEFAULT_SORT)
     with st.container(gap="xxsmall"):
         with st.container(horizontal=True, vertical_alignment="bottom"):
-            search = st.text_input("Search Session ID", key="transcripts_search", placeholder="Session ID contains…")
+            search = st.text_input(
+                "Search Session ID, Last Message or First Prompt",
+                key="transcripts_search",
+                placeholder="Session ID, Last Message or First Prompt contains…",
+            )
             st.button("Clear", key="clear_transcripts_search", on_click=_clear_transcripts_search)
         with st.container(horizontal=True, vertical_alignment="bottom"):
             projects = st.multiselect("Project", _categorical_options(df, "Project"), key="transcripts_filter_project", placeholder="Select projects…", label_visibility="collapsed")
@@ -53,12 +57,21 @@ def render_transcripts_table() -> None:
         st.divider()
         for row in df.to_dict("records"):
             _render_table_row(
-                row, _TRANSCRIPTS_COLUMNS, _TRANSCRIPTS_WIDTHS,
-                key=f"sessrow-transcripts-{row['Session ID']}", tooltip=_tooltip_text(row),
+                row,
+                _TRANSCRIPTS_COLUMNS,
+                _TRANSCRIPTS_WIDTHS,
+                key=f"sessrow-transcripts-{row['Session ID']}",
+                tooltip=_tooltip_text(row, "transcripts"),
                 on_click=lambda r=row: _open_session_dialog(
-                    source="transcripts", heading=f"[{r['Project']}] {r['Git Branch']}",
-                    session_id=r["Session ID"], title=r["Title"], last_message=r["Last Message"],
-                    first_prompt=r["First Prompt"], started=r["Started"], updated=r["Last Updated"],
-                    deletable=r["Session ID"] not in live_ids),
+                    source="transcripts",
+                    heading=f"[{r['Project']}] {r['Git Branch']}",
+                    session_id=r["Session ID"],
+                    title=r["Title"],
+                    last_message=r["Last Message"],
+                    first_prompt=r["First Prompt"],
+                    started=r["Started"],
+                    updated=r["Last Updated"],
+                    deletable=r["Session ID"] not in live_ids,
+                ),
             )
     _maybe_render_recap_dialog("transcripts")

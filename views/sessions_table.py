@@ -30,14 +30,34 @@ def _format_cell(value: pd.Timestamp | datetime | float | str | None) -> str:
     return str(value)
 
 
-def _tooltip_text(row: dict) -> str:
+def _tooltip_text(row: dict, type: str) -> str:
+    tooltip = ""
+
+    prefix = f"[{row.get('Title')}] " if row.get("Title") else ""
     session_id = row.get("Session ID")
-    msg_title = "Last Message" if row.get("Last Message") else "First Prompt" if row.get("First Prompt") else ""
+
+    tooltip = f"{prefix}{session_id}"
+
+    msg_title = (
+        "Last Message"
+        if row.get("Last Message")
+        else "First Prompt" if row.get("First Prompt") else ""
+    )
     msg = f"{row.get('Last Message') or row.get('First Prompt') or ''}"
     msg = msg[:200].strip() + ("..." if len(msg) > 200 else "")
     final_msg = f"{msg_title}:  \n{msg}" if msg else ""
-    prefix = f"[{row.get('Title')}] " if row.get("Title") else ""
-    return f"{prefix}{session_id}" + (f"  \n  \n{final_msg}" if final_msg else "")
+
+    tooltip += f"  \n  \n{final_msg}" if final_msg else ""
+
+    if type == "live":
+        date_created = row.get("Started")
+        if date_created:
+            tooltip += f"  \n  \nStarted: *{date_created}*"
+        date_updated = row.get("Last Updated")
+        if date_updated:
+            tooltip += f"  \nLast Updated: *{date_updated}*"
+
+    return tooltip
 
 
 def _render_table_header(labels: Sequence[str], widths: Sequence[int], *, key: str) -> None:

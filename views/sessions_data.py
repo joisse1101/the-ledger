@@ -3,6 +3,7 @@
 from typing import Sequence
 
 import pandas as pd
+from views.utils import format_date
 
 from claude_sessions import load_sessions
 from claude_transcripts import load_transcripts
@@ -13,11 +14,19 @@ def _sessions_dataframe() -> pd.DataFrame:
     sessions = load_sessions()
     return pd.DataFrame(
         [
-            {"Name": s.name, "Project": s.project, "Title": s.title,
-             "Status": s.status, "Kind": s.kind, "PID": s.pid,
-             "Started": s.started_at, "Last Updated": s.updated_at,
-             "Session ID": s.session_id, "Last Message": s.last_message,
-             "First Prompt": s.first_prompt}
+            {
+                "Name": s.name,
+                "Project": s.project,
+                "Title": s.title,
+                "Status": s.status,
+                "Kind": s.kind,
+                "PID": s.pid,
+                "Started": format_date(s.started_at),
+                "Last Updated": format_date(s.updated_at),
+                "Session ID": s.session_id,
+                "Last Message": s.last_message,
+                "First Prompt": s.first_prompt,
+            }
             for s in sessions
         ]
     )
@@ -28,11 +37,19 @@ def _transcripts_dataframe() -> pd.DataFrame:
     transcripts = load_transcripts()
     return pd.DataFrame(
         [
-            {"Project": t.project, "Title": t.title, "Session ID": t.session_id,
-             "Started": t.started_at, "Last Updated": t.updated_at,
-             "Messages": t.message_count, "Est. Cost ($)": t.cost,
-             "Version": t.version, "Git Branch": t.git_branch,
-             "Last Message": t.last_message, "First Prompt": t.first_prompt}
+            {
+                "Project": t.project,
+                "Title": t.title,
+                "Session ID": t.session_id,
+                "Started": format_date(t.started_at),
+                "Last Updated": format_date(t.updated_at),
+                "Messages": t.message_count,
+                "Est. Cost ($)": t.cost,
+                "Version": t.version,
+                "Git Branch": t.git_branch,
+                "Last Message": t.last_message,
+                "First Prompt": t.first_prompt,
+            }
             for t in transcripts
         ]
     )
@@ -56,7 +73,11 @@ def _filter_transcripts_dataframe(
 ) -> pd.DataFrame:
     """Narrow the All table to rows matching all selected filters."""
     if search:
-        df = df[df["Session ID"].str.contains(search, case=False, na=False, regex=False)]
+        df = df[
+            df["Session ID"].str.contains(search, case=False, na=False, regex=False)
+            | df["Last Message"].str.contains(search, case=False, na=False, regex=False)
+            | df["First Prompt"].str.contains(search, case=False, na=False, regex=False)
+        ]
     if projects:
         df = df[df["Project"].isin(projects)]
     if versions:
