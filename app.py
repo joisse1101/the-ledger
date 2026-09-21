@@ -42,7 +42,7 @@ _COMPACT_LAYOUT_CSS = """
     padding-right: 2rem;
 }
 [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] hr) {
-    height: 2rem;
+    height: 1rem;
 }
 [data-testid="stMarkdownContainer"] hr {
     margin: 0.9375rem 0;

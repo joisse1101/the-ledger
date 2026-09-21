@@ -30,6 +30,16 @@ _TRANSCRIPTS_COLUMNS = [
 ]
 _TRANSCRIPTS_WIDTHS = [3, 3, 4, 3, 3, 2, 2, 2, 2]
 
+# Columns with a small, repeated set of values - filterable via a multiselect
+# rather than free-text search (that's Session ID's job instead, see below).
+_TRANSCRIPTS_CATEGORICAL_COLUMNS = ["Project", "Version", "Git Branch"]
+
+_TRANSCRIPTS_SORT_STATE_KEY = "transcripts_sort"
+_TRANSCRIPTS_DEFAULT_SORT = (
+    "Last Updated",
+    False,
+)  # matches load_transcripts()'s own order
+
 
 def _sessions_dataframe() -> pd.DataFrame:
     """The "Live" table's rows, one per running Claude Code session."""
@@ -75,6 +85,51 @@ def _transcripts_dataframe() -> pd.DataFrame:
             for transcript in transcripts
         ]
     )
+
+
+def _categorical_options(df: pd.DataFrame, column: str) -> list[str]:
+    """Distinct, non-blank values of `column`, for a filter multiselect's options."""
+    return sorted({str(value) for value in df[column].dropna() if str(value).strip()})
+
+
+def _sort_transcripts_dataframe(
+    df: pd.DataFrame, sort_column: str, ascending: bool
+) -> pd.DataFrame:
+    """Stable sort by any column, pushing missing values to the end either way."""
+    if df.empty or sort_column not in df.columns:
+        return df
+    return df.sort_values(
+        by=sort_column, ascending=ascending, kind="mergesort", na_position="last"
+    )
+
+
+def _filter_transcripts_dataframe(
+    df: pd.DataFrame,
+    *,
+    search: str = "",
+    projects: Sequence[str] = (),
+    versions: Sequence[str] = (),
+    branches: Sequence[str] = (),
+) -> pd.DataFrame:
+    """Narrows the "All" table to rows matching the Session ID search text and
+    the selected categorical filter values - all optional, all AND'ed together."""
+    if search:
+        df = df[
+            df["Session ID"].str.contains(search, case=False, na=False, regex=False)
+        ]
+    if projects:
+        df = df[df["Project"].isin(projects)]
+    if versions:
+        df = df[df["Version"].isin(versions)]
+    if branches:
+        df = df[df["Git Branch"].isin(branches)]
+    return df
+
+
+def _clear_transcripts_search() -> None:
+    """Reset the Session ID search and any selection kept by the All table."""
+    st.session_state.pop("transcripts_search", None)
+    st.session_state.pop("transcripts_table", None)
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +188,33 @@ _ROW_CSS = """
     padding: 0 !important;
     margin: 0 !important;
 }
-[class*="st-key-table-header-"] {
-    border-bottom: 2px solid rgba(128, 128, 128, 0.35);
+[data-testid="stVerticalBlock"][class*="st-key-table-header-"] {
     padding-bottom: 0.35rem;
     margin-bottom: 0.1rem;
     font-weight: 600;
+    display: flex;
+    height: 2rem;
+    max-height: 2rem;
+}
+[class*="st-key-table-header-"] [data-testid="stButton"],
+[class*="st-key-table-header-"] [data-testid="stButton"] > button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+    width: 100% !important;
+    color: inherit !important;
+}
+[class*="st-key-table-header-"] [data-testid="stButton"] > button:hover,
+[class*="st-key-table-header-"] [data-testid="stButton"] > button:focus {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-decoration: none !important;
+    color: inherit !important;
 }
 </style>
 """
@@ -177,6 +254,31 @@ def _render_table_header(labels: Sequence[str], widths: Sequence[int], *, key: s
     with st.container(key=key):
         for col, label in zip(st.columns(widths), labels):
             col.markdown(f"**{label}**")
+
+
+def _render_sortable_table_header(
+    labels: Sequence[str], widths: Sequence[int], *, key: str, sort_state_key: str
+) -> None:
+    """Same layout as `_render_table_header`, but each label is a button that
+    sets `sort_state_key` to (that column, ascending) - clicking the already-
+    active column flips its direction instead of resetting to ascending."""
+    sort_column, ascending = st.session_state[sort_state_key]
+    with st.container(key=key):
+        for col, label in zip(st.columns(widths), labels):
+            if label == sort_column:
+                arrow = " ▲" if ascending else " ▼"
+            else:
+                arrow = ""
+            if col.button(
+                f"{label}{arrow}",
+                key=f"{key}-sort-{label}",
+                use_container_width=True,
+            ):
+                if label == sort_column:
+                    st.session_state[sort_state_key] = (label, not ascending)
+                else:
+                    st.session_state[sort_state_key] = (label, True)
+                st.rerun()
 
 
 def _render_table_row(
@@ -319,6 +421,7 @@ def render_sessions_table() -> None:
         st.caption("Click a session to see what it was about.")
         with st.container(gap="xxsmall"):
             _render_table_header(_LIVE_COLUMNS, _LIVE_WIDTHS, key="table-header-live")
+            st.divider()
             for row in df.to_dict("records"):
                 _render_table_row(
                     row,
@@ -351,13 +454,65 @@ def render_transcripts_table() -> None:
         _maybe_render_recap_dialog("transcripts")
         return
 
+    st.session_state.setdefault(_TRANSCRIPTS_SORT_STATE_KEY, _TRANSCRIPTS_DEFAULT_SORT)
+
+    with st.container(gap="xxsmall"):
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            search = st.text_input(
+                "Search Session ID",
+                key="transcripts_search",
+                placeholder="Session ID contains…",
+            )
+            st.button(
+                "Clear",
+                key="clear_transcripts_search",
+                on_click=_clear_transcripts_search,
+            )
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            projects = st.multiselect(
+                "Project",
+                _categorical_options(df, "Project"),
+                key="transcripts_filter_project",
+                placeholder="Select projects…",
+                label_visibility="collapsed",
+            )
+            versions = st.multiselect(
+                "Version",
+                _categorical_options(df, "Version"),
+                key="transcripts_filter_version",
+                placeholder="Select versions…",
+                label_visibility="collapsed",
+            )
+            branches = st.multiselect(
+                "Git Branch",
+                _categorical_options(df, "Git Branch"),
+                key="transcripts_filter_branch",
+                placeholder="Select branches…",
+                label_visibility="collapsed",
+            )
+    df = _filter_transcripts_dataframe(
+        df, search=search, projects=projects, versions=versions, branches=branches
+    )
+
+    sort_column, ascending = st.session_state[_TRANSCRIPTS_SORT_STATE_KEY]
+    df = _sort_transcripts_dataframe(df, sort_column, ascending)
+
     st.caption("Click a session to see what it was about.")
     live_ids = {session.session_id for session in load_sessions()}
 
+    if df.empty:
+        st.write("No sessions match the current filters.")
+        _maybe_render_recap_dialog("transcripts")
+        return
+
     with st.container(gap="xxsmall"):
-        _render_table_header(
-            _TRANSCRIPTS_COLUMNS, _TRANSCRIPTS_WIDTHS, key="table-header-transcripts"
+        _render_sortable_table_header(
+            _TRANSCRIPTS_COLUMNS,
+            _TRANSCRIPTS_WIDTHS,
+            key="table-header-transcripts",
+            sort_state_key=_TRANSCRIPTS_SORT_STATE_KEY,
         )
+        st.divider()
         for row in df.to_dict("records"):
             _render_table_row(
                 row,
