@@ -30,6 +30,8 @@ class ClaudeTranscript:
     title: str
     last_message: str
     first_prompt: str
+    # Context size at the last real main-thread response (see claude_context); None if there wasn't one.
+    context: Optional[int] = None
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -51,6 +53,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         title=row["title"],
         last_message=row["last_message"],
         first_prompt=row["first_prompt"],
+        context=row["context"],
     )
 
 

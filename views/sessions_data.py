@@ -57,6 +57,7 @@ def _transcripts_dataframe() -> pd.DataFrame:
                 "Last Updated": format_date(t.updated_at),
                 "Messages": t.message_count,
                 "Est. Cost ($)": t.cost,
+                "Context": t.context,
                 "Version": t.version,
                 "Git Branch": t.git_branch,
                 "Last Message": t.last_message,

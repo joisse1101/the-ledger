@@ -6,12 +6,12 @@ from claude_sessions import load_sessions
 from views.sessions_data import (_categorical_options, _filter_transcripts_dataframe,
                                  _sort_transcripts_dataframe, _transcripts_dataframe)
 from views.sessions_dialog import _maybe_render_recap_dialog, _open_session_dialog
-from views.sessions_table import (_ROW_CSS, _render_sortable_table_header,
+from views.sessions_table import (_ROW_CSS, _format_context, _render_sortable_table_header,
                                   _render_table_row, _tooltip_text)
 
 
-_TRANSCRIPTS_COLUMNS = ["Project", "Title", "Session ID", "Started", "Last Updated", "Messages", "Est. Cost ($)", "Version", "Git Branch"]
-_TRANSCRIPTS_WIDTHS = [3, 3, 4, 3, 3, 2, 2, 2, 2]
+_TRANSCRIPTS_COLUMNS = ["Project", "Title", "Session ID", "Started", "Last Updated", "Messages", "Est. Cost ($)", "Context", "Version", "Git Branch"]
+_TRANSCRIPTS_WIDTHS = [3, 3, 4, 3, 3, 2, 2, 2, 2, 2]
 _TRANSCRIPTS_SORT_STATE_KEY = "transcripts_sort"
 _TRANSCRIPTS_DEFAULT_SORT = ("Last Updated", False)
 
@@ -61,6 +61,7 @@ def render_transcripts_table() -> None:
                 _TRANSCRIPTS_COLUMNS,
                 _TRANSCRIPTS_WIDTHS,
                 key=f"sessrow-transcripts-{row['Session ID']}",
+                formatters={"Context": _format_context},
                 tooltip=_tooltip_text(row, "transcripts"),
                 on_click=lambda r=row: _open_session_dialog(
                     heading=f"[{r['Project']}] {r['Git Branch']}",

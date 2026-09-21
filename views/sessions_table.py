@@ -1,10 +1,12 @@
 """Shared clickable-table presentation helpers for the Sessions page."""
 
 from datetime import datetime
-from typing import Sequence
+from typing import Callable, Mapping, Sequence
 
 import pandas as pd
 import streamlit as st
+
+from claude_context import humanise_tokens
 
 
 _ROW_CSS = """
@@ -28,6 +30,11 @@ def _format_cell(value: pd.Timestamp | datetime | float | str | None) -> str:
     if isinstance(value, float):
         return f"{value:.4f}"
     return str(value)
+
+
+def _format_context(value: float | None) -> str:
+    """A token count for the All table's Context column (pandas turns a missing int into NaN)."""
+    return "--" if pd.isna(value) else humanise_tokens(int(value))
 
 
 def _tooltip_text(row: dict, type: str) -> str:
@@ -76,9 +83,11 @@ def _render_sortable_table_header(labels: Sequence[str], widths: Sequence[int], 
                 st.rerun()
 
 
-def _render_table_row(row: dict, columns: Sequence[str], widths: Sequence[int], *, key: str, tooltip: str, on_click) -> None:
+def _render_table_row(row: dict, columns: Sequence[str], widths: Sequence[int], *, key: str, tooltip: str, on_click,
+                      formatters: Mapping[str, Callable] | None = None) -> None:
+    formatters = formatters or {}
     with st.container(key=key):
         for col, name in zip(st.columns(widths, vertical_alignment="center"), columns):
-            col.write(_format_cell(row[name]))
+            col.write(formatters.get(name, _format_cell)(row[name]))
         if st.button("", key=f"{key}-btn", help=tooltip or None, use_container_width=True):
             on_click()

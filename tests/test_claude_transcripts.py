@@ -18,7 +18,15 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
                 "sessionId": "s1",
                 "message": {"content": "What's causing the login bug?"},
             },
-            {"type": "assistant", "timestamp": "2024-01-01T10:05:00Z"},
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 2, "cache_read_input_tokens": 300, "cache_creation_input_tokens": 40},
+                },
+            },
         ],
     )
     claude_db.refresh()
@@ -35,6 +43,7 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
     assert t.title == ""
     assert t.last_message == ""
     assert t.first_prompt == "What's causing the login bug?"
+    assert t.context == 342
 
 
 def test_delete_project_transcripts_removes_files_and_rows(

@@ -208,6 +208,73 @@ def test_scan_transcript_file_aggregates_fields(tmp_path, write_transcript):
     assert row["project"] == "repo"
 
 
+def _assistant(message_id, *, new=0, read=0, written=0, model="claude-sonnet-5", **extra):
+    return {
+        "type": "assistant",
+        "timestamp": "2024-01-01T10:05:00Z",
+        "message": {
+            "id": message_id,
+            "model": model,
+            "usage": {
+                "input_tokens": new,
+                "cache_read_input_tokens": read,
+                "cache_creation_input_tokens": written,
+                "output_tokens": 5,
+            },
+        },
+        **extra,
+    }
+
+
+def test_scan_transcript_file_context_is_the_last_real_turns_total(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            _assistant("m1", new=10, read=100, written=1_000),
+            _assistant("m2", new=5, read=2_000, written=300),
+            # Repeated line of the same multi-block turn: last line's usage wins.
+            _assistant("m2", new=5, read=2_000, written=300),
+            # None of these is a real main-thread response, so none may become the context.
+            _assistant("side", new=99_999, isSidechain=True),
+            _assistant("synth", new=99_999, model="<synthetic>"),
+            _assistant("zero"),
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["context"] == 5 + 2_000 + 300
+
+
+def test_scan_transcript_file_context_is_none_without_a_real_turn(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {"type": "user", "timestamp": "2024-01-01T10:00:00Z"},
+            _assistant("synth", new=50, model="<synthetic>"),
+        ],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["context"] is None
+
+
+def test_scan_transcript_file_context_matches_the_live_gauge(tmp_path, write_transcript):
+    import claude_context
+
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            _assistant("m1", new=3, read=500, written=9_000),
+            _assistant("side", new=77_777, isSidechain=True),
+            _assistant("m2", new=4, read=9_500, written=120),
+            _assistant("synth", new=1, model="<synthetic>"),
+        ],
+    )
+    stored = claude_db._scan_transcript_file(path, project_by_folder={})["context"]
+    live = claude_context.extract_turns(path.read_text(encoding="utf-8").splitlines())[-1].context
+    assert stored == live == 4 + 9_500 + 120
+
+
 def test_scan_transcript_file_project_prefers_folder_match(tmp_path, write_transcript):
     path = tmp_path / "projects" / "sanitized-folder" / "abc-123.jsonl"
     write_transcript(

@@ -83,6 +83,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             updated_at TEXT,
             message_count INTEGER NOT NULL,
             cost REAL NOT NULL,
+            context INTEGER,
             project TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
             last_message TEXT NOT NULL DEFAULT '',
@@ -298,6 +299,35 @@ def _normalize_snippet(text: str, max_len: int = 600) -> str:
     return normalized
 
 
+def _context_tokens(entry: dict[str, Any]) -> Optional[int]:
+    """Context size at one assistant line: `input + cache_read + cache_creation` tokens.
+
+    None for lines that aren't a real main-thread response - sidechains, `<synthetic>`
+    API-error placeholders, missing usage/id, or zero usage. Must stay in step with
+    `claude_context._scan`, so a finished session's stored value is the same number the
+    Live table's gauge showed for it.
+    """
+    message = entry.get("message")
+    if entry.get("type") != "assistant" or entry.get("isSidechain") or not isinstance(message, dict):
+        return None
+    usage = message.get("usage")
+    if (
+        message.get("model") == "<synthetic>"
+        or not isinstance(usage, dict)
+        or not isinstance(message.get("id"), str)
+    ):
+        return None
+    total = sum(
+        value if isinstance(value, int) and not isinstance(value, bool) else 0
+        for value in (
+            usage.get("input_tokens"),
+            usage.get("cache_read_input_tokens"),
+            usage.get("cache_creation_input_tokens"),
+        )
+    )
+    return total or None
+
+
 def _scan_transcript_file(
     path: Path, project_by_folder: dict[str, str]
 ) -> Optional[dict[str, Any]]:
@@ -309,6 +339,7 @@ def _scan_transcript_file(
     updated_at: Optional[datetime] = None
     message_count = 0
     cost = 0.0
+    context: Optional[int] = None
     seen_message_ids: set[str] = set()
     ai_title: Optional[str] = None
     last_assistant_text: Optional[str] = None
@@ -342,6 +373,10 @@ def _scan_transcript_file(
 
                 if entry.get("type") == "ai-title":
                     ai_title = entry.get("aiTitle") or ai_title
+
+                turn_context = _context_tokens(entry)
+                if turn_context is not None:
+                    context = turn_context
 
                 message = entry.get("message")
                 if entry.get("type") == "assistant" and isinstance(message, dict):
@@ -401,6 +436,7 @@ def _scan_transcript_file(
         "updated_at": updated_at,
         "message_count": message_count,
         "cost": cost,
+        "context": context,
         "project": project,
         "title": title,
         "last_message": last_message,
@@ -460,12 +496,12 @@ def refresh() -> datetime:
             """
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, project, title, last_message,
-                first_prompt
+                updated_at, message_count, cost, context, project, title,
+                last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :project, :title, :last_message,
-                :first_prompt
+                :updated_at, :message_count, :cost, :context, :project, :title,
+                :last_message, :first_prompt
             )
             """,
             [

@@ -8,7 +8,7 @@ from claude_projects import ClaudeProject
 from claude_sessions import ClaudeSession
 from claude_transcripts import ClaudeTranscript
 from views.projects import _projects_dataframe
-from views.sessions_data import _sessions_dataframe, _transcripts_dataframe
+from views.sessions_data import _sessions_dataframe, _sort_transcripts_dataframe, _transcripts_dataframe
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +54,7 @@ def _transcript(**overrides):
         title="Fixed the login bug",
         last_message="All done, let me know if you need anything else.",
         first_prompt="Can you fix the login bug?",
+        context=120_000,
     )
     defaults.update(overrides)
     return ClaudeTranscript(**defaults) # type: ignore
@@ -147,6 +148,18 @@ def test_transcripts_dataframe_maps_fields(monkeypatch):
     assert row["Messages"] == 4
     assert row["Est. Cost ($)"] == 0.5
     assert row["Git Branch"] == "main"
+    assert row["Context"] == 120_000
+
+
+def test_transcripts_dataframe_context_is_numeric_so_it_sorts_and_formats_missing_as_placeholder(monkeypatch):
+    import views.sessions_data as sessions_view
+    from views.sessions_table import _format_context
+
+    monkeypatch.setattr(sessions_view, "load_transcripts", lambda: [
+        _transcript(session_id="a", context=9_000), _transcript(session_id="b", context=None), _transcript(session_id="c", context=120_000)])
+    df = _sort_transcripts_dataframe(_transcripts_dataframe(), "Context", ascending=False)
+    assert list(df["Session ID"]) == ["c", "a", "b"]
+    assert [_format_context(v) for v in df["Context"]] == ["120k", "9k", "--"]
 
 
 def test_projects_dataframe_maps_fields(monkeypatch):
