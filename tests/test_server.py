@@ -6,9 +6,19 @@ import server
 from live_snapshot import LiveSnapshot
 
 
+def _client():
+    """A client the security middleware treats as the browser on this machine."""
+    return TestClient(
+        server.app,
+        base_url="http://localhost",
+        client=("127.0.0.1", 50000),
+        headers={"X-Requested-With": "ledger"},
+    )
+
+
 @pytest.fixture
 def client(isolated_db):
-    return TestClient(server.app)
+    return _client()
 
 
 def test_meta_has_refreshed_at_field(client):
@@ -97,5 +107,5 @@ def test_refresh_loop_survives_a_failed_scan(monkeypatch):
 def test_lifespan_seeds_the_snapshot(isolated_db, monkeypatch):
     monkeypatch.setattr(claude_db, "_started", False)
     monkeypatch.setattr(claude_db.atexit, "register", lambda *a: None)
-    with TestClient(server.app) as started:
+    with _client() as started:
         assert started.get("/api/meta").json()["refreshed_at"] is not None

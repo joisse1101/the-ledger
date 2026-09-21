@@ -12,6 +12,16 @@ from claude_sessions import ClaudeSession
 from live_snapshot import LiveSnapshot
 
 
+def _client():
+    """A client the security middleware treats as the browser on this machine."""
+    return TestClient(
+        server.app,
+        base_url="http://localhost",
+        client=("127.0.0.1", 50000),
+        headers={"X-Requested-With": "ledger"},
+    )
+
+
 def _live_session(session_id="live-1", cwd="/h/alpha", pid=7):
     return ClaudeSession(
         pid=pid, session_id=session_id, cwd=cwd, name="n", status="busy", kind="interactive", entrypoint="cli",
@@ -54,7 +64,7 @@ def seeded(isolated_db, write_config, write_transcript):
 @pytest.fixture
 def api(seeded, monkeypatch):
     _use_live(monkeypatch)
-    return TestClient(server.app)
+    return _client()
 
 
 def _ids(response):
@@ -70,7 +80,7 @@ def test_live_lists_sessions_with_context(isolated_db, monkeypatch):
         [_live_session()],
         context=lambda session_id, cwd: LiveContext(394_000, 2_100, [390_000, 394_000]),
     )
-    body = TestClient(server.app).get("/api/live").json()
+    body = _client().get("/api/live").json()
     assert [s["session_id"] for s in body["sessions"]] == ["live-1"]
     assert body["sessions"][0]["context"]["label"].startswith("394k ▲ +2.1k ")
     assert "cwd" not in body["sessions"][0]
@@ -78,7 +88,7 @@ def test_live_lists_sessions_with_context(isolated_db, monkeypatch):
 
 def test_live_with_nothing_running_is_an_empty_list(isolated_db, monkeypatch):
     _use_live(monkeypatch)
-    assert TestClient(server.app).get("/api/live").json() == {"sessions": []}
+    assert _client().get("/api/live").json() == {"sessions": []}
 
 
 # ---------------------------------------------------------------- /api/transcripts
@@ -137,7 +147,7 @@ def test_transcripts_bad_parameters_are_422_not_a_crash(api, params):
 
 def test_transcripts_flags_live_sessions(seeded, monkeypatch):
     _use_live(monkeypatch, [_live_session("bbb-2")])
-    items = {i["session_id"]: i for i in TestClient(server.app).get("/api/transcripts").json()["items"]}
+    items = {i["session_id"]: i for i in _client().get("/api/transcripts").json()["items"]}
     assert items["bbb-2"]["live"] is True
     assert items["aaa-1"]["live"] is False
 
@@ -214,7 +224,7 @@ def with_turns(isolated_db, write_config, write_transcript):
 
 def test_session_detail_has_a_recap_and_turns_that_reconcile(with_turns, monkeypatch):
     _use_live(monkeypatch)
-    response = TestClient(server.app).get("/api/sessions/aaa-1")
+    response = _client().get("/api/sessions/aaa-1")
     assert response.status_code == 200
     body = response.json()
     assert body["readable"] is True
@@ -234,14 +244,14 @@ def test_session_detail_has_a_recap_and_turns_that_reconcile(with_turns, monkeyp
 
 def test_session_detail_for_a_live_session_is_flagged_and_uses_the_registry_cwd(with_turns, monkeypatch):
     _use_live(monkeypatch, [_live_session("aaa-1", cwd="/h/alpha")])
-    body = TestClient(server.app).get("/api/sessions/aaa-1").json()
+    body = _client().get("/api/sessions/aaa-1").json()
     assert body["live"] is True
     assert body["readable"] is True
 
 
 def test_session_only_known_to_the_registry_gets_a_recap_from_it(isolated_db, monkeypatch):
     _use_live(monkeypatch, [_live_session("fresh-1")])
-    body = TestClient(server.app).get("/api/sessions/fresh-1").json()
+    body = _client().get("/api/sessions/fresh-1").json()
     assert body["live"] is True
     assert body["readable"] is False
     assert body["detail"] is None
@@ -262,7 +272,9 @@ def test_unknown_session_is_404(api):
     assert api.get("/api/sessions/nope-404").status_code == 404
 
 
-@pytest.mark.parametrize("bad_id", ["../../x", "a/b", "a%2Fb", "..%2F..%2Fx", "a.b", "a b", "x" * 65, "a\\b"])
+# (A literal "../../x" isn't listed: HTTP clients collapse dot segments before sending,
+# so it never arrives as a session ID. The encoded forms are what actually reach the route.)
+@pytest.mark.parametrize("bad_id", ["a/b", "a%2Fb", "..%2F..%2Fx", "a.b", "a b", "x" * 65, "a\\b"])
 def test_malformed_session_ids_are_rejected_before_any_filesystem_access(api, monkeypatch, bad_id):
     def boom(*args, **kwargs):
         raise AssertionError("the filesystem was touched")
@@ -293,7 +305,7 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
 def test_deleting_a_live_session_is_409_and_keeps_the_file(seeded, monkeypatch):
     _use_live(monkeypatch, [_live_session("bbb-2")])
     path = claude_db.transcript_path_for_session("bbb-2")
-    response = TestClient(server.app).delete("/api/sessions/bbb-2")
+    response = _client().delete("/api/sessions/bbb-2")
     assert response.status_code == 409
     assert path.exists()
     assert claude_db.transcript_path_for_session("bbb-2") is not None
@@ -304,7 +316,7 @@ def test_liveness_for_delete_is_a_fresh_read_not_the_cached_snapshot(seeded, mon
     monkeypatch.setattr(
         server, "live", LiveSnapshot(load_sessions=lambda: list(sessions), ttl=3600)
     )
-    client = TestClient(server.app)
+    client = _client()
     assert client.get("/api/live").json() == {"sessions": []}  # the cache now says "nothing live"
     sessions.append(_live_session("bbb-2"))
     assert client.delete("/api/sessions/bbb-2").status_code == 409
@@ -337,7 +349,7 @@ def with_projects(seeded, write_config, monkeypatch):
     )
     claude_db.refresh()
     _use_live(monkeypatch)
-    return TestClient(server.app)
+    return _client()
 
 
 def test_projects_lists_what_the_snapshot_knows(with_projects):

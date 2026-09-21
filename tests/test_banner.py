@@ -1,0 +1,146 @@
+"""The startup banner: address discovery, the QR code and the text."""
+
+import types
+
+import pytest
+
+import banner
+
+# ------------------------------------------------ address filter
+
+
+def test_usable_ipv4_drops_loopback_link_local_unspecified_and_junk():
+    candidates = [
+        "127.0.0.1",
+        "127.5.5.5",
+        "169.254.10.2",
+        "192.168.1.20",
+        "0.0.0.0",
+        "::1",
+        "fe80::1",
+        "not-an-ip",
+        "",
+        "10.0.0.5",
+        "192.168.1.20",  # duplicate
+        "172.16.0.9",
+    ]
+    assert banner.usable_ipv4(candidates) == ["192.168.1.20", "10.0.0.5", "172.16.0.9"]
+
+
+def test_usable_ipv4_of_nothing_is_empty():
+    assert banner.usable_ipv4([]) == []
+    assert banner.usable_ipv4(["127.0.0.1", "169.254.1.1"]) == []
+
+
+class _Probe:
+    """Stands in for the UDP socket: it 'connects' and reports the outbound address."""
+
+    def __init__(self, *args):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def connect(self, address):
+        pass
+
+    def getsockname(self):
+        return ("192.168.1.20", 54321)
+
+
+def test_discovery_puts_the_outbound_interface_first_and_filters_the_rest(monkeypatch):
+    monkeypatch.setattr(banner.socket, "socket", _Probe)
+    monkeypatch.setattr(banner.socket, "gethostname", lambda: "box")
+    monkeypatch.setattr(
+        banner.socket,
+        "getaddrinfo",
+        lambda *args: [
+            (2, 1, 6, "", ("169.254.3.4", 0)),
+            (2, 1, 6, "", ("10.0.0.5", 0)),
+            (2, 1, 6, "", ("192.168.1.20", 0)),
+            (2, 1, 6, "", ("127.0.0.1", 0)),
+        ],
+    )
+    assert banner.discover_ipv4() == ["192.168.1.20", "10.0.0.5"]
+
+
+def test_discovery_survives_a_machine_with_no_network(monkeypatch):
+    def offline(*args, **kwargs):
+        raise OSError("network is unreachable")
+
+    monkeypatch.setattr(banner.socket, "socket", offline)
+    monkeypatch.setattr(banner.socket, "gethostname", lambda: "box")
+    monkeypatch.setattr(banner.socket, "getaddrinfo", offline)
+    assert banner.discover_ipv4() == []
+
+
+# ------------------------------------------------ QR
+
+
+def test_render_qr_is_a_block_of_lines(monkeypatch):
+    monkeypatch.setattr(banner.sys, "stdout", types.SimpleNamespace(encoding="utf-8"))
+    rendered = banner.render_qr("http://192.168.1.20:8501/?token=abc")
+    lines = rendered.splitlines()
+    assert len(lines) > 10
+    assert len({len(line) for line in lines}) == 1  # rectangular
+    assert any(char in rendered for char in "█▀▄")
+
+
+def test_render_qr_steps_aside_when_the_terminal_cannot_show_it(monkeypatch):
+    monkeypatch.setattr(banner.sys, "stdout", types.SimpleNamespace(encoding="ascii"))
+    assert banner.render_qr("http://192.168.1.20:8501/") is None
+
+
+# ------------------------------------------------ text
+
+
+def test_local_only_banner_has_one_address_and_no_token_talk():
+    text = banner.build_banner(port=8501, frontend_built=True)
+    assert "http://localhost:8501/" in text
+    assert "token" not in text.lower()
+    assert "HTTP" not in text
+
+
+def test_lan_banner_lists_each_address_with_the_token_the_qr_and_the_warning():
+    text = banner.build_banner(
+        port=9000,
+        frontend_built=True,
+        lan_addresses=["192.168.1.20", "10.0.0.5"],
+        token="tok-123",
+        qr="QR-ROWS\n",
+    )
+    assert "http://localhost:9000/" in text
+    assert "http://192.168.1.20:9000/?token=tok-123" in text
+    assert "http://10.0.0.5:9000/?token=tok-123" in text
+    assert "QR-ROWS" in text and "192.168.1.20" in text.split("QR-ROWS")[0].splitlines()[-1]  # QR is for the first
+    assert "plain HTTP" in text
+    assert "firewall" in text
+
+
+def test_lan_banner_without_a_qr_still_prints_the_links():
+    text = banner.build_banner(
+        port=8501, frontend_built=True, lan_addresses=["192.168.1.20"], token="t", qr=None
+    )
+    assert "http://192.168.1.20:8501/?token=t" in text
+    assert "Scan" not in text
+
+
+def test_lan_banner_with_no_address_says_so_and_prints_no_token():
+    text = banner.build_banner(port=8501, frontend_built=True, lan_addresses=[], token="secret-value")
+    assert "No network address" in text
+    assert "secret-value" not in text
+    assert "plain HTTP" in text
+
+
+@pytest.mark.parametrize("lan", [None, ["192.168.1.20"]])
+def test_a_missing_front_end_is_called_out_with_the_build_command(lan):
+    text = banner.build_banner(port=8501, frontend_built=False, lan_addresses=lan, token="t")
+    assert "not been built" in text
+    assert "npm ci" in text and "npm run build" in text
+
+
+def test_a_built_front_end_prints_no_warning():
+    assert "not been built" not in banner.build_banner(port=8501, frontend_built=True)

@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
+import mimetypes
+import os
 import threading
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Literal, Optional
+from pathlib import Path as FilePath
+from typing import Annotated, Literal, Mapping, Optional, Sequence
 
-from fastapi import FastAPI, HTTPException, Path, Query
+import uvicorn
+from fastapi import FastAPI, HTTPException, Path, Query, Request
+from fastapi.responses import FileResponse, PlainTextResponse
+from starlette.middleware.gzip import GZipMiddleware
 
+import banner
 import claude_context
 import claude_db
 import claude_projects
@@ -18,6 +27,7 @@ import claude_transcripts
 import overview_stats
 import transcript_query
 from live_snapshot import LiveSnapshot
+from security import TOKEN_ENV, SecurityMiddleware, provision_token
 
 log = logging.getLogger("ledger")
 
@@ -70,6 +80,14 @@ app = FastAPI(
     openapi_url=None,
     lifespan=lifespan,
 )
+
+# Set by main() when the server is reachable from other devices (or LEDGER_TOKEN is
+# set). While None, no token exists, so every request that isn't plain local is refused.
+access_token: Optional[str] = None
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+# Added last so it is outermost: nothing else runs for a refused request.
+app.add_middleware(SecurityMiddleware, token=lambda: access_token)
 
 
 def _iso(value) -> Optional[str]:
@@ -294,3 +312,149 @@ def get_overview(
     if range_ not in overview_stats.TIME_RANGES:
         raise HTTPException(status_code=422, detail=f"unknown range: {range_!r}")
     return overview_stats.overview(claude_transcripts.load_transcripts(), range_)
+
+
+# ---------------------------------------------------------------- front end
+
+WEB_DIST = FilePath(__file__).resolve().parent / "web" / "dist"
+
+# Windows takes these from the registry and can answer text/plain for .js, which
+# browsers refuse to run as a module script.
+for _suffix, _type in (
+    (".js", "text/javascript"),
+    (".mjs", "text/javascript"),
+    (".css", "text/css"),
+    (".svg", "image/svg+xml"),
+    (".json", "application/json"),
+    (".webmanifest", "application/manifest+json"),
+):
+    mimetypes.add_type(_type, _suffix)
+
+
+def frontend_built() -> bool:
+    return (WEB_DIST / "index.html").is_file()
+
+
+def _dist_file(path: str) -> Optional[FilePath]:
+    """The file under web/dist that `path` names, or None. Never anything outside it."""
+    root = WEB_DIST.resolve()
+    try:
+        candidate = (root / path).resolve()
+    except (OSError, ValueError):
+        return None
+    return candidate if candidate.is_file() and candidate.is_relative_to(root) else None
+
+
+# Registered after every API route, so it only sees what they didn't match. It takes
+# every method so that an unknown /api path is a 404 whatever the verb.
+@app.api_route(
+    "/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    include_in_schema=False,
+)
+def frontend(path: str, request: Request):
+    if path == "api" or path.startswith("api/"):
+        raise HTTPException(status_code=404)  # JSON 404, never the page
+    if request.method != "GET":
+        raise HTTPException(status_code=405, headers={"Allow": "GET"})
+    if not frontend_built():
+        return PlainTextResponse(banner.NOT_BUILT_MESSAGE, status_code=503)
+    asset = _dist_file(path)
+    if asset is not None:
+        # Vite names what it puts in assets/ by content hash, so those never change.
+        immutable = path.startswith("assets/")
+        return FileResponse(
+            asset,
+            headers={"Cache-Control": "public, max-age=31536000, immutable" if immutable else "no-cache"},
+        )
+    if "." in path.rsplit("/", 1)[-1]:
+        raise HTTPException(status_code=404)  # a file that isn't there, not a page route
+    return FileResponse(WEB_DIST / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+# ---------------------------------------------------------------- command line
+
+DEFAULT_HOST = "127.0.0.1"
+LAN_HOST = "0.0.0.0"
+DEFAULT_PORT = 8501
+_LOOPBACK_BINDS = frozenset({"127.0.0.1", "localhost", "::1"})
+_WILDCARD_BINDS = frozenset({"0.0.0.0", "::", ""})
+
+
+@dataclass(frozen=True)
+class Settings:
+    host: str
+    port: int
+
+    @property
+    def exposed(self) -> bool:
+        """Whether devices other than this machine can connect."""
+        return self.host not in _LOOPBACK_BINDS
+
+
+def parse_settings(
+    argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.environ
+) -> Settings:
+    """--host beats --lan beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501."""
+    parser = argparse.ArgumentParser(
+        prog="python server.py",
+        description="The Ledger: a dashboard for your Claude Code sessions.",
+    )
+    parser.add_argument(
+        "--lan",
+        action="store_true",
+        help=f"serve other devices on the network (binds {LAN_HOST}); they need the access token",
+    )
+    parser.add_argument("--host", help=f"address to bind (default {DEFAULT_HOST}, env LEDGER_HOST)")
+    parser.add_argument("--port", type=int, help=f"port to serve on (default {DEFAULT_PORT}, env LEDGER_PORT)")
+    args = parser.parse_args(argv)
+
+    host = args.host or (LAN_HOST if args.lan else None) or environ.get("LEDGER_HOST") or DEFAULT_HOST
+    if args.port is not None:
+        port = args.port
+    elif environ.get("LEDGER_PORT", "").strip():
+        try:
+            port = int(environ["LEDGER_PORT"])
+        except ValueError:
+            parser.error(f"LEDGER_PORT must be a number, got {environ['LEDGER_PORT']!r}")
+    else:
+        port = DEFAULT_PORT
+    if not 1 <= port <= 65535:
+        parser.error(f"port must be between 1 and 65535, got {port}")
+    return Settings(host=host, port=port)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    global access_token
+    settings = parse_settings(argv)
+
+    # A token exists whenever other devices can connect, or when the user set one
+    # (so a tunnel on this machine can be let in with it).
+    if settings.exposed or os.environ.get(TOKEN_ENV, "").strip():
+        access_token = provision_token()
+
+    lan_addresses = qr = None
+    if settings.exposed:
+        lan_addresses = (
+            banner.discover_ipv4() if settings.host in _WILDCARD_BINDS else [settings.host]
+        )
+        if lan_addresses:
+            qr = banner.render_qr(f"http://{lan_addresses[0]}:{settings.port}/?token={access_token}")
+    print(
+        banner.build_banner(
+            port=settings.port,
+            frontend_built=frontend_built(),
+            lan_addresses=lan_addresses,
+            token=access_token,
+            qr=qr,
+        ),
+        flush=True,
+    )
+
+    # No access log: it would write every ?token=... URL to the terminal. proxy_headers off:
+    # the peer address must stay the real one, not whatever a header claims.
+    uvicorn.run(app, host=settings.host, port=settings.port, access_log=False, proxy_headers=False)
+
+
+if __name__ == "__main__":
+    main()
