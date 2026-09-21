@@ -10,7 +10,7 @@ from streamlit import config as st_config
 import claude_db
 from views.overview import render_overview_page
 from views.projects import render_projects_table
-from views.sessions import render_sessions_table, render_transcripts_table
+from views.sessions import render_sessions_page
 
 _THEME_PREF_PATH = Path(__file__).parent / ".streamlit" / "theme_pref.json"
 
@@ -153,12 +153,7 @@ def main() -> None:
         render_overview_page()
 
     elif st.session_state.page == "sessions":
-        st.header("Sessions")
-        st.subheader("Live")
-        render_sessions_table()
-
-        st.subheader("All")
-        render_transcripts_table()
+        render_sessions_page()
 
     else:
         st.header("Projects")

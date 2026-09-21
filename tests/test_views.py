@@ -5,7 +5,7 @@ from claude_projects import ClaudeProject
 from claude_sessions import ClaudeSession
 from claude_transcripts import ClaudeTranscript
 from views.projects import _projects_dataframe
-from views.sessions import _sessions_dataframe, _transcripts_dataframe
+from views.sessions_data import _sessions_dataframe, _transcripts_dataframe
 
 
 def _session(**overrides):
@@ -25,7 +25,7 @@ def _session(**overrides):
         project="proj",
     )
     defaults.update(overrides)
-    return ClaudeSession(**defaults)
+    return ClaudeSession(**defaults) # type: ignore
 
 
 def _transcript(**overrides):
@@ -45,7 +45,7 @@ def _transcript(**overrides):
         first_prompt="Can you fix the login bug?",
     )
     defaults.update(overrides)
-    return ClaudeTranscript(**defaults)
+    return ClaudeTranscript(**defaults) # type: ignore
 
 
 def _project(**overrides):
@@ -62,11 +62,11 @@ def _project(**overrides):
         mcp_servers=["a", "b"],
     )
     defaults.update(overrides)
-    return ClaudeProject(**defaults)
+    return ClaudeProject(**defaults) # type: ignore
 
 
 def test_sessions_dataframe_maps_fields(monkeypatch):
-    import views.sessions as sessions_view
+    import views.sessions_data as sessions_view
 
     monkeypatch.setattr(sessions_view, "load_sessions", lambda: [_session()])
     df = _sessions_dataframe()
@@ -80,7 +80,7 @@ def test_sessions_dataframe_maps_fields(monkeypatch):
 
 
 def test_sessions_dataframe_empty(monkeypatch):
-    import views.sessions as sessions_view
+    import views.sessions_data as sessions_view
 
     monkeypatch.setattr(sessions_view, "load_sessions", lambda: [])
     df = _sessions_dataframe()
@@ -88,7 +88,7 @@ def test_sessions_dataframe_empty(monkeypatch):
 
 
 def test_transcripts_dataframe_maps_fields(monkeypatch):
-    import views.sessions as sessions_view
+    import views.sessions_data as sessions_view
 
     monkeypatch.setattr(sessions_view, "load_transcripts", lambda: [_transcript()])
     df = _transcripts_dataframe()
