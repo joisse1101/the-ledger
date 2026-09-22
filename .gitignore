@@ -8,3 +8,5 @@ __pycache__/
 run_log.txt
 .pytest_cache/
 .ledger/
+web/node_modules/
+web/dist/

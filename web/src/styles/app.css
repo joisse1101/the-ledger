@@ -1,0 +1,251 @@
+/* Base, shell and shared controls. Colors come only from tokens.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 1.4rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+/* iOS Safari zooms the page when a field under 16px is focused. */
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 16px;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- buttons */
+
+.button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button {
+  padding: 0 16px;
+}
+
+.icon-button {
+  border-color: transparent;
+  background: transparent;
+  flex: none;
+}
+
+.icon-button:hover:not(:disabled),
+.button:hover:not(:disabled) {
+  background: var(--grid);
+}
+
+.button:disabled,
+.icon-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.spin {
+  display: inline-flex;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+/* ---- shell */
+
+.app {
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh; /* excludes the mobile browser's collapsing toolbar */
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--header-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) calc(var(--gutter) + env(safe-area-inset-right)) 0
+    calc(var(--gutter) + env(safe-area-inset-left));
+  background: var(--surface);
+  border-bottom: 1px solid var(--grid);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.refresh {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.refresh-caption {
+  color: var(--text-2);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.refresh-failed {
+  color: var(--danger);
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--gutter) calc(var(--gutter) + env(safe-area-inset-right)) var(--gutter)
+    calc(var(--gutter) + env(safe-area-inset-left));
+}
+
+/* Nothing on a narrow screen may sit under the fixed tab bar. */
+.app[data-viewport="narrow"] .content {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--gutter));
+}
+
+/* On a narrow screen the caption drops its label to leave room for the two buttons. */
+.app[data-viewport="narrow"] .refresh-label {
+  display: none;
+}
+
+/* ---- navigation */
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-link.active {
+  color: var(--accent);
+}
+
+.nav--top {
+  display: flex;
+  gap: 4px;
+}
+
+.nav--top .nav-link {
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: var(--radius);
+}
+
+.nav--top .nav-link:hover {
+  background: var(--grid);
+}
+
+.nav--top .nav-link.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.nav--bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--surface);
+  border-top: 1px solid var(--grid);
+}
+
+.nav--bottom .nav-link {
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--tabbar-h);
+  font-size: 0.75rem;
+}
+
+/* ---- notices */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px calc(var(--gutter) + env(safe-area-inset-right)) 8px calc(var(--gutter) + env(safe-area-inset-left));
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.banner span {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice {
+  max-width: 40rem;
+  margin: 8vh auto 0;
+}

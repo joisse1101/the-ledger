@@ -1,0 +1,88 @@
+/* Design tokens. Light is the default; dark applies when <html data-theme="dark">
+   is set, or (before the app has set anything) when the device prefers dark.
+   The categorical slots are a fixed order: a project keeps its slot, so only which
+   prefix of the list is used may vary, never the order. Values are the ones the
+   Streamlit Overview used (_CATEGORICAL_LIGHT / _CATEGORICAL_DARK / _MUTED_INK). */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f4f3ef;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --grid: #e8e7e1;
+  --accent: #d6487e;
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --warn-bg: #fff4d6;
+  --warn-text: #5c3d00;
+
+  --cat-0: #d6487e;
+  --cat-1: #0891b2;
+  --cat-2: #d97706;
+  --cat-3: #059669;
+  --cat-4: #3b82f6;
+  --cat-5: #e06d53;
+  --cat-6: #a259ff;
+  --cat-7: #65a30d;
+  --muted-ink: #898781; /* "Other" bucket: the same in both themes */
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #121211;
+  --surface: #1a1a19;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --grid: #2b2a27;
+  --accent: #c26d88;
+  --on-accent: #ffffff;
+  --danger: #f97066;
+  --warn-bg: #3d2f00;
+  --warn-text: #ffe29a;
+
+  --cat-0: #c26d88;
+  --cat-1: #0099ca;
+  --cat-2: #c87b00;
+  --cat-3: #009362;
+  --cat-4: #0094da;
+  --cat-5: #e65f2a;
+  --cat-6: #a260df;
+  --cat-7: #5a9400;
+}
+
+/* Before the app sets data-theme (first paint, or scripts blocked) follow the device. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg: #121211;
+    --surface: #1a1a19;
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --grid: #2b2a27;
+    --accent: #c26d88;
+    --danger: #f97066;
+    --warn-bg: #3d2f00;
+    --warn-text: #ffe29a;
+
+    --cat-0: #c26d88;
+    --cat-1: #0099ca;
+    --cat-2: #c87b00;
+    --cat-3: #009362;
+    --cat-4: #0094da;
+    --cat-5: #e65f2a;
+    --cat-6: #a260df;
+    --cat-7: #5a9400;
+  }
+}
+
+:root {
+  --tap: 44px; /* minimum touch target */
+  --gutter: 16px;
+  --radius: 10px;
+  --tabbar-h: 56px;
+  --header-h: 56px;
+}

@@ -1,0 +1,148 @@
+/* The shared list component (table + card renderers) and, as later tasks add them, the
+   Sessions page's Live/All toolbars and detail sheet. Colors come only from tokens.css. */
+
+.list-empty {
+  color: var(--text-2);
+  padding: 24px 0;
+}
+
+/* ---- table renderer (medium/wide) */
+
+.list-table-scroll {
+  /* A wide table (the detail view's all-responses table, or this one on a narrow browser
+     window in dev) scrolls sideways in its own box rather than widening the page. */
+  overflow-x: auto;
+}
+
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.list-table th,
+.list-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 22ch;
+}
+
+.list-table th[data-align="end"],
+.list-table td[data-align="end"] {
+  text-align: right;
+}
+
+.list-table tbody tr {
+  cursor: pointer;
+}
+
+.list-table tbody tr:hover {
+  background: var(--grid);
+}
+
+.sort-header {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---- card renderer (narrow) */
+
+.list-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-card:hover {
+  background: var(--grid);
+}
+
+.list-card-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.list-card-field:first-child {
+  font-weight: 600;
+}
+
+.list-card-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+.list-card-chip {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.list-card-chip-label::after {
+  content: ":";
+}
+
+/* ---- toolbars */
+
+.sessions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  min-height: var(--tap);
+}
+
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-height: var(--tap);
+}
+
+.switch-field input {
+  width: 36px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sessions-toolbar-caption {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
