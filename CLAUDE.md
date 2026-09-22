@@ -12,10 +12,11 @@ Claude Code data:
   filter/sort, session-detail dialogs, delete flows.
 - `api/` (FastAPI backend) + `web/` (React + Vite frontend) — the replacement, built to also allow
   read access from other devices on the network (a phone) behind a shared access token, which
-  Streamlit has no way to do safely. As of this writing it covers Overview and Sessions (Live, All,
-  the session-detail view, and delete) with responsiveness down to phone widths; the Projects page
-  (`web/src/pages/ProjectsPage.tsx`) is still a stub (just a heading). Streamlit has not been
-  removed — cutover is the last step of the migration, once the React app has full parity.
+  Streamlit has no way to do safely. As of this writing it covers Overview, Sessions (Live, All,
+  the session-detail view, and delete), and Projects (list + delete), all with responsiveness down
+  to phone widths — remaining work is the manual responsive/phone verification and cutover passes
+  (tasks.md §9–10). Streamlit has not been removed — cutover is the last step of the migration,
+  once the React app has full parity.
 
 The migration's rationale, decisions, and status are recorded in
 `openspec/changes/migrate-to-react-lan-access/` (`proposal.md` for why/what, `design.md` for the
@@ -450,8 +451,15 @@ path here) rendered inside `AppShell`.
   pattern `TokensChart` uses directly). `SummaryStats` renders the KPI tiles; the four extreme
   figures are buttons that toggle an inline disclosure naming their project/session (plus a `title`
   attribute for hover on pointer devices) since there's no hover-only affordance on a touchscreen.
-- **`pages/ProjectsPage.tsx` is currently a stub** — just an `<h1>`. Building it out (list + delete
-  flow, matching `streamlit_app/views/projects.py`'s behavior) is tasks.md §8, not yet done.
+- **Projects** (`components/projects/ProjectsList.tsx`, `pages/ProjectsPage.tsx`) ports
+  `views/projects.py`'s behavior: every field from `useProjects()` (name, path, trust, last
+  session, version, last cost, last start, lines +/-, MCP servers) through the same
+  `ResponsiveList` the Sessions lists use. There's no per-project detail view here, so — unlike
+  Sessions, where a row click opens a dialog — a row click doubles as "delete this one" (a
+  dedicated per-row delete button isn't possible without nesting a `<button>` inside `ListCards`'
+  card-as-button); selecting a row shows an inline `detail-notice` confirmation naming the exact
+  path before Confirm/Cancel. Confirming calls `useDeleteProject`, whose `onSuccess` already
+  invalidates the `projects`, `transcripts`, and `overview` queries.
 - **`lib/format.ts`** — display formatting for API values (`formatTime`, `formatDateTime`,
   `formatCost`, `formatContext`, `formatText`, `formatCount`; every one renders `"--"` for a missing
   value). **`lib/tokens.ts`** — `humanizeTokens`/`formatGrowth`, a deliberate port of

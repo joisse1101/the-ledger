@@ -287,6 +287,13 @@
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+/* Shared by any list's "this row is the pending action's target" state - currently just the
+   Projects list's select-a-row-to-delete flow. */
+.list-table tbody tr.row-selected,
+.list-card.row-selected {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
 .sessions-load-more {
   display: flex;
   align-items: center;
