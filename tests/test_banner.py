@@ -2,8 +2,6 @@
 
 import types
 
-import pytest
-
 import banner
 
 # ------------------------------------------------ address filter
@@ -97,17 +95,17 @@ def test_render_qr_steps_aside_when_the_terminal_cannot_show_it(monkeypatch):
 # ------------------------------------------------ text
 
 
-def test_local_only_banner_has_one_address_and_no_token_talk():
-    text = banner.build_banner(port=8501, frontend_built=True)
+def test_local_only_banner_has_one_address_no_token_talk_and_the_preview_reminder():
+    text = banner.build_banner(frontend_port=8501)
     assert "http://localhost:8501/" in text
     assert "token" not in text.lower()
     assert "HTTP" not in text
+    assert "npm run preview" in text and "--host" not in text
 
 
 def test_lan_banner_lists_each_address_with_the_token_the_qr_and_the_warning():
     text = banner.build_banner(
-        port=9000,
-        frontend_built=True,
+        frontend_port=9000,
         lan_addresses=["192.168.1.20", "10.0.0.5"],
         token="tok-123",
         qr="QR-ROWS\n",
@@ -118,29 +116,17 @@ def test_lan_banner_lists_each_address_with_the_token_the_qr_and_the_warning():
     assert "QR-ROWS" in text and "192.168.1.20" in text.split("QR-ROWS")[0].splitlines()[-1]  # QR is for the first
     assert "plain HTTP" in text
     assert "firewall" in text
+    assert "npm run preview -- --host" in text  # the reminder to serve the frontend separately
 
 
 def test_lan_banner_without_a_qr_still_prints_the_links():
-    text = banner.build_banner(
-        port=8501, frontend_built=True, lan_addresses=["192.168.1.20"], token="t", qr=None
-    )
+    text = banner.build_banner(frontend_port=8501, lan_addresses=["192.168.1.20"], token="t", qr=None)
     assert "http://192.168.1.20:8501/?token=t" in text
     assert "Scan" not in text
 
 
 def test_lan_banner_with_no_address_says_so_and_prints_no_token():
-    text = banner.build_banner(port=8501, frontend_built=True, lan_addresses=[], token="secret-value")
+    text = banner.build_banner(frontend_port=8501, lan_addresses=[], token="secret-value")
     assert "No network address" in text
     assert "secret-value" not in text
     assert "plain HTTP" in text
-
-
-@pytest.mark.parametrize("lan", [None, ["192.168.1.20"]])
-def test_a_missing_front_end_is_called_out_with_the_build_command(lan):
-    text = banner.build_banner(port=8501, frontend_built=False, lan_addresses=lan, token="t")
-    assert "not been built" in text
-    assert "npm ci" in text and "npm run build" in text
-
-
-def test_a_built_front_end_prints_no_warning():
-    assert "not been built" not in banner.build_banner(port=8501, frontend_built=True)

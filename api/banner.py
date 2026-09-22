@@ -8,15 +8,6 @@ import socket
 import sys
 from typing import Iterable, Optional
 
-NOT_BUILT_MESSAGE = (
-    "The web interface has not been built yet.\n"
-    "Build it once, then reload this page:\n"
-    "\n"
-    "  cd web\n"
-    "  npm ci\n"
-    "  npm run build\n"
-)
-
 
 def usable_ipv4(candidates: Iterable[str]) -> list[str]:
     """The addresses another device could reach: valid IPv4 only, no loopback,
@@ -73,20 +64,23 @@ def render_qr(text: str) -> Optional[str]:
 
 def build_banner(
     *,
-    port: int,
-    frontend_built: bool,
+    frontend_port: int,
     lan_addresses: Optional[list[str]] = None,
     token: Optional[str] = None,
     qr: Optional[str] = None,
 ) -> str:
-    """The startup text. `lan_addresses` is None when the server is local-only."""
-    lines = ["", f"The Ledger is running.  On this machine: http://localhost:{port}/"]
+    """The startup text for the API process. It prints a link to the *frontend*
+    (see design.md Decision 12) rather than to itself: this process only ever serves
+    `/api/*`. `lan_addresses` is None when the API is local-only."""
+    lines = ["", f"The Ledger's frontend: http://localhost:{frontend_port}/"]
+    preview_command = "cd web && npm run preview" + (" -- --host" if lan_addresses is not None else "")
+    lines.append(f"The frontend runs as its own process - start it separately: {preview_command}")
 
     if lan_addresses is not None:
         lines.append("")
         if lan_addresses and token:
             lines.append("Open on another device (the link signs that device in):")
-            lines += [f"  http://{address}:{port}/?token={token}" for address in lan_addresses]
+            lines += [f"  http://{address}:{frontend_port}/?token={token}" for address in lan_addresses]
             if qr:
                 lines += ["", f"Scan to open {lan_addresses[0]}:", qr.rstrip("\n")]
         else:
@@ -99,7 +93,5 @@ def build_banner(
             "on Private networks) and check the phone is on the same network.",
         ]
 
-    if not frontend_built:
-        lines += ["", "WARNING: " + NOT_BUILT_MESSAGE.rstrip("\n")]
     lines.append("")
     return "\n".join(lines)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, ApiError, CSRF_HEADER, CSRF_VALUE, NetworkError, UnauthorizedError } from "./client";
+import { apiFetch, apiOrigin, ApiError, CSRF_HEADER, CSRF_VALUE, NetworkError, UnauthorizedError } from "./client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -10,6 +10,7 @@ function jsonResponse(status: number, body: unknown): Response {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe("apiFetch", () => {
@@ -46,5 +47,42 @@ describe("apiFetch", () => {
   it("turns a dropped connection into a NetworkError", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     await expect(apiFetch("/api/live")).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it("attaches the stored token as a Bearer header", async () => {
+    localStorage.setItem("ledger_token", "abc123");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/live");
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer abc123");
+  });
+
+  it("sends no Authorization header once the stored token is cleared, and a 401 still surfaces", async () => {
+    localStorage.setItem("ledger_token", "abc123");
+    localStorage.clear();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(401, {}));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiFetch("/api/live")).rejects.toBeInstanceOf(UnauthorizedError);
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.has("Authorization")).toBe(false);
+  });
+});
+
+describe("apiOrigin", () => {
+  const location = { protocol: "http:", hostname: "192.168.1.20" };
+
+  it("is relative in dev, where Vite's own proxy forwards /api to the backend", () => {
+    expect(apiOrigin({ DEV: true, VITE_API_PORT: undefined }, location)).toBe("");
+  });
+
+  it("is the API's own origin, on the default port, once built", () => {
+    expect(apiOrigin({ DEV: false, VITE_API_PORT: undefined }, location)).toBe("http://192.168.1.20:8501");
+  });
+
+  it("honours VITE_API_PORT when the API runs on a non-default port", () => {
+    expect(apiOrigin({ DEV: false, VITE_API_PORT: "9000" }, location)).toBe("http://192.168.1.20:9000");
   });
 });

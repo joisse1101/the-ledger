@@ -1,12 +1,15 @@
-"""Access control for everything the server serves: one ASGI middleware over every request.
+"""Access control for the API: one ASGI middleware over every request.
 
 A request is *local* only when it comes from a loopback address and carries no
 proxy marker (a tunnel or reverse proxy on this machine also connects from
 loopback). Local requests need no token but must name a loopback host, so a web
 page can't reach the app by rebinding its own DNS name to 127.0.0.1. Everything
-else must present the access token. State-changing requests must also carry a
-custom header, which a page on another site can't add without a CORS preflight
-(and no CORS header is ever sent).
+else must present the access token as `Authorization: Bearer <token>` — the
+frontend (a separate origin, see server.py's CORS setup) is what turns a printed
+link's `?token=` into that header; the API itself has no query or cookie handling
+for it. State-changing requests must also carry a custom header, which a page on
+another site can't add without a CORS preflight (and only the frontend's own
+origin is ever allowed one).
 """
 
 from __future__ import annotations
@@ -17,16 +20,13 @@ import re
 import secrets
 from pathlib import Path
 from typing import Callable, Mapping, Optional
-from urllib.parse import parse_qsl, quote, urlencode
 
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, RedirectResponse, Response
+from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 LEDGER_DIR = Path(__file__).resolve().parent.parent / ".ledger"
 TOKEN_ENV = "LEDGER_TOKEN"
-COOKIE_NAME = "ledger_token"
-COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # signed in for a year, or until the token changes
 
 CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "ledger"
@@ -80,18 +80,6 @@ def _bearer(request: Request) -> Optional[str]:
     return credential.strip() if scheme.lower() == "bearer" else None
 
 
-def _without_token(request: Request) -> str:
-    """The request's own path and query with every `token` parameter removed."""
-    query = [
-        (key, value)
-        for key, value in parse_qsl(request.url.query, keep_blank_values=True)
-        if key != "token"
-    ]
-    # Leading slashes collapse to one so the target can't read as a protocol-relative URL.
-    target = quote("/" + request.url.path.lstrip("/"))
-    return target + ("?" + urlencode(query) if query else "")
-
-
 class SecurityMiddleware:
     def __init__(self, app: ASGIApp, token: Callable[[], Optional[str]]) -> None:
         self.app = app
@@ -120,36 +108,11 @@ class SecurityMiddleware:
                 return PlainTextResponse(
                     "Forbidden: this address must be opened as localhost.\n", status_code=403
                 )
-        else:
-            in_query = any(_matches(token, value) for value in request.query_params.getlist("token"))
-            if in_query and request.method in ("GET", "HEAD"):
-                return self._sign_in(request, token)
-            signed_in = (
-                in_query
-                or _matches(token, request.cookies.get(COOKIE_NAME))
-                or _matches(token, _bearer(request))
-            )
-            if not signed_in:
-                return PlainTextResponse(UNAUTHORIZED_MESSAGE, status_code=401)
+        elif not _matches(token, _bearer(request)):
+            return PlainTextResponse(UNAUTHORIZED_MESSAGE, status_code=401)
 
         if request.method != "GET" and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
             return PlainTextResponse(
                 f"Forbidden: send the header {CSRF_HEADER}: {CSRF_VALUE}.\n", status_code=403
             )
         return None
-
-    @staticmethod
-    def _sign_in(request: Request, token: Optional[str]) -> Response:
-        """Remember this browser and drop the token from the address it lands on."""
-        response = RedirectResponse(_without_token(request), status_code=303)
-        # Lax, not Strict: a link opened from a QR scanner or another app is a cross-site
-        # navigation, and Strict keeps the cookie off the redirect that follows it.
-        response.set_cookie(
-            COOKIE_NAME,
-            token or "",
-            max_age=COOKIE_MAX_AGE,
-            path="/",
-            httponly=True,
-            samesite="lax",
-        )
-        return response

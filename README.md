@@ -95,33 +95,48 @@ npm run dev
 
 Open http://localhost:5173.
 
-**Built** — one server, one port, serving both the API and the compiled frontend.
-This is also what's needed to reach the app from another device (see below):
+**Built** — two processes, two ports: the API serves only `/api/*`, and the built
+frontend is served separately by Vite's own static server. This is also what's needed
+to reach the app from another device (see below):
 
 ```powershell
+# Terminal 1: build once, then serve the compiled frontend on its own port
 cd web
 npm ci
 npm run build
-cd ..
+npm run preview
+```
+
+```powershell
+# Terminal 2, from the repo root: the API
 python api/server.py
 ```
 
-Open http://localhost:8501.
+Open http://localhost:4173 (Vite's own default preview port).
 
 **From another device on your network** (phone, tablet, another computer), pass
-`--lan`:
+`--lan` to the API and `-- --host` to the frontend's preview command — both need to be
+running:
 
 ```powershell
 python api/server.py --lan
 ```
 
-This requires the frontend to already be built (see above). It binds the server to
-your network interfaces instead of just this machine, and prints a URL, a QR code, and
-an access token — the other device needs the token (baked into the QR/URL, or entered
-by hand) to connect. Only do this on a network you trust: the connection is plain HTTP,
-so the token and your session data aren't encrypted in transit. `--host`/`--port` (or
-the `LEDGER_HOST`/`LEDGER_PORT` env vars) override the address/port if you need
-something other than the default.
+```powershell
+cd web
+npm run preview -- --host
+```
+
+This requires the frontend to already be built (see above). `--lan` binds the API to
+your network interfaces instead of just this machine, and it prints the frontend's URL,
+a QR code, and an access token for each — the other device needs the token (baked into
+the QR/URL) to sign in; opening that link stores the token on the device and it's used
+on every API request from then on. Only do this on a network you trust: the connection
+is plain HTTP, so the token and your session data aren't encrypted in transit.
+`--host`/`--port`/`--frontend-port` (or the `LEDGER_HOST`/`LEDGER_PORT`/
+`LEDGER_FRONTEND_PORT` env vars) override the API's address/port and the port it expects
+the frontend on, if you need something other than the defaults — keep `--frontend-port`
+in sync with whatever port you actually run `npm run preview` on.
 
 ## Testing
 

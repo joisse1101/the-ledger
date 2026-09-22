@@ -2,11 +2,31 @@
 // UnauthorizedError or NetworkError so the UI can tell "sign in again" from
 // "the server is away" from "the server said no".
 
+import { getStoredToken } from "./token";
+
 /** Sent on every state-changing request. A page on another site can't add a custom
- *  header without a CORS preflight (which the server never grants), so this is what
- *  keeps a cross-site page from deleting anything. */
+ *  header without a CORS preflight (which the API only ever grants to its own
+ *  frontend's origin — see design.md Decision 7), so this is what keeps a cross-site
+ *  page from deleting anything. */
 export const CSRF_HEADER = "X-Requested-With";
 export const CSRF_VALUE = "ledger";
+
+const DEFAULT_API_PORT = 8501;
+
+/** Where API calls go. `npm run dev`'s Vite proxy (vite.config.ts) forwards relative
+ *  `/api` paths to the backend, so dev keeps using those (import.meta.env.DEV is true
+ *  there, and under Vitest). The built app is served by `vite preview` on its own
+ *  origin (design.md Decision 2), so it has to call the API's own origin directly;
+ *  VITE_API_PORT overrides the default port 8501 at build time. Params are injectable
+ *  so this is testable without stubbing Vite's globals. */
+export function apiOrigin(
+  env: Pick<ImportMetaEnv, "DEV" | "VITE_API_PORT"> = import.meta.env,
+  location: Pick<Location, "protocol" | "hostname"> = window.location,
+): string {
+  if (env.DEV) return "";
+  const port = env.VITE_API_PORT || DEFAULT_API_PORT;
+  return `${location.protocol}//${location.hostname}:${port}`;
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -52,10 +72,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (method !== "GET" && method !== "HEAD") headers.set(CSRF_HEADER, CSRF_VALUE);
+  const token = getStoredToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   let response: Response;
   try {
-    response = await fetch(path, { ...init, method, headers, credentials: "same-origin" });
+    response = await fetch(apiOrigin() + path, { ...init, method, headers });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new NetworkError();

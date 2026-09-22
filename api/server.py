@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import mimetypes
 import os
 import sys
 import threading
@@ -16,8 +15,8 @@ from pathlib import Path as FilePath
 from typing import Annotated, Literal, Mapping, Optional, Sequence
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Path, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 # This file lives in api/, one level below the repo root, but the shared data-layer
@@ -94,9 +93,39 @@ app = FastAPI(
 # set). While None, no token exists, so every request that isn't plain local is refused.
 access_token: Optional[str] = None
 
+DEFAULT_FRONTEND_PORT = 4173  # Vite's own `vite preview` default
+
+
+def cors_origins(frontend_port: int, lan_addresses: Sequence[str] = ()) -> list[str]:
+    """The exact origins the frontend can be reached at (design.md Decision 7):
+    localhost/127.0.0.1 always (dev's `npm run dev` and a local `vite preview` both use
+    one of these), plus one entry per LAN address discovered under `--lan`. Never a
+    wildcard — an unlisted origin gets no CORS header at all, even from this machine."""
+    origins = [f"http://localhost:{frontend_port}", f"http://127.0.0.1:{frontend_port}"]
+    origins += [f"http://{address}:{frontend_port}" for address in lan_addresses]
+    return origins
+
+
+# Mutated in place by main() (and by tests) once the frontend's port/addresses are known;
+# CORSMiddleware keeps this exact list reference, so mutating it changes what it allows.
+_cors_origins: list[str] = []
+
+
+def configure_cors(origins: Sequence[str]) -> None:
+    _cors_origins[:] = origins
+
+
 app.add_middleware(GZipMiddleware, minimum_size=1024)
-# Added last so it is outermost: nothing else runs for a refused request.
 app.add_middleware(SecurityMiddleware, token=lambda: access_token)
+# Added last so it is outermost: it answers a CORS preflight (OPTIONS) itself, before
+# the token/CSRF checks above ever run — a real request still needs to pass those.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,  # nothing is credentialed: auth is a header, not a cookie
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "X-Requested-With", "Content-Type"],
+)
 
 
 def _iso(value) -> Optional[str]:
@@ -323,64 +352,6 @@ def get_overview(
     return overview_stats.overview(claude_transcripts.load_transcripts(), range_)
 
 
-# ---------------------------------------------------------------- front end
-
-WEB_DIST = _REPO_ROOT / "web" / "dist"
-
-# Windows takes these from the registry and can answer text/plain for .js, which
-# browsers refuse to run as a module script.
-for _suffix, _type in (
-    (".js", "text/javascript"),
-    (".mjs", "text/javascript"),
-    (".css", "text/css"),
-    (".svg", "image/svg+xml"),
-    (".json", "application/json"),
-    (".webmanifest", "application/manifest+json"),
-):
-    mimetypes.add_type(_type, _suffix)
-
-
-def frontend_built() -> bool:
-    return (WEB_DIST / "index.html").is_file()
-
-
-def _dist_file(path: str) -> Optional[FilePath]:
-    """The file under web/dist that `path` names, or None. Never anything outside it."""
-    root = WEB_DIST.resolve()
-    try:
-        candidate = (root / path).resolve()
-    except (OSError, ValueError):
-        return None
-    return candidate if candidate.is_file() and candidate.is_relative_to(root) else None
-
-
-# Registered after every API route, so it only sees what they didn't match. It takes
-# every method so that an unknown /api path is a 404 whatever the verb.
-@app.api_route(
-    "/{path:path}",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    include_in_schema=False,
-)
-def frontend(path: str, request: Request):
-    if path == "api" or path.startswith("api/"):
-        raise HTTPException(status_code=404)  # JSON 404, never the page
-    if request.method != "GET":
-        raise HTTPException(status_code=405, headers={"Allow": "GET"})
-    if not frontend_built():
-        return PlainTextResponse(banner.NOT_BUILT_MESSAGE, status_code=503)
-    asset = _dist_file(path)
-    if asset is not None:
-        # Vite names what it puts in assets/ by content hash, so those never change.
-        immutable = path.startswith("assets/")
-        return FileResponse(
-            asset,
-            headers={"Cache-Control": "public, max-age=31536000, immutable" if immutable else "no-cache"},
-        )
-    if "." in path.rsplit("/", 1)[-1]:
-        raise HTTPException(status_code=404)  # a file that isn't there, not a page route
-    return FileResponse(WEB_DIST / "index.html", headers={"Cache-Control": "no-cache"})
-
-
 # ---------------------------------------------------------------- command line
 
 DEFAULT_HOST = "127.0.0.1"
@@ -394,6 +365,7 @@ _WILDCARD_BINDS = frozenset({"0.0.0.0", "::", ""})
 class Settings:
     host: str
     port: int
+    frontend_port: int
 
     @property
     def exposed(self) -> bool:
@@ -401,10 +373,27 @@ class Settings:
         return self.host not in _LOOPBACK_BINDS
 
 
+def _parse_port(value: Optional[int], env_name: str, environ: Mapping[str, str], default: int, parser) -> int:
+    if value is not None:
+        port = value
+    elif environ.get(env_name, "").strip():
+        try:
+            port = int(environ[env_name])
+        except ValueError:
+            parser.error(f"{env_name} must be a number, got {environ[env_name]!r}")
+    else:
+        port = default
+    if not 1 <= port <= 65535:
+        parser.error(f"port must be between 1 and 65535, got {port}")
+    return port
+
+
 def parse_settings(
     argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.environ
 ) -> Settings:
-    """--host beats --lan beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501."""
+    """--host beats --lan beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501;
+    --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link and the
+    CORS allow-list — this process never connects to the frontend's port itself)."""
     parser = argparse.ArgumentParser(
         prog="python server.py",
         description="The Ledger: a dashboard for your Claude Code sessions.",
@@ -416,21 +405,19 @@ def parse_settings(
     )
     parser.add_argument("--host", help=f"address to bind (default {DEFAULT_HOST}, env LEDGER_HOST)")
     parser.add_argument("--port", type=int, help=f"port to serve on (default {DEFAULT_PORT}, env LEDGER_PORT)")
+    parser.add_argument(
+        "--frontend-port",
+        type=int,
+        help=f"port the frontend is served on (default {DEFAULT_FRONTEND_PORT}, env LEDGER_FRONTEND_PORT)",
+    )
     args = parser.parse_args(argv)
 
     host = args.host or (LAN_HOST if args.lan else None) or environ.get("LEDGER_HOST") or DEFAULT_HOST
-    if args.port is not None:
-        port = args.port
-    elif environ.get("LEDGER_PORT", "").strip():
-        try:
-            port = int(environ["LEDGER_PORT"])
-        except ValueError:
-            parser.error(f"LEDGER_PORT must be a number, got {environ['LEDGER_PORT']!r}")
-    else:
-        port = DEFAULT_PORT
-    if not 1 <= port <= 65535:
-        parser.error(f"port must be between 1 and 65535, got {port}")
-    return Settings(host=host, port=port)
+    port = _parse_port(args.port, "LEDGER_PORT", environ, DEFAULT_PORT, parser)
+    frontend_port = _parse_port(
+        args.frontend_port, "LEDGER_FRONTEND_PORT", environ, DEFAULT_FRONTEND_PORT, parser
+    )
+    return Settings(host=host, port=port, frontend_port=frontend_port)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
@@ -448,11 +435,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             banner.discover_ipv4() if settings.host in _WILDCARD_BINDS else [settings.host]
         )
         if lan_addresses:
-            qr = banner.render_qr(f"http://{lan_addresses[0]}:{settings.port}/?token={access_token}")
+            qr = banner.render_qr(
+                f"http://{lan_addresses[0]}:{settings.frontend_port}/?token={access_token}"
+            )
+    # The frontend's origins are always allowed (dev and a local `vite preview` both call
+    # this API cross-origin), plus one per LAN address once those are known.
+    configure_cors(cors_origins(settings.frontend_port, lan_addresses or []))
     print(
         banner.build_banner(
-            port=settings.port,
-            frontend_built=frontend_built(),
+            frontend_port=settings.frontend_port,
             lan_addresses=lan_addresses,
             token=access_token,
             qr=qr,
