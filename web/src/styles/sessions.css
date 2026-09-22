@@ -295,3 +295,201 @@
   flex-wrap: wrap;
   margin-top: 12px;
 }
+
+/* ---- session detail dialog */
+
+.session-dialog {
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  width: min(640px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: 85vh;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.session-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.session-dialog-scroll {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Full-screen sheet under 640px, with the header always visible while the body scrolls. */
+@media (max-width: 639.98px) {
+  .session-dialog {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .session-dialog-scroll {
+    max-height: 100dvh;
+  }
+}
+
+.session-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px calc(var(--gutter) + env(safe-area-inset-right)) 10px
+    calc(var(--gutter) + env(safe-area-inset-left));
+  background: var(--surface);
+  border-bottom: 1px solid var(--grid);
+}
+
+.session-dialog-title {
+  margin: 0;
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px calc(var(--gutter) + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+    calc(var(--gutter) + env(safe-area-inset-left));
+}
+
+.detail-heading {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.detail-caption {
+  margin: 4px 0;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+.detail-notice {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.detail-section > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  font-weight: 600;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.detail-table th,
+.detail-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+
+.detail-table th[data-align="end"],
+.detail-table td[data-align="end"] {
+  text-align: right;
+}
+
+.session-recap-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.session-recap-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-recap-stat dt {
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
+.session-recap-stat dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.session-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+/* ---- tokens-per-response bars (task 6.4's stand-in; 6.5 ports the vega-embed chart) */
+
+.tokens-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 200px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.tokens-chart-bar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 8px;
+  height: 100%;
+}
+
+.tokens-chart-segment {
+  width: 100%;
+  border-radius: 1px;
+}
+
+.tokens-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+.tokens-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tokens-chart-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

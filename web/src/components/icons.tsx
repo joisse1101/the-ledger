@@ -61,3 +61,11 @@ export function MoonIcon() {
     </svg>
   );
 }
+
+export function CloseIcon() {
+  return (
+    <svg {...common}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
