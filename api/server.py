@@ -7,6 +7,7 @@ import asyncio
 import logging
 import mimetypes
 import os
+import sys
 import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -18,6 +19,14 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from starlette.middleware.gzip import GZipMiddleware
+
+# This file lives in api/, one level below the repo root, but the shared data-layer
+# modules (claude_db, ...) live at the root alongside streamlit_app/'s modules.
+# Running it directly only puts this file's own directory on sys.path, so the repo
+# root needs adding explicitly before those modules can be imported.
+_REPO_ROOT = FilePath(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import banner
 import claude_context
@@ -316,7 +325,7 @@ def get_overview(
 
 # ---------------------------------------------------------------- front end
 
-WEB_DIST = FilePath(__file__).resolve().parent / "web" / "dist"
+WEB_DIST = _REPO_ROOT / "web" / "dist"
 
 # Windows takes these from the registry and can answer text/plain for .js, which
 # browsers refuse to run as a module script.

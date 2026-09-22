@@ -33,9 +33,21 @@ CLI version, lines changed, and any MCP servers configured for it.
 There's also a dark mode toggle in the sidebar, if you're into that.
 
 > **Note:** this repo is mid-migration from the Streamlit UI below to a React frontend
-> served by a FastAPI backend (`server.py`), which also adds access from other devices
-> on your network. Both currently work; see "Run the new web app" below for the one
-> that's replacing Streamlit. The `## Setup` section applies to either.
+> served by a FastAPI backend (`api/server.py`), which also adds access from other
+> devices on your network. Both currently work; see "Run the new web app" below for
+> the one that's replacing Streamlit. The `## Setup` section applies to either.
+
+## Layout
+
+- `streamlit_app/` — the Streamlit UI (`app.py` + `views/`).
+- `api/` — the FastAPI backend that serves the React frontend (`server.py` and its
+  supporting modules: `banner.py`, `security.py`, `live_snapshot.py`,
+  `overview_stats.py`, `transcript_query.py`).
+- `web/` — the React + Vite frontend `api/server.py` serves once built.
+- Everything else at the repo root (`claude_db.py`, `claude_projects.py`,
+  `claude_transcripts.py`, `claude_sessions.py`, `claude_context.py`) is the shared
+  data layer both the Streamlit app and the API server read from — it isn't specific
+  to either UI, so it stays put rather than living under one of the two folders above.
 
 ## Setup
 
@@ -54,8 +66,10 @@ pip install -r requirements.txt
 
 ## Run
 
+Run this from the repo root, not from inside `streamlit_app/`:
+
 ```powershell
-streamlit run app.py
+streamlit run streamlit_app/app.py
 ```
 
 The app will open at http://localhost:8501.
@@ -63,14 +77,15 @@ The app will open at http://localhost:8501.
 ## Run the new web app
 
 The new frontend lives in `web/` (React + Vite) and talks to a FastAPI backend
-(`server.py`); you need Node.js installed in addition to the Python setup above.
+(`api/server.py`); you need Node.js installed in addition to the Python setup above.
+Run the Python commands below from the repo root, not from inside `api/`.
 
 **Development** — backend and frontend as separate dev servers, so the frontend
 hot-reloads on save:
 
 ```powershell
 # Terminal 1: the API, on http://localhost:8501
-python server.py
+python api/server.py
 
 # Terminal 2: the UI, on http://localhost:5173 (proxies /api to the backend above)
 cd web
@@ -88,7 +103,7 @@ cd web
 npm ci
 npm run build
 cd ..
-python server.py
+python api/server.py
 ```
 
 Open http://localhost:8501.
@@ -97,7 +112,7 @@ Open http://localhost:8501.
 `--lan`:
 
 ```powershell
-python server.py --lan
+python api/server.py --lan
 ```
 
 This requires the frontend to already be built (see above). It binds the server to

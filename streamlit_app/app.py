@@ -4,6 +4,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+# This file lives in streamlit_app/, one level below the repo root, but the shared
+# data-layer modules (claude_db, ...) live at the root alongside api/'s server-side
+# modules. `streamlit run` only puts this file's own directory on sys.path, so the
+# repo root needs adding explicitly before those modules can be imported.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 import streamlit as st
 from streamlit import config as st_config
 
@@ -12,7 +20,7 @@ from views.overview import render_overview_page
 from views.projects import render_projects_table
 from views.sessions import render_sessions_page
 
-_THEME_PREF_PATH = Path(__file__).parent / ".streamlit" / "theme_pref.json"
+_THEME_PREF_PATH = _REPO_ROOT / ".streamlit" / "theme_pref.json"
 
 
 def _load_theme_pref() -> str:

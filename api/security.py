@@ -23,7 +23,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-LEDGER_DIR = Path(__file__).resolve().parent / ".ledger"
+LEDGER_DIR = Path(__file__).resolve().parent.parent / ".ledger"
 TOKEN_ENV = "LEDGER_TOKEN"
 COOKIE_NAME = "ledger_token"
 COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # signed in for a year, or until the token changes

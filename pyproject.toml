@@ -1,3 +1,8 @@
 [tool.pytest.ini_options]
-pythonpath = ["."]
+# "." for the shared root-level data modules (claude_db, ...); "streamlit_app" and
+# "api" so tests can import their modules unqualified (e.g. `import app`, `import
+# server`), matching how each is put on sys.path at runtime (streamlit_app/app.py's
+# own bootstrap + Streamlit's script-dir insertion; api/server.py's own bootstrap +
+# Python's script-dir insertion when run directly).
+pythonpath = [".", "streamlit_app", "api"]
 testpaths = ["tests"]
