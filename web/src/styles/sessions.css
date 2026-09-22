@@ -447,49 +447,14 @@
   font-weight: 700;
 }
 
-/* ---- tokens-per-response bars (task 6.4's stand-in; 6.5 ports the vega-embed chart) */
+/* ---- tokens-per-response chart (vega-embed, lazily imported by TokensChart.tsx) */
 
-.tokens-chart-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 200px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+.tokens-chart {
+  /* Matches the spec's own height (task 6.5), so the dialog doesn't jump once the lazily
+     imported chart module resolves and renders into this container. */
+  min-height: 260px;
 }
 
-.tokens-chart-bar {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  justify-content: flex-end;
-  width: 8px;
-  height: 100%;
-}
-
-.tokens-chart-segment {
+.tokens-chart .vega-embed {
   width: 100%;
-  border-radius: 1px;
-}
-
-.tokens-chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 8px;
-  color: var(--text-2);
-  font-size: 0.82rem;
-}
-
-.tokens-chart-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tokens-chart-swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
 }

@@ -121,9 +121,10 @@ function Detail({ detail }: { detail: SessionDetail }) {
       <div>
         <p className="detail-heading">Tokens per response</p>
         <p className="detail-caption">
-          Each bar is what one request sent: newly sent input plus cached tokens read and written.
+          Each bar is what one request sent: newly sent input plus cached tokens read and written. ▼ marks a cache
+          miss (a response that wrote more cache than it read); a dashed line marks a compaction.
         </p>
-        <TokensChart turns={detail.turns} />
+        <TokensChart turns={detail.turns} compactions={detail.compactions} />
         {compactionCaptions(detail).map((caption) => (
           <p key={caption} className="detail-caption">
             {caption}
