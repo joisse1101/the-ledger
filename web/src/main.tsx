@@ -7,6 +7,7 @@ import { createQueryClient } from "./api/queryClient";
 import "./theme/tokens.css";
 import "./styles/app.css";
 import "./styles/sessions.css";
+import "./styles/overview.css";
 
 const queryClient = createQueryClient();
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark";
 
@@ -34,29 +34,57 @@ export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
 }
 
-/** The active theme and a toggle. With no saved choice it follows the device's own
- *  setting (live, if that changes); once toggled, the choice is this device's alone. */
+// One module-level store rather than per-component state: useTheme() is called both by the
+// toggle button and by every chart that needs to know when to recolor itself (TokensChart, and
+// the Overview page's three charts), and a component-local useState per call site means toggling
+// in one of them never notifies the others - the charts stayed on the old palette until they
+// happened to remount. A shared store (read via useSyncExternalStore, the same pattern
+// useViewportClass.ts uses) keeps every mounted instance in agreement instead.
+let storedTheme: Theme | null = readStoredTheme();
+let systemPreference: Theme = systemTheme();
+const listeners = new Set<() => void>();
+
+function currentTheme(): Theme {
+  return storedTheme ?? systemPreference;
+}
+
+function notify(): void {
+  applyTheme(currentTheme());
+  listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+let mediaListenerAttached = false;
+function ensureMediaListener(): void {
+  if (mediaListenerAttached || typeof window.matchMedia !== "function") return;
+  mediaListenerAttached = true;
+  window.matchMedia(DARK_QUERY).addEventListener("change", (event) => {
+    systemPreference = event.matches ? "dark" : "light";
+    notify();
+  });
+}
+
+applyTheme(currentTheme()); // seed <html data-theme> before the first component even mounts
+
+/** The active theme and a toggle, shared across every call site (see the store comment above).
+ *  With no saved choice it follows the device's own setting (live, if that changes); once
+ *  toggled, the choice is this device's alone. */
 export function useTheme(): { theme: Theme; toggle: () => void } {
-  const [stored, setStored] = useState<Theme | null>(readStoredTheme);
-  const [system, setSystem] = useState<Theme>(systemTheme);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia(DARK_QUERY);
-    const onChange = () => setSystem(query.matches ? "dark" : "light");
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-
-  const theme = stored ?? system;
-
-  useEffect(() => applyTheme(theme), [theme]);
+  ensureMediaListener();
+  const theme = useSyncExternalStore(subscribe, currentTheme, (): Theme => "light");
 
   const toggle = useCallback(() => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
+    const next: Theme = currentTheme() === "dark" ? "light" : "dark";
     writeStoredTheme(next);
-    setStored(next);
-  }, [theme]);
+    storedTheme = next;
+    notify();
+  }, []);
 
   return { theme, toggle };
 }

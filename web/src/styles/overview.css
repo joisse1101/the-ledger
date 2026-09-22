@@ -1,0 +1,183 @@
+/* The Overview page: time-range selector, KPI stat grid, and the three project/hour charts.
+   Colors come only from tokens.css. */
+
+/* ---- time range selector */
+
+.time-range {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+}
+
+.time-range-option {
+  flex: none;
+  white-space: nowrap;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.time-range-option:hover {
+  background: var(--grid);
+}
+
+.time-range-option.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---- summary figures */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+.stat-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: var(--tap);
+  padding: 10px 14px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.stat-tile-button {
+  width: 100%;
+  border: 1px solid var(--grid);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-tile-button:hover {
+  background: var(--grid);
+}
+
+.stat-label {
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.stat-note {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* ---- layout: donut beside the figures at wide, stacked below that */
+
+.overview-top {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .overview-top {
+    grid-template-columns: minmax(220px, 260px) 1fr;
+  }
+}
+
+.donut-chart-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 260px;
+}
+
+.donut-chart {
+  width: 220px;
+  height: 220px;
+}
+
+.donut-chart .vega-embed {
+  width: 100%;
+}
+
+.donut-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 160px;
+}
+
+.donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.donut-legend-label {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- bar charts */
+
+.overview-chart {
+  margin: 24px 0 0;
+}
+
+.chart-heading {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.chart-caption {
+  margin: 4px 0 12px;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+.bar-chart {
+  min-height: 260px;
+}
+
+.bar-chart .vega-embed {
+  width: 100%;
+}
