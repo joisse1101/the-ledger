@@ -387,6 +387,15 @@
   color: var(--warn-text);
 }
 
+.detail-notice p {
+  margin: 0 0 8px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .detail-section > summary {
   cursor: pointer;
   padding: 6px 0;

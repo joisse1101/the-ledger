@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LIVE_POLL_MS, useSession } from "../../api/queries";
+import { LIVE_POLL_MS, useDeleteSession, useSession } from "../../api/queries";
 import type { Compaction, SessionDetail, SessionRecap, Turn } from "../../api/types";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText, formatTime } from "../../lib/format";
 import { humanizeTokens } from "../../lib/tokens";
@@ -229,9 +229,56 @@ function Detail({ detail }: { detail: SessionDetail }) {
   );
 }
 
+/** The delete flow for an All-list session (ported from views/sessions_context.py's
+ *  _render_delete_controls). Not offered from the Live list — a live session is always
+ *  disabled here too, in case a race makes it live between load and click. `key={sessionId}`
+ *  on the call site resets `confirming` when a different session's dialog opens. */
+function DeleteControls({ sessionId, live, onDeleted }: { sessionId: string; live: boolean; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const deleteSession = useDeleteSession();
+
+  if (live) {
+    return <p className="detail-caption">This session is still live and can't be deleted.</p>;
+  }
+
+  if (!confirming) {
+    return (
+      <button type="button" className="button" onClick={() => setConfirming(true)}>
+        Delete this session
+      </button>
+    );
+  }
+
+  return (
+    <div className="detail-notice">
+      <p>Delete this session transcript? This cannot be undone.</p>
+      <div className="detail-actions">
+        <button
+          type="button"
+          className="button button-danger"
+          disabled={deleteSession.isPending}
+          onClick={() => deleteSession.mutate(sessionId, { onSuccess: onDeleted })}
+        >
+          {deleteSession.isPending ? "Deleting…" : "Confirm delete"}
+        </button>
+        <button
+          type="button"
+          className="button"
+          disabled={deleteSession.isPending}
+          onClick={() => setConfirming(false)}
+        >
+          Cancel
+        </button>
+      </div>
+      {/* A 409 here means the session went live between opening this dialog and confirming. */}
+      {deleteSession.isError && <p className="detail-caption">{deleteSession.error.message}</p>}
+    </div>
+  );
+}
+
 /** The session detail view: a native `<dialog>` kept mounted so opening/closing never remounts
  *  it, which is what lets a Live poll update its content in place without disturbing scroll
- *  position (see design.md's "detail view" decision). Delete (task 6.6) isn't wired up yet. */
+ *  position (see design.md's "detail view" decision). */
 export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [live, setLive] = useState(false);
@@ -293,6 +340,14 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
                   {from === "all" && data.recap && <Recap recap={data.recap} />}
                   {!data.readable && <p className="detail-notice">Couldn't read this session's transcript.</p>}
                   {data.readable && data.detail && <Detail detail={data.detail} />}
+                  {from === "all" && (
+                    <DeleteControls
+                      key={data.session_id}
+                      sessionId={data.session_id}
+                      live={data.live}
+                      onDeleted={() => dialogRef.current?.close()}
+                    />
+                  )}
                 </>
               )}
             </>

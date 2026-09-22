@@ -32,6 +32,11 @@ CLI version, lines changed, and any MCP servers configured for it.
 
 There's also a dark mode toggle in the sidebar, if you're into that.
 
+> **Note:** this repo is mid-migration from the Streamlit UI below to a React frontend
+> served by a FastAPI backend (`server.py`), which also adds access from other devices
+> on your network. Both currently work; see "Run the new web app" below for the one
+> that's replacing Streamlit. The `## Setup` section applies to either.
+
 ## Setup
 
 Create and activate a virtual environment (Windows PowerShell):
@@ -41,7 +46,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+Install dependencies (this covers both the Streamlit app and the new FastAPI server):
 
 ```powershell
 pip install -r requirements.txt
@@ -54,6 +59,54 @@ streamlit run app.py
 ```
 
 The app will open at http://localhost:8501.
+
+## Run the new web app
+
+The new frontend lives in `web/` (React + Vite) and talks to a FastAPI backend
+(`server.py`); you need Node.js installed in addition to the Python setup above.
+
+**Development** — backend and frontend as separate dev servers, so the frontend
+hot-reloads on save:
+
+```powershell
+# Terminal 1: the API, on http://localhost:8501
+python server.py
+
+# Terminal 2: the UI, on http://localhost:5173 (proxies /api to the backend above)
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:5173.
+
+**Built** — one server, one port, serving both the API and the compiled frontend.
+This is also what's needed to reach the app from another device (see below):
+
+```powershell
+cd web
+npm ci
+npm run build
+cd ..
+python server.py
+```
+
+Open http://localhost:8501.
+
+**From another device on your network** (phone, tablet, another computer), pass
+`--lan`:
+
+```powershell
+python server.py --lan
+```
+
+This requires the frontend to already be built (see above). It binds the server to
+your network interfaces instead of just this machine, and prints a URL, a QR code, and
+an access token — the other device needs the token (baked into the QR/URL, or entered
+by hand) to connect. Only do this on a network you trust: the connection is plain HTTP,
+so the token and your session data aren't encrypted in transit. `--host`/`--port` (or
+the `LEDGER_HOST`/`LEDGER_PORT` env vars) override the address/port if you need
+something other than the default.
 
 ## Testing
 

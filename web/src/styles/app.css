@@ -85,6 +85,11 @@ textarea {
   cursor: default;
 }
 
+.button-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .spin {
   display: inline-flex;
   animation: spin 0.9s linear infinite;
