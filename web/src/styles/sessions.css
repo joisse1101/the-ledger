@@ -66,11 +66,16 @@
   gap: 8px;
 }
 
+.list-cards > li {
+  min-width: 0;
+}
+
 .list-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  min-width: 0;
   min-height: var(--tap);
   padding: 10px 12px;
   border: 1px solid var(--grid);
@@ -91,6 +96,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 10px;
+  min-width: 0;
 }
 
 .list-card-field:first-child {
@@ -103,11 +109,22 @@
   gap: 6px 14px;
   color: var(--text-2);
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .list-card-chip {
   display: inline-flex;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* A chip's value can be an unbroken string (e.g. an absolute project path in `<code>`) that's
+   wider than the card - let it wrap instead of forcing the card, and the page, to scroll sideways. */
+.list-card-field,
+.list-card-chip > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .list-card-chip-label::after {
