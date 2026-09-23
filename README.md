@@ -35,26 +35,31 @@ another device" below — and each device remembers its own light/dark theme pre
 
 ## Layout
 
-- `api/` — the FastAPI backend (`server.py` and its supporting modules: `banner.py`,
-  `security.py`, `live_snapshot.py`, `overview_stats.py`, `transcript_query.py`). It
-  only ever serves `/api/*` — no pages, no static files.
+Three top-level folders, one per service, each self-contained:
+
+- `api/` — the FastAPI backend: `server.py` and its supporting modules (`banner.py`,
+  `security.py`, `live_snapshot.py`, `overview_stats.py`, `transcript_query.py`), the
+  data layer that actually knows how to read Claude Code's on-disk files
+  (`claude_db.py`, `claude_projects.py`, `claude_transcripts.py`, `claude_sessions.py`,
+  `claude_context.py`), its tests (`api/tests/`), `requirements*.txt`, `pyproject.toml`,
+  and its own `.venv`/`.ledger` (both gitignored). It only ever serves `/api/*` — no
+  pages, no static files.
 - `web/` — the React + Vite frontend. Built once with `npm run build`, then served by
   its own process (`vite preview`), entirely separate from the API.
-- Everything else at the repo root (`claude_db.py`, `claude_projects.py`,
-  `claude_transcripts.py`, `claude_sessions.py`, `claude_context.py`) is the shared data
-  layer the API reads from — the part of the app that actually knows how to read Claude
-  Code's on-disk files.
+- `hooks/` — Windows toast notifications for Claude Code's hook events, unrelated to
+  the dashboard (see `hooks/README.md`).
 
 ## Setup
 
-Create and activate a virtual environment (Windows PowerShell):
+Create and activate a virtual environment inside `api/` (Windows PowerShell):
 
 ```powershell
+cd api
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Install Python dependencies:
+Install Python dependencies (still in `api/`):
 
 ```powershell
 pip install -r requirements.txt
@@ -64,13 +69,13 @@ You'll also need [Node.js](https://nodejs.org/) installed for the frontend.
 
 ## Run
 
-The API and the frontend are two separate processes on two separate ports. Run the
-Python commands from the repo root, not from inside `api/`.
+The API and the frontend are two separate processes on two separate ports.
 
-**Terminal 1 — the API:**
+**Terminal 1 — the API** (from `api/`, with its venv active):
 
 ```powershell
-python api/server.py
+cd api
+python server.py
 ```
 
 **Terminal 2 — build and serve the frontend** (from `web/`; `npm run build` only needs
@@ -97,7 +102,8 @@ To reach the dashboard from a phone, tablet, or another computer on your network
 running, and the frontend needs to already be built (see above):
 
 ```powershell
-python api/server.py --lan
+cd api
+python server.py --lan
 ```
 
 ```powershell
@@ -122,7 +128,7 @@ token and your session data aren't encrypted in transit — anyone else on the s
 network could read them.
 
 **Rotating the token.** If you've shared the link and want to revoke access, delete
-`.ledger/token` and restart the API; it generates a fresh one on the next `--lan` run,
+`api/.ledger/token` and restart the API; it generates a fresh one on the next `--lan` run,
 and every device using the old token will need the new link.
 
 `--host`/`--port`/`--frontend-port` (or the `LEDGER_HOST`/`LEDGER_PORT`/
@@ -132,22 +138,23 @@ in sync with whatever port you actually run `npm run preview` on.
 
 ## Testing
 
-Install dev dependencies (this includes `requirements.txt` plus `pytest`):
+Install dev dependencies (from `api/`; this includes `requirements.txt` plus `pytest`):
 
 ```powershell
+cd api
 pip install -r requirements-dev.txt
 ```
 
-Run the Python test suite:
+Run the Python test suite (from `api/`, where its `pyproject.toml` lives):
 
 ```powershell
 pytest
 ```
 
-Tests live in `tests/`, one file per module under test. They cover the pure
+Tests live in `api/tests/`, one file per module under test. They cover the pure
 parsing/aggregation logic (cost math, time-range filtering, chart data prep), the
 SQLite-backed read/write/delete paths in `claude_db.py`, `claude_projects.py`, and
-`claude_transcripts.py` (via an `isolated_db` fixture — see `tests/conftest.py` — that
+`claude_transcripts.py` (via an `isolated_db` fixture — see `api/tests/conftest.py` — that
 points `claude_db` at a throwaway `tmp_path` instead of your real `~/.claude.json` /
 `~/.claude/projects/`, so running the suite never touches your actual Claude Code data),
 and the FastAPI app end to end (auth, CORS, routes) via `TestClient`.

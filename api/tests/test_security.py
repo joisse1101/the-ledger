@@ -18,7 +18,7 @@ from security import SecurityMiddleware, provision_token
 TOKEN = "s3cret-token-value_0123456789"
 HEADER = {"X-Requested-With": "ledger"}
 BEARER = {"Authorization": f"Bearer {TOKEN}"}
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
@@ -250,10 +250,10 @@ def test_an_empty_token_file_is_regenerated(tmp_path):
 @pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 def test_git_ignores_the_stored_token():
     result = subprocess.run(
-        ["git", "check-ignore", ".ledger/token"], cwd=REPO, capture_output=True, text=True
+        ["git", "check-ignore", "api/.ledger/token"], cwd=REPO, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == ".ledger/token"
+    assert result.stdout.strip() == "api/.ledger/token"
 
 
 # ------------------------------------------------ 4.4: cross-site and rebinding guards

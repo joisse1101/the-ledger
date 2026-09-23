@@ -25,7 +25,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-LEDGER_DIR = Path(__file__).resolve().parent.parent / ".ledger"
+LEDGER_DIR = Path(__file__).resolve().parent / ".ledger"
 TOKEN_ENV = "LEDGER_TOKEN"
 
 CSRF_HEADER = "x-requested-with"

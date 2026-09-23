@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# "." (api/) so tests can import its modules unqualified (e.g. `import server`,
+# `import claude_db`), matching how running api/server.py directly puts its own
+# directory on sys.path at runtime.
+pythonpath = ["."]
+testpaths = ["tests"]

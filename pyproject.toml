@@ -1,7 +1,0 @@
-[tool.pytest.ini_options]
-# "." for the shared root-level data modules (claude_db, ...); "api" so tests can
-# import its modules unqualified (e.g. `import server`), matching how api/server.py
-# puts its own directory on sys.path at runtime (its own bootstrap + Python's
-# script-dir insertion when run directly).
-pythonpath = [".", "api"]
-testpaths = ["tests"]

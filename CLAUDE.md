@@ -11,6 +11,12 @@ built so a phone or other device on the same network can read it too, behind a s
 and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 "Setup & Run" below).
 
+The repo has exactly three top-level folders, one per service, each self-contained: `api/` (the
+backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
+gitignored `.venv`/`.ledger`), `web/` (the frontend), and `hooks/` (Claude Code toast hooks). The
+root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`, `.gitignore`, `openspec/`,
+`.claude/`) — nothing that runs.
+
 This started as a migration from a Streamlit app to this React+FastAPI stack; that migration is
 now complete and Streamlit has been fully removed. Its rationale, decisions, and the cutover
 checklist are recorded in `openspec/changes/migrate-to-react-lan-access/` (`proposal.md` for
@@ -19,22 +25,23 @@ why/what, `design.md` for the decisions, `tasks.md` for the checklist) — worth
 separate origins) ahead of inferring it from the code alone.
 
 The API and frontend both read the same on-disk Claude Code data (`~/.claude.json` and
-`~/.claude/projects/*/*.jsonl`) via a SQLite snapshot at `.ledger/ledger.db` (gitignored, rebuilt
-from disk on every server start and periodically thereafter — see "Shared data layer" below).
+`~/.claude/projects/*/*.jsonl`) via a SQLite snapshot at `api/.ledger/ledger.db` (gitignored, rebuilt
+from disk on every server start and periodically thereafter — see "Data layer" below).
 
 ## Setup & Run
 
-Create/activate the venv and install Python dependencies:
+Create/activate the venv and install Python dependencies, all inside `api/`:
 
 ```powershell
+cd api
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-A `.venv` already exists at the repo root with dependencies installed — activate it
-(`.venv\Scripts\Activate.ps1`, or invoke `.venv\Scripts\python.exe` / `.venv\Scripts\pytest.exe`
-directly) rather than searching for or recreating one.
+A `.venv` already exists at `api/.venv` with dependencies installed — activate it
+(`api\.venv\Scripts\Activate.ps1`, or invoke `api\.venv\Scripts\python.exe` /
+`api\.venv\Scripts\pytest.exe` directly) rather than searching for or recreating one.
 
 The frontend needs Node.js in addition to the Python setup above. It's built once (`npm run build`)
 and then served by `vite preview`, which serves only the already-built `web/dist` — it doesn't
@@ -45,8 +52,9 @@ while actively working on the frontend, but isn't what's used for normal local u
 always its own separate process:
 
 ```powershell
-# Terminal 1, from the repo root: the API (defaults to http://localhost:8501)
-python api/server.py
+# Terminal 1, in api/: the API (defaults to http://localhost:8501)
+cd api
+python server.py
 
 # Terminal 2, in web/: build once, then serve the built frontend (defaults to http://localhost:4173)
 cd web
@@ -62,7 +70,8 @@ show you.
 and `-- --host` to the frontend's preview command — both must be running:
 
 ```powershell
-python api/server.py --lan
+cd api
+python server.py --lan
 ```
 
 ```powershell
@@ -81,7 +90,7 @@ data aren't encrypted in transit. Windows will prompt to allow Python through th
 first time — allow it on Private networks — and the same device also needs to reach the frontend's
 port, not just the API's.
 
-To rotate the access token (e.g. after sharing it), delete `.ledger/token` and restart the API; a
+To rotate the access token (e.g. after sharing it), delete `api/.ledger/token` and restart the API; a
 fresh one is generated on the next `--lan` run. Setting `LEDGER_TOKEN` in the environment overrides
 the stored file entirely.
 
@@ -97,17 +106,18 @@ Dark/light theme is chosen per device, not shared server-side: each browser pick
 ## Testing
 
 ```powershell
+cd api
 pip install -r requirements-dev.txt  # requirements.txt + pytest + httpx
 pytest
 ```
 
-`pyproject.toml` sets `pythonpath = [".", "api"]` (so bare imports like `import server` work under
-pytest the same way `api/server.py`'s own `sys.path` bootstrap makes them work at runtime) and
-`testpaths = ["tests"]`.
+Run pytest from `api/` — that's where `pyproject.toml` lives. It sets `pythonpath = ["."]` (so bare
+imports like `import server`/`import claude_db` work under pytest the same way running
+`api/server.py` directly puts its own directory on `sys.path` at runtime) and `testpaths = ["tests"]`.
 
 Python tests, one file per module under test:
-- Shared data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
-  `test_claude_sessions.py`, `test_claude_context.py`. `tests/conftest.py`'s `isolated_db` fixture
+- Data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
+  `test_claude_sessions.py`, `test_claude_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
   monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
 - API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring, CORS allow-list), 
@@ -133,12 +143,11 @@ was verified manually (resizing a real browser, and a real phone over `--lan`) p
 
 ## Architecture
 
-### Shared data layer (repo root)
+### Data layer (`api/claude_*.py`)
 
-These modules are plain Python with no FastAPI/Starlette dependency of their own, read by `api/`,
-and deliberately stay at the repo root rather than moving under `api/` (or a new shared package —
-considered and rejected) since there's now only the one consumer but the split still keeps the pure
-data layer testable and readable independent of the web framework wrapping it.
+These modules live in `api/` alongside the server (their only consumer), but are plain Python with
+no FastAPI/Starlette dependency of their own — keeping them framework-free keeps the pure data layer
+testable and readable independent of the web framework wrapping it.
 
 - `claude_db.py` is the single SQLite-backed store that `claude_projects.py` and
   `claude_transcripts.py` both read from, rather than each independently scanning and mtime-caching
@@ -152,8 +161,8 @@ data layer testable and readable independent of the web framework wrapping it.
   automatically via `startup()` on process start, plus a periodic 10-minute `asyncio` loop task (see
   `api/server.py`). `startup()` treats the database as a pure derived cache: it deletes any leftover
   db file from a previous run, calls `refresh()` to rebuild it from disk, and registers an `atexit`
-  handler to delete it again on exit (best-effort). `db_path()` returns `.ledger/ledger.db` (gitignored;
-  `.ledger/` is also where the LAN access token lives — see `api/security.py` below).
+  handler to delete it again on exit (best-effort). `db_path()` returns `api/.ledger/ledger.db` (gitignored;
+  that `.ledger/` is also where the LAN access token lives — see `api/security.py` below).
   `_connect()` sets `PRAGMA journal_mode=WAL` and a busy timeout, for the FastAPI server's
   concurrent-request model (multiple browsers/phones reading while a background `refresh()` writes);
   `startup()`/its `atexit` hook also clean up the `-wal`/`-shm` files. `load_projects()` /
@@ -210,9 +219,9 @@ data layer testable and readable independent of the web framework wrapping it.
 
 `api/server.py` is both the ASGI app and the CLI (`python server.py [--lan] [--host] [--port]
 [--frontend-port]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
-`127.0.0.1` port `8501`, `--lan` binds `0.0.0.0`). It lives one level below the repo root alongside
-its own supporting modules, so it inserts the repo root onto `sys.path` before importing the
-root-level modules. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
+`127.0.0.1` port `8501`, `--lan` binds `0.0.0.0`). Every module it imports lives
+alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
+the import setup it needs. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
 `_refresh_lock` shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
 is never triggered twice concurrently. It serves `/api/*` only — no HTML, no static assets; the
@@ -253,7 +262,7 @@ addresses discovered under `--lan` — never a wildcard, and never a credentiale
   triggering a CORS preflight, which `server.py`'s `CORSMiddleware` only ever grants to the frontend's
   own origin(s), so that header is what stops a blind cross-site `POST`/`DELETE` even from a page that
   is otherwise allowed to read the API. `provision_token()` is `LEDGER_TOKEN` if set, else the token
-  stored at `.ledger/token` (created with `secrets.token_urlsafe(32)` on first `--lan` run, mode
+  stored at `api/.ledger/token` (created with `secrets.token_urlsafe(32)` on first `--lan` run, mode
   `0o600`) — delete that file and restart to rotate it.
 - `api/banner.py` — what the server prints at startup: always a reminder that the frontend is a
   separate process and how to start it (`cd web && npm run preview [-- --host]`), plus its local URL.
@@ -397,10 +406,10 @@ it's required to do, ahead of inferring intent from the code alone.
 
 ### Other repo files
 
-- `.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see "Shared data layer" above)
+- `api/.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see "Data layer" above)
   and the LAN access token (`token`, see `api/security.py` above); both are recreated as needed and
   never committed. `.gitignore` also excludes `web/node_modules/` and `web/dist/`.
-- `requirements.txt`: `fastapi`, `uvicorn`, `qrcode` — unpinned. `requirements-dev.txt` adds
+- `api/requirements.txt`: `fastapi`, `uvicorn`, `qrcode` — unpinned. `requirements-dev.txt` adds
   `pytest`, `httpx` (for FastAPI's `TestClient`).
 - `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom`, `vega-embed`
   (dependencies); Vite, TypeScript, Vitest, Testing Library, jsdom (devDependencies). `npm run build`

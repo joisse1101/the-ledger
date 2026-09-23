@@ -6,26 +6,16 @@ import argparse
 import asyncio
 import logging
 import os
-import sys
 import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path as FilePath
 from typing import Annotated, Literal, Mapping, Optional, Sequence
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-
-# This file lives in api/, one level below the repo root, but the shared data-layer
-# modules (claude_db, ...) live at the root alongside streamlit_app/'s modules.
-# Running it directly only puts this file's own directory on sys.path, so the repo
-# root needs adding explicitly before those modules can be imported.
-_REPO_ROOT = FilePath(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 import banner
 import claude_context
