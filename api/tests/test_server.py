@@ -114,5 +114,9 @@ def test_refresh_loop_survives_a_failed_scan(monkeypatch):
 def test_lifespan_seeds_the_snapshot(isolated_db, monkeypatch):
     monkeypatch.setattr(claude_db, "_started", False)
     monkeypatch.setattr(claude_db.atexit, "register", lambda *a: None)
+    # lifespan() provisions a token itself when none is set (see its docstring) - stub that out so
+    # this test doesn't touch the real api/.ledger/token file.
+    monkeypatch.setattr(server, "access_token", None)
+    monkeypatch.setattr(server, "provision_token", lambda: "tok-123")
     with _client() as started:
         assert started.get("/api/meta").json()["refreshed_at"] is not None

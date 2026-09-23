@@ -16,7 +16,10 @@ gitignored `.venv`/`.ledger`), `web/` (the frontend), `gateway/` (the containeri
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see "From another device on your network" below), and `hooks/` (Claude
 Code toast hooks). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
-`.gitignore`, `.env.example`, `openspec/`, `.claude/`) — nothing that runs on its own.
+`.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
+`Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
+rather than inside any one service folder since they're the one piece of tooling that spans all
+three equally (see "Setup & Run" below) — otherwise nothing at root runs on its own.
 
 The agreed requirements for each shipped capability live in `openspec/specs/` (see "`openspec/`"
 below) — check there for what a feature is required to do (e.g. `network-access` for the
@@ -63,6 +66,32 @@ npm run preview
 
 Open the frontend's URL (http://localhost:4173 by default), not the API's — the API has no page to
 show you.
+
+**Or start everything at once** with the root `Start-Ledger.ps1`, which runs the two processes
+above (each in its own window, so their logs/Ctrl+C stay independent) plus the gateway described
+below, in one call — paired with `Stop-Ledger.ps1` to stop exactly what it started (backend/frontend
+window PIDs recorded to the root `.ledger-run.json`, gitignored, and the gateway container):
+
+```powershell
+.\Start-Ledger.ps1              # build mode (default) — matches normal local use
+.\Start-Ledger.ps1 -Mode dev    # backend + frontend as hot-reloading dev servers instead
+.\Start-Ledger.ps1 -NoGateway   # skip the gateway container (this machine only)
+.\Stop-Ledger.ps1               # stop the backend/frontend windows and the gateway
+```
+
+`-Mode` changes how both the backend and frontend windows start — the gateway always starts the
+same way either way. `build` runs `npm run build` + `npm run preview` and starts the backend
+without `--reload`; `dev` runs `npm run dev` and starts the backend with `python server.py
+--reload` (uvicorn restarts the process on any saved change under `api/`). Port overrides
+(`-BackendPort`/`-FrontendPort`/`-GatewayPort`) follow the same `.env` precedence as
+`gateway\Start-Gateway.ps1` (see below).
+
+`server.py --reload` (also usable directly, outside `Start-Ledger.ps1`) only works because uvicorn
+is given `"server:app"` as an import string rather than the already-constructed `app` object — that
+lets it re-import the module fresh in a new subprocess on every change, which is also why the
+backend's startup banner and access-token print in the terminal are only accurate for the very
+first start of a `--reload` session (each subsequent restart re-provisions the same stored token
+silently in `lifespan()`, since the freshly re-imported module never runs `main()` again).
 
 **From another device on your network** (phone, tablet, another computer): the backend and frontend
 above never bind beyond loopback, no matter what — the only thing that ever grants LAN access is a
@@ -242,11 +271,16 @@ testable and readable independent of the web framework wrapping it.
 ### `api/` — the FastAPI backend
 
 `api/server.py` is both the ASGI app and the CLI (`python server.py [--host] [--port]
-[--frontend-port]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
+[--frontend-port] [--reload]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
 `127.0.0.1` port `8501`). It always binds loopback only now — `--frontend-port` only controls the
 printed frontend link, and `--lan` is still recognized by the parser but exits with an error
 pointing at the gateway (`gateway/`) instead of binding `0.0.0.0`; the gateway container is the only
-thing that ever grants LAN access (see CLAUDE.md's "Setup & Run" above). Every module it imports lives
+thing that ever grants LAN access (see CLAUDE.md's "Setup & Run" above). `--reload` (dev only, no
+env var) restarts the process on any saved change under `api/`; it works by handing uvicorn the
+import string `"server:app"` instead of the already-built `app` object, since only the string form
+lets uvicorn re-import the module fresh per restart — which is also why `main()`'s own token
+provisioning (see `lifespan` below) is duplicated, guarded, in `lifespan` itself: the reload
+subprocess re-imports the module without ever calling `main()`. Every module it imports lives
 alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
 the import setup it needs. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide

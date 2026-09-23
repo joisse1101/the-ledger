@@ -62,6 +62,15 @@ async def refresh_loop(interval: float = REFRESH_INTERVAL_SECONDS) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Normally already set by main() before this process's own uvicorn.run() call, so this is a
+    # no-op then. --reload's subprocess is the exception: uvicorn imports "server:app" fresh in a
+    # separate process that never runs main() at all, so this is that process's only chance to
+    # provision the token it actually serves with (re-reads the same stored file main() already
+    # wrote, so it's the same token either way).
+    global access_token
+    if access_token is None:
+        access_token = provision_token()
+
     await asyncio.to_thread(_startup_snapshot)
     task = asyncio.create_task(refresh_loop())
     try:
@@ -324,6 +333,7 @@ class Settings:
     host: str
     port: int
     frontend_port: int
+    reload: bool = False
 
     @property
     def exposed(self) -> bool:
@@ -353,7 +363,7 @@ def parse_settings(
     --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link — this
     process never connects to the frontend's port itself). `--lan` is no longer a bind mode: other
     devices now reach the app through the containerized gateway (see CLAUDE.md), so passing it exits
-    with an error rather than doing anything."""
+    with an error rather than doing anything. `--reload` has no env var (dev-only, always explicit)."""
     parser = argparse.ArgumentParser(
         prog="python server.py",
         description="The Ledger: a dashboard for your Claude Code sessions.",
@@ -370,6 +380,12 @@ def parse_settings(
         type=int,
         help=f"port the frontend is served on (default {DEFAULT_FRONTEND_PORT}, env LEDGER_FRONTEND_PORT)",
     )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="restart on code changes (dev only - imports the app fresh per restart, so this "
+        "process's own startup banner/token print reflects only the very first start)",
+    )
     args = parser.parse_args(argv)
 
     if args.lan:
@@ -383,7 +399,7 @@ def parse_settings(
     frontend_port = _parse_port(
         args.frontend_port, "LEDGER_FRONTEND_PORT", environ, DEFAULT_FRONTEND_PORT, parser
     )
-    return Settings(host=host, port=port, frontend_port=frontend_port)
+    return Settings(host=host, port=port, frontend_port=frontend_port, reload=args.reload)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
@@ -399,7 +415,21 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     # No access log: it would write every ?token=... URL to the terminal. proxy_headers off:
     # the peer address must stay the real one, not whatever a header claims.
-    uvicorn.run(app, host=settings.host, port=settings.port, access_log=False, proxy_headers=False)
+    if settings.reload:
+        # reload=True only takes effect when the app is passed as an import string - uvicorn
+        # watches the cwd, and on each change spawns a fresh subprocess that imports "server:app"
+        # itself (this process's own `app` object above is never reused); see lifespan() for how
+        # that subprocess still gets a token.
+        uvicorn.run(
+            "server:app",
+            host=settings.host,
+            port=settings.port,
+            reload=True,
+            access_log=False,
+            proxy_headers=False,
+        )
+    else:
+        uvicorn.run(app, host=settings.host, port=settings.port, access_log=False, proxy_headers=False)
 
 
 if __name__ == "__main__":

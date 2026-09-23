@@ -114,3 +114,20 @@ def test_a_configured_token_is_used_even_when_local_only(launched, monkeypatch):
     monkeypatch.setenv("LEDGER_TOKEN", "from-env")
     server.main([])
     assert server.access_token == "tok-123"  # via provision_token, which honours the env var
+
+
+def test_reload_passes_an_import_string_not_the_app_object(launched):
+    # uvicorn only actually reloads when given an import string (see lifespan()'s docstring for
+    # why the app object path can't be reused here) - the app object branch is exercised by
+    # test_default_launch_is_local_with_no_access_log_and_provisions_a_token above.
+    server.main(["--reload"])
+
+    (app, kwargs), = launched
+    assert app == "server:app"
+    assert kwargs == {
+        "host": "127.0.0.1",
+        "port": 8501,
+        "reload": True,
+        "access_log": False,
+        "proxy_headers": False,
+    }
