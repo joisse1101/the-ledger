@@ -11,6 +11,7 @@ const backendTarget = `http://127.0.0.1:${process.env.BACKEND_PORT ?? 8501}`;
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: "127.0.0.1",
     proxy: {
       "/api": backendTarget,
     },

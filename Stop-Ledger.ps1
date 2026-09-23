@@ -46,7 +46,7 @@ if ($NoGateway) {
 Write-Host "Stopping gateway..."
 Push-Location (Join-Path $PSScriptRoot 'gateway')
 try {
-    docker compose down
+    docker compose down -v
 } finally {
     Pop-Location
 }
