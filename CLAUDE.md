@@ -5,34 +5,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 A dashboard for viewing your local Claude Code sessions and projects: Overview, Sessions (Live +
-All), Projects. The repo is **mid-migration** between two front ends that read the same on-disk
-Claude Code data:
+All), Projects. It's an API-only FastAPI backend (`api/`) plus one React + Vite frontend (`web/`),
+built so a phone or other device on the same network can read it too, behind a shared access token
+— something the project's original Streamlit UI (now retired) had no safe way to do. The backend
+and frontend run as two separate processes/ports; the API never serves any HTML itself (see
+"Setup & Run" below).
 
-- `streamlit_app/` — the original Streamlit app. Complete: all three pages, live polling, search/
-  filter/sort, session-detail dialogs, delete flows.
-- `api/` (FastAPI backend) + `web/` (React + Vite frontend) — the replacement, built to also allow
-  read access from other devices on the network (a phone) behind a shared access token, which
-  Streamlit has no way to do safely. As of this writing it covers Overview, Sessions (Live, All,
-  the session-detail view, and delete), and Projects (list + delete), all with responsiveness down
-  to phone widths — remaining work is the manual responsive/phone verification and cutover passes
-  (tasks.md §9–10). Streamlit has not been removed — cutover is the last step of the migration,
-  once the React app has full parity.
+This started as a migration from a Streamlit app to this React+FastAPI stack; that migration is
+now complete and Streamlit has been fully removed. Its rationale, decisions, and the cutover
+checklist are recorded in `openspec/changes/migrate-to-react-lan-access/` (`proposal.md` for
+why/what, `design.md` for the decisions, `tasks.md` for the checklist) — worth checking for the
+*why* behind a design choice (e.g. why auth is bearer-token-only, why the API and frontend are
+separate origins) ahead of inferring it from the code alone.
 
-The migration's rationale, decisions, and status are recorded in
-`openspec/changes/migrate-to-react-lan-access/` (`proposal.md` for why/what, `design.md` for the
-decisions, `tasks.md` for the checklist) — **check `tasks.md` before assuming either UI's state**,
-rather than inferring it from this file, since it's the thing that's kept current task-by-task as
-the migration proceeds. Don't assume Streamlit is gone or that the React app is at parity without
-checking there and in the actual code.
-
-Both UIs currently read/write the *same* SQLite snapshot at `.streamlit/ledger.db` (the DB path
-move to `.ledger/` is one of the not-yet-done cutover tasks) and the same `~/.claude.json` /
-`~/.claude/projects/*/*.jsonl` on disk.
+The API and frontend both read the same on-disk Claude Code data (`~/.claude.json` and
+`~/.claude/projects/*/*.jsonl`) via a SQLite snapshot at `.ledger/ledger.db` (gitignored, rebuilt
+from disk on every server start and periodically thereafter — see "Shared data layer" below).
 
 ## Setup & Run
 
-Create/activate the venv and install Python dependencies (covers both UIs — `fastapi`, `uvicorn`,
-`qrcode` are additive to the original `streamlit`/`pandas`):
+Create/activate the venv and install Python dependencies:
 
 ```powershell
 python -m venv .venv
@@ -44,37 +36,63 @@ A `.venv` already exists at the repo root with dependencies installed — activa
 (`.venv\Scripts\Activate.ps1`, or invoke `.venv\Scripts\python.exe` / `.venv\Scripts\pytest.exe`
 directly) rather than searching for or recreating one.
 
-**Streamlit app** (run from the repo root, not from inside `streamlit_app/`):
+The frontend needs Node.js in addition to the Python setup above. It's built once (`npm run build`)
+and then served by `vite preview`, which serves only the already-built `web/dist` — it doesn't
+rebuild on save. `npm run dev` (hot-reloading, proxies `/api` to the backend) is available instead
+while actively working on the frontend, but isn't what's used for normal local use.
+
+**Two processes, two ports, every time** — the API only ever serves `/api/*`; the frontend is
+always its own separate process:
 
 ```powershell
-streamlit run streamlit_app/app.py
-```
-
-Opens at http://localhost:8501. `.streamlit/config.toml` sets `runOnSave = true`, so it auto-reloads
-on file changes while `streamlit run` is active.
-
-**React + FastAPI app** — needs Node.js in addition to the Python setup above. Run the Python
-commands from the repo root, not from inside `api/`.
-
-Development (hot-reloading frontend, two terminals):
-
-```powershell
-python api/server.py            # the API, on http://localhost:8501
-cd web; npm install; npm run dev  # the UI, on http://localhost:5173, proxies /api to 8501
-```
-
-Built (one server, one port — also what's needed to reach the app from another device):
-
-```powershell
-cd web; npm ci; npm run build; cd ..
+# Terminal 1, from the repo root: the API (defaults to http://localhost:8501)
 python api/server.py
+
+# Terminal 2, in web/: build once, then serve the built frontend (defaults to http://localhost:4173)
+cd web
+npm ci
+npm run build
+npm run preview
 ```
 
-Opens at http://localhost:8501. Pass `--lan` to bind every network interface instead of just this
-machine (`python api/server.py --lan`); the server then prints a URL, a QR code, and a one-time
-access token per discovered address for a phone to sign in with (see `api/security.py` /
-`api/banner.py` below). `--host`/`--port` (or `LEDGER_HOST`/`LEDGER_PORT`) override the address/port.
-Both apps default to port 8501 — run only one at a time unless you also change one's port.
+Open the frontend's URL (http://localhost:4173 by default), not the API's — the API has no page to
+show you.
+
+**From another device on your network** (phone, tablet, another computer): pass `--lan` to the API
+and `-- --host` to the frontend's preview command — both must be running:
+
+```powershell
+python api/server.py --lan
+```
+
+```powershell
+cd web
+npm run preview -- --host
+```
+
+`--lan` binds the API to every network interface instead of just this machine; it then prints the
+frontend's URL for each discovered address, a QR code, and a one-time access token — opening that
+link signs the device in (the token is stored in that browser's `localStorage` and stripped from
+the address bar) and every subsequent API request from it carries `Authorization: Bearer <token>`.
+A local request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other
+request needs it, checked by `api/security.py`'s `SecurityMiddleware` (see "Architecture" below).
+Only do this on a network you trust: the connection is plain HTTP, so the token and your session
+data aren't encrypted in transit. Windows will prompt to allow Python through the firewall the
+first time — allow it on Private networks — and the same device also needs to reach the frontend's
+port, not just the API's.
+
+To rotate the access token (e.g. after sharing it), delete `.ledger/token` and restart the API; a
+fresh one is generated on the next `--lan` run. Setting `LEDGER_TOKEN` in the environment overrides
+the stored file entirely.
+
+`--host`/`--port`/`--frontend-port` (or the `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT` env
+vars) override the API's bind address/port and the port it expects the frontend on — keep
+`--frontend-port` in sync with whatever port you actually run `npm run preview` on, since it's also
+what the API's CORS allow-list is built from (see "Architecture" below).
+
+Dark/light theme is chosen per device, not shared server-side: each browser picks up
+`prefers-color-scheme` until it toggles the switch itself, then remembers that choice in its own
+`localStorage` (see `web/src/theme/theme.ts`).
 
 ## Testing
 
@@ -83,29 +101,22 @@ pip install -r requirements-dev.txt  # requirements.txt + pytest + httpx
 pytest
 ```
 
-`pyproject.toml` sets `pythonpath = [".", "streamlit_app", "api"]` (so bare imports like `import
-app`, `import server`, `import views.overview` work under pytest the same way each entry point's
-own `sys.path` bootstrap makes them work at runtime — see `streamlit_app/app.py` and
-`api/server.py`) and `testpaths = ["tests"]`.
+`pyproject.toml` sets `pythonpath = [".", "api"]` (so bare imports like `import server` work under
+pytest the same way `api/server.py`'s own `sys.path` bootstrap makes them work at runtime) and
+`testpaths = ["tests"]`.
 
 Python tests, one file per module under test:
 - Shared data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
   `test_claude_sessions.py`, `test_claude_context.py`. `tests/conftest.py`'s `isolated_db` fixture
   monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
-- Streamlit: `test_app.py` (the `_auto_refresh_due` gate logic), `test_overview.py` (the pure
-  aggregation functions in `views/overview.py`), `test_views.py` (`_sessions_dataframe`/
-  `_transcripts_dataframe`/`_projects_dataframe` and the filter/sort helpers). Streamlit *rendering*
-  itself (`render_*` functions that call `st.*` widgets) isn't covered.
-- API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring), `test_security.py` (the
-  auth middleware — local vs. remote, token matching, sign-in redirect, CSRF header, Host
-  rebinding-guard), `test_banner.py` (address discovery, QR rendering, banner text), `test_cli.py`
-  (`parse_settings`/`main` — host/port precedence, token provisioning on launch), `test_frontend.py`
-  (serving `web/dist`, SPA fallback, the "not built yet" response), `test_live_snapshot.py`
-  (`LiveSnapshot`'s TTL coalescing and per-session failure isolation), `test_overview_stats.py` and
-  `test_transcript_query.py` (the pure logic ported out of `views/overview.py`/`views/sessions_data.py`
-  into `overview_stats.py`/`transcript_query.py` — kept in step with `test_overview.py`/`test_views.py`
-  until Streamlit's versions are retired), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
+- API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring, CORS allow-list), 
+  `test_security.py` (the auth middleware — local vs. remote, bearer-token matching, CSRF header,
+  Host rebinding-guard), `test_banner.py` (address discovery, QR rendering, banner text), `test_cli.py`
+  (`parse_settings`/`main` — host/port/frontend-port precedence, token provisioning on launch),
+  `test_live_snapshot.py` (`LiveSnapshot`'s TTL coalescing and per-session failure isolation),
+  `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
+  behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
   `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`).
 
 Frontend (`cd web`):
@@ -117,16 +128,17 @@ npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
 There is no browser-automation/E2E harness for the React app; responsive layout across breakpoints
-is verified manually (resizing a real browser, and a real phone over `--lan`) per
+was verified manually (resizing a real browser, and a real phone over `--lan`) per
 `openspec/changes/migrate-to-react-lan-access/tasks.md`'s groups 9–10.
 
 ## Architecture
 
 ### Shared data layer (repo root)
 
-These modules are Streamlit-free plain Python, read by both `streamlit_app/` and `api/`, and
-deliberately stay at the repo root rather than moving into either folder (or a new shared package —
-considered and rejected) since that would touch every import on both sides for no real benefit.
+These modules are plain Python with no FastAPI/Starlette dependency of their own, read by `api/`,
+and deliberately stay at the repo root rather than moving under `api/` (or a new shared package —
+considered and rejected) since there's now only the one consumer but the split still keeps the pure
+data layer testable and readable independent of the web framework wrapping it.
 
 - `claude_db.py` is the single SQLite-backed store that `claude_projects.py` and
   `claude_transcripts.py` both read from, rather than each independently scanning and mtime-caching
@@ -136,19 +148,15 @@ considered and rejected) since that would touch every import on both sides for n
   just-scanned project list (matching the transcript's on-disk parent folder against
   `sanitize_project_path()`), replaces the `projects`/`transcripts` tables' contents in one pass, and
   stamps a `meta.refreshed_at` timestamp; `refreshed_at()` reads that timestamp back. This is the
-  *only* place disk gets rescanned — triggered explicitly (Streamlit's "⟳" button, or `POST
-  /api/refresh`), plus once automatically via `startup()` on process start, plus a periodic
-  background pass (a 10-minute Streamlit fragment on that side, a 10-minute `asyncio` loop task on
-  the API side — see `api/server.py`). `startup()` treats the database as a pure derived cache: it
-  deletes any leftover db file from a previous run, calls `refresh()` to rebuild it from disk, and
-  registers an `atexit` handler to delete it again on exit (best-effort). `db_path()` currently
-  returns `.streamlit/ledger.db` for **both** UIs (the move to `.ledger/ledger.db` is a not-yet-done
-  cutover task — see `openspec/changes/migrate-to-react-lan-access/tasks.md` §10.2); don't assume the
-  path from that design doc's prose without checking the function.
-  `_connect()` sets `PRAGMA journal_mode=WAL` and a busy timeout — added for the FastAPI server's
-  concurrent-request model (multiple browsers/phones reading while a background `refresh()` writes),
-  not needed by Streamlit's single-script-thread model, but it lives here since both read the same
-  file; `startup()`/its `atexit` hook also clean up the `-wal`/`-shm` files. `load_projects()` /
+  *only* place disk gets rescanned — triggered explicitly via `POST /api/refresh`, plus once
+  automatically via `startup()` on process start, plus a periodic 10-minute `asyncio` loop task (see
+  `api/server.py`). `startup()` treats the database as a pure derived cache: it deletes any leftover
+  db file from a previous run, calls `refresh()` to rebuild it from disk, and registers an `atexit`
+  handler to delete it again on exit (best-effort). `db_path()` returns `.ledger/ledger.db` (gitignored;
+  `.ledger/` is also where the LAN access token lives — see `api/security.py` below).
+  `_connect()` sets `PRAGMA journal_mode=WAL` and a busy timeout, for the FastAPI server's
+  concurrent-request model (multiple browsers/phones reading while a background `refresh()` writes);
+  `startup()`/its `atexit` hook also clean up the `-wal`/`-shm` files. `load_projects()` /
   `load_transcripts()` just `SELECT * ... ORDER BY` these tables and build dataclasses from the rows
   — cheap enough to call fresh on every request/rerun with no caching of their own. `delete_project()`
   / `delete_project_transcripts()` / `delete_transcript()` each mutate the real on-disk source first,
@@ -190,122 +198,25 @@ considered and rejected) since that would touch every import on both sides for n
   `message.id`). `live_context()` tail-reads backwards from EOF in a doubling window, memoized by
   `(path, size, mtime_ns)`; returns a `LiveContext(size, growth, history)` or `None`, never raises.
   `format_context()` renders `394k ▲ +2.1k ▁▂▃…` (`humanise_tokens` for sizes, one-decimal `k` for
-  growth, a block-glyph sparkline scaled 0→window-max). The API's `live_snapshot.py` calls this same
-  function so the Live list's `label` text is identical between the two UIs. For the detail dialog/
+  growth, a block-glyph sparkline scaled 0→window-max). The API's `live_snapshot.py` calls this
+  function directly so the Live list's `label` text comes straight from it. For the detail dialog/
   view, `load_detail()` fully parses the transcript on demand into per-turn records plus
   `compact_boundary` compactions; growth attribution credits each turn's context delta to the first
   tool called in the previous turn (or "prompt / text"), since the latest compaction, with
   `first-turn context + attributed growth == current context` holding exactly. Main thread only —
   subagent transcripts are ignored.
 
-### `streamlit_app/` — the Streamlit UI
-
-`streamlit_app/app.py` is the entry point. Because it lives one directory below the repo root but
-the shared data-layer modules live at the root, it inserts the repo root onto `sys.path` itself
-before importing them (`streamlit run` only puts the script's own directory on `sys.path`). It seeds
-`claude_db`'s SQLite snapshot on the very first run (`claude_db.startup()`) and drives a top nav bar
-(`st.container(horizontal=True, vertical_alignment="center")`): the "**The Ledger**" brand, three
-`st.button`s — "Overview", "Manage Sessions", "Manage Projects" (highlighted `type="primary"` for
-`st.session_state.page`, set via each button's `on_click` rather than its return value so the
-highlight reflects a click immediately instead of lagging one rerun behind), an empty `st.caption("")`
-used purely as a flexible spacer, a "Dark mode" `st.toggle`, and a "⟳" refresh button + "Last
-refreshed: HH:MM:SS"/"Never refreshed" caption (the caption reads `claude_db.refreshed_at()` *after*
-that click is handled via `st.rerun()`, so a click's new timestamp shows in the same script run).
-Dark mode flips `streamlit.config.set_option("theme.base", ...)` — undocumented and process-wide
-(re-themes every connected tab) — persisted to a gitignored `.streamlit/theme_pref.json` so it
-survives restarts without repo churn. `_auto_refresh_data()`, an invisible
-`@st.fragment(run_every="10m")` called once per script run, gates a background `claude_db.refresh()`
-+ `st.rerun()` behind `_auto_refresh_due(last, now)` (a plain, unit-tested function) so most of its
-per-rerun calls are no-ops and only one call per 10-minute interval does the refresh; this only runs
-while a browser tab is open. Page dispatch (`Overview`/`Sessions`/`Projects`) is a plain `if/elif` on
-`st.session_state.page`.
-
-`streamlit_app/views/` holds each page's render functions (kept out of `app.py` to limit it to nav/
-theming/dispatch; named `views/` rather than `pages/` to avoid colliding with Streamlit's own
-auto-detected multipage-app convention, which this app doesn't use):
-
-- `views/overview.py` (`render_overview_page`) opens with an `st.segmented_control` time-range
-  filter (`_TIME_RANGES`: All time/Today/Yesterday/Past week/Past month/Past quarter/Past year,
-  bucketed by *local calendar date*, not a rolling window) that scopes everything below it. A
-  two-column row — a donut chart of session counts by project on the left, an `st.metric` KPI grid
-  on the right (counts/duration/cost, with the longest/shortest/most-expensive/cheapest figures
-  carrying a `help=` tooltip naming their project/session) — followed by two full-width grouped-bar
-  charts ("Messages & Cost by Project", "Activity by Hour of Day"), each measure normalized to % of
-  its own peak so two differently-scaled measures can share one axis instead of a dual-axis chart.
-  All three project-based charts read from one `_project_totals_dataframe()` call (top-7 + "Other",
-  ranked by session count) so a project's color never shifts between charts; colors come from a
-  fixed-order categorical palette (`_CATEGORICAL_LIGHT`/`_CATEGORICAL_DARK`) chosen per
-  `theme.base`, exposed via `_theme_colors()` (also imported by `views/sessions_context.py` for its
-  chart, and ported to TypeScript CSS variables for the React app — see `web/` below). This module
-  is also where `api/overview_stats.py` was ported *from*: keep the two in step if you touch either
-  (`tests/test_overview.py` and `tests/test_overview_stats.py` carry equivalent cases).
-- `views/projects.py` (`render_projects_table`) is a plain, non-fragment render (no polling, no
-  caching of its own). An "Edit mode" toggle switches a plain `st.dataframe` for one with
-  `on_select="rerun", selection_mode="single-row"` (key `"projects_table"`); selecting a row surfaces
-  a delete button which sets `confirm_delete_project` to show an inline confirm/cancel warning.
-  Confirming calls `_clear_project()` (`delete_project` + `delete_project_transcripts`, each already
-  updating the SQLite snapshot directly) then pops `"projects_table"` from session state (`.pop()`,
-  not direct assignment, to avoid `StreamlitWidgetAlreadyInstantiatedError`).
-- `views/sessions.py` (`render_sessions_page`) is now just page composition — a header plus
-  `render_sessions_table()` (Live) and `render_transcripts_table()` (All); the actual table logic
-  lives in the two modules below.
-- `views/sessions_live.py` (`render_sessions_table`) is an `@st.fragment(run_every="2s")`: an
-  "Auto-refresh" toggle + "Last refreshed" caption row, then the Live table itself, rendered via the
-  shared row components in `sessions_table.py`. When auto-refresh is off the fragment still ticks on
-  schedule but redisplays the cached `st.session_state.sessions_df` instead of re-reading sessions.
-  Clicking a row opens the "Session context" dialog (`sessions_context.py`'s `_open_context_dialog`).
-- `views/sessions_transcripts.py` (`render_transcripts_table`) is a plain render (search box +
-  Project/Version/Branch `st.multiselect` filters + a sortable header, all backed by
-  `sessions_data.py`) for the "All" table — every session transcript ever recorded, not just live
-  ones. Clicking a row opens the "Session details" dialog (`_open_transcript_dialog`), which is also
-  where deleting that transcript now lives (see `sessions_context.py` below) — there is no longer a
-  separate Edit-mode/multi-row-select delete flow on this table itself.
-- `views/sessions_table.py` holds the presentation pieces shared by both tables: `_ROW_CSS` (a CSS
-  hack that lays a row's cells out with plain `st.columns` and overlays an invisible full-row
-  `st.button` on top via `[class*="st-key-sessrow-"]`/absolute positioning, so the whole row is
-  clickable without Streamlit's `st.dataframe` row-selection UI), `_render_table_row` /
-  `_render_table_header` / `_render_sortable_table_header` (the sortable variant toggles
-  `st.session_state[sort_state_key]` and reruns), `_format_context` (the All table's numeric,
-  `humanise_tokens`-formatted Context column; `"--"` for a pandas `NaN`), and `_tooltip_text` (the
-  hover tooltip on a row's invisible button, previewing the title/session ID and last
-  message/first prompt).
-- `views/sessions_data.py` builds the two tables' `pandas.DataFrame`s (`_sessions_dataframe`,
-  `_transcripts_dataframe`, each row keyed by the columns the two dialogs and tables above expect)
-  and the All table's filter/sort logic (`_filter_transcripts_dataframe`: literal
-  case-insensitive substring match over Session ID/Last Message/First Prompt, AND-combined with
-  Project/Version/Branch `isin` filters; `_sort_transcripts_dataframe`: a stable `mergesort` with
-  missing values pushed last either direction) and `_categorical_options` (distinct non-blank
-  values for a filter's choices). `_context_cell` wraps `claude_context.live_context` so one
-  unreadable transcript renders `"--"` instead of sinking the whole Live table. This is also where
-  `api/transcript_query.py` was ported *from* — keep the two in step (`tests/test_views.py` and
-  `tests/test_transcript_query.py` carry equivalent cases).
-- `views/sessions_context.py` renders the two session-detail `st.dialog`s, keyed off separate
-  session-state entries so only one can be open per script run and each opener clears the other's:
-  `_render_context_dialog` ("Session context", opened from a Live row — token/cache history and
-  attribution only) and `_render_transcript_dialog` ("Session details", opened from an All row — the
-  same detail plus a recap block of title/last-message-or-first-prompt/started/updated/messages/
-  cost, and `_render_delete_controls`: a "🗑️ Delete this session" button → inline confirm/cancel
-  warning → `delete_transcript` + dialog dismiss, disabled with a caption when the session is still
-  live). The shared detail body (`_render_detail`) is a stacked-bar Vega-Lite chart of tokens per
-  response (`_render_history_chart`: Cache read/Cache written/New, with a ▼ marker on cache-miss
-  responses and a dashed rule on the first response after a compaction, colored via
-  `views/overview.py`'s `_theme_colors()`), an "All responses" `st.dataframe` in an expander, and
-  "What filled the context" (by-tool growth table plus largest single increases). This is the module
-  the React app's `SessionDialog`/`TokensChart` were ported *from* — both sides' chart specs and
-  copy should read the same.
-- `views/utils.py` holds `format_date`, a tiny shared cell-formatting helper (blank/NaN → `"--"`,
-  `datetime`/`Timestamp` → `"%Y-%m-%d %H:%M:%S"`).
-
 ### `api/` — the FastAPI backend
 
-`api/server.py` is both the ASGI app and the CLI (`python server.py [--lan] [--host] [--port]`,
-env `LEDGER_HOST`/`LEDGER_PORT`; default host `127.0.0.1` port `8501`, `--lan` binds `0.0.0.0`). Like
-`streamlit_app/app.py`, it inserts the repo root onto `sys.path` before importing the root-level
-modules (it lives one level below the root too, alongside its own supporting modules). Its
-`lifespan` calls `claude_db.startup()` in a worker thread on start and runs a 10-minute
-`refresh_loop()` for as long as the process is up, both funneled through a process-wide
+`api/server.py` is both the ASGI app and the CLI (`python server.py [--lan] [--host] [--port]
+[--frontend-port]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
+`127.0.0.1` port `8501`, `--lan` binds `0.0.0.0`). It lives one level below the repo root alongside
+its own supporting modules, so it inserts the repo root onto `sys.path` before importing the
+root-level modules. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
+a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
 `_refresh_lock` shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
-is never triggered twice concurrently. Routes:
+is never triggered twice concurrently. It serves `/api/*` only — no HTML, no static assets; the
+frontend is a wholly separate process (see `web/` below). Routes:
 
 | Endpoint | Notes |
 |---|---|
@@ -319,57 +230,59 @@ is never triggered twice concurrently. Routes:
 | `DELETE /api/projects?path=` | 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
 | `GET /api/overview?range=` | 422 for an unknown range label; otherwise `overview_stats.overview()`'s payload |
 
-It also serves the built frontend: `web/dist` assets get long-cache/immutable headers when under
-`assets/` (Vite's content-hashed filenames), everything else no-cache; any non-`/api` path with no
-file extension falls back to `index.html` (SPA routing); if `web/dist` hasn't been built yet, page
-requests get `banner.NOT_BUILT_MESSAGE` (503) instead of failing, while `/api/*` still works. `GZipMiddleware`
-and `SecurityMiddleware` (outermost, so nothing else runs for a refused request) wrap every route.
-Windows MIME-type registry quirks are worked around explicitly (`.js`/`.mjs` etc. get their type
-forced, since Windows can otherwise answer `text/plain` for `.js`, which browsers refuse to run as a
-module script).
+It serves `/api/*` only — no static files, no SPA fallback; that all lives in `web/` now, served by
+Vite's own `vite preview` (see below and design.md Decision 2/9). `GZipMiddleware`, `SecurityMiddleware`
+(added first so it's outermost — nothing else runs for a refused request), and `CORSMiddleware`
+(added last, so it's innermost — it answers a CORS preflight itself before the token/CSRF checks
+above ever see it, but a real cross-origin request still has to pass them) wrap every route.
+`cors_origins()`/`configure_cors()` build the exact allow-list from `--frontend-port` plus any LAN
+addresses discovered under `--lan` — never a wildcard, and never a credentialed response
+(`allow_credentials=False`), since auth is a bearer header, not a cookie.
 
 - `api/security.py` — one ASGI middleware gating every request (see also `design.md`'s "Auth" decision).
   A request is **local** only when `request.client.host` is loopback (`127.0.0.1`/`::1`/
   `::ffff:127.0.0.1`) *and* carries none of `Forwarded`/`X-Forwarded-For`/`X-Real-IP` (so a tunnel or
   reverse proxy on the same machine is treated as remote, not silently trusted); local requests must
   still present `Host: localhost`/`127.0.0.1`/`[::1]` (any port) or get a 403 — this stops a public DNS
-  name that resolves to 127.0.0.1 from reaching the app unauthenticated. Non-local requests need the
-  access token via `?token=` (GET/HEAD only — a valid one triggers a 303 redirect to the same URL
-  with `token` stripped and sets an `HttpOnly`/`SameSite=Lax`/one-year cookie, so the token never sits
-  in browser history), the `ledger_token` cookie, or an `Authorization: Bearer` header; comparisons
-  use `hmac.compare_digest`. Every non-GET request additionally needs an `X-Requested-With: ledger`
-  header — a page on another site can't add a custom header without triggering a CORS preflight,
-  which this app never grants (no CORS middleware at all), so that header is what stops a blind
-  cross-site `POST`/`DELETE`. `provision_token()` is `LEDGER_TOKEN` if set, else `.ledger/token`
-  (created with `secrets.token_urlsafe(32)` on first `--lan` run, mode `0o600`).
-- `api/banner.py` — what the server prints at startup: the local URL always; with `--lan`,
-  `discover_ipv4()` (a UDP-connect trick to find the outbound interface, plus hostname resolution,
-  filtered by `usable_ipv4` to drop loopback/link-local/unspecified addresses) drives one
-  `http://<ip>:<port>/?token=<token>` line per address plus an ASCII QR (`render_qr`, via `qrcode`;
-  `None` if the package or the terminal's encoding can't render it) for the first address, and a
-  plain-HTTP/trusted-networks warning. `NOT_BUILT_MESSAGE` is the "run `npm ci && npm run build`"
-  text used both in the startup banner and as the page response when `web/dist` is missing.
+  name that resolves to 127.0.0.1 from reaching the app unauthenticated. Every non-local request needs
+  the access token as `Authorization: Bearer <token>` (`hmac.compare_digest` comparison) or gets a 401
+  with a message pointing back at the printed sign-in link — there is no `?token=` query handling or
+  cookie on the API side at all; turning a printed link's `?token=` into that header is entirely the
+  frontend's job (see `web/src/api/token.ts` below). Every non-GET request additionally needs an
+  `X-Requested-With: ledger` header — a page on another site can't add a custom header without
+  triggering a CORS preflight, which `server.py`'s `CORSMiddleware` only ever grants to the frontend's
+  own origin(s), so that header is what stops a blind cross-site `POST`/`DELETE` even from a page that
+  is otherwise allowed to read the API. `provision_token()` is `LEDGER_TOKEN` if set, else the token
+  stored at `.ledger/token` (created with `secrets.token_urlsafe(32)` on first `--lan` run, mode
+  `0o600`) — delete that file and restart to rotate it.
+- `api/banner.py` — what the server prints at startup: always a reminder that the frontend is a
+  separate process and how to start it (`cd web && npm run preview [-- --host]`), plus its local URL.
+  With `--lan`, `discover_ipv4()` (a UDP-connect trick to find the outbound interface, plus hostname
+  resolution, filtered by `usable_ipv4` to drop loopback/link-local/unspecified addresses) drives one
+  `http://<ip>:<frontend-port>/?token=<token>` line per address plus an ASCII QR (`render_qr`, via
+  `qrcode`; `None` if the package or the terminal's encoding can't render it) for the first address,
+  and a plain-HTTP/trusted-networks/firewall warning.
 - `api/live_snapshot.py` — `LiveSnapshot`, a lock-guarded, TTL-coalesced (`LIVE_TTL_SECONDS = 1.0`)
   wrapper around `claude_sessions.load_sessions()` + `claude_context.live_context()` per session, so
   N browsers/phones polling `/api/live` every ~2s cost about one recompute per second rather than N —
-  those two modules' caches were written assuming a single Streamlit script thread, so every read of
-  them from the API goes through this one lock. One session's `live_context()` raising leaves the
-  others populated (`context: null` for that one). `is_live_now()` bypasses the TTL for delete
-  decisions (see the `DELETE /api/sessions/{id}` route above); `cwd_for()` is used server-side only,
-  never sent to a client.
-- `api/overview_stats.py` — the pure aggregation lifted out of `views/overview.py`, with no pandas or
-  Streamlit: `TIME_RANGES` (same table/semantics as `_TIME_RANGES`), `filter_by_range`,
-  `project_totals` (top-7 + `"Other"`, `share`/`messages_pct`/`cost_pct`), `hourly_activity`
-  (24-hour buckets trimmed to the contiguous active range, `sessions_pct`/`messages_pct`),
-  `format_duration`, and `summary()` (the KPI figures, extremes annotated with `project`/`session_id`
-  via `_with_session`). `overview()` ties it together into the `/api/overview` response, including
-  `project_order` — the one ordering every chart on the page uses so a project's color never shifts
-  between them.
-- `api/transcript_query.py` — the pure port of `views/sessions_data.py`'s All-table filter/sort:
-  `filter_transcripts` (literal case-insensitive substring over session ID/last message/first prompt,
-  AND-combined with project/version/branch membership), `sort_transcripts` (stable, missing values
-  last either direction), `filter_options` (distinct non-blank values per filterable field), and
-  `query()` which combines all of that plus paging (`limit`/`offset`, default page size 50) into a
+  those two modules' own caches assume a single caller, so every read of them from the API goes
+  through this one lock. One session's `live_context()` raising leaves the others populated
+  (`context: null` for that one). `is_live_now()` bypasses the TTL for delete decisions (see the
+  `DELETE /api/sessions/{id}` route above); `cwd_for()` is used server-side only, never sent to a
+  client.
+- `api/overview_stats.py` — the pure aggregation behind `/api/overview`, no pandas: `TIME_RANGES`
+  (All time/Today/Yesterday/Past week/Past month/Past quarter/Past year, bucketed by *local calendar
+  date*, not a rolling window), `filter_by_range`, `project_totals` (top-7 + `"Other"`,
+  `share`/`messages_pct`/`cost_pct`), `hourly_activity` (24-hour buckets trimmed to the contiguous
+  active range, `sessions_pct`/`messages_pct`), `format_duration`, and `summary()` (the KPI figures,
+  extremes annotated with `project`/`session_id` via `_with_session`). `overview()` ties it together
+  into the `/api/overview` response, including `project_order` — the one ordering every chart on the
+  page uses so a project's color never shifts between them.
+- `api/transcript_query.py` — the filter/sort logic behind `/api/transcripts`: `filter_transcripts`
+  (literal case-insensitive substring over session ID/last message/first prompt, AND-combined with
+  project/version/branch membership), `sort_transcripts` (stable, missing values last either
+  direction), `filter_options` (distinct non-blank values per filterable field), and `query()` which
+  combines all of that plus paging (`limit`/`offset`, default page size 50) into a
   `Page(items, total, options)`.
 
 ### `web/` — the React + TypeScript frontend
@@ -408,9 +321,8 @@ path here) rendered inside `AppShell`.
   and every chart that needs to recolor on theme change — via `useSyncExternalStore`, the same
   pattern `useViewportClass` uses; a live media-query listener keeps it in sync with the OS if
   nothing's been explicitly chosen yet. `theme/tokens.css` holds the light/dark CSS variables,
-  including the 8-slot categorical palette (`--cat-0`..`--cat-7`) and `--muted-ink`, ported from
-  `views/overview.py`'s `_CATEGORICAL_LIGHT`/`_CATEGORICAL_DARK`/`_MUTED_INK` — same fixed slot order,
-  so a chart's `chartColors()`/`themeColors()` (see below) never has to duplicate a hex value.
+  including the 8-slot categorical palette (`--cat-0`..`--cat-7`) and `--muted-ink`, at a fixed slot
+  order so a chart's `chartColors()`/`themeColors()` (see below) never has to duplicate a hex value.
 - **Responsive list** (`components/list/`): `ResponsiveList` picks `ListTable` (medium/wide) or
   `ListCards` (narrow) by viewport — only one is ever mounted, both take the same `columns`/`rows`/
   `rowId`/`onSelect`, so switching layouts never changes what's shown or its order. A `ListColumn`
@@ -428,33 +340,32 @@ path here) rendered inside `AppShell`.
   `AllList` debounces its search box (`useDebouncedValue`, 300ms), drives `Project`/`Version`/`Branch`
   `FilterMultiselect`s (`<details>`-based checkbox lists — no popover/portal machinery needed) off
   the API's option lists, and pages 50-at-a-time via `useTranscripts`'s "Load more". `SessionDialog`
-  shows the recap block only when opened `from="all"` (ported from `sessions_context.py`'s
-  `_render_recap`); its `Detail` section (current-context figure, `TokensChart`, "All responses"
-  table, "what filled the context" by-tool/largest-increases tables) and `DeleteControls`
-  (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409 mid-confirm surfaces
-  the server's message) are ports of `_render_detail`/`_render_delete_controls`. `TokensChart` lazily
-  `import()`s `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its
-  bundle cost until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the
-  theme change; its stacked-bar/cache-miss-triangle/compaction-rule spec mirrors
-  `sessions_context.py`'s `_render_history_chart` field-for-field.
+  shows the recap block only when opened `from="all"`; its `Detail` section (current-context figure,
+  `TokensChart`, "All responses" table, "what filled the context" by-tool/largest-increases tables)
+  and `DeleteControls` (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409
+  mid-confirm surfaces the server's message) round it out. `TokensChart` lazily `import()`s
+  `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its bundle cost
+  until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the theme
+  change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers and
+  dashed compaction rules.
 - **Overview** (`components/overview/`, `pages/OverviewPage.tsx`): `TimeRangeSelector` is a
-  horizontally-scrollable segmented control over the same seven ranges as `_TIME_RANGES`.
+  horizontally-scrollable segmented control over the same seven ranges as `overview_stats.TIME_RANGES`.
   `chartTheme.ts`'s `chartColors()`/`projectColorScale()`/`projectColorMap()` centralize reading the
   CSS-variable palette and turning the API's `project_order` into a Vega-Lite domain/range (`"Other"`
   always the muted ink) shared by `ProjectDonutChart` and `ProjectBarChart`; `ProjectDonutChart` draws
   its own color key as a plain HTML list (`ProjectLegend`) instead of a Vega-Lite legend so long
   project names wrap instead of clipping. `ProjectBarChart` ("Messages & Cost by Project") and
   `HourlyBarChart` ("Activity by Hour of Day") both normalize each measure to % of its own peak (a
-  deliberate non-dual-axis choice, matching `views/overview.py`) and keep "Messages" on the same
-  categorical hue (`hues[0]`) in both charts. All three charts use the shared `useVegaEmbed` hook
+  deliberate non-dual-axis choice so two differently-scaled measures can share one axis) and keep
+  "Messages" on the same categorical hue (`hues[0]`) in both charts. All three charts use the shared `useVegaEmbed` hook
   (lazy `vega-embed` import, re-embeds on spec change, `useVegaEmbed.ts` — the general form of the
   pattern `TokensChart` uses directly). `SummaryStats` renders the KPI tiles; the four extreme
   figures are buttons that toggle an inline disclosure naming their project/session (plus a `title`
   attribute for hover on pointer devices) since there's no hover-only affordance on a touchscreen.
-- **Projects** (`components/projects/ProjectsList.tsx`, `pages/ProjectsPage.tsx`) ports
-  `views/projects.py`'s behavior: every field from `useProjects()` (name, path, trust, last
-  session, version, last cost, last start, lines +/-, MCP servers) through the same
-  `ResponsiveList` the Sessions lists use. There's no per-project detail view here, so — unlike
+- **Projects** (`components/projects/ProjectsList.tsx`, `pages/ProjectsPage.tsx`) renders every
+  field from `useProjects()` (name, path, trust, last session, version, last cost, last start, lines
+  +/-, MCP servers) through the same `ResponsiveList` the Sessions lists use. There's no per-project
+  detail view here, so — unlike
   Sessions, where a row click opens a dialog — a row click doubles as "delete this one" (a
   dedicated per-row delete button isn't possible without nesting a `<button>` inside `ListCards`'
   card-as-button); selecting a row shows an inline `detail-notice` confirmation naming the exact
@@ -486,13 +397,11 @@ it's required to do, ahead of inferring intent from the code alone.
 
 ### Other repo files
 
-- `.streamlit/config.toml` holds Streamlit config (theme, server settings); `.streamlit/secrets.toml`
-  (if created) and `.streamlit/theme_pref.json` are gitignored, as is `.streamlit/ledger.db*` (the
-  SQLite snapshot both UIs currently read — see "Shared data layer" above). `.gitignore` also already
-  has `.ledger/`, `web/node_modules/`, and `web/dist/` staged for when the DB-path/build-output
-  migration tasks land.
-- `requirements.txt`: `streamlit`, `pandas` (Streamlit side), `fastapi`, `uvicorn`, `qrcode` (API
-  side) — unpinned. `requirements-dev.txt` adds `pytest`, `httpx` (for FastAPI's `TestClient`).
+- `.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see "Shared data layer" above)
+  and the LAN access token (`token`, see `api/security.py` above); both are recreated as needed and
+  never committed. `.gitignore` also excludes `web/node_modules/` and `web/dist/`.
+- `requirements.txt`: `fastapi`, `uvicorn`, `qrcode` — unpinned. `requirements-dev.txt` adds
+  `pytest`, `httpx` (for FastAPI's `TestClient`).
 - `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom`, `vega-embed`
   (dependencies); Vite, TypeScript, Vitest, Testing Library, jsdom (devDependencies). `npm run build`
   is `tsc --noEmit && vite build` — a type error fails the build, not just lint.

@@ -12,8 +12,8 @@ have to go digging.
 session you've ever run by project, plus a panel of headline numbers next to it —
 total projects, sessions, and messages, how long your sessions tend to run (average,
 longest, shortest), and what they've cost (average, most expensive, cheapest, total).
-Hover the longest/shortest/cheapest/most-expensive figures to see which project and
-session they came from.
+Tap or hover the longest/shortest/cheapest/most-expensive figures to see which project
+and session they came from.
 
 **See what's running right now.** The Sessions page has a "Live" table that shows every
 Claude Code process currently running on your machine — which project it's in, what
@@ -30,24 +30,20 @@ transcript on every tick would be slow.
 directory you've run or trusted Claude Code in, along with the last session's cost,
 CLI version, lines changed, and any MCP servers configured for it.
 
-There's also a dark mode toggle in the sidebar, if you're into that.
-
-> **Note:** this repo is mid-migration from the Streamlit UI below to a React frontend
-> served by a FastAPI backend (`api/server.py`), which also adds access from other
-> devices on your network. Both currently work; see "Run the new web app" below for
-> the one that's replacing Streamlit. The `## Setup` section applies to either.
+It also works from your phone or another device on the same network — see "Run from
+another device" below — and each device remembers its own light/dark theme preference.
 
 ## Layout
 
-- `streamlit_app/` — the Streamlit UI (`app.py` + `views/`).
-- `api/` — the FastAPI backend that serves the React frontend (`server.py` and its
-  supporting modules: `banner.py`, `security.py`, `live_snapshot.py`,
-  `overview_stats.py`, `transcript_query.py`).
-- `web/` — the React + Vite frontend `api/server.py` serves once built.
+- `api/` — the FastAPI backend (`server.py` and its supporting modules: `banner.py`,
+  `security.py`, `live_snapshot.py`, `overview_stats.py`, `transcript_query.py`). It
+  only ever serves `/api/*` — no pages, no static files.
+- `web/` — the React + Vite frontend. Built once with `npm run build`, then served by
+  its own process (`vite preview`), entirely separate from the API.
 - Everything else at the repo root (`claude_db.py`, `claude_projects.py`,
-  `claude_transcripts.py`, `claude_sessions.py`, `claude_context.py`) is the shared
-  data layer both the Streamlit app and the API server read from — it isn't specific
-  to either UI, so it stays put rather than living under one of the two folders above.
+  `claude_transcripts.py`, `claude_sessions.py`, `claude_context.py`) is the shared data
+  layer the API reads from — the part of the app that actually knows how to read Claude
+  Code's on-disk files.
 
 ## Setup
 
@@ -58,65 +54,47 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Install dependencies (this covers both the Streamlit app and the new FastAPI server):
+Install Python dependencies:
 
 ```powershell
 pip install -r requirements.txt
 ```
 
+You'll also need [Node.js](https://nodejs.org/) installed for the frontend.
+
 ## Run
 
-Run this from the repo root, not from inside `streamlit_app/`:
+The API and the frontend are two separate processes on two separate ports. Run the
+Python commands from the repo root, not from inside `api/`.
+
+**Terminal 1 — the API:**
 
 ```powershell
-streamlit run streamlit_app/app.py
-```
-
-The app will open at http://localhost:8501.
-
-## Run the new web app
-
-The new frontend lives in `web/` (React + Vite) and talks to a FastAPI backend
-(`api/server.py`); you need Node.js installed in addition to the Python setup above.
-Run the Python commands below from the repo root, not from inside `api/`.
-
-**Development** — backend and frontend as separate dev servers, so the frontend
-hot-reloads on save:
-
-```powershell
-# Terminal 1: the API, on http://localhost:8501
 python api/server.py
-
-# Terminal 2: the UI, on http://localhost:5173 (proxies /api to the backend above)
-cd web
-npm install
-npm run dev
 ```
 
-Open http://localhost:5173.
-
-**Built** — two processes, two ports: the API serves only `/api/*`, and the built
-frontend is served separately by Vite's own static server. This is also what's needed
-to reach the app from another device (see below):
+**Terminal 2 — build and serve the frontend** (from `web/`; `npm run build` only needs
+re-running after you pull frontend changes, not on every start):
 
 ```powershell
-# Terminal 1: build once, then serve the compiled frontend on its own port
 cd web
 npm ci
 npm run build
 npm run preview
 ```
 
-```powershell
-# Terminal 2, from the repo root: the API
-python api/server.py
-```
+Open the URL `npm run preview` prints (http://localhost:4173 by default) — not the
+API's address, which has no page to show you.
 
-Open http://localhost:4173 (Vite's own default preview port).
+While actively working on the frontend, `npm run dev` (in place of `npm run build` +
+`npm run preview`) hot-reloads on save and proxies `/api` to the backend on
+http://localhost:8501, instead of requiring a rebuild for every change.
 
-**From another device on your network** (phone, tablet, another computer), pass
+## Run from another device
+
+To reach the dashboard from a phone, tablet, or another computer on your network, pass
 `--lan` to the API and `-- --host` to the frontend's preview command — both need to be
-running:
+running, and the frontend needs to already be built (see above):
 
 ```powershell
 python api/server.py --lan
@@ -127,12 +105,26 @@ cd web
 npm run preview -- --host
 ```
 
-This requires the frontend to already be built (see above). `--lan` binds the API to
-your network interfaces instead of just this machine, and it prints the frontend's URL,
-a QR code, and an access token for each — the other device needs the token (baked into
-the QR/URL) to sign in; opening that link stores the token on the device and it's used
-on every API request from then on. Only do this on a network you trust: the connection
-is plain HTTP, so the token and your session data aren't encrypted in transit.
+`--lan` binds the API to your network interfaces instead of just this machine, and it
+prints the frontend's URL, a QR code, and an access token for each address it finds —
+scanning the QR (or opening the printed link) signs that device in: the token is stored
+in that browser and stripped from the address bar, then sent as a header on every
+request from then on. A device that hasn't opened that link sees an empty, signed-out
+shell instead of your data.
+
+Windows will prompt to allow Python through the firewall the first time you run with
+`--lan` — allow it on **Private networks**. The other device also needs to reach the
+frontend's port, not just the API's, so if you have a firewall prompt for the frontend
+process too, allow that as well.
+
+Only do this on a network you trust: the connection is plain HTTP, not HTTPS, so the
+token and your session data aren't encrypted in transit — anyone else on the same
+network could read them.
+
+**Rotating the token.** If you've shared the link and want to revoke access, delete
+`.ledger/token` and restart the API; it generates a fresh one on the next `--lan` run,
+and every device using the old token will need the new link.
+
 `--host`/`--port`/`--frontend-port` (or the `LEDGER_HOST`/`LEDGER_PORT`/
 `LEDGER_FRONTEND_PORT` env vars) override the API's address/port and the port it expects
 the frontend on, if you need something other than the defaults — keep `--frontend-port`
@@ -146,23 +138,31 @@ Install dev dependencies (this includes `requirements.txt` plus `pytest`):
 pip install -r requirements-dev.txt
 ```
 
-Run the test suite:
+Run the Python test suite:
 
 ```powershell
 pytest
 ```
 
-Tests live in `tests/`, one file per module under test (`test_claude_db.py`,
-`test_claude_projects.py`, `test_claude_transcripts.py`, `test_claude_sessions.py`,
-`test_overview.py`, `test_views.py`). They cover the pure parsing/aggregation logic
-(cost math, time-range filtering, chart data prep) and the SQLite-backed
-read/write/delete paths in `claude_db.py`, `claude_projects.py`, and
-`claude_transcripts.py` — the latter via a `isolated_db` fixture (see
-`tests/conftest.py`) that points `claude_db` at a throwaway `tmp_path` instead of your
-real `~/.claude.json` / `~/.claude/projects/`, so running the suite never touches your
-actual Claude Code data. Streamlit rendering itself (`render_*` functions that call
-`st.*` widgets) isn't covered — only the plain functions those pages build their data
-from.
+Tests live in `tests/`, one file per module under test. They cover the pure
+parsing/aggregation logic (cost math, time-range filtering, chart data prep), the
+SQLite-backed read/write/delete paths in `claude_db.py`, `claude_projects.py`, and
+`claude_transcripts.py` (via an `isolated_db` fixture — see `tests/conftest.py` — that
+points `claude_db` at a throwaway `tmp_path` instead of your real `~/.claude.json` /
+`~/.claude/projects/`, so running the suite never touches your actual Claude Code data),
+and the FastAPI app end to end (auth, CORS, routes) via `TestClient`.
+
+Run the frontend tests (from `web/`):
+
+```powershell
+npm test
+```
+
+And check the frontend still builds cleanly (also fails on a TypeScript type error):
+
+```powershell
+npm run build
+```
 
 ## A couple of things worth knowing
 
@@ -172,6 +172,6 @@ from.
   counted.
 - The "Live" table can occasionally show a session that's no longer actually running —
   Claude Code doesn't always clean up its registry file the moment a process exits.
-- Your dark mode preference is saved locally to a gitignored `.streamlit/theme_pref.json`
-  so it survives restarts without cluttering up the repo. Delete that file if you ever
-  want to reset back to the default theme.
+- Each device remembers its own light/dark theme preference locally (it follows your
+  system setting until you flip the toggle yourself), so there's nothing to configure
+  and nothing that syncs between devices.

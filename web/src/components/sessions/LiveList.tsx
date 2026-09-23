@@ -23,7 +23,7 @@ const columns: ListColumn<LiveSession>[] = [
     key: "title",
     header: "Title",
     priority: "high",
-    render: (s) => formatText(s.title || s.name),
+    render: (s) => formatText(s.title),
   },
   {
     key: "status",

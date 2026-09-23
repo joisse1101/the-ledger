@@ -3,7 +3,7 @@
 refresh() is the only place that reads ~/.claude.json and
 ~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects.py,
 claude_transcripts.py) just queries the SQLite snapshot this writes to
-.streamlit/ledger.db (WAL mode). claude_sessions.py's live-session polling is separate
+.ledger/ledger.db (WAL mode). claude_sessions.py's live-session polling is separate
 and untouched by this module.
 """
 
@@ -23,7 +23,7 @@ _BUSY_TIMEOUT_MS = 10_000
 
 
 def db_path() -> Path:
-    return Path(__file__).parent / ".streamlit" / "ledger.db"
+    return Path(__file__).parent / ".ledger" / "ledger.db"
 
 
 def config_path() -> Path:
