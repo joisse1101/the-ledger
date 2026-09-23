@@ -1,28 +1,28 @@
 ## 1. Spike: verify the load-bearing networking assumption
 
-- [ ] 1.1 Bind a throwaway Python `http.server` (or the real backend) to `127.0.0.1:8501` only,
+- [x] 1.1 Bind a throwaway Python `http.server` (or the real backend) to `127.0.0.1:8501` only,
       run a bare `nginx:alpine` container with `curl` and confirm
       `curl http://host.docker.internal:8501` from inside it succeeds. Verify: the curl returns the
       test server's response, not a connection error.
-- [ ] 1.2 If 1.1 fails, stop and report back before continuing — design.md's fallback (a narrower
+- [x] 1.2 If 1.1 fails, stop and report back before continuing — design.md's fallback (a narrower
       host bind reachable by Docker Desktop's gateway) needs to be chosen with the user, not
       assumed.
 
 ## 2. Gateway service
 
-- [ ] 2.1 Create `gateway/` as a new top-level, self-contained folder (Dockerfile, Nginx config,
+- [x] 2.1 Create `gateway/` as a new top-level, self-contained folder (Dockerfile, Nginx config,
       compose file), matching how `api/` and `web/` are organized. Verify: `docker compose config`
       (or equivalent) parses without error from inside `gateway/`.
-- [ ] 2.2 Write the Nginx config: `location /api/` proxies to `http://host.docker.internal:8501`
+- [x] 2.2 Write the Nginx config: `location /api/` proxies to `http://host.docker.internal:8501`
       with `X-Real-IP`/`X-Forwarded-For`/`Host` headers set; `location /` proxies to
       `http://host.docker.internal:4173`. Verify: with the backend and frontend running locally and
       the gateway container up, `curl http://localhost:<gateway-port>/api/meta` returns the same
       JSON as `curl http://localhost:8501/api/meta`, and `curl http://localhost:<gateway-port>/`
       returns the frontend's HTML shell.
-- [ ] 2.3 Make the gateway's listen port configurable (compose port mapping or an env var) with a
+- [x] 2.3 Make the gateway's listen port configurable (compose port mapping or an env var) with a
       documented default that doesn't collide with 4173/8501. Verify: changing the mapping changes
       which port answers, per a manual check.
-- [ ] 2.4 Confirm a request proxied through the gateway is refused without a token, and succeeds
+- [x] 2.4 Confirm a request proxied through the gateway is refused without a token, and succeeds
       with the correct `Authorization: Bearer <token>` header, exercising the existing
       `SecurityMiddleware` unchanged. Verify: two `curl` calls through the gateway (with and
       without the header) return 401 then 200 for a data endpoint like `/api/meta`.
