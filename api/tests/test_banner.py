@@ -103,30 +103,6 @@ def test_local_only_banner_has_one_address_no_token_talk_and_the_preview_reminde
     assert "npm run preview" in text and "--host" not in text
 
 
-def test_lan_banner_lists_each_address_with_the_token_the_qr_and_the_warning():
-    text = banner.build_banner(
-        frontend_port=9000,
-        lan_addresses=["192.168.1.20", "10.0.0.5"],
-        token="tok-123",
-        qr="QR-ROWS\n",
-    )
+def test_banner_uses_the_given_frontend_port():
+    text = banner.build_banner(frontend_port=9000)
     assert "http://localhost:9000/" in text
-    assert "http://192.168.1.20:9000/?token=tok-123" in text
-    assert "http://10.0.0.5:9000/?token=tok-123" in text
-    assert "QR-ROWS" in text and "192.168.1.20" in text.split("QR-ROWS")[0].splitlines()[-1]  # QR is for the first
-    assert "plain HTTP" in text
-    assert "firewall" in text
-    assert "npm run preview -- --host" in text  # the reminder to serve the frontend separately
-
-
-def test_lan_banner_without_a_qr_still_prints_the_links():
-    text = banner.build_banner(frontend_port=8501, lan_addresses=["192.168.1.20"], token="t", qr=None)
-    assert "http://192.168.1.20:8501/?token=t" in text
-    assert "Scan" not in text
-
-
-def test_lan_banner_with_no_address_says_so_and_prints_no_token():
-    text = banner.build_banner(frontend_port=8501, lan_addresses=[], token="secret-value")
-    assert "No network address" in text
-    assert "secret-value" not in text
-    assert "plain HTTP" in text

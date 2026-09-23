@@ -1,9 +1,16 @@
 import pytest
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
 import claude_db
 import server
 from live_snapshot import LiveSnapshot
+
+
+def test_no_cors_middleware_is_registered():
+    # CORS is dropped entirely (not just shrunk): every legitimate caller reaches the
+    # API through a same-origin proxy, so there is no allow-list to maintain.
+    assert not any(m.cls is CORSMiddleware for m in server.app.user_middleware)
 
 
 def _client():

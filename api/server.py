@@ -14,7 +14,6 @@ from typing import Annotated, Literal, Mapping, Optional, Sequence
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Path, Query
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 import banner
@@ -25,7 +24,7 @@ import claude_transcripts
 import overview_stats
 import transcript_query
 from live_snapshot import LiveSnapshot
-from security import TOKEN_ENV, SecurityMiddleware, provision_token
+from security import SecurityMiddleware, provision_token
 
 log = logging.getLogger("ledger")
 
@@ -79,43 +78,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Set by main() when the server is reachable from other devices (or LEDGER_TOKEN is
-# set). While None, no token exists, so every request that isn't plain local is refused.
+# Set by main() on every start. While None (tests that never call main()), no token
+# exists, so every request that isn't plain local is refused.
 access_token: Optional[str] = None
 
 DEFAULT_FRONTEND_PORT = 4173  # Vite's own `vite preview` default
 
-
-def cors_origins(frontend_port: int, lan_addresses: Sequence[str] = ()) -> list[str]:
-    """The exact origins the frontend can be reached at:
-    localhost/127.0.0.1 always (dev's `npm run dev` and a local `vite preview` both use
-    one of these), plus one entry per LAN address discovered under `--lan`. Never a
-    wildcard — an unlisted origin gets no CORS header at all, even from this machine."""
-    origins = [f"http://localhost:{frontend_port}", f"http://127.0.0.1:{frontend_port}"]
-    origins += [f"http://{address}:{frontend_port}" for address in lan_addresses]
-    return origins
-
-
-# Mutated in place by main() (and by tests) once the frontend's port/addresses are known;
-# CORSMiddleware keeps this exact list reference, so mutating it changes what it allows.
-_cors_origins: list[str] = []
-
-
-def configure_cors(origins: Sequence[str]) -> None:
-    _cors_origins[:] = origins
-
-
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityMiddleware, token=lambda: access_token)
-# Added last so it is outermost: it answers a CORS preflight (OPTIONS) itself, before
-# the token/CSRF checks above ever run — a real request still needs to pass those.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=False,  # nothing is credentialed: auth is a header, not a cookie
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Authorization", "X-Requested-With", "Content-Type"],
-)
 
 
 def _iso(value) -> Optional[str]:
@@ -345,10 +315,8 @@ def get_overview(
 # ---------------------------------------------------------------- command line
 
 DEFAULT_HOST = "127.0.0.1"
-LAN_HOST = "0.0.0.0"
 DEFAULT_PORT = 8501
 _LOOPBACK_BINDS = frozenset({"127.0.0.1", "localhost", "::1"})
-_WILDCARD_BINDS = frozenset({"0.0.0.0", "::", ""})
 
 
 @dataclass(frozen=True)
@@ -381,9 +349,11 @@ def _parse_port(value: Optional[int], env_name: str, environ: Mapping[str, str],
 def parse_settings(
     argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.environ
 ) -> Settings:
-    """--host beats --lan beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501;
-    --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link and the
-    CORS allow-list — this process never connects to the frontend's port itself)."""
+    """--host beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501;
+    --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link — this
+    process never connects to the frontend's port itself). `--lan` is no longer a bind mode: other
+    devices now reach the app through the containerized gateway (see CLAUDE.md), so passing it exits
+    with an error rather than doing anything."""
     parser = argparse.ArgumentParser(
         prog="python server.py",
         description="The Ledger: a dashboard for your Claude Code sessions.",
@@ -391,7 +361,7 @@ def parse_settings(
     parser.add_argument(
         "--lan",
         action="store_true",
-        help=f"serve other devices on the network (binds {LAN_HOST}); they need the access token",
+        help="removed - start the containerized gateway instead (see CLAUDE.md's Setup & Run)",
     )
     parser.add_argument("--host", help=f"address to bind (default {DEFAULT_HOST}, env LEDGER_HOST)")
     parser.add_argument("--port", type=int, help=f"port to serve on (default {DEFAULT_PORT}, env LEDGER_PORT)")
@@ -402,7 +372,13 @@ def parse_settings(
     )
     args = parser.parse_args(argv)
 
-    host = args.host or (LAN_HOST if args.lan else None) or environ.get("LEDGER_HOST") or DEFAULT_HOST
+    if args.lan:
+        parser.error(
+            "--lan has been removed: other devices connect through the containerized gateway now "
+            "(see CLAUDE.md's Setup & Run), not a backend bind mode."
+        )
+
+    host = args.host or environ.get("LEDGER_HOST") or DEFAULT_HOST
     port = _parse_port(args.port, "LEDGER_PORT", environ, DEFAULT_PORT, parser)
     frontend_port = _parse_port(
         args.frontend_port, "LEDGER_FRONTEND_PORT", environ, DEFAULT_FRONTEND_PORT, parser
@@ -414,32 +390,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     global access_token
     settings = parse_settings(argv)
 
-    # A token exists whenever other devices can connect, or when the user set one
-    # (so a tunnel on this machine can be let in with it).
-    if settings.exposed or os.environ.get(TOKEN_ENV, "").strip():
-        access_token = provision_token()
+    # Provisioned unconditionally: the gateway (a separate process) is what decides whether
+    # anyone off this machine can ever present it, so the backend no longer gates this on
+    # its own bind address.
+    access_token = provision_token()
 
-    lan_addresses = qr = None
-    if settings.exposed:
-        lan_addresses = (
-            banner.discover_ipv4() if settings.host in _WILDCARD_BINDS else [settings.host]
-        )
-        if lan_addresses:
-            qr = banner.render_qr(
-                f"http://{lan_addresses[0]}:{settings.frontend_port}/?token={access_token}"
-            )
-    # The frontend's origins are always allowed (dev and a local `vite preview` both call
-    # this API cross-origin), plus one per LAN address once those are known.
-    configure_cors(cors_origins(settings.frontend_port, lan_addresses or []))
-    print(
-        banner.build_banner(
-            frontend_port=settings.frontend_port,
-            lan_addresses=lan_addresses,
-            token=access_token,
-            qr=qr,
-        ),
-        flush=True,
-    )
+    print(banner.build_banner(frontend_port=settings.frontend_port), flush=True)
 
     # No access log: it would write every ?token=... URL to the terminal. proxy_headers off:
     # the peer address must stay the real one, not whatever a header claims.

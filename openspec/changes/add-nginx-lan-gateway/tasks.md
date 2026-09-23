@@ -42,17 +42,17 @@
 
 ## 4. Backend: drop `--lan`, unconditional token, no CORS
 
-- [ ] 4.1 Remove the `--lan` option's bind-mode behavior from `parse_settings`/`main` in
+- [x] 4.1 Remove the `--lan` option's bind-mode behavior from `parse_settings`/`main` in
       `api/server.py`; keep `--lan` recognized by the argument parser but have it exit with an error
       pointing at the gateway instead of silently doing nothing. Verify: `python server.py --lan`
       prints that message and exits non-zero; `api/tests/test_cli.py` covers it.
-- [ ] 4.2 Make `provision_token()` run unconditionally on backend start (not gated by
+- [x] 4.2 Make `provision_token()` run unconditionally on backend start (not gated by
       `settings.exposed`). Verify: starting the backend with no flags and no `LEDGER_TOKEN` still
       creates `api/.ledger/token`; update `api/tests/test_cli.py`.
-- [ ] 4.3 Remove `cors_origins()`/`configure_cors()` and the `CORSMiddleware` registration from
+- [x] 4.3 Remove `cors_origins()`/`configure_cors()` and the `CORSMiddleware` registration from
       `api/server.py` (design.md Decision 6). Verify: `api/tests/test_server.py`'s CORS-allow-list
       tests are removed/updated to assert no CORS middleware is present; full `pytest` suite passes.
-- [ ] 4.4 Remove LAN-address discovery and the QR/token banner content from `api/banner.py`'s
+- [x] 4.4 Remove LAN-address discovery and the QR/token banner content from `api/banner.py`'s
       backend-startup path (keep `discover_ipv4()` itself — task 5 reuses it) and update
       `api/tests/test_banner.py` for the backend's now-simpler startup message (local frontend
       address only, no network section). Verify: `pytest api/tests/test_banner.py` passes.

@@ -32,21 +32,6 @@ def token(monkeypatch):
     return TOKEN
 
 
-FRONTEND_ORIGIN = "http://localhost:4173"
-
-
-@pytest.fixture
-def cors():
-    """The CORS middleware keeps the exact `_cors_origins` list reference (server.py's
-    `configure_cors` mutates it in place), so a test has to restore its contents too."""
-    original = list(server._cors_origins)
-    server.configure_cors([FRONTEND_ORIGIN, "http://127.0.0.1:4173"])
-    try:
-        yield FRONTEND_ORIGIN
-    finally:
-        server.configure_cors(original)
-
-
 def remote(**kwargs):
     """A phone on the LAN: a non-loopback client addressing the machine by its LAN IP."""
     kwargs.setdefault("base_url", "http://192.168.1.20:8501")
@@ -301,53 +286,35 @@ def test_loopback_host_names_are_accepted_with_or_without_a_port(host):
     assert local(host=host).get("/api/meta").status_code == 200
 
 
-# ------------------------------------------------ CORS allow-list
+# ------------------------------------------------ no CORS
 
 
 @pytest.mark.parametrize("path", ["/api/meta", "/api/nope", "/api/refresh"])
-def test_an_unrelated_origin_gets_no_cors_header_at_all(token, cors, path):
-    # A simple (non-preflight) request from an origin outside the allow-list gets no
-    # Access-Control-* header of any kind, whatever the request otherwise looks like.
+def test_no_response_ever_carries_a_cors_header(token, path):
+    # There is no CORSMiddleware: every legitimate caller (dev server, `vite preview`,
+    # the gateway) reaches the API through a same-origin proxy, so no origin - not even
+    # the frontend's own - is ever granted permission to read a response cross-origin.
     origin = {"Origin": "https://evil.example"}
+    frontend_origin = {"Origin": "http://localhost:4173"}
     responses = [
         local().get(path, headers=origin),
         local().post(path, headers={**origin, **HEADER}),
         remote().get(path, headers=origin),  # 401
         remote(headers=BEARER).get(path, headers=origin),
+        remote(headers=BEARER).get(path, headers=frontend_origin),
         local(host="evil.example").get(path, headers=origin),  # 403
     ]
     for response in responses:
         assert not [h for h in response.headers if h.lower().startswith("access-control-")], response
 
 
-def test_a_preflight_from_an_unrelated_origin_is_never_approved(cors):
+def test_a_preflight_request_gets_no_cors_treatment():
     response = local().options(
         "/api/sessions/aaa-1",
         headers={
-            "Origin": "https://evil.example",
-            "Access-Control-Request-Method": "DELETE",
-            "Access-Control-Request-Headers": "x-requested-with",
-        },
-    )
-    assert "access-control-allow-origin" not in response.headers
-
-
-def test_the_frontends_own_origin_gets_a_matching_cors_header_and_no_credentials_flag(token, cors):
-    response = remote(headers=BEARER).get("/api/meta", headers={"Origin": FRONTEND_ORIGIN})
-    assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == FRONTEND_ORIGIN
-    assert "access-control-allow-credentials" not in response.headers
-
-
-def test_a_preflight_from_the_frontends_origin_is_approved(cors):
-    response = local().options(
-        "/api/sessions/aaa-1",
-        headers={
-            "Origin": FRONTEND_ORIGIN,
+            "Origin": "http://localhost:4173",
             "Access-Control-Request-Method": "DELETE",
             "Access-Control-Request-Headers": "authorization,x-requested-with",
         },
     )
-    assert response.headers["access-control-allow-origin"] == FRONTEND_ORIGIN
-    assert "DELETE" in response.headers["access-control-allow-methods"]
-    assert "access-control-allow-credentials" not in response.headers
+    assert "access-control-allow-origin" not in response.headers
