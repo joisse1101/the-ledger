@@ -146,10 +146,10 @@ cd gateway
 docker compose up -d --build
 ```
 
-It listens on port 10080 by default (override with `$env:GATEWAY_PORT` before running the
+It listens on port 8080 by default (override with `$env:GATEWAY_PORT` before running the
 command above) and proxies `/api/*` to the local API and everything else to the local
 frontend via Docker Desktop's `host.docker.internal`. From another device, open
-`http://<this machine's LAN address>:10080/?token=<token>` (the token is the contents of
+`http://<this machine's LAN address>:8080/?token=<token>` (the token is the contents of
 `api/.ledger/token`) to sign in — same mechanism as today's `--lan` link. `--lan` above
 still works for now; it'll be removed once the gateway fully replaces it (see
 `openspec/changes/add-nginx-lan-gateway/`).

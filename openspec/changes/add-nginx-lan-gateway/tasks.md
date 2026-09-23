@@ -100,9 +100,9 @@
 
 ## 7. End-to-end verification
 
-- [ ] 7.1 With the backend and frontend running locally (no `--lan`) and the gateway container up,
+- [x] 7.1 With the backend and frontend running locally (no `--lan`) and the gateway container up,
       open the printed gateway link on an actual phone on the same LAN. Verify: the dashboard loads
       and shows live data.
-- [ ] 7.2 Confirm direct local access still works unchanged: `localhost:4173` in a desktop browser
+- [x] 7.2 Confirm direct local access still works unchanged: `localhost:4173` in a desktop browser
       loads and functions with no token needed. Verify: manual check, Sessions/Overview/Projects
       pages all load data.

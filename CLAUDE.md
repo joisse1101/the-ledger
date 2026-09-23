@@ -77,9 +77,9 @@ cd gateway
 .\Start-Gateway.ps1
 ```
 
-This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `10080`) and
+This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `8080`) and
 then prints the sign-in link/QR for every address this machine is reachable at — e.g.
-`http://<address>:10080/?token=<token>` — via `api/gateway_signin.py`. Opening that link on another
+`http://<address>:8080/?token=<token>` — via `api/gateway_signin.py`. Opening that link on another
 device signs it in (the token is stored in that browser's `localStorage` and stripped from the
 address bar) and every subsequent request from it carries `Authorization: Bearer <token>`. A local
 request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other request
@@ -89,6 +89,13 @@ the connection is plain HTTP, so the token and your session data aren't encrypte
 Windows will prompt to allow Docker/the gateway through the firewall the first time — allow it on
 Private networks. Stop it with `.\Stop-Gateway.ps1`; it doesn't touch the backend/frontend
 processes.
+
+**`GATEWAY_PORT` must not be one of Chromium's restricted ports** (e.g. `10080`, which was this
+project's own original default and broke exactly this way) — Chrome, and every Chromium-based
+mobile browser, silently refuses to even attempt a connection to those ports (`ERR_UNSAFE_PORT`),
+with nothing to see server-side: `curl`/`Test-NetConnection` and the like still succeed, only actual
+browsers fail, which makes this easy to misdiagnose as a firewall or Docker networking problem. Pick
+an ordinary high port instead (`8080`, or anything else not on Chromium's list).
 
 To rotate the access token (e.g. after sharing it), delete `api/.ledger/token` and restart the
 backend; a fresh one is generated on next start (token provisioning is unconditional now, not tied
@@ -107,7 +114,11 @@ proxies `/api/*` and `/` to inside the container. The backend and frontend thems
 separate local processes that don't read this file: if you change `BACKEND_PORT`/`FRONTEND_PORT`
 away from the defaults (8501/4173), also pass `python server.py --port <BACKEND_PORT>` and
 `npm run preview -- --port <FRONTEND_PORT>` so they actually run on the ports the gateway expects,
-or the gateway will fail to reach them.
+or the gateway will fail to reach them. A custom `BACKEND_PORT` also needs to be set in the
+frontend process's own environment (e.g. `BACKEND_PORT=<port> npm run preview -- --port
+<FRONTEND_PORT>`) — `web/vite.config.ts`'s own `/api` proxy (used for direct, non-gateway access)
+reads it from `process.env.BACKEND_PORT` (default `8501`), separately from the port the gateway's
+Nginx is told to target.
 
 Dark/light theme is chosen per device, not shared server-side: each browser picks up
 `prefers-color-scheme` until it toggles the switch itself, then remembers that choice in its own
@@ -427,7 +438,7 @@ mechanism for a container to reach a host process bound to loopback only (Window
 why the gateway needs Docker Desktop specifically). Both locations forward
 `X-Real-IP`/`X-Forwarded-For`/`Host`, so `api/security.py`'s existing "relayed by a proxy = treat as
 remote" rule gates gateway traffic exactly like it always gated the old `--lan` mode — the gateway
-adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-10080}`
+adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-8080}`
 and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment variables (defaults
 8501/4173). `Start-Gateway.ps1` loads the root `.env` (see "Setup & Run" above), runs
 `docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
