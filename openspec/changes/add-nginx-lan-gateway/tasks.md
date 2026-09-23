@@ -59,13 +59,13 @@
 
 ## 5. Gateway-side sign-in banner
 
-- [ ] 5.1 Add a small helper (script or backend CLI subcommand — pick whichever keeps
+- [x] 5.1 Add a small helper (script or backend CLI subcommand — pick whichever keeps
       `banner.discover_ipv4()` as the single source of address-discovery logic per design.md
       Decision 5) that reads `api/.ledger/token` and prints
       `http://<address>:<gateway-port>/?token=<token>` plus a QR code for each discovered LAN
       address, invoked when the gateway starts. Verify: running it with the token file present
       prints a correct, working sign-in link (manually opening it signs a browser in).
-- [ ] 5.2 Wire the helper into the gateway's startup (e.g. a `docker compose up` wrapper or a
+- [x] 5.2 Wire the helper into the gateway's startup (e.g. a `docker compose up` wrapper or a
       documented manual step). Verify: starting the gateway per the documented command shows the
       banner.
 
