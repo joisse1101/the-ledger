@@ -7,11 +7,11 @@ Shows how much a running Claude Code session is sending to Claude, in absolute t
 ## Requirements
 
 ### Requirement: Live table shows each session's current context size
-The Live sessions table SHALL include a Context column that shows, for each live session, the size of that session's context in tokens. Sizes SHALL be humanised: an exact number below 1,000, the nearest thousand with a `k` suffix from 1,000 up to but below 1,000,000, and one decimal with an `M` suffix at 1,000,000 and above.
+The Live sessions list SHALL include, for each live session, a Context cell showing the size of that session's context in tokens. In the table layout the Context cell is a column; in the card layout used on narrow screens it is a labelled field on the session's card. Sizes SHALL be humanised: an exact number below 1,000, the nearest thousand with a `k` suffix from 1,000 up to but below 1,000,000, and one decimal with an `M` suffix at 1,000,000 and above.
 
 #### Scenario: Session with responses shows its context size
 - **WHEN** a live session has completed at least one response from Claude
-- **THEN** its row's Context cell shows the session's current context size, for example `394k`
+- **THEN** its row's or card's Context cell shows the session's current context size, for example `394k`
 
 #### Scenario: Size is humanised
 - **WHEN** a session's context size is 742, 80,618, or 1,234,567 tokens
@@ -52,10 +52,10 @@ When a session has at least two responses, its Context cell SHALL also show the 
 - **THEN** the Context cell shows only the size, with no growth figure or sparkline
 
 ### Requirement: Only absolute token counts are shown
-The Context column and the detail view SHALL express usage only as token counts. They SHALL NOT display a percentage of a context window, a context-window size, or a compaction threshold.
+The Context cell and the detail view SHALL express usage only as token counts. They SHALL NOT display a percentage of a context window, a context-window size, or a compaction threshold.
 
 #### Scenario: No percentage or limit
-- **WHEN** the Context column or the detail view is displayed for any session
+- **WHEN** the Context cell or the detail view is displayed for any session
 - **THEN** no value is presented as a percentage of a limit, and no limit or threshold is shown
 
 ### Requirement: Context stays current with the Live table
@@ -81,10 +81,10 @@ When a session's context size can't be determined (its conversation record is mi
 - **THEN** its Context cell shows `--` and all other rows still show their own context sizes
 
 ### Requirement: Detail view shows per-response token and cache history
-Selecting a live session's row SHALL open a detail view showing, for each of the session's responses in order, the tokens newly sent, the cached tokens read, the cached tokens written, and the output tokens. A response other than the first that wrote more cached tokens than it read SHALL be marked as a cache miss. Each compaction of the conversation SHALL be marked at its position in the history.
+Selecting a live session's row or card SHALL open a detail view showing, for each of the session's responses in order, the tokens newly sent, the cached tokens read, the cached tokens written, and the output tokens. A response other than the first that wrote more cached tokens than it read SHALL be marked as a cache miss. Each compaction of the conversation SHALL be marked at its position in the history.
 
 #### Scenario: Per-response history is listed
-- **WHEN** the user selects a live session's row
+- **WHEN** the user selects a live session's row or card
 - **THEN** the detail view shows new, cache-read, cache-written, and output token counts for each response in order
 
 #### Scenario: Cache miss is marked
