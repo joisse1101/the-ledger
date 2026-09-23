@@ -29,15 +29,15 @@
 
 ## 3. Frontend: always call relative `/api` paths
 
-- [ ] 3.1 Add a `preview.proxy` entry for `/api` to `web/vite.config.ts`, mirroring the existing
+- [x] 3.1 Add a `preview.proxy` entry for `/api` to `web/vite.config.ts`, mirroring the existing
       `server.proxy` entry. Verify: `npm run build && npm run preview`, then a browser at
       `localhost:4173` successfully loads data (the Sessions page shows the Live/All lists).
-- [ ] 3.2 Simplify `apiOrigin()` in `web/src/api/client.ts` to always return `""`; remove the
+- [x] 3.2 Simplify `apiOrigin()` in `web/src/api/client.ts` to always return `""`; remove the
       `VITE_API_PORT`/`DEFAULT_API_PORT` branch. Update `web/src/api/client.test.ts` accordingly.
       Verify: `npm test` passes.
-- [ ] 3.3 Remove `VITE_API_PORT` from any remaining references (env examples, comments in
+- [x] 3.3 Remove `VITE_API_PORT` from any remaining references (env examples, comments in
       `client.ts`'s docstring). Verify: `grep -r VITE_API_PORT web/` returns nothing.
-- [ ] 3.4 Run the full frontend test suite and type check. Verify: `npm test` and `npm run build`
+- [x] 3.4 Run the full frontend test suite and type check. Verify: `npm test` and `npm run build`
       both succeed.
 
 ## 4. Backend: drop `--lan`, unconditional token, no CORS
