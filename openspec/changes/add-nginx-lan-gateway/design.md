@@ -93,6 +93,24 @@ protective as today's allow-list approach, and removes `cors_origins()`/`configu
 requirement is still satisfied — by there being no allowed origin at all, rather than by an
 allow-list scoped to the frontend's own origin.
 
+**7. Nginx's upstream targets (backend/frontend ports), not just the gateway's own listen port, are
+configurable, via the nginx:alpine image's built-in `envsubst`-on-templates entrypoint feature
+(`gateway/nginx.conf.template` → `BACKEND_PORT`/`FRONTEND_PORT`, restricted substitution so nginx's
+own `$host`/`$remote_addr`/etc. variables are left alone) plus a root `.env`/`.env.example` listing
+all three ports (`BACKEND_PORT`, `FRONTEND_PORT`, `GATEWAY_PORT`) for one place to see them at a
+glance. Added after task 2.3 shipped assuming the backend/frontend stay at their documented defaults
+(8501/4173) — surfaced once that assumption broke a real run with non-default ports.
+`Start-Gateway.ps1`'s precedence per port (highest wins): an explicit `-GatewayPort`/`-BackendPort`/
+`-FrontendPort`, then the root `.env`, then an already-set environment variable, then the hardcoded
+default — the `.env` file outranks a stray already-set environment variable deliberately, since it's
+meant to be the one authoritative place to look/set these regardless of whatever a shell happens to
+still have set from earlier experimentation (an earlier version got this backwards, letting a
+leftover shell env var silently beat `.env`; caught when a real run kept publishing the container on
+an old port despite `.env` saying otherwise). The backend and frontend remain separate local
+processes that don't read this file themselves — CLAUDE.md must say so, so changing a port in `.env`
+without also passing `--port` (backend) or `--port` (vite) to the respective process is a documented
+gotcha, not a silent inconsistency.
+
 ## Risks / Trade-offs
 
 - [Risk] `host.docker.internal` might not reach a `127.0.0.1`-only bind on some Docker Desktop

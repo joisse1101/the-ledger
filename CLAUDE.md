@@ -10,11 +10,13 @@ built so a phone or other device on the same network can read it too, behind a s
 The backend and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 "Setup & Run" below).
 
-The repo has exactly three top-level folders, one per service, each self-contained: `api/` (the
+The repo has exactly four top-level folders, one per service, each self-contained: `api/` (the
 backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
-gitignored `.venv`/`.ledger`), `web/` (the frontend), and `hooks/` (Claude Code toast hooks). The
-root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`, `.gitignore`, `openspec/`,
-`.claude/`) — nothing that runs.
+gitignored `.venv`/`.ledger`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
+proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
+template, and compose file; see "From another device on your network" below), and `hooks/` (Claude
+Code toast hooks). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+`.gitignore`, `.env.example`, `openspec/`, `.claude/`) — nothing that runs on its own.
 
 The agreed requirements for each shipped capability live in `openspec/specs/` (see "`openspec/`"
 below) — check there for what a feature is required to do (e.g. `network-access` for the
@@ -62,38 +64,50 @@ npm run preview
 Open the frontend's URL (http://localhost:4173 by default), not the API's — the API has no page to
 show you.
 
-**From another device on your network** (phone, tablet, another computer): pass `--lan` to the API
-and `-- --host` to the frontend's preview command — both must be running:
+**From another device on your network** (phone, tablet, another computer): the backend and frontend
+above never bind beyond loopback, no matter what — the only thing that ever grants LAN access is a
+containerized Nginx gateway, started as its own third piece alongside the two processes above.
+Requires Docker Desktop (Windows/Mac; this relies on `host.docker.internal` reaching a
+loopback-only bind, a Docker Desktop behavior — see
+`openspec/changes/add-nginx-lan-gateway/design.md`). With the backend and frontend already
+running:
 
 ```powershell
-cd api
-python server.py --lan
+cd gateway
+.\Start-Gateway.ps1
 ```
 
-```powershell
-cd web
-npm run preview -- --host
-```
+This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `10080`) and
+then prints the sign-in link/QR for every address this machine is reachable at — e.g.
+`http://<address>:10080/?token=<token>` — via `api/gateway_signin.py`. Opening that link on another
+device signs it in (the token is stored in that browser's `localStorage` and stripped from the
+address bar) and every subsequent request from it carries `Authorization: Bearer <token>`. A local
+request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other request
+needs it, checked by `api/security.py`'s `SecurityMiddleware` (see "Architecture" below) exactly as
+before — the gateway adds no auth of its own, it only relays. Only do this on a network you trust:
+the connection is plain HTTP, so the token and your session data aren't encrypted in transit.
+Windows will prompt to allow Docker/the gateway through the firewall the first time — allow it on
+Private networks. Stop it with `.\Stop-Gateway.ps1`; it doesn't touch the backend/frontend
+processes.
 
-`--lan` binds the API to every network interface instead of just this machine; it then prints the
-frontend's URL for each discovered address, a QR code, and a one-time access token — opening that
-link signs the device in (the token is stored in that browser's `localStorage` and stripped from
-the address bar) and every subsequent API request from it carries `Authorization: Bearer <token>`.
-A local request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other
-request needs it, checked by `api/security.py`'s `SecurityMiddleware` (see "Architecture" below).
-Only do this on a network you trust: the connection is plain HTTP, so the token and your session
-data aren't encrypted in transit. Windows will prompt to allow Python through the firewall the
-first time — allow it on Private networks — and the same device also needs to reach the frontend's
-port, not just the API's.
+To rotate the access token (e.g. after sharing it), delete `api/.ledger/token` and restart the
+backend; a fresh one is generated on next start (token provisioning is unconditional now, not tied
+to any LAN flag). Setting `LEDGER_TOKEN` in the environment overrides the stored file entirely.
 
-To rotate the access token (e.g. after sharing it), delete `api/.ledger/token` and restart the API; a
-fresh one is generated on the next `--lan` run. Setting `LEDGER_TOKEN` in the environment overrides
-the stored file entirely.
+The backend's `--host`/`--port`/`--frontend-port` (or `LEDGER_HOST`/`LEDGER_PORT`/
+`LEDGER_FRONTEND_PORT` env vars) still override its own bind address/port and the port it prints a
+frontend link for — `--frontend-port` is cosmetic only now (CORS is gone entirely, since the
+frontend never calls the backend cross-origin any more). Passing `--lan` is a removed no-op: it
+exits with an error pointing at the gateway instead.
 
-`--host`/`--port`/`--frontend-port` (or the `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT` env
-vars) override the API's bind address/port and the port it expects the frontend on — keep
-`--frontend-port` in sync with whatever port you actually run `npm run preview` on, since it's also
-what the API's CORS allow-list is built from (see "Architecture" below).
+**One place to see every port at a glance**: copy root `.env.example` to `.env` (gitignored) and
+edit `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` there. `Start-Gateway.ps1`/
+`gateway/docker-compose.yml` read it directly — it's the source of truth for what port Nginx
+proxies `/api/*` and `/` to inside the container. The backend and frontend themselves are still
+separate local processes that don't read this file: if you change `BACKEND_PORT`/`FRONTEND_PORT`
+away from the defaults (8501/4173), also pass `python server.py --port <BACKEND_PORT>` and
+`npm run preview -- --port <FRONTEND_PORT>` so they actually run on the ports the gateway expects,
+or the gateway will fail to reach them.
 
 Dark/light theme is chosen per device, not shared server-side: each browser picks up
 `prefers-color-scheme` until it toggles the switch itself, then remembers that choice in its own
@@ -116,10 +130,12 @@ Python tests, one file per module under test:
   `test_claude_sessions.py`, `test_claude_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
   monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
-- API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring, CORS allow-list), 
-  `test_security.py` (the auth middleware — local vs. remote, bearer-token matching, CSRF header,
-  Host rebinding-guard), `test_banner.py` (address discovery, QR rendering, banner text), `test_cli.py`
-  (`parse_settings`/`main` — host/port/frontend-port precedence, token provisioning on launch),
+- API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring, asserts no
+  `CORSMiddleware` is registered), `test_security.py` (the auth middleware — local vs. remote,
+  bearer-token matching, CSRF header, Host rebinding-guard), `test_banner.py` (address discovery,
+  QR rendering, the backend's now-simpler local-only startup banner), `test_cli.py`
+  (`parse_settings`/`main` — host/port/frontend-port precedence, token provisioning on launch,
+  `--lan` rejected with a message pointing at the gateway),
   `test_live_snapshot.py` (`LiveSnapshot`'s TTL coalescing and per-session failure isolation),
   `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
   behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
@@ -135,7 +151,8 @@ npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
 There is no browser-automation/E2E harness for the React app; responsive layout across breakpoints
-is verified manually (resizing a real browser, and a real phone over `--lan`).
+is verified manually (resizing a real browser, and a real phone through the gateway — see "From
+another device on your network" above).
 
 ## Architecture
 
@@ -213,9 +230,12 @@ testable and readable independent of the web framework wrapping it.
 
 ### `api/` — the FastAPI backend
 
-`api/server.py` is both the ASGI app and the CLI (`python server.py [--lan] [--host] [--port]
+`api/server.py` is both the ASGI app and the CLI (`python server.py [--host] [--port]
 [--frontend-port]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
-`127.0.0.1` port `8501`, `--lan` binds `0.0.0.0`). Every module it imports lives
+`127.0.0.1` port `8501`). It always binds loopback only now — `--frontend-port` only controls the
+printed frontend link, and `--lan` is still recognized by the parser but exits with an error
+pointing at the gateway (`gateway/`) instead of binding `0.0.0.0`; the gateway container is the only
+thing that ever grants LAN access (see CLAUDE.md's "Setup & Run" above). Every module it imports lives
 alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
 the import setup it needs. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
@@ -236,13 +256,12 @@ frontend is a wholly separate process (see `web/` below). Routes:
 | `GET /api/overview?range=` | 422 for an unknown range label; otherwise `overview_stats.overview()`'s payload |
 
 There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
-`GZipMiddleware`, `SecurityMiddleware`
-(added first so it's outermost — nothing else runs for a refused request), and `CORSMiddleware`
-(added last, so it's innermost — it answers a CORS preflight itself before the token/CSRF checks
-above ever see it, but a real cross-origin request still has to pass them) wrap every route.
-`cors_origins()`/`configure_cors()` build the exact allow-list from `--frontend-port` plus any LAN
-addresses discovered under `--lan` — never a wildcard, and never a credentialed response
-(`allow_credentials=False`), since auth is a bearer header, not a cookie.
+`GZipMiddleware` and `SecurityMiddleware` (added first so it's outermost — nothing else runs for a
+refused request) wrap every route. There is no `CORSMiddleware` at all: the frontend only ever
+calls relative `/api/...` paths (`vite dev`'s proxy, `vite preview`'s proxy, or the gateway's proxy),
+so no browser page is ever served from a different origin than the one it calls, and the backend
+never receives a legitimate cross-origin request to allow (`test_server.py` asserts no
+`CORSMiddleware` is registered).
 
 - `api/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
   A request is **local** only when `request.client.host` is loopback (`127.0.0.1`/`::1`/
@@ -254,19 +273,21 @@ addresses discovered under `--lan` — never a wildcard, and never a credentiale
   with a message pointing back at the printed sign-in link — there is no `?token=` query handling or
   cookie on the API side at all; turning a printed link's `?token=` into that header is entirely the
   frontend's job (see `web/src/api/token.ts` below). Every non-GET request additionally needs an
-  `X-Requested-With: ledger` header — a page on another site can't add a custom header without
-  triggering a CORS preflight, which `server.py`'s `CORSMiddleware` only ever grants to the frontend's
-  own origin(s), so that header is what stops a blind cross-site `POST`/`DELETE` even from a page that
-  is otherwise allowed to read the API. `provision_token()` is `LEDGER_TOKEN` if set, else the token
-  stored at `api/.ledger/token` (created with `secrets.token_urlsafe(32)` on first `--lan` run, mode
-  `0o600`) — delete that file and restart to rotate it.
+  `X-Requested-With: ledger` header, which a page on another origin can't add without a CORS
+  preflight — with no `CORSMiddleware` at all now, that preflight always fails, so that header is
+  what stops a blind cross-site `POST`/`DELETE` even from a page that could otherwise read the API.
+  `provision_token()` runs unconditionally on every backend start now (no longer gated by a LAN
+  flag) — it's `LEDGER_TOKEN` if set, else the token stored at `api/.ledger/token` (created with
+  `secrets.token_urlsafe(32)` on first start, mode `0o600`) — delete that file and restart to rotate it.
 - `api/banner.py` — what the server prints at startup: always a reminder that the frontend is a
-  separate process and how to start it (`cd web && npm run preview [-- --host]`), plus its local URL.
-  With `--lan`, `discover_ipv4()` (a UDP-connect trick to find the outbound interface, plus hostname
-  resolution, filtered by `usable_ipv4` to drop loopback/link-local/unspecified addresses) drives one
-  `http://<ip>:<frontend-port>/?token=<token>` line per address plus an ASCII QR (`render_qr`, via
-  `qrcode`; `None` if the package or the terminal's encoding can't render it) for the first address,
-  and a plain-HTTP/trusted-networks/firewall warning.
+  separate process and how to start it (`cd web && npm run preview`), plus its local URL — the
+  backend has no LAN-facing state to report any more, so that's the whole banner (`build_banner()`).
+  Its `discover_ipv4()` (a UDP-connect trick to find the outbound interface, plus hostname
+  resolution, filtered by `usable_ipv4` to drop loopback/link-local/unspecified addresses) and
+  `render_qr()` (ASCII QR via `qrcode`; `None` if the package or the terminal's encoding can't render
+  it) are still here and still exercised by `test_banner.py`, but are no longer called from the
+  backend's own startup path — `api/gateway_signin.py` reuses them instead (see `gateway/` below) to
+  build the gateway's own sign-in banner/QR from the gateway side, once the gateway container starts.
 - `api/live_snapshot.py` — `LiveSnapshot`, a lock-guarded, TTL-coalesced (`LIVE_TTL_SECONDS = 1.0`)
   wrapper around `claude_sessions.load_sessions()` + `claude_context.live_context()` per session, so
   N browsers/phones polling `/api/live` every ~2s cost about one recompute per second rather than N —
@@ -294,8 +315,10 @@ addresses discovered under `--lan` — never a wildcard, and never a credentiale
 
 Vite + React + TypeScript + React Router + TanStack Query; plain hand-written CSS (no component
 library) in `styles/` (`app.css`, `overview.css`, `sessions.css`), inline SVG icons in
-`components/icons.tsx`. `npm run dev` proxies `/api` to `http://127.0.0.1:8501` (`vite.config.ts`) so the dev
-server and the built app are both effectively same-origin. `web/src/main.tsx` wires up
+`components/icons.tsx`. Both `npm run dev` and `npm run preview` proxy `/api` to
+`http://127.0.0.1:8501` (`vite.config.ts`'s `server.proxy`/`preview.proxy`, kept in sync), so the
+page is always same-origin with the API whether run directly or through the gateway — the frontend
+never needs a different-origin API client. `web/src/main.tsx` wires up
 `QueryClientProvider`/`BrowserRouter`; `App.tsx` is the route table (`/` → Sessions, `/overview`,
 `/projects`, everything else redirects to `/`, since `vite preview`'s SPA fallback serves `index.html` for
 any unknown path) rendered inside `AppShell`.
@@ -389,6 +412,29 @@ any unknown path) rendered inside `AppShell`.
   the Python formatter directly; these are for the raw numbers the API sends elsewhere — the All
   list's Context column, the detail view's "Current context" figure).
 
+### `gateway/` — the containerized Nginx reverse proxy
+
+The only thing that ever grants LAN access (see CLAUDE.md's "Setup & Run" above); the backend and
+frontend stay loopback-only always. `Dockerfile` builds `nginx:alpine` with `nginx.conf.template`
+copied to `/etc/nginx/templates/default.conf.template` — the base image's entrypoint runs `envsubst`
+on it at container start, substituting `${BACKEND_PORT}`/`${FRONTEND_PORT}` (left in the template as
+literal `$host`/`$remote_addr`/`$proxy_add_x_forwarded_for` for Nginx itself, since `envsubst` only
+touches names that are actually set environment variables) into
+`/etc/nginx/conf.d/default.conf`. `location /api/` proxies to
+`http://host.docker.internal:${BACKEND_PORT}`; `location /` proxies to
+`http://host.docker.internal:${FRONTEND_PORT}` — `host.docker.internal` is Docker Desktop's
+mechanism for a container to reach a host process bound to loopback only (Windows/Mac only; this is
+why the gateway needs Docker Desktop specifically). Both locations forward
+`X-Real-IP`/`X-Forwarded-For`/`Host`, so `api/security.py`'s existing "relayed by a proxy = treat as
+remote" rule gates gateway traffic exactly like it always gated the old `--lan` mode — the gateway
+adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-10080}`
+and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment variables (defaults
+8501/4173). `Start-Gateway.ps1` loads the root `.env` (see "Setup & Run" above), runs
+`docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
+`Stop-Gateway.ps1` runs `docker compose down` and touches nothing else. `api/gateway_signin.py`
+reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
+`banner.render_qr()` (not its own copy) so address-discovery logic still lives in exactly one place.
+
 ### `hooks/`
 
 A standalone utility, unrelated to the dashboard: Windows toast notifications for Claude
@@ -409,7 +455,10 @@ of what a capability is required to do, ahead of inferring intent from the code 
 
 - `api/.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see "Data layer" above)
   and the LAN access token (`token`, see `api/security.py` above); both are recreated as needed and
-  never committed. `.gitignore` also excludes `web/node_modules/` and `web/dist/`.
+  never committed. `.gitignore` also excludes `web/node_modules/`, `web/dist/`, and root `.env`.
+- Root `.env.example` (committed) documents `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` in one
+  place — copy it to `.env` (gitignored) to override any of them; see "Setup & Run" above for how
+  each one is actually consumed.
 - `api/requirements.txt`: `fastapi`, `uvicorn`, `qrcode` — unpinned. `requirements-dev.txt` adds
   `pytest`, `httpx` (for FastAPI's `TestClient`).
 - `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom`, `vega-embed`

@@ -26,6 +26,21 @@
       with the correct `Authorization: Bearer <token>` header, exercising the existing
       `SecurityMiddleware` unchanged. Verify: two `curl` calls through the gateway (with and
       without the header) return 401 then 200 for a data endpoint like `/api/meta`.
+- [x] 2.5 Make Nginx's upstream targets configurable too (design.md Decision 7): convert
+      `nginx.conf` into `gateway/nginx.conf.template` using `${BACKEND_PORT}`/`${FRONTEND_PORT}`,
+      relying on the nginx:alpine image's built-in envsubst-on-templates entrypoint (Dockerfile
+      copies it to `/etc/nginx/templates/default.conf.template`, drops the old static
+      `nginx.conf`); add `BACKEND_PORT`/`FRONTEND_PORT` to `gateway/docker-compose.yml`'s
+      `environment:`. Add a root `.env.example` (and gitignored `.env`) listing
+      `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT`; `Start-Gateway.ps1` loads it (lowest
+      precedence) and gains `-BackendPort`/`-FrontendPort` params alongside `-GatewayPort`. Verify:
+      built the image, confirmed the rendered `/etc/nginx/conf.d/default.conf` inside a running
+      container reflects custom `BACKEND_PORT`/`FRONTEND_PORT` values and leaves nginx's own
+      `$host`/`$remote_addr`/`$proxy_add_x_forwarded_for` untouched; ran the real backend on a
+      non-default port (10082) alongside a stand-in "frontend" on 10081, started the gateway via
+      `docker compose up` with `GATEWAY_PORT=10080 BACKEND_PORT=10082 FRONTEND_PORT=10081`, and
+      confirmed `curl http://localhost:10080/api/meta` reaches the backend (401 then 200 with the
+      token) and `curl http://localhost:10080/` reaches the frontend stand-in.
 
 ## 3. Frontend: always call relative `/api` paths
 
@@ -71,10 +86,15 @@
 
 ## 6. Documentation
 
-- [ ] 6.1 Rewrite CLAUDE.md's "Setup & Run" `--lan` section to describe starting the gateway
-      instead, including the new `gateway/` folder and its port. Verify: a fresh read-through
-      matches the actual commands from tasks 2-5.
-- [ ] 6.2 Update CLAUDE.md's repo-layout paragraph from "exactly three top-level folders" to four,
+- [x] 6.1 Rewrite CLAUDE.md's "Setup & Run" `--lan` section to describe starting the gateway
+      instead, including the new `gateway/` folder and its port, and the root `.env`/`.env.example`
+      (task 2.5) as the one place to see `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` at a glance —
+      noting it only drives the gateway directly, so the backend/frontend still need `--port`
+      passed to match. Verify: a fresh read-through matches the actual commands from tasks 2-5. Also
+      fixed the Architecture section's `api/server.py`/`api/banner.py`/`api/security.py` writeups
+      (still describing the removed `--lan`/CORS mechanics) and added a `### gateway/` section, since
+      leaving them describing removed behavior would make CLAUDE.md actively wrong.
+- [x] 6.2 Update CLAUDE.md's repo-layout paragraph from "exactly three top-level folders" to four,
       describing `gateway/`'s contents alongside `api/`, `web/`, `hooks/`. Verify: matches what
       task 2.1 actually created.
 
