@@ -68,8 +68,7 @@ export interface ProjectDonutChartProps {
   projectOrder: string[];
 }
 
-/** Session counts by project as a donut, ported from views/overview.py's
- *  _render_project_sessions_chart. A fixed pixel size (rather than "container" width) because
+/** Session counts by project as a donut. A fixed pixel size (rather than "container" width) because
  *  an arc mark's radius doesn't itself track a fluid width; the color key is a plain HTML list
  *  underneath (ProjectLegend) rather than a Vega-Lite legend, so long project names wrap instead
  *  of being clipped to a couple of characters in a cramped multi-column legend grid. */

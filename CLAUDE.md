@@ -6,9 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A dashboard for viewing your local Claude Code sessions and projects: Overview, Sessions (Live +
 All), Projects. It's an API-only FastAPI backend (`api/`) plus one React + Vite frontend (`web/`),
-built so a phone or other device on the same network can read it too, behind a shared access token
-— something the project's original Streamlit UI (now retired) had no safe way to do. The backend
-and frontend run as two separate processes/ports; the API never serves any HTML itself (see
+built so a phone or other device on the same network can read it too, behind a shared access token.
+The backend and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 "Setup & Run" below).
 
 The repo has exactly three top-level folders, one per service, each self-contained: `api/` (the
@@ -17,12 +16,9 @@ gitignored `.venv`/`.ledger`), `web/` (the frontend), and `hooks/` (Claude Code 
 root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`, `.gitignore`, `openspec/`,
 `.claude/`) — nothing that runs.
 
-This started as a migration from a Streamlit app to this React+FastAPI stack; that migration is
-now complete and Streamlit has been fully removed. Its rationale, decisions, and the cutover
-checklist are recorded in `openspec/changes/migrate-to-react-lan-access/` (`proposal.md` for
-why/what, `design.md` for the decisions, `tasks.md` for the checklist) — worth checking for the
-*why* behind a design choice (e.g. why auth is bearer-token-only, why the API and frontend are
-separate origins) ahead of inferring it from the code alone.
+The agreed requirements for each shipped capability live in `openspec/specs/` (see "`openspec/`"
+below) — check there for what a feature is required to do (e.g. `network-access` for the
+bearer-token auth and separate-origin rules) ahead of inferring it from the code alone.
 
 The API and frontend both read the same on-disk Claude Code data (`~/.claude.json` and
 `~/.claude/projects/*/*.jsonl`) via a SQLite snapshot at `api/.ledger/ledger.db` (gitignored, rebuilt
@@ -132,14 +128,14 @@ Python tests, one file per module under test:
 Frontend (`cd web`):
 
 ```powershell
-npm test          # Vitest: client.test.ts, queries.test.tsx, useDebouncedValue/useViewportClass
-                   # tests, format.test.ts, tokens.test.ts (jsdom, see web/src/test-setup.ts)
+npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
+                   # list/ResponsiveList, hooks/useDebouncedValue, hooks/useViewportClass,
+                   # lib/format, lib/tokens
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
 There is no browser-automation/E2E harness for the React app; responsive layout across breakpoints
-was verified manually (resizing a real browser, and a real phone over `--lan`) per
-`openspec/changes/migrate-to-react-lan-access/tasks.md`'s groups 9–10.
+is verified manually (resizing a real browser, and a real phone over `--lan`).
 
 ## Architecture
 
@@ -239,8 +235,8 @@ frontend is a wholly separate process (see `web/` below). Routes:
 | `DELETE /api/projects?path=` | 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
 | `GET /api/overview?range=` | 422 for an unknown range label; otherwise `overview_stats.overview()`'s payload |
 
-It serves `/api/*` only — no static files, no SPA fallback; that all lives in `web/` now, served by
-Vite's own `vite preview` (see below and design.md Decision 2/9). `GZipMiddleware`, `SecurityMiddleware`
+There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
+`GZipMiddleware`, `SecurityMiddleware`
 (added first so it's outermost — nothing else runs for a refused request), and `CORSMiddleware`
 (added last, so it's innermost — it answers a CORS preflight itself before the token/CSRF checks
 above ever see it, but a real cross-origin request still has to pass them) wrap every route.
@@ -248,7 +244,7 @@ above ever see it, but a real cross-origin request still has to pass them) wrap 
 addresses discovered under `--lan` — never a wildcard, and never a credentialed response
 (`allow_credentials=False`), since auth is a bearer header, not a cookie.
 
-- `api/security.py` — one ASGI middleware gating every request (see also `design.md`'s "Auth" decision).
+- `api/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
   A request is **local** only when `request.client.host` is loopback (`127.0.0.1`/`::1`/
   `::ffff:127.0.0.1`) *and* carries none of `Forwarded`/`X-Forwarded-For`/`X-Real-IP` (so a tunnel or
   reverse proxy on the same machine is treated as remote, not silently trusted); local requests must
@@ -297,14 +293,19 @@ addresses discovered under `--lan` — never a wildcard, and never a credentiale
 ### `web/` — the React + TypeScript frontend
 
 Vite + React + TypeScript + React Router + TanStack Query; plain hand-written CSS (no component
-library). `npm run dev` proxies `/api` to `http://127.0.0.1:8501` (`vite.config.ts`) so the dev
+library) in `styles/` (`app.css`, `overview.css`, `sessions.css`), inline SVG icons in
+`components/icons.tsx`. `npm run dev` proxies `/api` to `http://127.0.0.1:8501` (`vite.config.ts`) so the dev
 server and the built app are both effectively same-origin. `web/src/main.tsx` wires up
 `QueryClientProvider`/`BrowserRouter`; `App.tsx` is the route table (`/` → Sessions, `/overview`,
-`/projects`, everything else redirects to `/`, since the server's SPA fallback can land any unknown
-path here) rendered inside `AppShell`.
+`/projects`, everything else redirects to `/`, since `vite preview`'s SPA fallback serves `index.html` for
+any unknown path) rendered inside `AppShell`.
 
-- **API layer** (`web/src/api/`): `client.ts`'s `apiFetch` is the one place that calls `fetch` —
-  it adds `X-Requested-With: ledger` on non-GET requests (matching `security.py`'s CSRF check),
+- **API layer** (`web/src/api/`): `token.ts` is the frontend's whole sign-in story —
+  `consumeTokenFromUrl()` runs in `main.tsx` before React renders, stores a printed link's
+  `?token=` in `localStorage` (try/catch-guarded) and strips it from the address bar via
+  `history.replaceState`; `getStoredToken()` reads it back. `client.ts`'s `apiFetch` is the one
+  place that calls `fetch` — it sends that token as `Authorization: Bearer <token>` when one is
+  stored, adds `X-Requested-With: ledger` on non-GET requests (matching `security.py`'s CSRF check),
   and turns every failure into one of `ApiError` (the server answered with a non-2xx; carries
   FastAPI's `detail` message), `UnauthorizedError` (401 — this device isn't signed in), or
   `NetworkError` (fetch itself failed/threw). `queries.ts` has one TanStack Query hook per endpoint
@@ -390,19 +391,19 @@ path here) rendered inside `AppShell`.
 
 ### `hooks/`
 
-A standalone utility, unrelated to either dashboard UI: Windows toast notifications for Claude
+A standalone utility, unrelated to the dashboard: Windows toast notifications for Claude
 Code's `Notification`/`Stop` hook events, with `Install-ClaudeHooks.ps1`/`Uninstall-ClaudeHooks.ps1`
 to set them up on a machine. See `hooks/README.md` for how it works and full install/uninstall/test
 steps.
 
 ### `openspec/`
 
-The OpenSpec workflow directory: `openspec/specs/` holds the current, agreed specs for shipped
-capabilities (`live-context-gauge`, `toast-context-line`); `openspec/changes/` holds proposals in
-flight, each with `proposal.md`/`design.md`/`tasks.md` and (once merged) a spec delta —
-`migrate-to-react-lan-access` (see "Project" above) is the active one; `openspec/changes/archive/`
-holds completed ones. Treat these as the authoritative record of *why* a capability exists and what
-it's required to do, ahead of inferring intent from the code alone.
+The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
+capabilities: `web-dashboard`, `responsive-layout`, `network-access`, `live-context-gauge`,
+`toast-context-line`. `openspec/changes/` holds proposals in flight (each with
+`proposal.md`/`design.md`/`tasks.md` plus a spec delta) — currently none; completed ones move to
+`openspec/changes/archive/` and aren't tracked further. Treat the specs as the authoritative record
+of what a capability is required to do, ahead of inferring intent from the code alone.
 
 ### Other repo files
 

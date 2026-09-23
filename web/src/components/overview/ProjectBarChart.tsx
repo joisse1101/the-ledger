@@ -37,7 +37,7 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
     view: { stroke: null },
     config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: 12 } },
     data: { values: records(projects) },
-    // A per-bar value label (as views/overview.py drew one) has nowhere to go without
+    // A per-bar value label has nowhere to go without
     // overlapping its neighbor once more than a couple of project groups are on screen - the
     // axis plus the tooltip (which does carry the exact formatted value) cover that instead.
     mark: { type: "bar", cornerRadiusTopLeft: 3, cornerRadiusTopRight: 3 },
@@ -92,8 +92,7 @@ export interface ProjectBarChartProps {
 }
 
 /** Messages and cost per project as grouped bars, each normalized to % of its own top project so
- *  the two independently-scaled measures can share one axis instead of a dual-axis chart -
- *  ported from views/overview.py's _render_messages_cost_chart. */
+ *  the two independently-scaled measures can share one axis instead of a dual-axis chart. */
 export function ProjectBarChart({ projects, projectOrder }: ProjectBarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();

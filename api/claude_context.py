@@ -190,7 +190,10 @@ def _thousands(n: int) -> int:
 
 
 def humanise_tokens(n: int) -> str:
-    """742 -> `742`, 80,618 -> `81k`, 1,234,567 -> `1.2M`. Keep in step with toast-token-usage."""
+    """742 -> `742`, 80,618 -> `81k`, 1,234,567 -> `1.2M`.
+
+    Keep in step with the toast hook's Format-TokenCount and web's humanizeTokens.
+    """
     if n < 1000:
         return str(n)
     if _thousands(n) < 1000:

@@ -36,7 +36,7 @@ REFRESH_INTERVAL_SECONDS = 10 * 60
 # serialised process-wide: startup, the timer and POST /api/refresh never overlap.
 _refresh_lock = threading.Lock()
 
-# The one place the live registry is read from; see live_snapshot.py.
+# The one place the live registry is read from; see LiveSnapshot.
 live = LiveSnapshot()
 
 
@@ -87,7 +87,7 @@ DEFAULT_FRONTEND_PORT = 4173  # Vite's own `vite preview` default
 
 
 def cors_origins(frontend_port: int, lan_addresses: Sequence[str] = ()) -> list[str]:
-    """The exact origins the frontend can be reached at (design.md Decision 7):
+    """The exact origins the frontend can be reached at:
     localhost/127.0.0.1 always (dev's `npm run dev` and a local `vite preview` both use
     one of these), plus one entry per LAN address discovered under `--lan`. Never a
     wildcard — an unlisted origin gets no CORS header at all, even from this machine."""

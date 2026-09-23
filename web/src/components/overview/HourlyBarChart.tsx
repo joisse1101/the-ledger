@@ -88,7 +88,7 @@ export interface HourlyBarChartProps {
 }
 
 /** Sessions and messages by local hour of day, normalized the same way as the project chart
- *  above - ported from views/overview.py's _render_hourly_activity_chart. The server already
+ *  above. The server already
  *  trims `hourly` to the contiguous range of hours that had any activity. */
 export function HourlyBarChart({ hourly }: HourlyBarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);

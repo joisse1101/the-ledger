@@ -63,7 +63,7 @@ def _turn(context, *tools, output=0):
                 tools=list(tools))
 
 
-# ---------------------------------------------------------------- 1.1 turn extraction
+# ---------------------------------------------------------------- turn extraction
 
 
 def test_context_includes_cached_tokens():
@@ -126,7 +126,7 @@ def test_tool_hint_prefers_path_then_command_and_is_single_line_and_short():
     assert turn.tools[3].hint == ""
 
 
-# ---------------------------------------------------------------- 1.2 humanising
+# ---------------------------------------------------------------- humanising
 
 
 @pytest.mark.parametrize("tokens, expected", [
@@ -138,7 +138,7 @@ def test_humanise_tokens(tokens, expected):
     assert humanise_tokens(tokens) == expected
 
 
-# ---------------------------------------------------------------- 1.3 growth and sparkline
+# ---------------------------------------------------------------- growth and sparkline
 
 
 @pytest.mark.parametrize("delta, expected", [
@@ -174,7 +174,7 @@ def test_format_context_single_response_is_size_only():
     assert format_context(LiveContext(size=42_000, growth=None, history=[42_000])) == "42k"
 
 
-# ---------------------------------------------------------------- 2.1 tail reader
+# ---------------------------------------------------------------- tail reader
 
 
 def test_tail_reader_skips_a_trailing_partial_line(tmp_path):
@@ -213,7 +213,7 @@ def test_tail_reader_drops_the_first_line_of_a_window_that_starts_mid_file(tmp_p
     assert [t.context for t in turns] == [1047, 1048, 1049]
 
 
-# ---------------------------------------------------------------- 2.2 transcript location
+# ---------------------------------------------------------------- transcript location
 
 
 def test_transcript_path_uses_the_sanitized_cwd(isolated_db, write_transcript):
@@ -236,7 +236,7 @@ def test_transcript_path_missing(isolated_db):
     assert claude_context._located == {}
 
 
-# ---------------------------------------------------------------- 2.3 stat-keyed cache, 2.4 entry point
+# ---------------------------------------------------------------- stat-keyed cache, entry point
 
 
 def _write_session(isolated_db, write_transcript, session_id="s1", cwd="/x/proj", entries=()):
@@ -304,7 +304,7 @@ def test_live_context_never_raises(isolated_db, write_transcript, monkeypatch):
     assert live_context("s1", "/x/proj") is None
 
 
-# ---------------------------------------------------------------- 4.1 full parse
+# ---------------------------------------------------------------- full parse
 
 
 def test_parse_detail_orders_turns_and_positions_compactions():
@@ -325,7 +325,7 @@ def test_parse_detail_without_compaction():
     assert detail.compactions == []
 
 
-# ---------------------------------------------------------------- 4.2 cache miss
+# ---------------------------------------------------------------- cache miss
 
 
 def test_cache_miss_flags():
@@ -337,7 +337,7 @@ def test_cache_miss_flags():
     assert [t.cache_miss for t in detail.turns] == [False, False, True]
 
 
-# ---------------------------------------------------------------- 4.3 growth attribution
+# ---------------------------------------------------------------- growth attribution
 
 
 def test_attribution_reconciles_and_groups_by_tool():
@@ -404,7 +404,7 @@ def test_attribution_of_a_single_turn_has_no_growth():
     assert (attribution.floor, attribution.current, attribution.by_tool) == (10, 10, [])
 
 
-# ---------------------------------------------------------------- 4.4 memoized full parse
+# ---------------------------------------------------------------- memoized full parse
 
 
 def test_load_detail_is_memoized_by_file_stat(isolated_db, write_transcript, monkeypatch):

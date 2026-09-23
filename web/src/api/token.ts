@@ -1,5 +1,5 @@
-// The bearer token a printed link's `?token=` signs this device in with (design.md
-// Decision 7): the API has no cookie or query-string handling of its own, so this is
+// The bearer token a printed link's `?token=` signs this device in with. The API has
+// no cookie or query-string handling of its own, so this is
 // the frontend's entire sign-in story. Stored in localStorage so it survives reloads;
 // wrapped in try/catch since a private window or blocked storage can throw on either
 // call, and losing the token just means the next request asks the user to sign in again.
@@ -23,8 +23,8 @@ function setStoredToken(token: string): void {
 }
 
 /** Called once at startup. A printed link's `?token=` is stored and then stripped from
- *  the address bar (no reload) so it isn't left visible in history (network-access spec,
- *  "Opening a link once signs the device in"). Does nothing if there's no token in the URL. */
+ *  the address bar (no reload) so it isn't left visible in history. Does nothing if there's
+ *  no token in the URL. */
 export function consumeTokenFromUrl(
   location: Pick<Location, "href" | "pathname" | "search" | "hash"> = window.location,
   history: Pick<History, "replaceState"> = window.history,

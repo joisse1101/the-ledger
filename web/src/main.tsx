@@ -11,7 +11,7 @@ import "./styles/sessions.css";
 import "./styles/overview.css";
 
 // Before anything renders: a printed link's `?token=` signs this device in and is
-// then stripped from the address bar (network-access spec).
+// then stripped from the address bar.
 consumeTokenFromUrl();
 
 const queryClient = createQueryClient();

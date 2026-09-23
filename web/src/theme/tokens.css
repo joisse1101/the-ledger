@@ -1,8 +1,7 @@
 /* Design tokens. Light is the default; dark applies when <html data-theme="dark">
    is set, or (before the app has set anything) when the device prefers dark.
    The categorical slots are a fixed order: a project keeps its slot, so only which
-   prefix of the list is used may vary, never the order. Values are the ones the
-   Streamlit Overview used (_CATEGORICAL_LIGHT / _CATEGORICAL_DARK / _MUTED_INK). */
+   prefix of the list is used may vary, never the order. */
 
 :root {
   color-scheme: light;

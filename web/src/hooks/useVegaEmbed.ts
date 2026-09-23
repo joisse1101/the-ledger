@@ -3,8 +3,7 @@ import type { Result } from "vega-embed";
 
 /** Lazily imports `vega-embed` and embeds `spec` into `containerRef`, finalizing the previous
  *  view before re-embedding whenever `spec` changes (new data, or a rebuilt spec after a theme
- *  change) and on unmount. `null` renders nothing. Mirrors the pattern TokensChart.tsx used for
- *  the session detail chart, factored out so every Overview chart shares it. */
+ *  change) and on unmount. `null` renders nothing. */
 export function useVegaEmbed(containerRef: RefObject<HTMLDivElement | null>, spec: object | null): void {
   useEffect(() => {
     if (!spec) return;

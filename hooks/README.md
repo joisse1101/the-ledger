@@ -67,9 +67,8 @@ admin rights needed):
   sidesteps that ambiguity entirely.
 
 If you'd rather see exactly what it changes before running it, the script
-is short — read `Install-ClaudeHooks.ps1` directly; it's the same handful of
-`New-Item`/`Set-ItemProperty`/`ConvertTo-Json` calls this section used to
-document inline.
+is short — read `Install-ClaudeHooks.ps1` directly; it's a short run of
+`New-Item`/`Set-ItemProperty`/`ConvertTo-Json` calls.
 
 ## 4. Tests
 

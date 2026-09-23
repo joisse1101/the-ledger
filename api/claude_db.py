@@ -1,10 +1,9 @@
 """SQLite-backed store for Claude Code project/transcript data.
 
 refresh() is the only place that reads ~/.claude.json and
-~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects.py,
-claude_transcripts.py) just queries the SQLite snapshot this writes to
-.ledger/ledger.db (WAL mode). claude_sessions.py's live-session polling is separate
-and untouched by this module.
+~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects,
+claude_transcripts) just queries the SQLite snapshot it writes. Live-session
+polling (claude_sessions) reads its own registry and doesn't go through here.
 """
 
 from __future__ import annotations
@@ -102,8 +101,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 # ---------------------------------------------------------------------------
 # Disk scanning - the only code in this app that reads ~/.claude.json and
-# ~/.claude/projects/*/*.jsonl. Moved here from claude_projects.py /
-# claude_transcripts.py, which now only query the database this produces.
+# ~/.claude/projects/*/*.jsonl.
 # ---------------------------------------------------------------------------
 
 

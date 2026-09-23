@@ -70,8 +70,8 @@ def build_banner(
     qr: Optional[str] = None,
 ) -> str:
     """The startup text for the API process. It prints a link to the *frontend*
-    (see design.md Decision 12) rather than to itself: this process only ever serves
-    `/api/*`. `lan_addresses` is None when the API is local-only."""
+    rather than to itself: this process only ever serves `/api/*`. `lan_addresses` is None
+    when the API is local-only."""
     lines = ["", f"The Ledger's frontend: http://localhost:{frontend_port}/"]
     preview_command = "cd web && npm run preview" + (" -- --host" if lan_addresses is not None else "")
     lines.append(f"The frontend runs as its own process - start it separately: {preview_command}")

@@ -65,7 +65,7 @@ def local(host="localhost", client="127.0.0.1", headers=None, **kwargs):
     )
 
 
-# ------------------------------------------------ 4.1/9.2: who needs the token
+# ------------------------------------------------ who needs the token
 
 
 @pytest.mark.parametrize("path", ["/api/meta", "/api/transcripts", "/api/live", "/api/nope"])
@@ -100,8 +100,8 @@ def test_the_bearer_header_is_accepted_case_insensitively(token):
 
 
 def test_a_token_in_the_query_string_is_no_longer_treated_specially(token):
-    # The API has no `?token=` handling any more (design.md Decision 7/9.2): the
-    # frontend is what turns a printed link's token into an Authorization header.
+    # The API ignores `?token=`: the frontend is what turns a printed link's token
+    # into an Authorization header.
     response = remote().get("/api/meta", params={"token": TOKEN})
     assert response.status_code == 401
     assert "set-cookie" not in response.headers
@@ -207,7 +207,7 @@ def test_a_changed_token_refuses_the_old_one(monkeypatch):
     assert remote().get("/api/meta", headers={"Authorization": "Bearer new-token-value"}).status_code == 200
 
 
-# ------------------------------------------------ 4.3: token provisioning
+# ------------------------------------------------ token provisioning
 
 
 def test_provisioning_generates_once_and_reuses_it(tmp_path):
@@ -256,7 +256,7 @@ def test_git_ignores_the_stored_token():
     assert result.stdout.strip() == "api/.ledger/token"
 
 
-# ------------------------------------------------ 4.4: cross-site and rebinding guards
+# ------------------------------------------------ cross-site and rebinding guards
 
 
 @pytest.mark.parametrize("method", ["post", "delete", "put", "patch"])
@@ -301,7 +301,7 @@ def test_loopback_host_names_are_accepted_with_or_without_a_port(host):
     assert local(host=host).get("/api/meta").status_code == 200
 
 
-# ------------------------------------------------ 9.1: CORS allow-list
+# ------------------------------------------------ CORS allow-list
 
 
 @pytest.mark.parametrize("path", ["/api/meta", "/api/nope", "/api/refresh"])

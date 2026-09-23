@@ -8,9 +8,6 @@ export interface TokensChartProps {
   compactions: Compaction[];
 }
 
-// Stack order bottom-to-top matches views/sessions_context.py's _KINDS, and the color scale's
-// range ([hues[1], hues[2], hues[0]]) matches its Cache-read/Cache-written/New -> cat-1/cat-2/cat-0
-// mapping, so the ▼ cache-miss and compaction markers line up with what the Streamlit dialog shows.
 const KINDS = ["Cache read", "Cache written", "New"] as const;
 
 interface ChartRecord {
@@ -166,11 +163,10 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
   };
 }
 
-/** Tokens sent per response, stacked by kind — ported from views/sessions_context.py's
- *  _render_history_chart. ▼ marks a cache miss (a response that wrote more cache than it read);
- *  a dashed rule marks the response right after a compaction. `vega-embed` is dynamically
- *  imported so the Sessions page doesn't pay for it until a detail view actually needs it (see
- *  design.md). Colors are read from the theme's CSS variables at embed time and the chart is
+/** Tokens sent per response, stacked by kind. ▼ marks a cache miss (a response that wrote more
+ *  cache than it read); a dashed rule marks the response right after a compaction. `vega-embed`
+ *  is dynamically imported so the Sessions page doesn't pay for it until a detail view actually
+ *  needs it. Colors are read from the theme's CSS variables at embed time and the chart is
  *  re-embedded whenever the theme changes or the data changes; container width changes are
  *  handled by Vega itself (a spec with `width: "container"` sets up its own ResizeObserver). */
 export function TokensChart({ turns, compactions }: TokensChartProps) {

@@ -36,10 +36,9 @@ export function applyTheme(theme: Theme): void {
 
 // One module-level store rather than per-component state: useTheme() is called both by the
 // toggle button and by every chart that needs to know when to recolor itself (TokensChart, and
-// the Overview page's three charts), and a component-local useState per call site means toggling
-// in one of them never notifies the others - the charts stayed on the old palette until they
-// happened to remount. A shared store (read via useSyncExternalStore, the same pattern
-// useViewportClass.ts uses) keeps every mounted instance in agreement instead.
+// the Overview page's three charts), and with a component-local useState per call site, toggling
+// in one of them would never notify the others. A shared store (read via useSyncExternalStore,
+// the same pattern useViewportClass uses) keeps every mounted instance in agreement instead.
 let storedTheme: Theme | null = readStoredTheme();
 let systemPreference: Theme = systemTheme();
 const listeners = new Set<() => void>();

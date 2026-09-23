@@ -1,4 +1,4 @@
-// Token-count humanising, ported from claude_context.py's humanise_tokens/format_context so both
+// Token-count humanising, mirroring claude_context.py's humanise_tokens/format_growth so both
 // languages agree on what a Context figure reads as. The server already sends a ready-made `label`
 // for the Live list; this is for values the API sends as raw numbers (the All list's Context column,
 // the detail view's "Current context" figure).

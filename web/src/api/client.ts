@@ -6,7 +6,7 @@ import { getStoredToken } from "./token";
 
 /** Sent on every state-changing request. A page on another site can't add a custom
  *  header without a CORS preflight (which the API only ever grants to its own
- *  frontend's origin — see design.md Decision 7), so this is what keeps a cross-site
+ *  frontend's origin), so this is what keeps a cross-site
  *  page from deleting anything. */
 export const CSRF_HEADER = "X-Requested-With";
 export const CSRF_VALUE = "ledger";
@@ -16,7 +16,7 @@ const DEFAULT_API_PORT = 8501;
 /** Where API calls go. `npm run dev`'s Vite proxy (vite.config.ts) forwards relative
  *  `/api` paths to the backend, so dev keeps using those (import.meta.env.DEV is true
  *  there, and under Vitest). The built app is served by `vite preview` on its own
- *  origin (design.md Decision 2), so it has to call the API's own origin directly;
+ *  origin, so it has to call the API's own origin directly;
  *  VITE_API_PORT overrides the default port 8501 at build time. Params are injectable
  *  so this is testable without stubbing Vite's globals. */
 export function apiOrigin(

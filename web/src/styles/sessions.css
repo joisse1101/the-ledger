@@ -1,5 +1,5 @@
-/* The shared list component (table + card renderers) and, as later tasks add them, the
-   Sessions page's Live/All toolbars and detail sheet. Colors come only from tokens.css. */
+/* The shared list component (table + card renderers), the Sessions page's Live/All
+   toolbars and its detail sheet. Colors come only from tokens.css. */
 
 .list-empty {
   color: var(--text-2);
@@ -304,7 +304,7 @@
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* Shared by any list's "this row is the pending action's target" state - currently just the
+/* Shared by any list's "this row is the pending action's target" state, e.g. the
    Projects list's select-a-row-to-delete flow. */
 .list-table tbody tr.row-selected,
 .list-card.row-selected {
@@ -483,7 +483,7 @@
 /* ---- tokens-per-response chart (vega-embed, lazily imported by TokensChart.tsx) */
 
 .tokens-chart {
-  /* Matches the spec's own height (task 6.5), so the dialog doesn't jump once the lazily
+  /* Matches the chart spec's own height, so the dialog doesn't jump once the lazily
      imported chart module resolves and renders into this container. */
   min-height: 260px;
 }

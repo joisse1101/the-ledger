@@ -7,10 +7,9 @@ import { CloseIcon } from "../icons";
 import { TokensChart } from "./TokensChart";
 
 export interface SessionDialogProps {
-  /** null when no session is selected: the dialog stays mounted (so it can close itself with an
-   *  animation-friendly transition later) but closed. */
+  /** null when no session is selected: the dialog stays mounted, but closed. */
   sessionId: string | null;
-  /** All list selections get the recap block; Live list selections don't (per spec). */
+  /** All list selections get the recap block; Live list selections don't. */
   from: "live" | "all";
   onClose: () => void;
 }
@@ -229,10 +228,9 @@ function Detail({ detail }: { detail: SessionDetail }) {
   );
 }
 
-/** The delete flow for an All-list session (ported from views/sessions_context.py's
- *  _render_delete_controls). Not offered from the Live list — a live session is always
- *  disabled here too, in case a race makes it live between load and click. `key={sessionId}`
- *  on the call site resets `confirming` when a different session's dialog opens. */
+/** The delete flow for an All-list session. Not offered from the Live list — a live session is
+ *  always disabled here too, in case a race makes it live between load and click.
+ *  `key={sessionId}` on the call site resets `confirming` when a different session's dialog opens. */
 function DeleteControls({ sessionId, live, onDeleted }: { sessionId: string; live: boolean; onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const deleteSession = useDeleteSession();
@@ -278,7 +276,7 @@ function DeleteControls({ sessionId, live, onDeleted }: { sessionId: string; liv
 
 /** The session detail view: a native `<dialog>` kept mounted so opening/closing never remounts
  *  it, which is what lets a Live poll update its content in place without disturbing scroll
- *  position (see design.md's "detail view" decision). */
+ *  position. */
 export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [live, setLive] = useState(false);

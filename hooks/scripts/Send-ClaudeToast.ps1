@@ -15,7 +15,7 @@ param(
 )
 
 # Context size = input + cache read + cache written tokens on the latest real
-# main-thread assistant turn. Same rule as claude_context.py (live-context-gauge);
+# main-thread assistant turn. Same rule as claude_context.py;
 # if one changes, review the other. Returns $null on any problem, so the toast
 # just omits the line.
 function Get-ContextTokens {

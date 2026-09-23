@@ -7,8 +7,8 @@ import type { LiveSession, TranscriptItem } from "../api/types";
 
 // The open session lives in the URL (?session=<id>&from=live|all) rather than component state,
 // so a reload or shared link reopens the same detail view, and so SessionDialog can stay mounted
-// across selections instead of being conditionally rendered (see its own comment on why that
-// matters for the Live-poll-updates-in-place requirement).
+// across selections instead of being conditionally rendered (which is what lets a Live poll
+// update it in place).
 export function SessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
