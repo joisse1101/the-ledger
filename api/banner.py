@@ -62,36 +62,17 @@ def render_qr(text: str) -> Optional[str]:
     return rendered
 
 
-def build_banner(
-    *,
-    frontend_port: int,
-    lan_addresses: Optional[list[str]] = None,
-    token: Optional[str] = None,
-    qr: Optional[str] = None,
-) -> str:
+def build_banner(*, frontend_port: int) -> str:
     """The startup text for the API process. It prints a link to the *frontend*
-    rather than to itself: this process only ever serves `/api/*`. `lan_addresses` is None
-    when the API is local-only."""
-    lines = ["", f"The Ledger's frontend: http://localhost:{frontend_port}/"]
-    preview_command = "cd web && npm run preview" + (" -- --host" if lan_addresses is not None else "")
-    lines.append(f"The frontend runs as its own process - start it separately: {preview_command}")
-
-    if lan_addresses is not None:
-        lines.append("")
-        if lan_addresses and token:
-            lines.append("Open on another device (the link signs that device in):")
-            lines += [f"  http://{address}:{frontend_port}/?token={token}" for address in lan_addresses]
-            if qr:
-                lines += ["", f"Scan to open {lan_addresses[0]}:", qr.rstrip("\n")]
-        else:
-            lines.append("No network address was found for this machine.")
-        lines += [
+    rather than to itself: this process only ever serves `/api/*`, and only ever binds
+    loopback — a device on the network reaches the app through the separate gateway
+    (its own sign-in banner/QR is built elsewhere, from this module's discovery/QR
+    helpers), not through anything printed here."""
+    return "\n".join(
+        [
             "",
-            "This is plain HTTP: the token only keeps out devices that don't have it, and anyone",
-            "who can watch this network can read it. Use --lan on networks you trust.",
-            "If a phone can't connect, allow Python through the firewall (on Windows: allow it",
-            "on Private networks) and check the phone is on the same network.",
+            f"The Ledger's frontend: http://localhost:{frontend_port}/",
+            "The frontend runs as its own process - start it separately: cd web && npm run preview",
+            "",
         ]
-
-    lines.append("")
-    return "\n".join(lines)
+    )

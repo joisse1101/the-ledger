@@ -11,21 +11,11 @@ import { getStoredToken } from "./token";
 export const CSRF_HEADER = "X-Requested-With";
 export const CSRF_VALUE = "ledger";
 
-const DEFAULT_API_PORT = 8501;
-
-/** Where API calls go. `npm run dev`'s Vite proxy (vite.config.ts) forwards relative
- *  `/api` paths to the backend, so dev keeps using those (import.meta.env.DEV is true
- *  there, and under Vitest). The built app is served by `vite preview` on its own
- *  origin, so it has to call the API's own origin directly;
- *  VITE_API_PORT overrides the default port 8501 at build time. Params are injectable
- *  so this is testable without stubbing Vite's globals. */
-export function apiOrigin(
-  env: Pick<ImportMetaEnv, "DEV" | "VITE_API_PORT"> = import.meta.env,
-  location: Pick<Location, "protocol" | "hostname"> = window.location,
-): string {
-  if (env.DEV) return "";
-  const port = env.VITE_API_PORT || DEFAULT_API_PORT;
-  return `${location.protocol}//${location.hostname}:${port}`;
+/** Where API calls go. Always relative: `npm run dev` and `npm run preview` both proxy
+ *  `/api` to the backend (vite.config.ts), so the page is same-origin with the API
+ *  whether it's reached directly or through the gateway. */
+export function apiOrigin(): string {
+  return "";
 }
 
 export class ApiError extends Error {

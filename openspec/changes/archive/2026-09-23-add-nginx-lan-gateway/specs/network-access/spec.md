@@ -1,10 +1,4 @@
-# network-access Specification
-
-## Purpose
-
-Lets the app be reached from other devices on the same network, such as a phone, without exposing Claude Code transcripts and delete actions to anyone else on that network. Local-only use stays the default and stays frictionless.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Local-only by default, network access is opt-in
 By default the API and the frontend SHALL each accept connections only from the machine they run
@@ -28,40 +22,6 @@ by the user.
 - **WHEN** the user starts the API, the frontend, or the gateway on a non-default port
 - **THEN** it is served on that port, and any address the app prints for it uses that port
 
-### Requirement: Other devices must present an access token for data
-A request to any of the app's data endpoints (session, project, overview, and live data; refresh; delete actions) that comes from anywhere other than the machine the app runs on SHALL be refused, with no dashboard data returned, unless it carries the app's access token. Requests from the same machine SHALL NOT need a token. A refused request SHALL receive an unauthorized response with a short message telling the user to open the address printed when the server started. The app's page shell (the files that render the empty dashboard before any data loads) is not itself gated by the token — see the following requirement.
-
-#### Scenario: No token from another device
-- **WHEN** a phone on the network requests any data address without the token
-- **THEN** it receives an unauthorized response and none of the app's data
-
-#### Scenario: Wrong token
-- **WHEN** a phone requests data with an incorrect token
-- **THEN** it receives an unauthorized response and none of the app's data
-
-#### Scenario: Same machine needs no token
-- **WHEN** a browser on the machine running the app requests data from localhost with no token
-- **THEN** the data is returned normally
-
-#### Scenario: Request relayed by a proxy or tunnel
-- **WHEN** a data request reaches the app from the same machine but carries a marker that it was forwarded on behalf of another client, as a tunnel or reverse proxy running on the machine would add
-- **THEN** it is treated as coming from another device and needs the token
-
-#### Scenario: Delete requires the token too
-- **WHEN** a device on the network sends a delete request for a session or project without the token
-- **THEN** it is refused and nothing is deleted
-
-### Requirement: The page shell carries no data and needs no token
-The static files that render the app's empty page (before any data has loaded) SHALL be servable to any device that can reach them, on the same machine or over the network, without the token. This is safe only because that shell contains no session, project, or transcript data by itself — every scenario in the previous requirement still applies to the data that fills it in.
-
-#### Scenario: Shell loads without a token
-- **WHEN** a device on the network without the token requests the app's page
-- **THEN** the empty page loads, but no dashboard data appears until a valid token is presented for the data requests it makes
-
-#### Scenario: A public shell is not a data leak
-- **WHEN** the page shell is inspected without a token
-- **THEN** it contains no session, project, or transcript content
-
 ### Requirement: Token is set once and stays valid across restarts
 The access token SHALL be taken from an environment setting when the user provides one. Otherwise
 the app SHALL generate a random token of at least 128 bits the first time the API runs, store it on
@@ -80,21 +40,6 @@ replace it by deleting the stored token or changing the environment setting.
 #### Scenario: Token is not committed
 - **WHEN** a token has been generated and the project is inspected with version control
 - **THEN** the stored token file is ignored by version control
-
-### Requirement: Opening a link once signs the device in
-Opening the app's address with the token attached SHALL sign that browser in: the browser SHALL be remembered so later visits to the plain address work without the token, and the token SHALL be removed from the address bar and browser history entry so it is not left visible or copied along with the page address. A device that is signed in SHALL be signed in for later sessions until the token is replaced. Opening the address with a wrong token SHALL NOT sign the device in.
-
-#### Scenario: First visit from a phone
-- **WHEN** the user opens the printed address with the token on a phone
-- **THEN** the dashboard loads and the address shown in the browser no longer contains the token
-
-#### Scenario: Later visit
-- **WHEN** that phone later opens the plain address without the token
-- **THEN** the dashboard loads
-
-#### Scenario: Token replaced
-- **WHEN** the token is changed on the server
-- **THEN** a phone signed in with the old token is refused until it opens a link with the new one
 
 ### Requirement: Cross-site and rebinding requests are refused
 The app SHALL NOT allow web pages from other sites to read its data or trigger its delete actions
@@ -121,21 +66,6 @@ SHALL be refused, so a web page can't reach the local app by pointing its own na
   loopback address
 - **THEN** it is refused
 
-### Requirement: Identifiers from requests can't reach outside Claude's files
-A session identifier or project path received in a request SHALL be validated before it is used to locate a file. A session identifier that is not a well-formed identifier (letters, digits, and dashes only) SHALL be refused. A request SHALL only ever read or delete files inside Claude Code's own transcript storage and configuration. The working directory used to find a session's transcript SHALL be determined by the server from its own records of that session, not supplied by the client.
-
-#### Scenario: Path traversal attempt
-- **WHEN** a request supplies a session identifier such as `../../secrets`
-- **THEN** it is refused and no file outside Claude's transcript storage is read or deleted
-
-#### Scenario: Unknown session
-- **WHEN** a request names a well-formed session identifier that has no transcript
-- **THEN** it receives a not-found response
-
-#### Scenario: Client-supplied directory is ignored
-- **WHEN** a request for a session's detail includes a working directory that differs from the one the server has recorded for that session
-- **THEN** the server uses its own record
-
 ### Requirement: Startup tells the user how to open the app
 When the app's backend starts it SHALL print the address of the app's frontend to open on the
 machine itself, and note that the frontend must be running for that address to answer. When the
@@ -156,6 +86,8 @@ page.
 - **WHEN** the frontend is started before the web interface has been built
 - **THEN** it says clearly that the interface is missing and gives the command that builds it,
   instead of serving a broken page
+
+## ADDED Requirements
 
 ### Requirement: A single gateway is the network's only entry point
 A containerized reverse-proxy gateway SHALL be the only component of the app that ever binds an

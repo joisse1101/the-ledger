@@ -72,17 +72,7 @@ describe("apiFetch", () => {
 });
 
 describe("apiOrigin", () => {
-  const location = { protocol: "http:", hostname: "192.168.1.20" };
-
-  it("is relative in dev, where Vite's own proxy forwards /api to the backend", () => {
-    expect(apiOrigin({ DEV: true, VITE_API_PORT: undefined }, location)).toBe("");
-  });
-
-  it("is the API's own origin, on the default port, once built", () => {
-    expect(apiOrigin({ DEV: false, VITE_API_PORT: undefined }, location)).toBe("http://192.168.1.20:8501");
-  });
-
-  it("honours VITE_API_PORT when the API runs on a non-default port", () => {
-    expect(apiOrigin({ DEV: false, VITE_API_PORT: "9000" }, location)).toBe("http://192.168.1.20:9000");
+  it("is always relative — Vite's dev and preview proxies both forward /api to the backend", () => {
+    expect(apiOrigin()).toBe("");
   });
 });

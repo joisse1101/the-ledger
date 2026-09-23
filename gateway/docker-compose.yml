@@ -1,0 +1,10 @@
+services:
+  gateway:
+    build: .
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    environment:
+      - BACKEND_PORT=${BACKEND_PORT:-8501}
+      - FRONTEND_PORT=${FRONTEND_PORT:-4173}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,13 +1,24 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// `npm run dev` serves the UI on its own port and forwards /api to the Python
-// server, so the dev page and the API are same-origin exactly like the built app.
+// Both `npm run dev` and `npm run preview` forward /api to the Python server, so the
+// page is always same-origin with the API — the built app (and the gateway proxying to
+// it) never needs to know the API's own port. The target reads BACKEND_PORT from the
+// environment (not baked into the client bundle, unlike the removed VITE_API_PORT) so
+// direct (non-gateway) frontend access keeps working when BACKEND_PORT is customized.
+const backendTarget = `http://127.0.0.1:${process.env.BACKEND_PORT ?? 8501}`;
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:8501",
+      "/api": backendTarget,
+    },
+  },
+  preview: {
+    host: "127.0.0.1",
+    proxy: {
+      "/api": backendTarget,
     },
   },
   test: {
