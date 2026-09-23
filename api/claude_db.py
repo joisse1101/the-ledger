@@ -588,17 +588,29 @@ def delete_project_row(project_path: str) -> None:
         conn.execute("DELETE FROM projects WHERE path = ?", (project_path,))
 
 
-def transcript_paths_for_cwd(cwd: str) -> list[Path]:
+def transcript_paths_for_project(project_path: str) -> list[Path]:
+    """Transcript file paths filed under `project_path`'s own `~/.claude/projects/` folder.
+
+    Matched by that on-disk folder name (`sanitize_project_path(project_path)`) rather than
+    each transcript's own recorded `cwd` - a session can `cd` partway through and leave `cwd`
+    pointing below the project root, but the folder a transcript is filed under never changes.
+    """
+    folder = sanitize_project_path(project_path)
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT path FROM transcripts WHERE cwd = ?", (cwd,)
-        ).fetchall()
-    return [Path(row["path"]) for row in rows]
+        rows = conn.execute("SELECT DISTINCT path FROM transcripts").fetchall()
+    return [Path(row["path"]) for row in rows if Path(row["path"]).parent.name == folder]
 
 
-def delete_transcript_rows_by_cwd(cwd: str) -> None:
+def delete_transcript_rows_by_project(project_path: str) -> None:
+    folder = sanitize_project_path(project_path)
     with _connect() as conn:
-        conn.execute("DELETE FROM transcripts WHERE cwd = ?", (cwd,))
+        rows = conn.execute("SELECT session_id, path FROM transcripts").fetchall()
+        session_ids = [row["session_id"] for row in rows if Path(row["path"]).parent.name == folder]
+        if session_ids:
+            conn.executemany(
+                "DELETE FROM transcripts WHERE session_id = ?",
+                [(sid,) for sid in session_ids],
+            )
 
 
 def transcript_path_for_session(session_id: str) -> Optional[Path]:

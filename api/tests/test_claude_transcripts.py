@@ -71,6 +71,27 @@ def test_delete_project_transcripts_no_match_is_a_noop(isolated_db, write_config
     assert claude_transcripts.delete_project_transcripts("/nonexistent") == 0
 
 
+def test_delete_project_transcripts_ignores_drifted_cwd(
+    isolated_db, write_config, write_transcript
+):
+    """A session that `cd`'d partway through leaves `cwd` pointing below the project root -
+    deleting the project must still remove it, matched by its on-disk folder."""
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    transcript_path = tmp_path / "projects" / folder / "s1.jsonl"
+    write_transcript(
+        transcript_path,
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj/subdir"}],
+    )
+    claude_db.refresh()
+
+    removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
+    assert removed_dirs == 1
+    assert not transcript_path.parent.exists()
+    assert claude_transcripts.load_transcripts() == []
+
+
 def test_delete_transcript_removes_file_and_row(isolated_db, write_config, write_transcript):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})

@@ -482,7 +482,7 @@ def test_delete_project_row(isolated_db, write_config):
     assert remaining[0]["path"] == "/b"
 
 
-def test_transcript_lookup_and_delete_by_cwd(isolated_db, write_config, write_transcript):
+def test_transcript_lookup_and_delete_by_project(isolated_db, write_config, write_transcript):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})
     folder = claude_db.sanitize_project_path("/home/x/proj")
@@ -492,11 +492,33 @@ def test_transcript_lookup_and_delete_by_cwd(isolated_db, write_config, write_tr
     )
     claude_db.refresh()
 
-    paths = claude_db.transcript_paths_for_cwd("/home/x/proj")
+    paths = claude_db.transcript_paths_for_project("/home/x/proj")
     assert len(paths) == 1
     assert paths[0] == tmp_path / "projects" / folder / "s1.jsonl"
 
-    claude_db.delete_transcript_rows_by_cwd("/home/x/proj")
+    claude_db.delete_transcript_rows_by_project("/home/x/proj")
+    assert claude_db.fetch_transcripts() == []
+
+
+def test_transcript_lookup_and_delete_by_project_ignores_drifted_cwd(
+    isolated_db, write_config, write_transcript
+):
+    """A session that `cd`'d partway through leaves `cwd` pointing below the project root -
+    matching must still go by the on-disk folder, not the recorded `cwd`."""
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    write_transcript(
+        tmp_path / "projects" / folder / "s1.jsonl",
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj/subdir"}],
+    )
+    claude_db.refresh()
+
+    paths = claude_db.transcript_paths_for_project("/home/x/proj")
+    assert len(paths) == 1
+    assert paths[0] == tmp_path / "projects" / folder / "s1.jsonl"
+
+    claude_db.delete_transcript_rows_by_project("/home/x/proj")
     assert claude_db.fetch_transcripts() == []
 
 

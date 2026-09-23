@@ -62,15 +62,15 @@ def load_transcripts() -> list[ClaudeTranscript]:
     return [_row_to_transcript(row) for row in claude_db.fetch_transcripts()]
 
 
-def delete_project_transcripts(cwd: str) -> int:
+def delete_project_transcripts(project_path: str) -> int:
     """Delete a project's on-disk transcript dir(s) and their SQLite rows; returns dirs removed."""
-    # Matched by the recorded `cwd` field rather than re-deriving Claude
-    # Code's directory-name sanitization, so this stays correct even if
-    # that naming scheme changes.
-    transcript_dirs = {path.parent for path in claude_db.transcript_paths_for_cwd(cwd)}
+    # Matched by the on-disk folder a transcript is filed under (see
+    # claude_db.transcript_paths_for_project), not by each transcript's own recorded `cwd` -
+    # that can point below the project root if a session `cd`'d partway through.
+    transcript_dirs = {path.parent for path in claude_db.transcript_paths_for_project(project_path)}
     for directory in transcript_dirs:
         shutil.rmtree(directory, ignore_errors=True)
-    claude_db.delete_transcript_rows_by_cwd(cwd)
+    claude_db.delete_transcript_rows_by_project(project_path)
     return len(transcript_dirs)
 
 
