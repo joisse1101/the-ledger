@@ -5,11 +5,11 @@ proxy marker (a tunnel or reverse proxy on this machine also connects from
 loopback). Local requests need no token but must name a loopback host, so a web
 page can't reach the app by rebinding its own DNS name to 127.0.0.1. Everything
 else must present the access token as `Authorization: Bearer <token>` — the
-frontend (a separate origin, allowed by server's CORS setup) is what turns a printed
-link's `?token=` into that header; the API itself has no query or cookie handling
-for it. State-changing requests must also carry a custom header, which a page on
-another site can't add without a CORS preflight (and only the frontend's own
-origin is ever allowed one).
+frontend (always same-origin with the API, via its own dev/preview proxy or the
+gateway) is what turns a printed link's `?token=` into that header; the API itself
+has no query or cookie handling for it. State-changing requests must also carry a
+custom header, which a page on another site can't add without a CORS preflight —
+and with no `CORSMiddleware` registered at all, every such preflight fails.
 """
 
 from __future__ import annotations

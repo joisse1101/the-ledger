@@ -179,7 +179,8 @@ Python tests, one file per module under test:
   `test_live_snapshot.py` (`LiveSnapshot`'s TTL coalescing and per-session failure isolation),
   `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
   behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
-  `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`).
+  `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`),
+  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI).
 
 Frontend (`cd web`):
 

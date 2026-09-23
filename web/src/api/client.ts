@@ -5,9 +5,9 @@
 import { getStoredToken } from "./token";
 
 /** Sent on every state-changing request. A page on another site can't add a custom
- *  header without a CORS preflight (which the API only ever grants to its own
- *  frontend's origin), so this is what keeps a cross-site
- *  page from deleting anything. */
+ *  header without a CORS preflight, and the API has no CORSMiddleware at all, so
+ *  every such preflight fails — this is what keeps a cross-site page from
+ *  deleting anything. */
 export const CSRF_HEADER = "X-Requested-With";
 export const CSRF_VALUE = "ledger";
 

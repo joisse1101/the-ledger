@@ -18,7 +18,7 @@ from typing import Mapping, Optional, Sequence
 import banner
 from security import LEDGER_DIR, TOKEN_ENV
 
-DEFAULT_GATEWAY_PORT = 10080  # matches gateway/docker-compose.yml's GATEWAY_PORT default
+DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml's GATEWAY_PORT default
 
 
 def read_token(directory=LEDGER_DIR, environ: Mapping[str, str] = os.environ) -> Optional[str]:
