@@ -1,8 +1,20 @@
 // Shapes of the JSON the Python server sends. Dates are ISO strings; the client
 // formats them, and shows `--` for anything missing.
 
+/** Whether other devices may see and answer a session's pending prompts. Only the machine running
+ *  the app can change it; it turns itself off after 8 hours and on every backend restart. */
+export interface RemoteMode {
+  enabled: boolean;
+  /** ISO timestamp it turns itself off, or null while it is off. */
+  expires_at: string | null;
+}
+
 export interface Meta {
   refreshed_at: string | null;
+  /** True only when this request comes from the machine running the app; the delete controls and
+   *  the Remote mode switch key off it. */
+  is_local: boolean;
+  remote_mode: RemoteMode;
 }
 
 export interface LiveContext {
@@ -12,6 +24,28 @@ export interface LiveContext {
   /** Ready-made text such as `394k ▲ +2.1k ▁▂▃`, from the server's format_context(). */
   label: string;
 }
+
+/** A dialog a live session is blocked on (a tool-permission prompt, or `AskUserQuestion`), relayed
+ *  by the optional PermissionRequest hook. `id` is the API's own, and names the prompt in answers. */
+export interface PendingDecision {
+  id: string;
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+
+export interface PendingDecisionResponse {
+  pending_decision: PendingDecision | null;
+}
+
+/** The tool whose prompt is a question rather than a permission request. */
+export const QUESTION_TOOL = "AskUserQuestion";
+
+/** What the dashboard sends back: approve/deny a permission prompt, or answer a question by its
+ *  text -> a label or free text (an array only for a multi-select question). */
+export type DecisionAnswer =
+  | { decision: "allow" }
+  | { decision: "deny"; reason?: string }
+  | { decision: "answer"; answers: Record<string, string | string[]> };
 
 export interface LiveSession {
   session_id: string;
@@ -26,6 +60,7 @@ export interface LiveSession {
   last_message: string;
   first_prompt: string;
   context: LiveContext | null;
+  pending_decision: PendingDecision | null;
 }
 
 export interface LiveResponse {

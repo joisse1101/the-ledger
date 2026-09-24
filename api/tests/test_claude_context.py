@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -287,6 +288,69 @@ def test_live_context_reads_an_unchanged_file_once_and_again_after_an_append(iso
         f.write(json.dumps(_assistant("m2", new=0, read=250)) + "\n")
     assert live_context("s1", "/x/proj").size == 250
     assert len(calls) == 2
+
+
+def test_latest_activity_is_the_newest_user_line_timestamp(isolated_db, write_transcript):
+    _write_session(isolated_db, write_transcript, entries=[
+        {"type": "user", "timestamp": "2026-01-01T12:00:01Z"},
+        {"type": "user", "timestamp": "2026-01-01T12:00:05Z"},
+        {"type": "summary"},  # no timestamp
+    ])
+    assert claude_context.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 5, tzinfo=timezone.utc)
+
+
+def test_latest_activity_ignores_assistant_and_bookkeeping_lines(isolated_db, write_transcript):
+    # A dialog can be open while these are written (a later tool call of the same batch still
+    # streaming in, an attachment or system note), so they must not read as "the prompt was answered".
+    _write_session(isolated_db, write_transcript, entries=[
+        {"type": "user", "timestamp": "2026-01-01T12:00:01Z"},
+        {"type": "assistant", "timestamp": "2026-01-01T12:00:05Z"},
+        {"type": "attachment", "timestamp": "2026-01-01T12:00:06Z"},
+        {"type": "system", "subtype": "hook_progress", "timestamp": "2026-01-01T12:00:07Z"},
+        {"type": "progress", "timestamp": "2026-01-01T12:00:08Z"},
+    ])
+    assert claude_context.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+
+
+def test_latest_activity_is_none_when_the_transcript_has_no_user_line(isolated_db, write_transcript):
+    _write_session(isolated_db, write_transcript, entries=[{"type": "assistant", "timestamp": "2026-01-01T12:00:05Z"}])
+    assert claude_context.latest_activity("s1", "/x/proj") is None
+
+
+def test_latest_activity_reads_an_unchanged_file_once_and_again_after_an_append(isolated_db, write_transcript, monkeypatch):
+    path = _write_session(isolated_db, write_transcript, entries=[{"type": "user", "timestamp": "2026-01-01T12:00:01Z"}])
+    calls = []
+    real = claude_context._read_tail_latest_timestamp
+    monkeypatch.setattr(claude_context, "_read_tail_latest_timestamp", lambda p: calls.append(p) or real(p))
+
+    claude_context.latest_activity("s1", "/x/proj")
+    claude_context.latest_activity("s1", "/x/proj")
+    assert len(calls) == 1
+
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "timestamp": "2026-01-01T12:00:09Z"}) + "\n")
+    assert claude_context.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 9, tzinfo=timezone.utc)
+    assert len(calls) == 2
+
+
+def test_latest_activity_widens_its_window_past_an_oversized_untimestamped_line(isolated_db, write_transcript, monkeypatch):
+    _write_session(isolated_db, write_transcript, entries=[
+        {"type": "user", "timestamp": "2026-01-01T12:00:01Z"},
+        {"type": "user", "blob": "x" * 5_000},
+    ])
+    monkeypatch.setattr(claude_context, "_TAIL_WINDOW", 700)
+    assert claude_context.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+
+
+def test_latest_activity_treats_a_naive_timestamp_as_utc(isolated_db, write_transcript):
+    _write_session(isolated_db, write_transcript, entries=[{"type": "user", "timestamp": "2026-01-01T12:00:01"}])
+    assert claude_context.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+
+
+def test_latest_activity_is_none_when_missing_empty_or_untimestamped(isolated_db, write_transcript):
+    assert claude_context.latest_activity("missing", "/x/proj") is None
+    _write_session(isolated_db, write_transcript, entries=[{"type": "summary"}])
+    assert claude_context.latest_activity("s1", "/x/proj") is None
 
 
 def test_live_context_never_raises(isolated_db, write_transcript, monkeypatch):

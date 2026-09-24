@@ -6,14 +6,18 @@ import argparse
 import asyncio
 import logging
 import os
+import pathlib
+import subprocess
 import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Literal, Mapping, Optional, Sequence
+from typing import Annotated, Any, Literal, Mapping, Optional, Sequence, Union
+from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi import FastAPI, HTTPException, Path, Query, Request
+from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
 
 import banner
@@ -24,7 +28,8 @@ import claude_transcripts
 import overview_stats
 import transcript_query
 from live_snapshot import LiveSnapshot
-from security import SecurityMiddleware, provision_token
+from pending_decisions import PendingDecisions
+from security import SecurityMiddleware, is_local, provision_token
 
 log = logging.getLogger("ledger")
 
@@ -37,6 +42,13 @@ _refresh_lock = threading.Lock()
 
 # The one place the live registry is read from; see LiveSnapshot.
 live = LiveSnapshot()
+
+# In-memory pending tool-permission decisions relayed from live sessions; see pending_decisions.py.
+decisions = PendingDecisions()
+
+# Invoked, unmodified, by POST /api/sessions/{id}/open-repo - this repo's own copy, not any
+# installed-under-%USERPROFILE% one, so opening a repo window needs no separate install step.
+OPEN_REPO_SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "hooks" / "scripts" / "Open-ClaudeRepoWindow.ps1"
 
 
 def locked_refresh() -> datetime:
@@ -102,8 +114,26 @@ def _iso(value) -> Optional[str]:
 
 
 @app.get("/api/meta")
-def get_meta() -> dict:
-    return {"refreshed_at": _iso(claude_db.refreshed_at())}
+def get_meta(request: Request) -> dict:
+    return {
+        "refreshed_at": _iso(claude_db.refreshed_at()),
+        "is_local": is_local(request),
+        "remote_mode": decisions.remote_mode(),
+    }
+
+
+class RemoteModeRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/remote-mode")
+def post_remote_mode(body: RemoteModeRequest, request: Request) -> dict:
+    # Same locality test as the delete routes: a valid token lets another device see and answer
+    # prompts while Remote mode is on, but never lets it change Remote mode itself.
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="switching Remote mode requires a local request")
+    decisions.set_remote_mode(body.enabled)
+    return decisions.remote_mode()
 
 
 @app.post("/api/refresh")
@@ -111,9 +141,31 @@ def post_refresh() -> dict:
     return {"refreshed_at": _iso(locked_refresh())}
 
 
+def _can_see_prompts(request: Request) -> bool:
+    """The machine's own browser always sees pending prompts; another device only while Remote mode is on."""
+    return is_local(request) or decisions.remote_mode_enabled()
+
+
+def _sweep_prompts() -> None:
+    """Drop every pending prompt whose session already moved on (answered in the terminal, say).
+
+    Run ahead of each read/answer of the pending prompts rather than on a timer of its own: a
+    prompt only matters while something is polling, and the transcript reads it costs are cached
+    by file stat.
+    """
+    decisions.sweep(live.latest_activity)
+
+
 @app.get("/api/live")
-def get_live() -> dict:
-    return {"sessions": live.get()}
+def get_live(request: Request) -> dict:
+    _sweep_prompts()
+    visible = _can_see_prompts(request)
+    return {
+        "sessions": [
+            {**item, "pending_decision": decisions.peek(item["session_id"]) if visible else None}
+            for item in live.get()
+        ]
+    }
 
 
 def _transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: set[str]) -> dict:
@@ -266,7 +318,10 @@ def get_session(session_id: SessionId) -> dict:
 
 
 @app.delete("/api/sessions/{session_id}")
-def delete_session(session_id: SessionId) -> dict:
+def delete_session(session_id: SessionId, request: Request) -> dict:
+    # A valid token widens what a remote device can read/trigger, but never authorizes a delete.
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="delete requires a local request")
     # Liveness comes from a fresh registry read: the 1s cached list could still say
     # "not live" for a session that started a moment ago.
     if live.is_live_now(session_id):
@@ -277,6 +332,117 @@ def delete_session(session_id: SessionId) -> dict:
         if not claude_transcripts.delete_transcript(session_id):
             raise HTTPException(status_code=500, detail="could not delete the transcript file")
     return {"deleted": session_id}
+
+
+class DecisionRequest(BaseModel):
+    tool_name: str
+    tool_input: dict
+
+
+@app.post("/api/sessions/{session_id}/decisions")
+async def post_decision(session_id: SessionId, body: DecisionRequest, request: Request) -> dict:
+    """Called by the relay hook only. Registers the prompt and holds the request until it is
+    answered, cleared or the wait elapses - `{decision: null}` then, and the hook prints nothing."""
+    # The hook runs on this machine; a remote device has no business registering prompts (a forged
+    # one could then be "answered" as if it were real).
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="registering a prompt requires a local request")
+    return await decisions.request_decision(session_id, body.tool_name, body.tool_input)
+
+
+@app.get("/api/sessions/{session_id}/pending-decision")
+def get_pending_decision(session_id: SessionId, request: Request) -> dict:
+    _sweep_prompts()
+    visible = _can_see_prompts(request)
+    return {"pending_decision": decisions.peek(session_id) if visible else None}
+
+
+QUESTION_TOOL = "AskUserQuestion"
+
+
+class DecisionAnswer(BaseModel):
+    decision: Literal["allow", "deny", "answer"]
+    reason: Optional[str] = None
+    answers: Optional[dict[str, Union[str, list[str]]]] = None
+
+
+def _checked_answers(prompt: dict[str, Any], answers: dict[str, Union[str, list[str]]]) -> dict[str, Any]:
+    """Validate a question's answers against the stored prompt; 422 when they don't fit it.
+
+    Each of the prompt's questions needs exactly one answer keyed by its text: an option label or
+    free text ("Other") as a string, or a list only where the question is multi-select.
+    """
+    asked = {
+        q["question"]: bool(q.get("multiSelect"))
+        for q in (prompt["tool_input"].get("questions") or [])
+        if isinstance(q, dict) and isinstance(q.get("question"), str)
+    }
+    if not asked:
+        raise HTTPException(status_code=422, detail="this prompt has no answerable questions")
+    if set(answers) != set(asked):
+        raise HTTPException(status_code=422, detail="answers must cover exactly the questions asked")
+    for text, value in answers.items():
+        if isinstance(value, list):
+            if not asked[text]:
+                raise HTTPException(status_code=422, detail=f"only a multi-select question takes a list: {text!r}")
+            if not value or any(not item.strip() for item in value):
+                raise HTTPException(status_code=422, detail=f"pick at least one non-blank option: {text!r}")
+        elif not value.strip():
+            raise HTTPException(status_code=422, detail=f"answer is blank: {text!r}")
+    return {"decision": "answer", "answers": answers}
+
+
+def _checked_answer(prompt: dict[str, Any], body: DecisionAnswer) -> dict[str, Any]:
+    """The answer the hook receives, or a 422 when its shape doesn't fit the kind of prompt."""
+    is_question = prompt["tool_name"] == QUESTION_TOOL
+    if body.decision == "answer":
+        if not is_question:
+            raise HTTPException(status_code=422, detail="this is a permission prompt: answer allow or deny")
+        if body.answers is None:
+            raise HTTPException(status_code=422, detail="answers are required")
+        return _checked_answers(prompt, body.answers)
+    if is_question:
+        raise HTTPException(status_code=422, detail="this is a question: answer with answers")
+    if body.decision == "allow":
+        return {"decision": "allow"}
+    return {"decision": "deny", "reason": (body.reason or "").strip() or None}
+
+
+@app.post("/api/sessions/{session_id}/decisions/{prompt_id}/answer")
+def post_decision_answer(
+    session_id: SessionId,
+    prompt_id: Annotated[str, Path(pattern=SESSION_ID_PATTERN)],
+    body: DecisionAnswer,
+    request: Request,
+) -> dict:
+    # Token and CSRF header were already checked by the middleware; Remote mode is the extra gate
+    # for another device.
+    if not _can_see_prompts(request):
+        raise HTTPException(status_code=403, detail="Remote mode is off")
+    _sweep_prompts()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
+    prompt = decisions.get(session_id, prompt_id)
+    if prompt is None:
+        raise HTTPException(status_code=409, detail="this session already moved on")
+    answer = _checked_answer(prompt, body)
+    # A plain `def` route runs in Starlette's threadpool; answer() wakes the hook's waiting request
+    # on that request's own event loop, so calling it from here is safe.
+    if not decisions.answer(session_id, prompt_id, answer):
+        raise HTTPException(status_code=409, detail="this session already moved on")
+    return {"answered": prompt_id}
+
+
+@app.post("/api/sessions/{session_id}/open-repo")
+def post_open_repo(session_id: SessionId) -> dict:
+    # The registry's own cwd, never a request parameter - the same rule GET /api/sessions/{id} follows.
+    cwd = live.cwd_for(session_id)
+    if cwd is None:
+        raise HTTPException(status_code=404, detail="unknown or not-live session")
+    uri = f"claudecode://open?path={quote(cwd, safe='')}"
+    subprocess.run(
+        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(OPEN_REPO_SCRIPT), uri],
+        check=False,
+    )
+    return {"opened": session_id}
 
 
 def _project_item(project: claude_projects.ClaudeProject) -> dict:
@@ -301,7 +467,10 @@ def get_projects() -> dict:
 
 
 @app.delete("/api/projects")
-def delete_project(path: str) -> dict:
+def delete_project(path: str, request: Request) -> dict:
+    # A valid token widens what a remote device can read/trigger, but never authorizes a delete.
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="delete requires a local request")
     # Only a path the snapshot already knows is acted on, matched exactly - the
     # delete below removes a directory tree, so it never runs on arbitrary input.
     if path not in {p.path for p in claude_projects.load_projects()}:
@@ -342,6 +511,7 @@ class Settings:
 
 
 def _parse_port(value: Optional[int], env_name: str, environ: Mapping[str, str], default: int, parser) -> int:
+    port = default
     if value is not None:
         port = value
     elif environ.get(env_name, "").strip():
@@ -349,9 +519,7 @@ def _parse_port(value: Optional[int], env_name: str, environ: Mapping[str, str],
             port = int(environ[env_name])
         except ValueError:
             parser.error(f"{env_name} must be a number, got {environ[env_name]!r}")
-    else:
-        port = default
-    if not 1 <= port <= 65535:
+    if port not in range(1, 65536):
         parser.error(f"port must be between 1 and 65535, got {port}")
     return port
 

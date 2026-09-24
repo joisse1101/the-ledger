@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect
 import claude_db
 import server
 from live_snapshot import LiveSnapshot
+from pending_decisions import PendingDecisions
 from security import SecurityMiddleware, provision_token
 
 TOKEN = "s3cret-token-value_0123456789"
@@ -24,6 +25,7 @@ REPO = Path(__file__).resolve().parents[2]
 @pytest.fixture(autouse=True)
 def _isolated(isolated_db, monkeypatch):
     monkeypatch.setattr(server, "live", LiveSnapshot(load_sessions=lambda: []))
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
 
 
 @pytest.fixture
@@ -180,10 +182,27 @@ def test_a_remote_delete_without_the_token_is_refused_and_deletes_nothing(
     assert remote().delete("/api/sessions/aaa-1").status_code == 401
     assert transcript.exists()
 
-    # With a correct bearer token, the same request goes through.
+
+def test_a_remote_delete_with_a_valid_token_is_refused_too(
+    token, isolated_db, write_config, write_transcript
+):
+    # A token widens what a remote device can read/trigger, but it no longer authorizes a delete.
+    transcript = _seed_finished_session(isolated_db, write_config, write_transcript)
     authorized = remote(headers=BEARER)
-    assert authorized.delete("/api/sessions/aaa-1", headers=HEADER).status_code == 200
+    assert authorized.delete("/api/sessions/aaa-1", headers=HEADER).status_code == 403
+    assert transcript.exists()
+    assert authorized.delete("/api/projects", params={"path": "/h/alpha"}, headers=HEADER).status_code == 403
+    assert transcript.exists()
+
+
+def test_a_local_delete_needs_no_token(isolated_db, write_config, write_transcript):
+    transcript = _seed_finished_session(isolated_db, write_config, write_transcript)
+    assert local(headers=HEADER).delete("/api/sessions/aaa-1").status_code == 200
     assert not transcript.exists()
+
+
+def test_meta_reports_is_local_false_for_a_remote_request(token):
+    assert remote(headers=BEARER).get("/api/meta").json()["is_local"] is False
 
 
 def test_a_changed_token_refuses_the_old_one(monkeypatch):

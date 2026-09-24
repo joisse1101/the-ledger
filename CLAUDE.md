@@ -15,7 +15,7 @@ backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml
 gitignored `.venv`/`.ledger`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see "From another device on your network" below), and `hooks/` (Claude
-Code toast hooks). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+Code toast hooks, plus one optional relay hook coupled to the dashboard — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all
@@ -108,14 +108,20 @@ cd gateway
 
 This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `8080`) and
 then prints the sign-in link/QR for every address this machine is reachable at — e.g.
-`http://<address>:8080/?token=<token>` — via `api/gateway_signin.py`. Opening that link on another
+`https://<address>:8080/?token=<token>` — via `api/gateway_signin.py`. The gateway serves **HTTPS
+only**, with a self-signed certificate (there's no plain-HTTP listener to fall back to), so each
+new device's browser shows a one-time certificate warning on first visit — expected, not a
+misconfiguration; accept it once. An old `http://` sign-in link no longer works: re-run
+`Start-Gateway.ps1` and use the freshly printed `https://` one. Opening that link on another
 device signs it in (the token is stored in that browser's `localStorage` and stripped from the
 address bar) and every subsequent request from it carries `Authorization: Bearer <token>`. A local
 request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other request
 needs it, checked by `api/security.py`'s `SecurityMiddleware` (see "Architecture" below) exactly as
-before — the gateway adds no auth of its own, it only relays. Only do this on a network you trust:
-the connection is plain HTTP, so the token and your session data aren't encrypted in transit.
-Windows will prompt to allow Docker/the gateway through the firewall the first time — allow it on
+before — the gateway adds no auth of its own, it only relays. A token is not enough for everything,
+though: deleting a session/project and switching Remote mode need a *local* request outright, and
+answering a live session's prompts from another device needs Remote mode on (see "Architecture"
+below). Only do this on a network you trust — the certificate is self-signed, so the encryption
+protects against snooping but the browser can't vouch for who it's talking to. Windows will prompt to allow Docker/the gateway through the firewall the first time — allow it on
 Private networks. Stop it with `.\Stop-Gateway.ps1`; it doesn't touch the backend/frontend
 processes.
 
@@ -180,14 +186,20 @@ Python tests, one file per module under test:
   `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
   behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
   `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`),
-  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI).
+  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI),
+  `test_pending_decisions.py` (the pending-prompt store, transcript-based clearing, Remote mode),
+  `test_relay_hook.py` (runs the real `hooks/ledgerScripts/Relay-PermissionRequest.ps1` as a subprocess
+  against a real uvicorn server: answers become decisions, and every no-answer path prints nothing),
+  `test_hook_install.py` (the relay's `-IncludeSessionControl` install/uninstall against a throwaway
+  `USERPROFILE`, never the real `settings.json`). The last two are skipped off Windows.
 
 Frontend (`cd web`):
 
 ```powershell
 npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
-                   # list/ResponsiveList, hooks/useDebouncedValue, hooks/useViewportClass,
-                   # lib/format, lib/tokens
+                   # list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
+                   # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
+                   # hooks/useViewportClass, lib/format, lib/tokens
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
@@ -291,14 +303,19 @@ frontend is a wholly separate process (see `web/` below). Routes:
 
 | Endpoint | Notes |
 |---|---|
-| `GET /api/meta` | `{refreshed_at}` |
+| `GET /api/meta` | `{refreshed_at, is_local, remote_mode: {enabled, expires_at}}` — `is_local` is `security.is_local(request)` for *this* request, so the frontend can hide controls a remote device can't use |
+| `POST /api/remote-mode` | Body `{enabled}`; **local requests only** (403 otherwise, token or not). Returns the new `remote_mode` |
 | `POST /api/refresh` | Forces a `locked_refresh()`, returns the new `refreshed_at` |
-| `GET /api/live` | `{sessions: [...]}` from the shared `LiveSnapshot` (see `live_snapshot.py`) |
+| `GET /api/live` | `{sessions: [...]}` from the shared `LiveSnapshot` (see `live_snapshot.py`); each session gains `pending_decision: {id, tool_name, tool_input} \| null` (its oldest pending prompt), always `null` for a non-local request while Remote mode is off. Sweeps stale prompts first |
+| `GET /api/sessions/{id}/pending-decision` | `{pending_decision}`, same visibility rule as `/api/live`; polled by the Live control view |
+| `POST /api/sessions/{id}/decisions` | **Relay hook only** (local requests only, 403 otherwise). Body `{tool_name, tool_input}`; registers the prompt and *holds the request open* until it's answered, cleared or times out, then returns `{decision: "allow" \| "deny" \| "answer" \| null, ...}` — `null` means "no answer", and the hook then prints nothing |
+| `POST /api/sessions/{id}/decisions/{prompt_id}/answer` | The dashboard's answer: `{decision: "allow"}`, `{decision: "deny", reason?}` or `{decision: "answer", answers: {"<question>": string \| string[]}}`. 403 for a non-local request unless Remote mode is on; 409 if the prompt is gone (answered/cleared elsewhere); 422 if the shape doesn't fit the prompt kind (answers must cover exactly the questions asked, lists only for multi-select) |
+| `POST /api/sessions/{id}/open-repo` | Opens the session's `cwd` (from the live registry — never a request parameter) in VS Code on the host; 404 unless the session is live. Token-gated like any other non-GET, no Remote-mode/locality requirement |
 | `GET /api/transcripts` | `q`, `project[]`, `version[]`, `branch[]`, `sort`, `dir`, `limit`, `offset` → paged items + `total` + filter `options`, via `transcript_query.py`; each item's `live` flag comes from the same `LiveSnapshot`'s live-ID set |
 | `GET /api/sessions/{id}` | Recap + `SessionDetail` JSON, or `readable: false`. `id` is validated against `^[A-Za-z0-9-]{1,64}$` at the route; `cwd` is resolved server-side from the live registry or the transcripts snapshot, **never** from a request parameter |
-| `DELETE /api/sessions/{id}` | 409 if `live.is_live_now(id)` (a *fresh* registry read, not the ≤1s snapshot — a session that just started can't be deleted on stale data), 404 if unknown, else `claude_transcripts.delete_transcript` under the refresh lock |
+| `DELETE /api/sessions/{id}` | **Local requests only** (403 otherwise — a valid token doesn't authorize a delete); 409 if `live.is_live_now(id)` (a *fresh* registry read, not the ≤1s snapshot — a session that just started can't be deleted on stale data), 404 if unknown, else `claude_transcripts.delete_transcript` under the refresh lock |
 | `GET /api/projects` | `{projects: [...]}` |
-| `DELETE /api/projects?path=` | 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
+| `DELETE /api/projects?path=` | **Local requests only**, like the session delete; 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
 | `GET /api/overview?range=` | 422 for an unknown range label; otherwise `overview_stats.overview()`'s payload |
 
 There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
@@ -325,6 +342,13 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
   `provision_token()` runs unconditionally on every backend start now (no longer gated by a LAN
   flag) — it's `LEDGER_TOKEN` if set, else the token stored at `api/.ledger/token` (created with
   `secrets.token_urlsafe(32)` on first start, mode `0o600`) — delete that file and restart to rotate it.
+  The middleware's locality test is also exported as `is_local(request)`, which is what makes some
+  things stricter than "has the token": both `DELETE` routes, `POST /api/remote-mode` and
+  `POST /api/sessions/{id}/decisions` call it and refuse a non-local request with 403 regardless of
+  any token (so a remote device can read, and — with Remote mode on — answer prompts, but never
+  delete or flip Remote mode), and `GET /api/meta` reports it back as `is_local` so the frontend can
+  hide those controls up front. The route-level check is the actual security boundary; hiding the
+  buttons is only UX.
 - `api/banner.py` — what the server prints at startup: always a reminder that the frontend is a
   separate process and how to start it (`cd web && npm run preview`), plus its local URL — the
   backend has no LAN-facing state to report any more, so that's the whole banner (`build_banner()`).
@@ -341,7 +365,32 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
   through this one lock. One session's `live_context()` raising leaves the others populated
   (`context: null` for that one). `is_live_now()` bypasses the TTL for delete decisions (see the
   `DELETE /api/sessions/{id}` route above); `cwd_for()` is used server-side only, never sent to a
-  client.
+  client. `latest_activity()` (through the same lock) feeds the pending-prompt sweep below.
+- `api/pending_decisions.py` — `PendingDecisions`, the in-memory, lock-guarded store (same spirit as
+  `LiveSnapshot`; nothing touches disk) behind answering a live session's blocking prompts from the
+  dashboard, plus the **Remote mode** switch. The prompts come from the optional relay hook (see
+  `hooks/` below): a `PermissionRequest` hook fires only when Claude Code is about to show a dialog
+  (a tool-permission prompt or an `AskUserQuestion`), runs *alongside* the terminal dialog rather than
+  in front of it, and POSTs the prompt to `/api/sessions/{id}/decisions`, which `register()`s it (an
+  API-generated id, since Claude Code supplies none) and awaits it in `request_decision()`. Whichever
+  surface answers first wins: a dashboard answer resolves the waiting request (`answer()`), which the
+  hook hands back to Claude Code as the decision; a terminal answer is never heard directly, so
+  `sweep()` clears the prompt when the session's transcript shows a new **`user`** line (the tool
+  result) stamped after it was registered — only `user` lines count, since `assistant`/bookkeeping
+  lines can appear while a dialog is still open — and releases the hook with "no answer" so it exits.
+  A 30-minute maximum age is the backstop. `sweep()` isn't on a timer: `/api/live`, the
+  pending-decision route and the answer route each run it first (`server._sweep_prompts`), so an
+  already-answered prompt gives a 409 rather than "succeeding". **Remote mode** is only state here
+  (`set_remote_mode`/`remote_mode`/`remote_mode_enabled`): in-memory, off after 8 hours and after any
+  backend restart, and only a local request can turn it on or off. It is purely an access gate on
+  *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
+  it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
+  browser always can (`server._can_see_prompts`).
+- `POST /api/sessions/{id}/open-repo` shells out to `hooks/scripts/Open-ClaudeRepoWindow.ps1`
+  (`server.OPEN_REPO_SCRIPT`, `subprocess.run`, the script unmodified) with a
+  `claudecode://open?path=<url-encoded cwd>` URI — the repo's own copy, not the one installed under
+  `%USERPROFILE%\.claude\hooks\`, so `api/` now depends on that file in `hooks/` even though `hooks/`
+  is otherwise standalone. It needs no install step, only that the API run from this checkout.
 - `api/overview_stats.py` — the pure aggregation behind `/api/overview`, no pandas: `TIME_RANGES`
   (All time/Today/Yesterday/Past week/Past month/Past quarter/Past year, bucketed by *local calendar
   date*, not a rolling window), `filter_by_range`, `project_totals` (top-7 + `"Other"`,
@@ -379,7 +428,8 @@ any unknown path) rendered inside `AppShell`.
   FastAPI's `detail` message), `UnauthorizedError` (401 — this device isn't signed in), or
   `NetworkError` (fetch itself failed/threw). `queries.ts` has one TanStack Query hook per endpoint
   (`useMeta`, `useRefresh`, `useLive`, `useTranscripts` — an `useInfiniteQuery` for "Load more"
-  paging, `useSession`, `useOverview`, `useProjects`, `useDeleteSession`, `useDeleteProject`);
+  paging, `useSession`, `useOverview`, `useProjects`, `useDeleteSession`, `useDeleteProject`,
+  `usePendingDecision`, `useAnswerDecision`, `useSetRemoteMode`, `useOpenRepo`);
   `useLive({auto})` sets `refetchInterval` to `2000` or `false` and disables background polling so a
   hidden tab stops hitting the server. `queryClient.ts` retries a dropped connection once
   (`NetworkError`) but never retries a real API error. `serverStatus.ts`'s `useServerProblem()` scans
@@ -422,7 +472,17 @@ any unknown path) rendered inside `AppShell`.
   shows the recap block only when opened `from="all"`; its `Detail` section (current-context figure,
   `TokensChart`, "All responses" table, "what filled the context" by-tool/largest-increases tables)
   and `DeleteControls` (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409
-  mid-confirm surfaces the server's message) round it out. `TokensChart` lazily `import()`s
+  mid-confirm surfaces the server's message; hidden entirely when `useMeta().is_local` is false)
+  round it out. **A Live-list selection (`from="live"`) opens `LiveControl` instead of any of
+  that** — a control-only view: the session's oldest pending prompt rendered by `DecisionPrompt`
+  (Approve/Deny with an optional reason for a permission prompt; the real options, multi-select and
+  free text for an `AskUserQuestion`, via `lib/prompt.ts`) and an "Open repo window" button
+  (`useOpenRepo`). `usePendingDecision` polls while it's mounted; a prompt that vanishes without this
+  view having answered it says the session already moved on (as does a 409) instead of going blank,
+  and it shows nothing on a non-local device while Remote mode is off. `LiveList` badges a row
+  (`pending-badge`) from `/api/live`'s `pending_decision`, and carries `RemoteModeControl`: a switch
+  on the machine running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere.
+  `TokensChart` lazily `import()`s
   `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its bundle cost
   until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the theme
   change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers and
@@ -448,7 +508,8 @@ any unknown path) rendered inside `AppShell`.
   Sessions, where a row click opens a dialog — a row click doubles as "delete this one" (a
   dedicated per-row delete button isn't possible without nesting a `<button>` inside `ListCards`'
   card-as-button); selecting a row shows an inline `detail-notice` confirmation naming the exact
-  path before Confirm/Cancel. Confirming calls `useDeleteProject`, whose `onSuccess` already
+  path before Confirm/Cancel — but only when `useMeta().is_local`; on another device a row click
+  does nothing, since the API refuses remote deletes. Confirming calls `useDeleteProject`, whose `onSuccess` already
   invalidates the `projects`, `transcripts`, and `overview` queries.
 - **`lib/format.ts`** — display formatting for API values (`formatTime`, `formatDateTime`,
   `formatCost`, `formatContext`, `formatText`, `formatCount`; every one renders `"--"` for a missing
@@ -461,7 +522,17 @@ any unknown path) rendered inside `AppShell`.
 ### `gateway/` — the containerized Nginx reverse proxy
 
 The only thing that ever grants LAN access (see CLAUDE.md's "Setup & Run" above); the backend and
-frontend stay loopback-only always. `Dockerfile` builds `nginx:alpine` with `nginx.conf.template`
+frontend stay loopback-only always. It **terminates TLS and serves HTTPS only**: the `Dockerfile`
+installs `openssl` at image build time to generate a self-signed EC certificate/key
+(`/etc/nginx/certs/gateway.{crt,key}`, 10-year validity, `CN=the-ledger-gateway`, SANs for
+`localhost`/`127.0.0.1`), then removes it again; Docker's layer cache keeps the same certificate
+across rebuilds, so a device that accepted it once isn't warned again until that layer is rebuilt.
+The template has a single `listen 443 ssl;` server (TLS 1.2/1.3) — no plain-HTTP listener at all, so
+nothing can be downgraded — and `docker-compose.yml` maps `${GATEWAY_PORT:-8080}` to container port
+443. The hop behind it (gateway → `host.docker.internal` → backend/frontend) stays plain HTTP: it's
+loopback-only on the host, so the gateway-to-device hop is the only one that's on the network at
+all. A LAN address has no stable hostname to get a real CA certificate for, hence self-signed and
+the one-time browser warning per device. `Dockerfile` builds `nginx:alpine` with `nginx.conf.template`
 copied to `/etc/nginx/templates/default.conf.template` — the base image's entrypoint runs `envsubst`
 on it at container start, substituting `${BACKEND_PORT}`/`${FRONTEND_PORT}` (left in the template as
 literal `$host`/`$remote_addr`/`$proxy_add_x_forwarded_for` for Nginx itself, since `envsubst` only
@@ -478,22 +549,43 @@ and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment varia
 8501/4173). `Start-Gateway.ps1` loads the root `.env` (see "Setup & Run" above), runs
 `docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
 `Stop-Gateway.ps1` runs `docker compose down` and touches nothing else. `api/gateway_signin.py`
+prints `https://` links and encodes the QR with the same HTTPS address, with a note that the
+self-signed certificate will draw a one-time browser warning; it
 reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
 `banner.render_qr()` (not its own copy) so address-discovery logic still lives in exactly one place.
 
 ### `hooks/`
 
-A standalone utility, unrelated to the dashboard: Windows toast notifications for Claude
-Code's `Notification`/`Stop` hook events, with `Install-ClaudeHooks.ps1`/`Uninstall-ClaudeHooks.ps1`
-to set them up on a machine. See `hooks/README.md` for how it works and full install/uninstall/test
-steps.
+`hooks/scripts/` is a standalone utility, unrelated to the dashboard: Windows toast notifications for
+Claude Code's `Notification`/`Stop` hook events, with `Install-ClaudeHooks.ps1`/
+`Uninstall-ClaudeHooks.ps1` to set them up on a machine. See `hooks/README.md` for how it works and
+full install/uninstall/test steps. (The dashboard's one reach into it: `api/` runs
+`scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action — see `api/` above.)
+
+`hooks/ledgerScripts/` is the exception: an **optional, dashboard-coupled** hook script, kept apart
+from `scripts/` precisely because it only makes sense with this app. `Relay-PermissionRequest.ps1` is
+a `PermissionRequest` hook that forwards each prompt Claude Code is about to show (permission dialog
+or `AskUserQuestion`) to `POST /api/sessions/{id}/decisions` on `127.0.0.1:<port>` (`-Port`, baked in
+by the installer, else `$env:LEDGER_PORT`, else 8501) and waits, so the dashboard can answer it. It
+must **print nothing at all** — empty stdout, exit 0 — whenever it has no answer (backend down, no
+answer in time, any error): any output is a decision, and silence leaves the terminal dialog as the
+only way to answer, exactly as if the hook weren't installed. The hook is machine-wide, so it fires
+for every session, not just ones the dashboard shows. It's installed separately from the toast
+hooks: `Install-ClaudeHooks.ps1 -IncludeSessionControl` (add `-SkipToastHooks` for the relay alone)
+copies it to `%USERPROFILE%\.claude\hooks\ledgerScripts\`, merges the `PermissionRequest` entry
+(empty matcher, `timeout` 1810s — kept above the script's own 1805s wait) into `settings.json`, and
+removes the legacy `PreToolUse` relay entry an earlier version of this feature installed;
+`Uninstall-ClaudeHooks.ps1 -IncludeSessionControl` removes just the relay entries. Behavior was
+verified against Claude Code 2.1.281 (the hook runs alongside the dialog, a late hook result is
+discarded, `updatedInput.answers` answers an `AskUserQuestion`) — re-check after a Claude Code
+upgrade. See `hooks/README.md` section 6.
 
 ### `openspec/`
 
 The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
 capabilities: `web-dashboard`, `responsive-layout`, `network-access`, `live-context-gauge`,
-`toast-context-line`. `openspec/changes/` holds proposals in flight (each with
-`proposal.md`/`design.md`/`tasks.md` plus a spec delta) — currently none; completed ones move to
+`toast-context-line`, `remote-session-control`. `openspec/changes/` holds proposals in flight (each with
+`proposal.md`/`design.md`/`tasks.md` plus a spec delta) — currently `add-transcript-history-backup`; completed ones move to
 `openspec/changes/archive/` and aren't tracked further. Treat the specs as the authoritative record
 of what a capability is required to do, ahead of inferring intent from the code alone.
 

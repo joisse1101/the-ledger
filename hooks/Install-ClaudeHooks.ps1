@@ -1,45 +1,116 @@
 <#
-Installs the Claude Code toast-notification hooks for the current user:
-copies everything in .\scripts into %USERPROFILE%\.claude\hooks, registers
-the claudecode:// protocol handler, and merges the Notification/Stop hooks
-into %USERPROFILE%\.claude\settings.json.
+.SYNOPSIS
+Installs the Claude Code hooks for the current user: the toast notifications, and optionally the
+Ledger relay hook.
 
-Run this directly (in your own PowerShell prompt) rather than embedding
-$env:USERPROFILE inside a hook's "command" string in settings.json — Claude
-Code runs those via Git Bash or PowerShell depending on the machine, and the
-two disagree on environment-variable syntax. Running this script resolves
-$env:USERPROFILE once, up front, in a known shell, and writes the fully
-resolved literal path into settings.json, so nothing needs to be expanded
-later when the hook actually fires.
+.DESCRIPTION
+By default this installs the toast-notification hooks: it copies everything in .\scripts into
+%USERPROFILE%\.claude\hooks, registers the claudecode:// protocol handler, and merges the
+Notification/Stop hooks into %USERPROFILE%\.claude\settings.json.
 
-Safe to re-run: copying is idempotent, and the settings.json merge skips
-hook entries that already reference Send-ClaudeToast.ps1 for a given title.
+With -IncludeSessionControl it also installs the optional Ledger relay hook, which lets you answer a
+live session's blocking prompts (tool-permission dialogs and questions) from the Ledger dashboard. It
+copies .\ledgerScripts to %USERPROFILE%\.claude\hooks\ledgerScripts and registers a PermissionRequest
+hook for it (empty matcher, timeout 1810s). The hook runs alongside the terminal dialog and stays
+silent unless the dashboard answers, so Claude Code behaves exactly as if it weren't installed
+otherwise. It also removes the earlier PreToolUse-based relay hook (entry and installed script), if
+that is still present.
+
+The relay hook has to know which port the Ledger API is on, so the install writes it into the hook's
+command as -Port. It's resolved the same way Start-Ledger.ps1 does (highest wins): -BackendPort, then
+BACKEND_PORT in the repo root's .env, then an already-set BACKEND_PORT environment variable, then
+8501. Re-run this install after changing BACKEND_PORT.
+
+Run this directly (in your own PowerShell prompt) rather than embedding $env:USERPROFILE inside a
+hook's "command" string in settings.json - Claude Code runs those via Git Bash or PowerShell
+depending on the machine, and the two disagree on environment-variable syntax. This script resolves
+$env:USERPROFILE once, up front, in a known shell, and writes the fully resolved literal path into
+settings.json, so nothing needs to be expanded later when the hook actually fires.
+
+Safe to re-run: copying is idempotent, and the settings.json merge updates hook entries that are
+already there instead of duplicating them.
+
+.PARAMETER IncludeSessionControl
+Also install the optional Ledger relay hook (PermissionRequest).
+
+.PARAMETER BackendPort
+The Ledger API's port to write into the relay hook. Only used with -IncludeSessionControl; when
+omitted it comes from .env, the environment, or 8501 (see above).
+
+.PARAMETER SkipToastHooks
+Leave the toast hooks alone: don't copy the toast scripts, register the claudecode:// handler, or
+touch the Notification/Stop hooks. Combine with -IncludeSessionControl to install only the relay
+hook. Does nothing on its own.
+
+.PARAMETER Help
+Show this help and exit (-h works too).
+
+.EXAMPLE
+.\Install-ClaudeHooks.ps1
+Installs the toast hooks only.
+
+.EXAMPLE
+.\Install-ClaudeHooks.ps1 -IncludeSessionControl
+Installs the toast hooks and the relay hook.
+
+.EXAMPLE
+.\Install-ClaudeHooks.ps1 -IncludeSessionControl -SkipToastHooks
+Installs only the relay hook.
 #>
+param(
+    [switch]$IncludeSessionControl,
+    [switch]$SkipToastHooks,
+    [int]$BackendPort,
+    [switch]$Help
+)
 
 $ErrorActionPreference = 'Stop'
 
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
+
+# Empty = every PermissionRequest. The event only fires when a dialog is about to be shown, so there
+# is nothing to narrow.
+$relayMatcher = ''
+# Seconds. Must stay above Relay-PermissionRequest.ps1's own wait (-TimeoutSeconds, default 1805) or
+# Claude Code kills the hook mid-wait.
+$relayHookTimeout = 1810
+
+if ($SkipToastHooks -and -not $IncludeSessionControl) {
+    Write-Host 'Nothing to install: -SkipToastHooks without -IncludeSessionControl.'
+    return
+}
+
 $hooksDir = Join-Path $env:USERPROFILE '.claude\hooks'
 $toastScript = Join-Path $hooksDir 'Send-ClaudeToast.ps1'
+$ledgerScriptsDir = Join-Path $hooksDir 'ledgerScripts'
+$relayScript = Join-Path $ledgerScriptsDir 'Relay-PermissionRequest.ps1'
+# The earlier, PreToolUse-based relay: removed on install, matched by script name.
+$legacyRelayName = 'Relay-PreToolUse.ps1'
 $settingsPath = Join-Path $env:USERPROFILE '.claude\settings.json'
 
-# 1. Copy the scripts
-New-Item -ItemType Directory -Force -Path $hooksDir | Out-Null
-Copy-Item -Path (Join-Path $PSScriptRoot 'scripts\*') -Destination $hooksDir -Force
-Write-Host "Copied scripts to $hooksDir"
+if (-not $SkipToastHooks) {
+    # 1. Copy the scripts
+    New-Item -ItemType Directory -Force -Path $hooksDir | Out-Null
+    Copy-Item -Path (Join-Path $PSScriptRoot 'scripts\*') -Destination $hooksDir -Force
+    Write-Host "Copied scripts to $hooksDir"
 
-# 2. Register the claudecode:// protocol handler (HKCU, no admin needed)
-$vbsPath = Join-Path $hooksDir 'Open-ClaudeRepoWindow.vbs'
-$command = "wscript.exe `"$vbsPath`" `"%1`""
+    # 2. Register the claudecode:// protocol handler (HKCU, no admin needed)
+    $vbsPath = Join-Path $hooksDir 'Open-ClaudeRepoWindow.vbs'
+    $command = "wscript.exe `"$vbsPath`" `"%1`""
 
-New-Item -Path 'HKCU:\Software\Classes\claudecode' -Force | Out-Null
-Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode' -Name '(Default)' -Value 'URL:Claude Code Repo Protocol'
-Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode' -Name 'URL Protocol' -Value ''
+    New-Item -Path 'HKCU:\Software\Classes\claudecode' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode' -Name '(Default)' -Value 'URL:Claude Code Repo Protocol'
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode' -Name 'URL Protocol' -Value ''
 
-New-Item -Path 'HKCU:\Software\Classes\claudecode\shell\open\command' -Force | Out-Null
-Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode\shell\open\command' -Name '(Default)' -Value $command
-Write-Host 'Registered the claudecode:// protocol handler'
+    New-Item -Path 'HKCU:\Software\Classes\claudecode\shell\open\command' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\claudecode\shell\open\command' -Name '(Default)' -Value $command
+    Write-Host 'Registered the claudecode:// protocol handler'
+}
 
-# 3. Merge the Notification/Stop hooks into settings.json
+# 3. Merge the hooks into settings.json
 if (Test-Path $settingsPath) {
     $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
 } else {
@@ -75,11 +146,95 @@ function Add-ToastHook {
     Write-Host "Added $EventName hook for `"$Title`""
 }
 
-Add-ToastHook -Settings $settings -EventName 'Notification' -Title 'Claude Code Alert' -BodyTemplate 'Waiting for input in {0}!' -ScriptPath $toastScript
-Add-ToastHook -Settings $settings -EventName 'Stop' -Title 'Claude Code Done' -BodyTemplate 'Finished task in {0}!' -ScriptPath $toastScript
+# Same precedence as Start-Ledger.ps1's Resolve-Port: explicit parameter, then the repo root's .env,
+# then an already-set BACKEND_PORT environment variable, then the default.
+function Resolve-BackendPort {
+    param([int]$Explicit)
+    if ($Explicit) { return $Explicit }
+
+    $rootEnvFile = Join-Path $PSScriptRoot '..\.env'
+    if (Test-Path $rootEnvFile) {
+        foreach ($line in Get-Content $rootEnvFile) {
+            if ($line -match '^\s*BACKEND_PORT\s*=\s*(\d+)\s*$' -and $line -notmatch '^\s*#') {
+                return [int]$Matches[1]
+            }
+        }
+    }
+
+    $existing = [Environment]::GetEnvironmentVariable('BACKEND_PORT')
+    if ($existing -match '^\d+$') { return [int]$existing }
+    return 8501
+}
+
+function Add-RelayHook {
+    param($Settings, [string]$ScriptPath, [string]$Matcher, [int]$Timeout, [int]$Port)
+
+    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Port $Port"
+
+    if (-not $Settings.hooks.PSObject.Properties['PermissionRequest']) {
+        $Settings.hooks | Add-Member -NotePropertyName 'PermissionRequest' -NotePropertyValue @()
+    }
+
+    $alreadyInstalled = @($Settings.hooks.PermissionRequest) | Where-Object {
+        @($_.hooks) | Where-Object { $_.command -like '*Relay-PermissionRequest.ps1*' }
+    }
+    if ($alreadyInstalled) {
+        Write-Host 'PermissionRequest relay hook already present, updating path, port and timeout'
+        $alreadyInstalled[0].hooks[0].command = $command
+        $alreadyInstalled[0].hooks[0].timeout = $Timeout
+        return
+    }
+
+    $newEntry = [PSCustomObject]@{
+        matcher = $Matcher
+        hooks   = @([PSCustomObject]@{ type = 'command'; command = $command; timeout = $Timeout })
+    }
+    $Settings.hooks.PermissionRequest = @($Settings.hooks.PermissionRequest) + $newEntry
+    Write-Host 'Added PermissionRequest relay hook'
+}
+
+# Drops the earlier PreToolUse relay entry (other PreToolUse hooks stay), and the whole PreToolUse key
+# if that leaves it empty.
+function Remove-LegacyRelayHook {
+    param($Settings, [string]$ScriptName)
+
+    if (-not $Settings.hooks.PSObject.Properties['PreToolUse']) { return }
+    $all = @($Settings.hooks.PreToolUse)
+    $kept = @($all | Where-Object {
+        -not (@($_.hooks) | Where-Object { $_.command -like "*$ScriptName*" })
+    })
+    if ($kept.Count -eq $all.Count) { return }
+    if ($kept.Count -gt 0) {
+        $Settings.hooks.PreToolUse = $kept
+    } else {
+        $Settings.hooks.PSObject.Properties.Remove('PreToolUse')
+    }
+    Write-Host 'Removed the earlier PreToolUse relay hook'
+}
+
+if (-not $SkipToastHooks) {
+    Add-ToastHook -Settings $settings -EventName 'Notification' -Title 'Claude Code Alert' -BodyTemplate 'Waiting for input in {0}!' -ScriptPath $toastScript
+    Add-ToastHook -Settings $settings -EventName 'Stop' -Title 'Claude Code Done' -BodyTemplate 'Finished task in {0}!' -ScriptPath $toastScript
+}
+
+if ($IncludeSessionControl) {
+    New-Item -ItemType Directory -Force -Path $ledgerScriptsDir | Out-Null
+    Copy-Item -Path (Join-Path $PSScriptRoot 'ledgerScripts\*') -Destination $ledgerScriptsDir -Force
+    Write-Host "Copied session-control scripts to $ledgerScriptsDir"
+    $legacyScript = Join-Path $ledgerScriptsDir $legacyRelayName
+    if (Test-Path $legacyScript) { Remove-Item -Path $legacyScript -Force }
+    Remove-LegacyRelayHook -Settings $settings -ScriptName $legacyRelayName
+    $relayPort = Resolve-BackendPort -Explicit $BackendPort
+    Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout -Port $relayPort
+    Write-Host "Relay hook will talk to the Ledger API on port $relayPort (re-run this install if BACKEND_PORT changes)"
+}
 
 New-Item -ItemType Directory -Force -Path (Split-Path $settingsPath) | Out-Null
 $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding utf8
 Write-Host "Updated $settingsPath"
 
-Write-Host "`nDone. Run the tests in README.md to verify (BurntToast module must already be installed)."
+if ($SkipToastHooks) {
+    Write-Host "`nDone. See README.md's session-control section to verify."
+} else {
+    Write-Host "`nDone. Run the tests in README.md to verify (BurntToast module must already be installed)."
+}

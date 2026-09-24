@@ -129,7 +129,7 @@ Or skip straight to all three with `.\Start-Ledger.ps1` from the repo root — i
 the gateway too unless you pass `-NoGateway`.
 
 Either way, once it's up you'll see a sign-in link and QR code printed for every address
-this machine is reachable at, e.g. `http://<address>:8080/?token=<token>`. Opening that
+this machine is reachable at, e.g. `https://<address>:8080/?token=<token>`. Opening that
 link (or scanning the QR) on another device signs it in — the token is stored in that
 browser and stripped from the address bar, then sent as a header on every request from
 then on. A device that hasn't opened that link sees an empty, signed-out shell instead of
@@ -138,9 +138,14 @@ your data.
 Windows will prompt to allow Docker/the gateway through the firewall the first time —
 allow it on **Private networks**.
 
-Only do this on a network you trust: the connection is plain HTTP, not HTTPS, so the
-token and your session data aren't encrypted in transit — anyone else on the same
-network could read them.
+The gateway serves HTTPS only, using a self-signed certificate it generates when its image
+is built, so the token and your session data are encrypted in transit. Because that
+certificate isn't from a public authority, each new device's browser warns that the
+connection isn't trusted the first time — that's expected; accept it once per device
+(rebuilding the gateway image from scratch generates a new certificate, and the warning
+returns). The token is still what keeps out devices that don't have it, so only do this on
+a network you trust. An old `http://` link no longer works — use the freshly printed
+`https://` one.
 
 Stop the gateway on its own with `cd gateway && .\Stop-Gateway.ps1` (or `.\Stop-Ledger.ps1`
 from the root, which also stops the API/frontend windows `Start-Ledger.ps1` opened) — it
