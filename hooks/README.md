@@ -19,6 +19,7 @@ Copy this whole `hooks\` folder to the other machine:
 | `scripts\Open-ClaudeRepoWindow.vbs` | Silent launcher — runs the above script with no console-window flash. Locates its own folder at runtime, so it works unmodified on any machine/username as long as the two `.ps1`/`.vbs` files stay together. |
 | `Install-ClaudeHooks.ps1` | Copies everything in `scripts\` into `%USERPROFILE%\.claude\hooks\`, registers the protocol handler, and adds the hooks to `settings.json`. See section 3. |
 | `Uninstall-ClaudeHooks.ps1` | Reverses the above. See section 5. |
+| `ledgerScripts\Relay-PreToolUse.ps1` | **Optional**, dashboard-coupled: relays tool-permission decisions to the Ledger app. Installed separately; see section 6. |
 
 
 ## 2. What needs to be installed
@@ -138,3 +139,54 @@ hooks untouched), removes the `claudecode://` protocol handler, and deletes
 just the 3 installed script files from `%USERPROFILE%\.claude\hooks\` — not
 the whole folder, in case you keep other, unrelated hook scripts there too
 (it removes the folder itself only if that leaves it empty).
+
+## 6. Optional: remote tool-permission relay (Ledger dashboard)
+
+Unlike everything above, this hook only does anything if the Ledger backend (`api/`) is running, and
+it is **not** installed by default. It lets you approve or deny a live session's tool call from the
+dashboard's Live list on another device.
+
+**What it does.** `ledgerScripts\Relay-PreToolUse.ps1` is a `PreToolUse` hook. Before a matched tool
+runs, it POSTs the call to the local Ledger API (`http://127.0.0.1:$env:LEDGER_PORT`, default `8501`).
+If that session's control view is open in a browser, the API holds the request until you approve or deny
+there (up to 120s), and the hook returns that as `allow`, or `deny` plus your reason. In every other case
+— nobody watching, no answer in time, backend not running — the hook prints nothing, so Claude Code
+decides exactly as it would without the hook (its normal local prompt, or a silent allow if the tool is
+already permitted). It never emits `ask`, which would turn a silent allow into a prompt.
+
+Both scripts print their options and examples with `-h` (or `-Help`, or `Get-Help .\hooks\Install-ClaudeHooks.ps1 -Detailed`).
+
+**Install** (independent of the toast hooks above):
+
+```powershell
+# relay hook only
+.\hooks\Install-ClaudeHooks.ps1 -IncludeSessionControl -SkipToastHooks
+
+# toast hooks and the relay hook
+.\hooks\Install-ClaudeHooks.ps1 -IncludeSessionControl
+```
+
+This copies `ledgerScripts\` to `%USERPROFILE%\.claude\hooks\ledgerScripts\` and adds a `PreToolUse`
+entry to `settings.json`. Safe to re-run. `-SkipToastHooks` also skips the toast scripts and the
+`claudecode://` protocol handler.
+
+**Defaults** (edit the entry in `settings.json` afterwards to change them):
+
+| Setting | Default | Notes |
+|---|---|---|
+| `matcher` | `Bash\|Edit\|MultiEdit\|Write\|WebFetch` | The tools that most commonly need permission. Kept narrow on purpose: every matched call spawns a PowerShell process (~100-300ms), even when the tool would have been allowed silently. `*` works but taxes every tool call. |
+| `timeout` | `130` (seconds) | Must stay above the script's own wait (`-TimeoutSeconds`, default 125, itself just above the API's 120s), or Claude Code kills the hook mid-wait. |
+| `LEDGER_PORT` | `8501` | Set this environment variable if the backend runs on a different port (`python server.py --port`). |
+
+**Uninstall:**
+
+```powershell
+# relay hook only (toast hooks stay)
+.\hooks\Uninstall-ClaudeHooks.ps1 -IncludeSessionControl -SkipToastHooks
+
+# toast hooks and the relay hook
+.\hooks\Uninstall-ClaudeHooks.ps1 -IncludeSessionControl
+```
+
+This removes only the `PreToolUse` entry that references `Relay-PreToolUse.ps1` (any other `PreToolUse`
+hooks stay) and deletes the installed `ledgerScripts\` folder.

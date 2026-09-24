@@ -48,16 +48,16 @@
 
 ## 4. Install / uninstall
 
-- [ ] 4.1 Add an `-IncludeSessionControl` switch to `Install-ClaudeHooks.ps1` that copies
+- [x] 4.1 Add an `-IncludeSessionControl` switch to `Install-ClaudeHooks.ps1` that copies
       `hooks/ledgerScripts/` to `%USERPROFILE%\.claude\hooks\ledgerScripts\` and merges the
       `PreToolUse` hook entry (matcher `Bash|Edit|MultiEdit|Write|WebFetch`, hook `timeout` above the
       script's 125s wait, e.g. 130) into `settings.json`, independent of the toast-hook install. Verify by running it in isolation (no toast hooks
       selected) and inspecting the resulting `settings.json` and installed files.
-- [ ] 4.2 Add the matching `-IncludeSessionControl` switch to `Uninstall-ClaudeHooks.ps1`, removing
+- [x] 4.2 Add the matching `-IncludeSessionControl` switch to `Uninstall-ClaudeHooks.ps1`, removing
       only the `PreToolUse` entry (matched by its script path) and the `ledgerScripts` folder, leaving
       any installed toast hooks untouched. Verify by installing both, uninstalling only the session
       control hook, and confirming the toast hooks and `Notification`/`Stop` entries remain.
-- [ ] 4.3 Update `hooks/README.md` with a new, clearly optional section documenting the relay hook:
+- [x] 4.3 Update `hooks/README.md` with a new, clearly optional section documenting the relay hook:
       what it does, its install/uninstall commands, and the matcher/timeout defaults.
 
 ## 5. Frontend: live control view
