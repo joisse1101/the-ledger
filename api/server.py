@@ -12,7 +12,7 @@ import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Literal, Mapping, Optional, Sequence
+from typing import Annotated, Any, Literal, Mapping, Optional, Sequence, Union
 from urllib.parse import quote
 
 import uvicorn
@@ -115,7 +115,25 @@ def _iso(value) -> Optional[str]:
 
 @app.get("/api/meta")
 def get_meta(request: Request) -> dict:
-    return {"refreshed_at": _iso(claude_db.refreshed_at()), "is_local": is_local(request)}
+    return {
+        "refreshed_at": _iso(claude_db.refreshed_at()),
+        "is_local": is_local(request),
+        "remote_mode": decisions.remote_mode(),
+    }
+
+
+class RemoteModeRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/remote-mode")
+def post_remote_mode(body: RemoteModeRequest, request: Request) -> dict:
+    # Same locality test as the delete routes: a valid token lets another device see and answer
+    # prompts while Remote mode is on, but never lets it change Remote mode itself.
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="switching Remote mode requires a local request")
+    decisions.set_remote_mode(body.enabled)
+    return decisions.remote_mode()
 
 
 @app.post("/api/refresh")
@@ -123,11 +141,29 @@ def post_refresh() -> dict:
     return {"refreshed_at": _iso(locked_refresh())}
 
 
+def _can_see_prompts(request: Request) -> bool:
+    """The machine's own browser always sees pending prompts; another device only while Remote mode is on."""
+    return is_local(request) or decisions.remote_mode_enabled()
+
+
+def _sweep_prompts() -> None:
+    """Drop every pending prompt whose session already moved on (answered in the terminal, say).
+
+    Run ahead of each read/answer of the pending prompts rather than on a timer of its own: a
+    prompt only matters while something is polling, and the transcript reads it costs are cached
+    by file stat.
+    """
+    decisions.sweep(live.latest_activity)
+
+
 @app.get("/api/live")
-def get_live() -> dict:
+def get_live(request: Request) -> dict:
+    _sweep_prompts()
+    visible = _can_see_prompts(request)
     return {
         "sessions": [
-            {**item, "pending_decision": decisions.peek(item["session_id"])} for item in live.get()
+            {**item, "pending_decision": decisions.peek(item["session_id"]) if visible else None}
+            for item in live.get()
         ]
     }
 
@@ -303,34 +339,96 @@ class DecisionRequest(BaseModel):
     tool_input: dict
 
 
-class DecisionAnswer(BaseModel):
-    decision: Literal["allow", "deny"]
-    reason: Optional[str] = None
-
-
 @app.post("/api/sessions/{session_id}/decisions")
-async def post_decision(session_id: SessionId, body: DecisionRequest) -> dict:
-    """Called by the relay hook only. Registers/waits on a pending decision when this session's
-    control view is being watched, else replies "no opinion" immediately - see pending_decisions.py."""
+async def post_decision(session_id: SessionId, body: DecisionRequest, request: Request) -> dict:
+    """Called by the relay hook only. Registers the prompt and holds the request until it is
+    answered, cleared or the wait elapses - `{decision: null}` then, and the hook prints nothing."""
+    # The hook runs on this machine; a remote device has no business registering prompts (a forged
+    # one could then be "answered" as if it were real).
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="registering a prompt requires a local request")
     return await decisions.request_decision(session_id, body.tool_name, body.tool_input)
 
 
 @app.get("/api/sessions/{session_id}/pending-decision")
-def get_pending_decision(session_id: SessionId) -> dict:
-    # The poll itself is the heartbeat that keeps this session "watched" for the relay hook's gate.
-    decisions.touch_watch(session_id)
-    return {"pending_decision": decisions.peek(session_id)}
+def get_pending_decision(session_id: SessionId, request: Request) -> dict:
+    _sweep_prompts()
+    visible = _can_see_prompts(request)
+    return {"pending_decision": decisions.peek(session_id) if visible else None}
 
 
-@app.post("/api/sessions/{session_id}/decisions/answer")
-async def post_decision_answer(session_id: SessionId, body: DecisionAnswer) -> dict:
-    # async, like post_decision: answer() resolves an asyncio.Event that post_decision awaits on
-    # this same event-loop thread, and asyncio.Event isn't safe to set() from another thread (a
-    # plain `def` route runs in Starlette's threadpool instead) - the timeout would still mask a
-    # correctness bug here, but only after a very unresponsive delay.
-    if not decisions.answer(session_id, body.decision, body.reason):
-        raise HTTPException(status_code=409, detail="no pending decision for this session")
-    return {"answered": session_id}
+QUESTION_TOOL = "AskUserQuestion"
+
+
+class DecisionAnswer(BaseModel):
+    decision: Literal["allow", "deny", "answer"]
+    reason: Optional[str] = None
+    answers: Optional[dict[str, Union[str, list[str]]]] = None
+
+
+def _checked_answers(prompt: dict[str, Any], answers: dict[str, Union[str, list[str]]]) -> dict[str, Any]:
+    """Validate a question's answers against the stored prompt; 422 when they don't fit it.
+
+    Each of the prompt's questions needs exactly one answer keyed by its text: an option label or
+    free text ("Other") as a string, or a list only where the question is multi-select.
+    """
+    asked = {
+        q["question"]: bool(q.get("multiSelect"))
+        for q in (prompt["tool_input"].get("questions") or [])
+        if isinstance(q, dict) and isinstance(q.get("question"), str)
+    }
+    if not asked:
+        raise HTTPException(status_code=422, detail="this prompt has no answerable questions")
+    if set(answers) != set(asked):
+        raise HTTPException(status_code=422, detail="answers must cover exactly the questions asked")
+    for text, value in answers.items():
+        if isinstance(value, list):
+            if not asked[text]:
+                raise HTTPException(status_code=422, detail=f"only a multi-select question takes a list: {text!r}")
+            if not value or any(not item.strip() for item in value):
+                raise HTTPException(status_code=422, detail=f"pick at least one non-blank option: {text!r}")
+        elif not value.strip():
+            raise HTTPException(status_code=422, detail=f"answer is blank: {text!r}")
+    return {"decision": "answer", "answers": answers}
+
+
+def _checked_answer(prompt: dict[str, Any], body: DecisionAnswer) -> dict[str, Any]:
+    """The answer the hook receives, or a 422 when its shape doesn't fit the kind of prompt."""
+    is_question = prompt["tool_name"] == QUESTION_TOOL
+    if body.decision == "answer":
+        if not is_question:
+            raise HTTPException(status_code=422, detail="this is a permission prompt: answer allow or deny")
+        if body.answers is None:
+            raise HTTPException(status_code=422, detail="answers are required")
+        return _checked_answers(prompt, body.answers)
+    if is_question:
+        raise HTTPException(status_code=422, detail="this is a question: answer with answers")
+    if body.decision == "allow":
+        return {"decision": "allow"}
+    return {"decision": "deny", "reason": (body.reason or "").strip() or None}
+
+
+@app.post("/api/sessions/{session_id}/decisions/{prompt_id}/answer")
+def post_decision_answer(
+    session_id: SessionId,
+    prompt_id: Annotated[str, Path(pattern=SESSION_ID_PATTERN)],
+    body: DecisionAnswer,
+    request: Request,
+) -> dict:
+    # Token and CSRF header were already checked by the middleware; Remote mode is the extra gate
+    # for another device.
+    if not _can_see_prompts(request):
+        raise HTTPException(status_code=403, detail="Remote mode is off")
+    _sweep_prompts()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
+    prompt = decisions.get(session_id, prompt_id)
+    if prompt is None:
+        raise HTTPException(status_code=409, detail="this session already moved on")
+    answer = _checked_answer(prompt, body)
+    # A plain `def` route runs in Starlette's threadpool; answer() wakes the hook's waiting request
+    # on that request's own event loop, so calling it from here is safe.
+    if not decisions.answer(session_id, prompt_id, answer):
+        raise HTTPException(status_code=409, detail="this session already moved on")
+    return {"answered": prompt_id}
 
 
 @app.post("/api/sessions/{session_id}/open-repo")

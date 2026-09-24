@@ -1,7 +1,8 @@
 """The data endpoints (/api/live, /api/transcripts, ...) over throwaway ~/.claude fixtures."""
 
-import asyncio
-from datetime import datetime
+import threading
+import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,6 +22,21 @@ def _client():
         base_url="http://localhost",
         client=("127.0.0.1", 50000),
         headers={"X-Requested-With": "ledger"},
+    )
+
+
+TOKEN = "s3cret-token-value_0123456789"
+BEARER = {"Authorization": f"Bearer {TOKEN}"}
+
+
+def _remote_client(*, token=True, csrf=True):
+    """A phone on the LAN, by default carrying the access token (set `server.access_token` to
+    TOKEN first) and the custom header every non-GET request needs."""
+    return TestClient(
+        server.app,
+        base_url="http://192.168.1.20:8501",
+        client=("192.168.1.50", 5000),
+        headers={**(BEARER if token else {}), **({"X-Requested-With": "ledger"} if csrf else {})},
     )
 
 
@@ -95,110 +111,380 @@ def test_live_with_nothing_running_is_an_empty_list(isolated_db, monkeypatch):
 
 
 def test_live_reflects_a_pending_decision(isolated_db, monkeypatch):
-    store = PendingDecisions(wait_timeout=5.0)
+    store = PendingDecisions()
     monkeypatch.setattr(server, "decisions", store)
     _use_live(monkeypatch, [_live_session("live-1")])
-    store.touch_watch("live-1")
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
 
-    async def scenario():
-        task = asyncio.create_task(store.request_decision("live-1", "Bash", {"command": "ls"}))
-        await asyncio.sleep(0)  # let it register before peeking
-        body = server.get_live()
-        store.answer("live-1", "allow")
-        await task
-        return body
+    body = _client().get("/api/live").json()
 
-    body = asyncio.run(scenario())
-    assert body["sessions"][0]["pending_decision"] == {"tool_name": "Bash", "tool_input": {"command": "ls"}}
+    assert body["sessions"][0]["pending_decision"] == {
+        "id": prompt_id, "tool_name": "Bash", "tool_input": {"command": "ls"},
+    }
+
+
+def test_live_shows_the_oldest_prompt_first(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    first = store.register("live-1", "Bash", {"command": "first"})
+    store.register("live-1", "Bash", {"command": "second"})
+
+    assert _client().get("/api/live").json()["sessions"][0]["pending_decision"]["id"] == first
+
+
+def test_live_hides_prompts_from_another_device_unless_remote_mode_is_on(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+
+    off = _remote_client().get("/api/live").json()
+    assert off["sessions"][0]["pending_decision"] is None
+    assert _client().get("/api/live").json()["sessions"][0]["pending_decision"]["id"] == prompt_id
+
+    store.set_remote_mode(True)
+    on = _remote_client().get("/api/live").json()
+    assert on["sessions"][0]["pending_decision"]["id"] == prompt_id
+
+
+def test_live_drops_a_prompt_once_its_transcript_moved_on(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    later = datetime.now(timezone.utc) + timedelta(seconds=30)
+    monkeypatch.setattr(
+        server, "live",
+        LiveSnapshot(load_sessions=lambda: [_live_session("live-1")], latest_activity=lambda sid, cwd: later),
+    )
+    store.register("live-1", "Bash", {"command": "ls"})
+
+    assert _client().get("/api/live").json()["sessions"][0]["pending_decision"] is None
+    assert store.for_session("live-1") == []
 
 
 # ---------------------------------------------------------------- POST /api/sessions/{id}/decisions
 
+QUESTION_INPUT = {
+    "questions": [
+        {"question": "Which db?", "options": [{"label": "sqlite"}, {"label": "postgres"}], "multiSelect": False},
+        {"question": "Which extras?", "options": [{"label": "auth"}, {"label": "logs"}], "multiSelect": True},
+    ]
+}
 
-def test_decisions_unwatched_session_passes_through_immediately(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
+
+def _start_hook(store, tool_name="Bash", tool_input=None, session_id="live-1"):
+    """The relay hook's request, on its own thread (it blocks until the prompt resolves).
+
+    Returns `(thread, result, prompt)` once the prompt is registered; result["response"] is
+    filled in when the request returns.
+    """
+    result = {}
+
+    def run():
+        result["response"] = _client().post(
+            f"/api/sessions/{session_id}/decisions",
+            json={"tool_name": tool_name, "tool_input": tool_input or {"command": "ls"}},
+        )
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    deadline = time.monotonic() + 5
+    while not store.for_session(session_id):
+        assert time.monotonic() < deadline, "the hook's request never registered a prompt"
+        time.sleep(0.01)
+    return thread, result, store.for_session(session_id)[0]
+
+
+def _answer(session_id, prompt_id, body, client=None):
+    return (client or _client()).post(f"/api/sessions/{session_id}/decisions/{prompt_id}/answer", json=body)
+
+
+def test_decisions_answered_returns_the_answer_to_the_hook(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    thread, result, prompt = _start_hook(store)
+    assert prompt["tool_name"] == "Bash" and prompt["tool_input"] == {"command": "ls"}
+
+    assert _answer("live-1", prompt["id"], {"decision": "allow"}).status_code == 200
+    thread.join(5)
+
+    assert result["response"].status_code == 200
+    assert result["response"].json() == {"decision": "allow"}
+    assert store.for_session("live-1") == []
+
+
+def test_decisions_cleared_without_an_answer_returns_no_decision(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    thread, result, prompt = _start_hook(store)
+
+    store.clear("live-1", prompt["id"])
+    thread.join(5)
+
+    assert result["response"].status_code == 200
+    assert result["response"].json() == {"decision": None}
+
+
+def test_decisions_wait_elapsing_returns_no_decision(isolated_db, monkeypatch):
+    store = PendingDecisions(max_age=0.2)
+    monkeypatch.setattr(server, "decisions", store)
+
     response = _client().post(
         "/api/sessions/live-1/decisions", json={"tool_name": "Bash", "tool_input": {"command": "ls"}}
     )
+
     assert response.status_code == 200
-    assert response.json() == {"decision": None, "reason": None}
+    assert response.json() == {"decision": None}
+    assert store.for_session("live-1") == []
 
 
-def test_decisions_watched_session_waits_for_the_answer(isolated_db, monkeypatch):
-    # Drives the two route coroutines directly on one event loop (asyncio.Event isn't safe to
-    # set() across real OS threads, which is exactly what two independent TestClient calls would
-    # do - see post_decision_answer's comment).
-    store = PendingDecisions(wait_timeout=5.0)
+def test_decisions_are_only_registered_by_a_local_request(isolated_db, monkeypatch):
+    store = PendingDecisions()
     monkeypatch.setattr(server, "decisions", store)
-    store.touch_watch("live-1")
+    monkeypatch.setattr(server, "access_token", TOKEN)
 
-    async def scenario():
-        request = server.DecisionRequest(tool_name="Bash", tool_input={"command": "ls"})
-        task = asyncio.create_task(server.post_decision("live-1", request))
-        await asyncio.sleep(0)  # let it register before answering
-        answered = await server.post_decision_answer("live-1", server.DecisionAnswer(decision="allow"))
-        return await task, answered
+    response = _remote_client().post(
+        "/api/sessions/live-1/decisions", json={"tool_name": "Bash", "tool_input": {"command": "ls"}}
+    )
 
-    result, answered = asyncio.run(scenario())
-
-    assert answered == {"answered": "live-1"}
-    assert result == {"decision": "allow", "reason": None}
+    assert response.status_code == 403
+    assert store.for_session("live-1") == []
 
 
 # ---------------------------------------------------------------- GET /api/sessions/{id}/pending-decision
 
 
-def test_pending_decision_endpoint_reports_none_and_touches_watch(isolated_db, monkeypatch):
-    store = PendingDecisions(watch_window=5.0)
-    monkeypatch.setattr(server, "decisions", store)
-    assert _client().get("/api/sessions/live-1/pending-decision").json() == {"pending_decision": None}
-    assert store.is_watched("live-1") is True
-
-
-def test_pending_decision_endpoint_reports_a_pending_decision(isolated_db, monkeypatch):
-    store = PendingDecisions(wait_timeout=5.0)
-    monkeypatch.setattr(server, "decisions", store)
-    store.touch_watch("live-1")
-
-    async def scenario():
-        task = asyncio.create_task(store.request_decision("live-1", "Edit", {"file": "a.py"}))
-        await asyncio.sleep(0)
-        body = server.get_pending_decision("live-1")
-        store.answer("live-1", "deny", "no")
-        await task
-        return body
-
-    body = asyncio.run(scenario())
-    assert body["pending_decision"] == {"tool_name": "Edit", "tool_input": {"file": "a.py"}}
-
-
-# ---------------------------------------------------------------- POST /api/sessions/{id}/decisions/answer
-
-
-def test_decision_answer_is_409_when_nothing_is_pending(isolated_db, monkeypatch):
+def test_pending_decision_endpoint_reports_none(isolated_db, monkeypatch):
     monkeypatch.setattr(server, "decisions", PendingDecisions())
-    response = _client().post("/api/sessions/live-1/decisions/answer", json={"decision": "allow"})
-    assert response.status_code == 409
+    assert _client().get("/api/sessions/live-1/pending-decision").json() == {"pending_decision": None}
 
 
-def test_decision_answer_carries_an_optional_deny_reason(isolated_db, monkeypatch):
-    store = PendingDecisions(wait_timeout=5.0)
+def test_pending_decision_endpoint_reports_the_oldest_prompt(isolated_db, monkeypatch):
+    store = PendingDecisions()
     monkeypatch.setattr(server, "decisions", store)
-    store.touch_watch("live-1")
+    first = store.register("live-1", "Edit", {"file": "a.py"})
+    store.register("live-1", "Edit", {"file": "b.py"})
 
-    async def scenario():
-        request = server.DecisionRequest(tool_name="Bash", tool_input={"command": "rm"})
-        task = asyncio.create_task(server.post_decision("live-1", request))
-        await asyncio.sleep(0)
-        answered = await server.post_decision_answer(
-            "live-1", server.DecisionAnswer(decision="deny", reason="not now")
-        )
-        return await task, answered
+    body = _client().get("/api/sessions/live-1/pending-decision").json()
 
-    result, answered = asyncio.run(scenario())
+    assert body == {"pending_decision": {"id": first, "tool_name": "Edit", "tool_input": {"file": "a.py"}}}
 
-    assert answered == {"answered": "live-1"}
-    assert result == {"decision": "deny", "reason": "not now"}
+
+def test_pending_decision_endpoint_follows_the_visibility_rule(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+
+    # Local: always visible. Another device: only while Remote mode is on.
+    assert _client().get("/api/sessions/live-1/pending-decision").json()["pending_decision"]["id"] == prompt_id
+    assert _remote_client().get("/api/sessions/live-1/pending-decision").json() == {"pending_decision": None}
+    store.set_remote_mode(True)
+    assert _remote_client().get("/api/sessions/live-1/pending-decision").json()["pending_decision"]["id"] == prompt_id
+
+
+# ---------------------------------------------------------------- POST /api/sessions/{id}/decisions/{prompt_id}/answer
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input, body, expected",
+    [
+        ("Bash", {"command": "ls"}, {"decision": "allow"}, {"decision": "allow"}),
+        ("Bash", {"command": "rm"}, {"decision": "deny"}, {"decision": "deny", "reason": None}),
+        ("Bash", {"command": "rm"}, {"decision": "deny", "reason": "  "}, {"decision": "deny", "reason": None}),
+        ("Bash", {"command": "rm"}, {"decision": "deny", "reason": "not now"},
+         {"decision": "deny", "reason": "not now"}),
+        # an option label, free text ("Other") and a multi-select array, all as sent
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "postgres", "Which extras?": ["auth", "logs"]}},
+         {"decision": "answer", "answers": {"Which db?": "postgres", "Which extras?": ["auth", "logs"]}}),
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "duckdb, actually", "Which extras?": "metrics"}},
+         {"decision": "answer", "answers": {"Which db?": "duckdb, actually", "Which extras?": "metrics"}}),
+    ],
+    ids=["allow", "deny", "deny-blank-reason", "deny-reason", "question-label-and-multi", "question-free-text"],
+)
+def test_answer_resolves_the_hook_with_each_shape(isolated_db, monkeypatch, tool_name, tool_input, body, expected):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    thread, result, prompt = _start_hook(store, tool_name, tool_input)
+
+    response = _answer("live-1", prompt["id"], body)
+    thread.join(5)
+
+    assert response.status_code == 200
+    assert response.json() == {"answered": prompt["id"]}
+    assert result["response"].json() == expected
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input, body",
+    [
+        ("Bash", {"command": "ls"}, {"decision": "answer", "answers": {"x": "y"}}),
+        ("AskUserQuestion", QUESTION_INPUT, {"decision": "allow"}),
+        ("AskUserQuestion", QUESTION_INPUT, {"decision": "deny"}),
+        ("AskUserQuestion", QUESTION_INPUT, {"decision": "answer"}),
+        # a question that was never asked / one left unanswered
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "sqlite", "Which extras?": "auth", "Nope?": "x"}}),
+        ("AskUserQuestion", QUESTION_INPUT, {"decision": "answer", "answers": {"Which db?": "sqlite"}}),
+        # an array for a single-select question
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": ["sqlite"], "Which extras?": ["auth"]}}),
+        # blank text, blank/empty selections
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "  ", "Which extras?": ["auth"]}}),
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "sqlite", "Which extras?": []}}),
+        ("AskUserQuestion", QUESTION_INPUT,
+         {"decision": "answer", "answers": {"Which db?": "sqlite", "Which extras?": [" "]}}),
+        # a prompt that carries no questions at all
+        ("AskUserQuestion", {}, {"decision": "answer", "answers": {"Which db?": "sqlite"}}),
+    ],
+    ids=["answer-to-permission", "allow-a-question", "deny-a-question", "no-answers", "unknown-question",
+         "missing-question", "list-for-single-select", "blank-text", "empty-list", "blank-list-item", "no-questions"],
+)
+def test_an_answer_that_does_not_fit_the_prompt_is_422_and_leaves_it_pending(
+    isolated_db, monkeypatch, tool_name, tool_input, body
+):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    prompt_id = store.register("live-1", tool_name, tool_input)
+
+    response = _answer("live-1", prompt_id, body)
+
+    assert response.status_code == 422
+    assert [p["id"] for p in store.for_session("live-1")] == [prompt_id]
+
+
+def test_answer_is_409_when_the_prompt_is_gone(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    assert _answer("live-1", "deadbeef", {"decision": "allow"}).status_code == 409
+
+
+def test_answer_is_409_for_an_already_answered_prompt(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+
+    assert _answer("live-1", prompt_id, {"decision": "allow"}).status_code == 200
+    assert _answer("live-1", prompt_id, {"decision": "deny"}).status_code == 409
+
+
+def test_answer_is_409_when_the_session_moved_on_in_the_terminal(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    later = datetime.now(timezone.utc) + timedelta(seconds=30)
+    monkeypatch.setattr(
+        server, "live",
+        LiveSnapshot(load_sessions=lambda: [_live_session("live-1")], latest_activity=lambda sid, cwd: later),
+    )
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+
+    assert _answer("live-1", prompt_id, {"decision": "allow"}).status_code == 409
+
+
+def test_answer_names_its_own_prompt_when_two_are_open(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    first = store.register("live-1", "Bash", {"command": "one"})
+    second = store.register("live-1", "Bash", {"command": "two"})
+
+    assert _answer("live-1", second, {"decision": "allow"}).status_code == 200
+    assert [p["id"] for p in store.for_session("live-1")] == [first]
+
+
+def test_answer_from_another_device_needs_remote_mode(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+    body = {"decision": "allow"}
+
+    off = _answer("live-1", prompt_id, body, client=_remote_client())
+    assert off.status_code == 403
+    assert [p["id"] for p in store.for_session("live-1")] == [prompt_id]
+
+    store.set_remote_mode(True)
+    on = _answer("live-1", prompt_id, body, client=_remote_client())
+    assert on.status_code == 200
+    assert store.for_session("live-1") == []
+
+
+def test_answer_from_another_device_still_needs_the_token_and_csrf_header(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    store.set_remote_mode(True)
+    prompt_id = store.register("live-1", "Bash", {"command": "ls"})
+    url = f"/api/sessions/live-1/decisions/{prompt_id}/answer"
+
+    no_token = _remote_client(token=False)
+    no_header = _remote_client(csrf=False)
+    assert no_token.post(url, json={"decision": "allow"}).status_code == 401
+    assert no_header.post(url, json={"decision": "allow"}).status_code == 403
+    assert [p["id"] for p in store.for_session("live-1")] == [prompt_id]
+
+
+# ---------------------------------------------------------------- Remote mode: GET /api/meta + POST /api/remote-mode
+
+
+def test_meta_reports_remote_mode_off_by_default(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    assert _client().get("/api/meta").json()["remote_mode"] == {"enabled": False, "expires_at": None}
+
+
+def test_a_local_request_switches_remote_mode_without_a_token(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    client = _client()
+
+    on = client.post("/api/remote-mode", json={"enabled": True})
+    assert on.status_code == 200
+    assert on.json()["enabled"] is True and on.json()["expires_at"]
+    assert client.get("/api/meta").json()["remote_mode"] == on.json()
+
+    off = client.post("/api/remote-mode", json={"enabled": False})
+    assert off.json() == {"enabled": False, "expires_at": None}
+    assert client.get("/api/meta").json()["remote_mode"] == off.json()
+
+
+def test_a_remote_request_with_a_valid_token_cannot_switch_remote_mode(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    remote = _remote_client()
+
+    assert remote.post("/api/remote-mode", json={"enabled": True}).status_code == 403
+    assert store.remote_mode()["enabled"] is False
+
+    store.set_remote_mode(True)
+    assert remote.post("/api/remote-mode", json={"enabled": False}).status_code == 403
+    assert store.remote_mode()["enabled"] is True
+
+
+def test_a_remote_request_without_the_token_cannot_switch_remote_mode(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    client = _remote_client(token=False)
+
+    assert client.post("/api/remote-mode", json={"enabled": True}).status_code == 401
+    assert store.remote_mode()["enabled"] is False
+
+
+def test_meta_shows_another_device_the_remote_mode_state(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    store.set_remote_mode(True)
+
+    meta = _remote_client().get("/api/meta").json()
+
+    assert meta["is_local"] is False
+    assert meta["remote_mode"] == store.remote_mode() and meta["remote_mode"]["enabled"] is True
 
 
 # ---------------------------------------------------------------- POST /api/sessions/{id}/open-repo

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import threading
 import time
+from datetime import datetime
 from typing import Any, Callable, Optional
 
 import claude_context
@@ -27,6 +28,7 @@ class LiveSnapshot:
         self,
         load_sessions: Optional[Callable[[], list]] = None,
         live_context: Optional[Callable[[str, str], Any]] = None,
+        latest_activity: Optional[Callable[[str, str], Optional[datetime]]] = None,
         ttl: float = LIVE_TTL_SECONDS,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -34,6 +36,9 @@ class LiveSnapshot:
         self._load_sessions = load_sessions or (lambda: claude_sessions.load_sessions())
         self._live_context = live_context or (
             lambda session_id, cwd: claude_context.live_context(session_id, cwd)
+        )
+        self._latest_activity = latest_activity or (
+            lambda session_id, cwd: claude_context.latest_activity(session_id, cwd)
         )
         self._ttl = ttl
         self._clock = clock
@@ -65,6 +70,17 @@ class LiveSnapshot:
         with self._lock:
             self._ensure_fresh()
             return self._cwds.get(session_id)
+
+    def latest_activity(self, session_id: str) -> Optional[datetime]:
+        """When the live session's transcript last got a line, or None (unknown session included).
+
+        Goes through this lock like every other read of claude_context's caches. Feeds the
+        pending-prompt store's sweep, which uses it to tell a prompt was answered elsewhere.
+        """
+        with self._lock:
+            self._ensure_fresh()
+            cwd = self._cwds.get(session_id)
+            return self._latest_activity(session_id, cwd) if cwd else None
 
     def is_live_now(self, session_id: str) -> bool:
         """Whether the session is registered right now: a fresh read, never the cached result."""

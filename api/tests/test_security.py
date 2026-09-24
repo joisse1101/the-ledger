@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect
 import claude_db
 import server
 from live_snapshot import LiveSnapshot
+from pending_decisions import PendingDecisions
 from security import SecurityMiddleware, provision_token
 
 TOKEN = "s3cret-token-value_0123456789"
@@ -24,6 +25,7 @@ REPO = Path(__file__).resolve().parents[2]
 @pytest.fixture(autouse=True)
 def _isolated(isolated_db, monkeypatch):
     monkeypatch.setattr(server, "live", LiveSnapshot(load_sessions=lambda: []))
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
 
 
 @pytest.fixture

@@ -92,3 +92,28 @@ def test_live_ids_come_from_the_same_snapshot():
 def test_empty_registry():
     snapshot = LiveSnapshot(load_sessions=lambda: [], live_context=lambda s, c: None)
     assert snapshot.get() == []
+
+
+def test_latest_activity_uses_the_registry_cwd_for_a_live_session():
+    seen = []
+    stamp = datetime(2026, 1, 1, 12)
+
+    def latest(session_id, cwd):
+        seen.append((session_id, cwd))
+        return stamp
+
+    snapshot = LiveSnapshot(
+        load_sessions=lambda: [_session("s1", cwd="/x/proj")], live_context=lambda s, c: None, latest_activity=latest
+    )
+
+    assert snapshot.latest_activity("s1") == stamp
+    assert seen == [("s1", "/x/proj")]
+
+
+def test_latest_activity_is_none_for_a_session_that_is_not_live():
+    snapshot = LiveSnapshot(
+        load_sessions=lambda: [_session("s1")],
+        live_context=lambda s, c: None,
+        latest_activity=lambda sid, cwd: datetime(2026, 1, 1),
+    )
+    assert snapshot.latest_activity("gone") is None

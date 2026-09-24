@@ -30,29 +30,52 @@
 
 ## 3. Backend: routes (rework)
 
-- [ ] 3.1 Rework `POST /api/sessions/{id}/decisions` (relay hook only, local request): always
+- [x] 3.1 Rework `POST /api/sessions/{id}/decisions` (relay hook only, local request): always
       registers the prompt, waits up to the configured wait, responds `{decision: "allow" | "deny" |
       "answer" | null, ...}`. Verify with `TestClient` tests: answered, cleared with no answer, and
       wait elapsed.
-- [ ] 3.2 Rework `GET /api/sessions/{id}/pending-decision`: remove the watch side effect; apply the
+- [x] 3.2 Rework `GET /api/sessions/{id}/pending-decision`: remove the watch side effect; apply the
       visibility rule (a non-local request sees a prompt only while Remote mode is on). Verify with
       tests for local, non-local with Remote mode off, and non-local with it on.
-- [ ] 3.3 Rework the answer route to `POST /api/sessions/{id}/decisions/{prompt_id}/answer`: body is
+- [x] 3.3 Rework the answer route to `POST /api/sessions/{id}/decisions/{prompt_id}/answer`: body is
       `{decision: "allow"}`, `{decision: "deny", reason?}` or `{decision: "answer", answers: {...}}`;
       validate answers against the stored prompt (option label or free text; an array only for
       multi-select); token + `X-Requested-With` like other non-GET routes; `403` for a non-local
       request while Remote mode is off; `409` when the prompt is gone. Verify with tests for each
       shape, the invalid-answer case, `403` and `409`.
-- [ ] 3.4 Rework `GET /api/live`'s per-session `pending_decision` to `{id, tool_name, tool_input} |
+      _Implemented contract (2026-09-24), for 4.1/6.1/6.2 to build against:_
+      - _Answer body: `{decision: "allow"}`; `{decision: "deny", reason?}` (blank reason -> null);
+        `{decision: "answer", answers: {"<question text>": string | string[]}}`. Success is
+        `{answered: "<prompt_id>"}`._
+      - _What the relay hook's `POST .../decisions` returns: `{decision: "allow"}`, `{decision:
+        "deny", reason: string | null}`, `{decision: "answer", answers}`, or `{decision: null}`
+        (cleared / wait elapsed -> print nothing)._
+      - _Status codes: `403` non-local while Remote mode is off; `409` prompt gone (answered,
+        cleared by the transcript sweep, or expired); `422` answer doesn't fit the prompt._
+      - _Strictness choices, not dictated by the spec, so they can be loosened without touching
+        anything else (`_checked_answers`/`_checked_answer` in `api/server.py`): the kind must match
+        (`answer` only for `AskUserQuestion`, `allow`/`deny` only for everything else); `answers`
+        must cover exactly the questions in `tool_input.questions[]`, no more, no fewer; a string
+        must be non-blank; a list only for a `multiSelect` question, non-empty, no blank items; a
+        prompt with no readable `questions[]` cannot be answered from the dashboard at all (the
+        terminal still can). Option labels are NOT checked - any non-blank string passes, since
+        free text ("Other") is legitimate._
+- [x] 3.4 Rework `GET /api/live`'s per-session `pending_decision` to `{id, tool_name, tool_input} |
       null` (oldest first), omitted for a non-local request while Remote mode is off. Verify with
       `test_api_data.py` cases.
 - [x] 3.5 `POST /api/sessions/{id}/open-repo` (already built; unchanged by this rework).
 - [x] 3.6 `is_local` locality check on both delete routes and `is_local` on `GET /api/meta`
       (already built; unchanged by this rework).
-- [ ] 3.7 Add `remote_mode: {enabled, expires_at}` to `GET /api/meta` and `POST /api/remote-mode`
+- [x] 3.7 Add `remote_mode: {enabled, expires_at}` to `GET /api/meta` and `POST /api/remote-mode`
       (`{enabled: bool}`), local-only using the same locality test as the delete routes. Verify with
       tests: local switch works without a token; a non-local request with a valid token is refused;
       `/api/meta` reflects the state for local and non-local requests.
+      _Notes (2026-09-24): `pending_decision` is `null`, not an absent key, when hidden from a
+      non-local request, so "hidden" and "no prompt" look identical to a remote device. Prompts are
+      cleared by `decisions.sweep()`, run at the top of `GET /api/live`, the pending-decision route
+      and the answer route (via `LiveSnapshot.latest_activity`); there is no timer, so a prompt is
+      only swept while something polls. Also added, beyond the task text: `POST .../decisions` is
+      refused with `403` for a non-local request (the hook is always on this machine)._
 
 ## 4. Relay hook script (rework)
 
@@ -85,6 +108,13 @@
 - [ ] 6.1 Rework `web/src/api/types.ts` and `queries.ts`: the new `pending_decision` shape, an
       answer mutation for the three answer shapes, and hooks for Remote mode (read from `useMeta`,
       set via `POST /api/remote-mode`). Verify with `npm test` covering the new request shapes.
+      _Note (2026-09-24): the backend (group 3) is done, so the frontend is currently BROKEN against
+      it until this lands. `web/src/api/queries.ts` (+ `queries.test.tsx`) still posts to the old
+      `/api/sessions/{id}/decisions/answer` with `{decision, reason}` and polls for a
+      `pending_decision` without an `id`. New contract: `pending_decision: {id, tool_name,
+      tool_input} | null`; answer to `/decisions/{prompt_id}/answer`; `useMeta` now also returns
+      `remote_mode: {enabled, expires_at}`. A `409` means "session already moved on", a `422` is a
+      client bug (the UI builds only valid shapes), a `403` means Remote mode is off._
 - [ ] 6.2 Rework `LiveControl.tsx`/`SessionDialog.tsx` control view into a prompt renderer: a
       permission prompt shows tool name and input with Approve/Deny (Deny opens an optional reason);
       a question shows each question with its options, multi-select where allowed, and a free-text
@@ -103,6 +133,11 @@
       with a reason blocks it and Claude sees the reason.
 - [ ] 7.2 Questions: trigger an `AskUserQuestion` and answer it from the dashboard with a single
       choice, a multi-select, and free text ("Other"); confirm Claude receives exactly that answer.
+      _Open question (2026-09-24): the API passes a multi-select answer through as a JSON array
+      (`"Which extras?": ["auth", "logs"]`) and 4.1 forwards it into `updatedInput.answers` as is.
+      Whether Claude Code expects an array there, or a joined string, was never spiked - only
+      single-choice answers were. Check what the terminal dialog itself produces for a multi-select
+      and match it in 4.1 (if it is a string, join in the hook, not the API)._
 - [ ] 7.3 First answer wins: answer in the terminal and confirm the dashboard clears the prompt
       within a few seconds and the hook exits; submit a late dashboard answer and confirm `409` and an
       unaffected session; confirm a late hook result after a terminal answer is discarded.
