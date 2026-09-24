@@ -1,22 +1,27 @@
 ## 1. Drop the PreToolUse relay
 
-- [ ] 1.1 Remove the still-installed `PreToolUse` relay entry from `~/.claude/settings.json` right
+- [x] 1.1 Remove the still-installed `PreToolUse` relay entry from `~/.claude/settings.json` right
       away, using the existing `Uninstall-ClaudeHooks.ps1 -IncludeSessionControl` (it works today),
       before any rework starts. Verify `settings.json` no longer has a `PreToolUse` entry pointing at
       `Relay-PreToolUse.ps1` and the toast hooks are untouched.
 - [ ] 1.2 Delete `hooks/ledgerScripts/Relay-PreToolUse.ps1` once task 4.1's replacement exists, and
       remove every reference to it (installer, uninstaller, README, tests). Verify with a repo-wide
       search that nothing mentions `Relay-PreToolUse` or a `PreToolUse` relay any more.
+      _Deferred (decided 2026-09-24): blocked on 4.1. The script is still referenced by
+      `Install-ClaudeHooks.ps1`, `Uninstall-ClaudeHooks.ps1`, `hooks/README.md`,
+      `api/pending_decisions.py` and `web/src/api/types.ts`; do it right after 4.1, or with group 5
+      (same installer/uninstaller lines). The uninstaller must keep matching the legacy entry by
+      name until then._
 
 ## 2. Backend: pending-prompt store and Remote mode (rework)
 
-- [ ] 2.1 Rework `api/pending_decisions.py`: per-session list of prompts `{id, tool_name, tool_input,
+- [x] 2.1 Rework `api/pending_decisions.py`: per-session list of prompts `{id, tool_name, tool_input,
       created_at, asyncio.Event, answer}` with API-generated ids; remove the `last_watched` heartbeat
       and `is_watched()`. Add the Remote mode state (enabled, expires_at; auto-off after 8 hours;
       starts off after every process start). Verify with unit tests: register -> answer -> resolve;
       register -> cleared -> waiter released with no answer; two prompts for one session keep
       independent ids; Remote mode expires and starts off.
-- [ ] 2.2 Add transcript-based clearing: a prompt is cleared when the session's transcript has a new
+- [x] 2.2 Add transcript-based clearing: a prompt is cleared when the session's transcript has a new
       line written after the prompt's `created_at` (reusing `claude_context.py`'s tail-reading
       approach), releasing its waiting hook request with no answer; add a maximum age (default 30
       minutes, adjustable) as a backstop. Check on each live snapshot pass. Verify with tests over
