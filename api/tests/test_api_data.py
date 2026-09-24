@@ -1,5 +1,6 @@
 """The data endpoints (/api/live, /api/transcripts, ...) over throwaway ~/.claude fixtures."""
 
+import asyncio
 from datetime import datetime
 
 import pytest
@@ -10,6 +11,7 @@ import server
 from claude_context import LiveContext
 from claude_sessions import ClaudeSession
 from live_snapshot import LiveSnapshot
+from pending_decisions import PendingDecisions
 
 
 def _client():
@@ -84,11 +86,150 @@ def test_live_lists_sessions_with_context(isolated_db, monkeypatch):
     assert [s["session_id"] for s in body["sessions"]] == ["live-1"]
     assert body["sessions"][0]["context"]["label"].startswith("394k ▲ +2.1k ")
     assert "cwd" not in body["sessions"][0]
+    assert body["sessions"][0]["pending_decision"] is None
 
 
 def test_live_with_nothing_running_is_an_empty_list(isolated_db, monkeypatch):
     _use_live(monkeypatch)
     assert _client().get("/api/live").json() == {"sessions": []}
+
+
+def test_live_reflects_a_pending_decision(isolated_db, monkeypatch):
+    store = PendingDecisions(wait_timeout=5.0)
+    monkeypatch.setattr(server, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    store.touch_watch("live-1")
+
+    async def scenario():
+        task = asyncio.create_task(store.request_decision("live-1", "Bash", {"command": "ls"}))
+        await asyncio.sleep(0)  # let it register before peeking
+        body = server.get_live()
+        store.answer("live-1", "allow")
+        await task
+        return body
+
+    body = asyncio.run(scenario())
+    assert body["sessions"][0]["pending_decision"] == {"tool_name": "Bash", "tool_input": {"command": "ls"}}
+
+
+# ---------------------------------------------------------------- POST /api/sessions/{id}/decisions
+
+
+def test_decisions_unwatched_session_passes_through_immediately(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    response = _client().post(
+        "/api/sessions/live-1/decisions", json={"tool_name": "Bash", "tool_input": {"command": "ls"}}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"decision": None, "reason": None}
+
+
+def test_decisions_watched_session_waits_for_the_answer(isolated_db, monkeypatch):
+    # Drives the two route coroutines directly on one event loop (asyncio.Event isn't safe to
+    # set() across real OS threads, which is exactly what two independent TestClient calls would
+    # do - see post_decision_answer's comment).
+    store = PendingDecisions(wait_timeout=5.0)
+    monkeypatch.setattr(server, "decisions", store)
+    store.touch_watch("live-1")
+
+    async def scenario():
+        request = server.DecisionRequest(tool_name="Bash", tool_input={"command": "ls"})
+        task = asyncio.create_task(server.post_decision("live-1", request))
+        await asyncio.sleep(0)  # let it register before answering
+        answered = await server.post_decision_answer("live-1", server.DecisionAnswer(decision="allow"))
+        return await task, answered
+
+    result, answered = asyncio.run(scenario())
+
+    assert answered == {"answered": "live-1"}
+    assert result == {"decision": "allow", "reason": None}
+
+
+# ---------------------------------------------------------------- GET /api/sessions/{id}/pending-decision
+
+
+def test_pending_decision_endpoint_reports_none_and_touches_watch(isolated_db, monkeypatch):
+    store = PendingDecisions(watch_window=5.0)
+    monkeypatch.setattr(server, "decisions", store)
+    assert _client().get("/api/sessions/live-1/pending-decision").json() == {"pending_decision": None}
+    assert store.is_watched("live-1") is True
+
+
+def test_pending_decision_endpoint_reports_a_pending_decision(isolated_db, monkeypatch):
+    store = PendingDecisions(wait_timeout=5.0)
+    monkeypatch.setattr(server, "decisions", store)
+    store.touch_watch("live-1")
+
+    async def scenario():
+        task = asyncio.create_task(store.request_decision("live-1", "Edit", {"file": "a.py"}))
+        await asyncio.sleep(0)
+        body = server.get_pending_decision("live-1")
+        store.answer("live-1", "deny", "no")
+        await task
+        return body
+
+    body = asyncio.run(scenario())
+    assert body["pending_decision"] == {"tool_name": "Edit", "tool_input": {"file": "a.py"}}
+
+
+# ---------------------------------------------------------------- POST /api/sessions/{id}/decisions/answer
+
+
+def test_decision_answer_is_409_when_nothing_is_pending(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    response = _client().post("/api/sessions/live-1/decisions/answer", json={"decision": "allow"})
+    assert response.status_code == 409
+
+
+def test_decision_answer_carries_an_optional_deny_reason(isolated_db, monkeypatch):
+    store = PendingDecisions(wait_timeout=5.0)
+    monkeypatch.setattr(server, "decisions", store)
+    store.touch_watch("live-1")
+
+    async def scenario():
+        request = server.DecisionRequest(tool_name="Bash", tool_input={"command": "rm"})
+        task = asyncio.create_task(server.post_decision("live-1", request))
+        await asyncio.sleep(0)
+        answered = await server.post_decision_answer(
+            "live-1", server.DecisionAnswer(decision="deny", reason="not now")
+        )
+        return await task, answered
+
+    result, answered = asyncio.run(scenario())
+
+    assert answered == {"answered": "live-1"}
+    assert result == {"decision": "deny", "reason": "not now"}
+
+
+# ---------------------------------------------------------------- POST /api/sessions/{id}/open-repo
+
+
+def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeypatch):
+    _use_live(monkeypatch, [_live_session("live-1", cwd="/h/alpha")])
+    calls = []
+    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    response = _client().post("/api/sessions/live-1/open-repo")
+
+    assert response.status_code == 200
+    assert response.json() == {"opened": "live-1"}
+    assert len(calls) == 1
+    (command,), kwargs = calls[0]
+    assert command[0] == "powershell.exe"
+    assert command[-2] == str(server.OPEN_REPO_SCRIPT)
+    assert command[-1] == "claudecode://open?path=%2Fh%2Falpha"
+    assert kwargs == {"check": False}
+
+
+def test_open_repo_is_404_for_an_unknown_or_not_live_session(isolated_db, monkeypatch):
+    _use_live(monkeypatch)
+    calls = []
+    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    response = _client().post("/api/sessions/nope-1/open-repo")
+
+    assert response.status_code == 404
+    assert calls == []
 
 
 # ---------------------------------------------------------------- /api/transcripts

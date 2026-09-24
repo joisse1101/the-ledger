@@ -39,6 +39,10 @@ def test_meta_reports_the_snapshot_timestamp(client):
     assert client.get("/api/meta").json()["refreshed_at"] == stamp.isoformat()
 
 
+def test_meta_reports_is_local_for_a_local_request(client):
+    assert client.get("/api/meta").json()["is_local"] is True
+
+
 def test_refresh_endpoint_advances_refreshed_at(client):
     first = client.post("/api/refresh").json()["refreshed_at"]
     second = client.post("/api/refresh").json()["refreshed_at"]

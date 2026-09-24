@@ -10,26 +10,26 @@
 
 ## 2. Backend: routes
 
-- [ ] 2.1 Add `POST /api/sessions/{id}/decisions` (relay hook → api; local request, no token needed
+- [x] 2.1 Add `POST /api/sessions/{id}/decisions` (relay hook → api; local request, no token needed
       under the existing local-bypass rule). Body `{tool_name, tool_input}`; implements the
       watched/unwatched gate from design.md and responds
       `{decision: "allow"|"deny"|null, reason: string|null}`. Verify with a `TestClient` test covering
       unwatched (immediate pass-through) and watched-then-answered paths.
-- [ ] 2.2 Add `GET /api/sessions/{id}/pending-decision`, gated like the existing session routes, that
+- [x] 2.2 Add `GET /api/sessions/{id}/pending-decision`, gated like the existing session routes, that
       both returns the current pending decision (if any) and calls `touch_watch(id)` as a side effect.
       Verify the side effect with a test: watch, then confirm `is_watched()` is true briefly after.
-- [ ] 2.3 Add `POST /api/sessions/{id}/decisions/answer` (browser-facing; token + `X-Requested-With`
+- [x] 2.3 Add `POST /api/sessions/{id}/decisions/answer` (browser-facing; token + `X-Requested-With`
       required like every other non-GET route). Body `{decision: "allow"|"deny", reason?: string}`;
       resolves the pending `Event`; `409` if nothing is pending. Verify with a test for the happy path
       and the `409` race.
-- [ ] 2.4 Extend `GET /api/live`'s per-session payload with `pending_decision: {tool_name, tool_input} |
+- [x] 2.4 Extend `GET /api/live`'s per-session payload with `pending_decision: {tool_name, tool_input} |
       null`, sourced from `pending_decisions`. Verify with a `test_api_data.py` case.
-- [ ] 2.5 Add `POST /api/sessions/{id}/open-repo` (token-gated): resolve `cwd` server-side from the live
+- [x] 2.5 Add `POST /api/sessions/{id}/open-repo` (token-gated): resolve `cwd` server-side from the live
       registry (never from the request), then `subprocess.run` the repo's own
       `hooks/scripts/Open-ClaudeRepoWindow.ps1` with a `claudecode://open?path=<encoded cwd>` argument.
       404 for an unknown/non-live session. Verify with a test that stubs `subprocess.run` and asserts
       the constructed command/URI, plus a 404 case.
-- [ ] 2.6 Add an `is_local` locality check (reusing `security.py`'s existing local-request test) to
+- [x] 2.6 Add an `is_local` locality check (reusing `security.py`'s existing local-request test) to
       both `DELETE /api/sessions/{id}` and `DELETE /api/projects`, refusing either when the request
       isn't local, independent of whether a valid token was presented. Add `is_local: bool` to
       `GET /api/meta`'s response, computed the same way. Verify with `test_security.py`/`test_api_data.py`
