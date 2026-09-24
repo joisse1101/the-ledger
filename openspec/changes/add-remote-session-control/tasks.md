@@ -4,14 +4,15 @@
       away, using the existing `Uninstall-ClaudeHooks.ps1 -IncludeSessionControl` (it works today),
       before any rework starts. Verify `settings.json` no longer has a `PreToolUse` entry pointing at
       `Relay-PreToolUse.ps1` and the toast hooks are untouched.
-- [ ] 1.2 Delete `hooks/ledgerScripts/Relay-PreToolUse.ps1` once task 4.1's replacement exists, and
+- [x] 1.2 Delete `hooks/ledgerScripts/Relay-PreToolUse.ps1` once task 4.1's replacement exists, and
       remove every reference to it (installer, uninstaller, README, tests). Verify with a repo-wide
       search that nothing mentions `Relay-PreToolUse` or a `PreToolUse` relay any more.
-      _Deferred (decided 2026-09-24): blocked on 4.1. The script is still referenced by
-      `Install-ClaudeHooks.ps1`, `Uninstall-ClaudeHooks.ps1`, `hooks/README.md`,
-      `api/pending_decisions.py` and `web/src/api/types.ts`; do it right after 4.1, or with group 5
-      (same installer/uninstaller lines). The uninstaller must keep matching the legacy entry by
-      name until then._
+      _Done with group 5 (2026-09-24). The script is deleted; the README no longer mentions it. The
+      installer and uninstaller still name `Relay-PreToolUse.ps1`/`PreToolUse` on purpose, in their
+      legacy-cleanup code only - that is how they find and remove a machine's still-installed
+      earlier relay (5.1/5.2 require it), so a repo-wide search is not literally empty. The one other
+      leftover is a comment in `web/src/api/types.ts` ("relayed by the optional PreToolUse hook"),
+      which goes with 6.1's rework of that file._
 
 ## 2. Backend: pending-prompt store and Remote mode (rework)
 
@@ -79,7 +80,7 @@
 
 ## 4. Relay hook script (rework)
 
-- [ ] 4.1 Create `hooks/ledgerScripts/Relay-PermissionRequest.ps1`: parse the `PermissionRequest`
+- [x] 4.1 Create `hooks/ledgerScripts/Relay-PermissionRequest.ps1`: parse the `PermissionRequest`
       stdin payload, read `$env:LEDGER_PORT` (default 8501), do a short loopback TCP probe, POST
       `{tool_name, tool_input}` to `/api/sessions/<id>/decisions` with a client timeout a few seconds
       above the server's wait, and translate the response into `hookSpecificOutput.decision`: allow
@@ -87,21 +88,42 @@
       `message`. Print nothing at all for no answer or any failure. Verify by running it manually
       against a live local `api/` for an answered and an unanswered prompt, and against a stopped
       backend to confirm silent, immediate exit.
+      _Done (2026-09-24), verified against a throwaway backend on port 8511 with a script POSTing
+      answers to the real routes: allow, deny with a reason, deny without one (message defaults to
+      "Denied from the Ledger dashboard"), and a two-question `AskUserQuestion` (single choice + a
+      multi-select) each produced the expected `hookSpecificOutput`; an unanswered prompt (client
+      timeout), a malformed payload and a stopped backend each printed nothing and exited 0 (a
+      stopped backend in ~1.2s total, essentially PowerShell start-up). Not exercised: the API's
+      "cleared by the terminal answering" path (a `{decision: null}` reply) - the script treats any
+      non-allow/deny/answer reply as silence, and the API side is covered by group 2/3 tests.
+      Choices: `-TimeoutSeconds` defaults to 1805 (the API's 30-minute prompt lifetime + 5s), so
+      the installed hook `timeout` is 1810. The port still comes from the installer-baked `-Port`,
+      then `$env:LEDGER_PORT`, then 8501 (kept from the earlier relay). A multi-select answer is
+      forwarded into `updatedInput.answers` as a JSON array, unchanged - see the open question
+      in 7.2._
 
 ## 5. Install / uninstall (rework)
 
-- [ ] 5.1 Rework `-IncludeSessionControl` in `Install-ClaudeHooks.ps1`: copy
+- [x] 5.1 Rework `-IncludeSessionControl` in `Install-ClaudeHooks.ps1`: copy
       `hooks/ledgerScripts/`, merge a `PermissionRequest` entry (empty matcher, hook `timeout` above
       the script's wait) into `settings.json`, and remove any legacy `PreToolUse` relay entry.
       Verify by running it in isolation on a `settings.json` that has the legacy entry.
-- [ ] 5.2 Rework the matching switch in `Uninstall-ClaudeHooks.ps1`: remove the `PermissionRequest`
+- [x] 5.2 Rework the matching switch in `Uninstall-ClaudeHooks.ps1`: remove the `PermissionRequest`
       relay entry (and a legacy `PreToolUse` one if present) and the `ledgerScripts` folder, leaving
       toast hooks untouched. Verify by installing both, uninstalling only session control, and
       confirming the toast hooks remain.
-- [ ] 5.3 Update `hooks/README.md`: the optional relay section describes the `PermissionRequest`
+- [x] 5.3 Update `hooks/README.md`: the optional relay section describes the `PermissionRequest`
       hook, the `-IncludeSessionControl` install/uninstall commands, the wait and timeout defaults,
       and notes that its behavior was verified on Claude Code 2.1.281 and should be re-checked after
       Claude Code upgrades.
+      _5.1-5.3 done (2026-09-24). 5.1/5.2 verified in isolation against a fake `USERPROFILE` (real
+      `settings.json` and registry untouched), seeded with toast hooks, the legacy relay entry plus
+      script, and an unrelated `PreToolUse` hook: install adds one `PermissionRequest` entry
+      (timeout 1810), removes the legacy entry and script, keeps the unrelated hook, and re-running
+      doesn't duplicate; `-IncludeSessionControl -SkipToastHooks` uninstall removes the relay
+      and folder and leaves both toast hooks; it also cleans up a settings file that still has only
+      the legacy entry. Not run: the installer with the toast hooks included (it writes the real
+      HKCU `claudecode://` handler); that path is unchanged._
 
 ## 6. Frontend (rework)
 
@@ -133,7 +155,7 @@
       with a reason blocks it and Claude sees the reason.
 - [ ] 7.2 Questions: trigger an `AskUserQuestion` and answer it from the dashboard with a single
       choice, a multi-select, and free text ("Other"); confirm Claude receives exactly that answer.
-      _Open question (2026-09-24): the API passes a multi-select answer through as a JSON array
+      _**TODO - open question (2026-09-24)**: the API passes a multi-select answer through as a JSON array
       (`"Which extras?": ["auth", "logs"]`) and 4.1 forwards it into `updatedInput.answers` as is.
       Whether Claude Code expects an array there, or a joined string, was never spiked - only
       single-choice answers were. Check what the terminal dialog itself produces for a multi-select
@@ -141,6 +163,12 @@
 - [ ] 7.3 First answer wins: answer in the terminal and confirm the dashboard clears the prompt
       within a few seconds and the hook exits; submit a late dashboard answer and confirm `409` and an
       unaffected session; confirm a late hook result after a terminal answer is discarded.
+      _**TODO (2026-09-24)**: the hook's silent path when the terminal answers first was never run
+      end to end - `Relay-PermissionRequest.ps1` was only tested with dashboard answers, a client
+      timeout, a malformed payload and a stopped backend. Run it live: answer in the terminal, then
+      confirm the API's transcript sweep releases the hook (`{decision: null}`), the hook prints
+      nothing and exits, and the dashboard drops the prompt. Also the "late hook result is
+      discarded" claim rests on the 2.1.281 spike, not a test here._
 - [ ] 7.4 Remote mode gating: with it off, a phone sees no prompt and cannot answer, and the PC
       dashboard and terminal still work; a phone cannot flip the switch even with a valid token;
       confirm the 8-hour expiry and restart reset.

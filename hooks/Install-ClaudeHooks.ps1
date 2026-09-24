@@ -8,11 +8,13 @@ By default this installs the toast-notification hooks: it copies everything in .
 %USERPROFILE%\.claude\hooks, registers the claudecode:// protocol handler, and merges the
 Notification/Stop hooks into %USERPROFILE%\.claude\settings.json.
 
-With -IncludeSessionControl it also installs the optional Ledger relay hook, which lets you approve
-or deny a live session's tool calls from the Ledger dashboard on another device. It copies
-.\ledgerScripts to %USERPROFILE%\.claude\hooks\ledgerScripts and registers a PreToolUse hook for it
-(matcher Bash|Edit|MultiEdit|Write|WebFetch, timeout 130s). If nobody is watching that session in the
-dashboard, the hook stays silent and Claude Code behaves exactly as if it weren't installed.
+With -IncludeSessionControl it also installs the optional Ledger relay hook, which lets you answer a
+live session's blocking prompts (tool-permission dialogs and questions) from the Ledger dashboard. It
+copies .\ledgerScripts to %USERPROFILE%\.claude\hooks\ledgerScripts and registers a PermissionRequest
+hook for it (empty matcher, timeout 1810s). The hook runs alongside the terminal dialog and stays
+silent unless the dashboard answers, so Claude Code behaves exactly as if it weren't installed
+otherwise. It also removes the earlier PreToolUse-based relay hook (entry and installed script), if
+that is still present.
 
 The relay hook has to know which port the Ledger API is on, so the install writes it into the hook's
 command as -Port. It's resolved the same way Start-Ledger.ps1 does (highest wins): -BackendPort, then
@@ -29,7 +31,7 @@ Safe to re-run: copying is idempotent, and the settings.json merge updates hook 
 already there instead of duplicating them.
 
 .PARAMETER IncludeSessionControl
-Also install the optional Ledger relay hook (PreToolUse).
+Also install the optional Ledger relay hook (PermissionRequest).
 
 .PARAMETER BackendPort
 The Ledger API's port to write into the relay hook. Only used with -IncludeSessionControl; when
@@ -69,12 +71,12 @@ if ($Help) {
     return
 }
 
-# Curated tools that commonly need permission; a broader matcher would spawn PowerShell before every
-# tool call. Editable by hand in settings.json afterwards.
-$relayMatcher = 'Bash|Edit|MultiEdit|Write|WebFetch'
-# Seconds. Must stay above Relay-PreToolUse.ps1's own wait (-TimeoutSeconds, default 125) or Claude
-# Code kills the hook mid-wait.
-$relayHookTimeout = 130
+# Empty = every PermissionRequest. The event only fires when a dialog is about to be shown, so there
+# is nothing to narrow.
+$relayMatcher = ''
+# Seconds. Must stay above Relay-PermissionRequest.ps1's own wait (-TimeoutSeconds, default 1805) or
+# Claude Code kills the hook mid-wait.
+$relayHookTimeout = 1810
 
 if ($SkipToastHooks -and -not $IncludeSessionControl) {
     Write-Host 'Nothing to install: -SkipToastHooks without -IncludeSessionControl.'
@@ -84,7 +86,9 @@ if ($SkipToastHooks -and -not $IncludeSessionControl) {
 $hooksDir = Join-Path $env:USERPROFILE '.claude\hooks'
 $toastScript = Join-Path $hooksDir 'Send-ClaudeToast.ps1'
 $ledgerScriptsDir = Join-Path $hooksDir 'ledgerScripts'
-$relayScript = Join-Path $ledgerScriptsDir 'Relay-PreToolUse.ps1'
+$relayScript = Join-Path $ledgerScriptsDir 'Relay-PermissionRequest.ps1'
+# The earlier, PreToolUse-based relay: removed on install, matched by script name.
+$legacyRelayName = 'Relay-PreToolUse.ps1'
 $settingsPath = Join-Path $env:USERPROFILE '.claude\settings.json'
 
 if (-not $SkipToastHooks) {
@@ -167,15 +171,15 @@ function Add-RelayHook {
 
     $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Port $Port"
 
-    if (-not $Settings.hooks.PSObject.Properties['PreToolUse']) {
-        $Settings.hooks | Add-Member -NotePropertyName 'PreToolUse' -NotePropertyValue @()
+    if (-not $Settings.hooks.PSObject.Properties['PermissionRequest']) {
+        $Settings.hooks | Add-Member -NotePropertyName 'PermissionRequest' -NotePropertyValue @()
     }
 
-    $alreadyInstalled = @($Settings.hooks.PreToolUse) | Where-Object {
-        @($_.hooks) | Where-Object { $_.command -like '*Relay-PreToolUse.ps1*' }
+    $alreadyInstalled = @($Settings.hooks.PermissionRequest) | Where-Object {
+        @($_.hooks) | Where-Object { $_.command -like '*Relay-PermissionRequest.ps1*' }
     }
     if ($alreadyInstalled) {
-        Write-Host 'PreToolUse relay hook already present, updating path, port and timeout'
+        Write-Host 'PermissionRequest relay hook already present, updating path, port and timeout'
         $alreadyInstalled[0].hooks[0].command = $command
         $alreadyInstalled[0].hooks[0].timeout = $Timeout
         return
@@ -185,8 +189,27 @@ function Add-RelayHook {
         matcher = $Matcher
         hooks   = @([PSCustomObject]@{ type = 'command'; command = $command; timeout = $Timeout })
     }
-    $Settings.hooks.PreToolUse = @($Settings.hooks.PreToolUse) + $newEntry
-    Write-Host "Added PreToolUse relay hook (matcher: $Matcher)"
+    $Settings.hooks.PermissionRequest = @($Settings.hooks.PermissionRequest) + $newEntry
+    Write-Host 'Added PermissionRequest relay hook'
+}
+
+# Drops the earlier PreToolUse relay entry (other PreToolUse hooks stay), and the whole PreToolUse key
+# if that leaves it empty.
+function Remove-LegacyRelayHook {
+    param($Settings, [string]$ScriptName)
+
+    if (-not $Settings.hooks.PSObject.Properties['PreToolUse']) { return }
+    $all = @($Settings.hooks.PreToolUse)
+    $kept = @($all | Where-Object {
+        -not (@($_.hooks) | Where-Object { $_.command -like "*$ScriptName*" })
+    })
+    if ($kept.Count -eq $all.Count) { return }
+    if ($kept.Count -gt 0) {
+        $Settings.hooks.PreToolUse = $kept
+    } else {
+        $Settings.hooks.PSObject.Properties.Remove('PreToolUse')
+    }
+    Write-Host 'Removed the earlier PreToolUse relay hook'
 }
 
 if (-not $SkipToastHooks) {
@@ -198,6 +221,9 @@ if ($IncludeSessionControl) {
     New-Item -ItemType Directory -Force -Path $ledgerScriptsDir | Out-Null
     Copy-Item -Path (Join-Path $PSScriptRoot 'ledgerScripts\*') -Destination $ledgerScriptsDir -Force
     Write-Host "Copied session-control scripts to $ledgerScriptsDir"
+    $legacyScript = Join-Path $ledgerScriptsDir $legacyRelayName
+    if (Test-Path $legacyScript) { Remove-Item -Path $legacyScript -Force }
+    Remove-LegacyRelayHook -Settings $settings -ScriptName $legacyRelayName
     $relayPort = Resolve-BackendPort -Explicit $BackendPort
     Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout -Port $relayPort
     Write-Host "Relay hook will talk to the Ledger API on port $relayPort (re-run this install if BACKEND_PORT changes)"

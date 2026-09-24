@@ -8,12 +8,12 @@ settings.json, removes the claudecode:// protocol handler, and deletes the files
 in %USERPROFILE%\.claude\hooks (only the files listed in .\scripts, in case that folder holds
 other, unrelated hook scripts too).
 
-With -IncludeSessionControl it also removes the optional Ledger relay hook: the PreToolUse entry
-referencing Relay-PreToolUse.ps1 (other PreToolUse hooks are left alone) and the installed
-ledgerScripts folder.
+With -IncludeSessionControl it also removes the optional Ledger relay hook: the PermissionRequest
+entry referencing Relay-PermissionRequest.ps1, the earlier PreToolUse relay entry if one is still
+there (other hooks under either event are left alone), and the installed ledgerScripts folder.
 
 .PARAMETER IncludeSessionControl
-Also remove the optional Ledger relay hook (PreToolUse).
+Also remove the optional Ledger relay hook (PermissionRequest).
 
 .PARAMETER SkipToastHooks
 Leave the toast hooks alone: don't touch the Notification/Stop hooks, the claudecode:// handler, or
@@ -72,16 +72,24 @@ if (Test-Path $settingsPath) {
             }
             Write-Host "Removed toast hooks from $settingsPath"
         }
-        if ($IncludeSessionControl -and $settings.hooks.PSObject.Properties['PreToolUse']) {
-            $kept = @(@($settings.hooks.PreToolUse) | Where-Object {
-                -not (@($_.hooks) | Where-Object { $_.command -like '*Relay-PreToolUse.ps1*' })
-            })
-            if ($kept.Count -gt 0) {
-                $settings.hooks.PreToolUse = $kept
-            } else {
-                $settings.hooks.PSObject.Properties.Remove('PreToolUse')
+        if ($IncludeSessionControl) {
+            # PermissionRequest is the current relay; PreToolUse is the earlier one, which may still be
+            # installed on a machine that never re-ran the installer.
+            foreach ($relay in @(
+                @{ Event = 'PermissionRequest'; Script = 'Relay-PermissionRequest.ps1' },
+                @{ Event = 'PreToolUse'; Script = 'Relay-PreToolUse.ps1' }
+            )) {
+                if (-not $settings.hooks.PSObject.Properties[$relay.Event]) { continue }
+                $kept = @(@($settings.hooks.($relay.Event)) | Where-Object {
+                    -not (@($_.hooks) | Where-Object { $_.command -like "*$($relay.Script)*" })
+                })
+                if ($kept.Count -gt 0) {
+                    $settings.hooks.($relay.Event) = $kept
+                } else {
+                    $settings.hooks.PSObject.Properties.Remove($relay.Event)
+                }
             }
-            Write-Host "Removed the PreToolUse relay hook from $settingsPath"
+            Write-Host "Removed the relay hook from $settingsPath"
         }
         $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding utf8
     }
