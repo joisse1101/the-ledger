@@ -38,7 +38,7 @@
 
 ## 3. Relay hook script
 
-- [ ] 3.1 Create `hooks/ledgerScripts/Relay-PreToolUse.ps1`: parse the `PreToolUse` stdin payload,
+- [x] 3.1 Create `hooks/ledgerScripts/Relay-PreToolUse.ps1`: parse the `PreToolUse` stdin payload,
       read `$env:LEDGER_PORT` (default 8501), POST to `/api/sessions/<id>/decisions` with a
       client-side timeout a few seconds above the server's own wait, and translate the response into
       `hookSpecificOutput.permissionDecision` — `allow`, `deny` (+ `permissionDecisionReason`), or no
@@ -50,8 +50,8 @@
 
 - [ ] 4.1 Add an `-IncludeSessionControl` switch to `Install-ClaudeHooks.ps1` that copies
       `hooks/ledgerScripts/` to `%USERPROFILE%\.claude\hooks\ledgerScripts\` and merges the
-      `PreToolUse` hook entry (matcher `Bash|Edit|MultiEdit|Write|WebFetch`) into `settings.json`,
-      independent of the toast-hook install. Verify by running it in isolation (no toast hooks
+      `PreToolUse` hook entry (matcher `Bash|Edit|MultiEdit|Write|WebFetch`, hook `timeout` above the
+      script's 125s wait, e.g. 130) into `settings.json`, independent of the toast-hook install. Verify by running it in isolation (no toast hooks
       selected) and inspecting the resulting `settings.json` and installed files.
 - [ ] 4.2 Add the matching `-IncludeSessionControl` switch to `Uninstall-ClaudeHooks.ps1`, removing
       only the `PreToolUse` entry (matched by its script path) and the `ledgerScripts` folder, leaving
