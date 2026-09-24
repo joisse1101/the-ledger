@@ -1,21 +1,41 @@
 <#
-Stops what Start-Ledger.ps1 started: the backend and frontend windows (found via the PIDs
-Start-Ledger.ps1 recorded to the root .ledger-run.json, removed once used) and the gateway
-container (`docker compose down`, same as gateway\Stop-Gateway.ps1) - all three, in one call.
+.SYNOPSIS
+Stops what Start-Ledger.ps1 started: backend, frontend and gateway.
+
+.DESCRIPTION
+Stops the backend and frontend windows (found via the PIDs Start-Ledger.ps1 recorded to the root
+.ledger-run.json, removed once used) and the gateway container (`docker compose down`, same as
+gateway\Stop-Gateway.ps1) - all three, in one call.
 
 Only ever touches processes Start-Ledger.ps1 itself launched - it won't find or stop a
 backend/frontend you started by hand in your own terminal (there's no .ledger-run.json for those).
 Each window is stopped as a whole process tree (its `npm`/`vite`/`python` children included), not
 just the outer PowerShell window.
 
-Usage:
-  .\Stop-Ledger.ps1              # stop backend + frontend + gateway
-  .\Stop-Ledger.ps1 -NoGateway   # leave the gateway container running
+.PARAMETER NoGateway
+Leave the gateway container running.
+
+.PARAMETER Help
+Show this help and exit (-h works too).
+
+.EXAMPLE
+.\Stop-Ledger.ps1
+Stop backend + frontend + gateway.
+
+.EXAMPLE
+.\Stop-Ledger.ps1 -NoGateway
+Stop backend + frontend, leave the gateway container running.
 #>
 
 param(
-    [switch]$NoGateway
+    [switch]$NoGateway,
+    [switch]$Help
 )
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
 
 $stateFile = Join-Path $PSScriptRoot '.ledger-run.json'
 

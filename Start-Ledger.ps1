@@ -1,13 +1,17 @@
 <#
-Starts all three pieces of the app from one place: the backend (`python server.py`), the frontend
-(a `vite` dev server, or a `vite build` + `vite preview`, per -Mode), and the gateway container
-(unless -NoGateway) - each still the same separate process/container CLAUDE.md's "Setup & Run"
-describes, just launched together. Backend and frontend each open in their own window so their logs
-and Ctrl+C stay independent; the gateway is a container, so it's started inline (`docker compose up
--d --build`) and this script then prints its sign-in link/QR the same way
-gateway\Start-Gateway.ps1 does. The backend/frontend window PIDs are recorded to the root
-.ledger-run.json (gitignored) so the paired Stop-Ledger.ps1 can stop exactly these two windows
-(and their child processes) without touching any other window you have open.
+.SYNOPSIS
+Starts the whole Ledger app from one place: backend, frontend and (optionally) the LAN gateway.
+
+.DESCRIPTION
+Starts all three pieces of the app: the backend (`python server.py`), the frontend (a `vite` dev
+server, or a `vite build` + `vite preview`, per -Mode), and the gateway container (unless
+-NoGateway) - each still the same separate process/container CLAUDE.md's "Setup & Run" describes,
+just launched together. Backend and frontend each open in their own window so their logs and Ctrl+C
+stay independent; the gateway is a container, so it's started inline (`docker compose up -d
+--build`) and this script then prints its sign-in link/QR the same way gateway\Start-Gateway.ps1
+does. The backend/frontend window PIDs are recorded to the root .ledger-run.json (gitignored) so the
+paired Stop-Ledger.ps1 can stop exactly these two windows (and their child processes) without
+touching any other window you have open.
 
 -Mode picks how the backend and frontend run - it has no effect on the gateway, which always starts
 the same way either way. `build` (the default, matching normal local use) runs `npm run build` once
@@ -20,18 +24,49 @@ banner/token print (see server.py's `main()`) is only ever accurate for the firs
 
 Port precedence per BackendPort/FrontendPort/GatewayPort (highest wins): an explicit -*Port
 parameter, then the repo root's .env (see .env.example), then an already-set
-BACKEND_PORT/FRONTEND_PORT/GATEWAY_PORT environment variable, then the hardcoded defaults below -
-the same precedence gateway\Start-Gateway.ps1 uses.
+BACKEND_PORT/FRONTEND_PORT/GATEWAY_PORT environment variable, then the hardcoded defaults (8501,
+4173, 8080) - the same precedence gateway\Start-Gateway.ps1 uses.
 
 The gateway needs Docker Desktop; -NoGateway skips it entirely, leaving the app reachable from this
 machine only (see CLAUDE.md's "From another device on your network").
 
-Usage:
-  .\Start-Ledger.ps1                            # build mode, backend + frontend + gateway
-  .\Start-Ledger.ps1 -Mode dev                  # both as hot-reloading dev servers
-  .\Start-Ledger.ps1 -NoGateway                 # skip the gateway container
-  .\Start-Ledger.ps1 -BackendPort 9000 -FrontendPort 5000 -GatewayPort 9090
-  .\Stop-Ledger.ps1                             # stop everything this script started
+.PARAMETER Mode
+'build' (default): build the frontend once and serve it with `vite preview`; backend without
+--reload. 'dev': hot-reloading vite dev server; backend with --reload.
+
+.PARAMETER NoGateway
+Skip the gateway container (this machine only).
+
+.PARAMETER BackendPort
+Port for the backend API. Default 8501.
+
+.PARAMETER FrontendPort
+Port for the frontend. Default 4173.
+
+.PARAMETER GatewayPort
+Port the gateway is published on. Default 8080. Avoid Chromium's restricted ports (e.g. 10080).
+
+.PARAMETER Help
+Show this help and exit (-h works too).
+
+.EXAMPLE
+.\Start-Ledger.ps1
+Build mode: backend + frontend + gateway.
+
+.EXAMPLE
+.\Start-Ledger.ps1 -Mode dev
+Backend and frontend as hot-reloading dev servers.
+
+.EXAMPLE
+.\Start-Ledger.ps1 -NoGateway
+Skip the gateway container.
+
+.EXAMPLE
+.\Start-Ledger.ps1 -BackendPort 9000 -FrontendPort 5000 -GatewayPort 9090
+Override every port.
+
+.LINK
+.\Stop-Ledger.ps1 stops everything this script started.
 #>
 
 param(
@@ -40,10 +75,16 @@ param(
     [switch]$NoGateway,
     [int]$BackendPort,
     [int]$FrontendPort,
-    [int]$GatewayPort
+    [int]$GatewayPort,
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
 
 $envFileValues = @{}
 $rootEnvFile = Join-Path $PSScriptRoot '.env'
