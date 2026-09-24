@@ -55,7 +55,7 @@ export function LiveSessionsPage() {
 
   return (
     <section>
-      <h1>Sessions</h1>
+      <h1>Live Sessions</h1>
       <LiveList onSelect={(session: LiveSession) => openSession(session.session_id)} />
       {sessionId && (
         <div className="live-panel-area">
