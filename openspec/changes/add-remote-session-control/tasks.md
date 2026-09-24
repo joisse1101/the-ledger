@@ -1,116 +1,137 @@
-## 1. Backend: pending-decision store
+## 1. Drop the PreToolUse relay
 
-- [x] 1.1 Add `api/pending_decisions.py`: lock-guarded, in-memory, per-session `{tool_name, tool_input,
-      created_at, asyncio.Event, answer}` plus a `last_watched: dict[session_id, float]` heartbeat map,
-      following `live_snapshot.py`'s pattern. Verify with a unit test exercising register → answer →
-      resolve, and register → timeout → pass-through, without touching any real session.
-- [x] 1.2 Add `touch_watch(session_id)` / `is_watched(session_id)` helpers (heartbeat freshness window,
-      e.g. 5s) and a configurable decision wait timeout (default 120s). Verify with a unit test that an
-      unwatched session's `request_decision()` returns immediately with `decision=None`.
+- [ ] 1.1 Remove the still-installed `PreToolUse` relay entry from `~/.claude/settings.json` right
+      away, using the existing `Uninstall-ClaudeHooks.ps1 -IncludeSessionControl` (it works today),
+      before any rework starts. Verify `settings.json` no longer has a `PreToolUse` entry pointing at
+      `Relay-PreToolUse.ps1` and the toast hooks are untouched.
+- [ ] 1.2 Delete `hooks/ledgerScripts/Relay-PreToolUse.ps1` once task 4.1's replacement exists, and
+      remove every reference to it (installer, uninstaller, README, tests). Verify with a repo-wide
+      search that nothing mentions `Relay-PreToolUse` or a `PreToolUse` relay any more.
 
-## 2. Backend: routes
+## 2. Backend: pending-prompt store and Remote mode (rework)
 
-- [x] 2.1 Add `POST /api/sessions/{id}/decisions` (relay hook → api; local request, no token needed
-      under the existing local-bypass rule). Body `{tool_name, tool_input}`; implements the
-      watched/unwatched gate from design.md and responds
-      `{decision: "allow"|"deny"|null, reason: string|null}`. Verify with a `TestClient` test covering
-      unwatched (immediate pass-through) and watched-then-answered paths.
-- [x] 2.2 Add `GET /api/sessions/{id}/pending-decision`, gated like the existing session routes, that
-      both returns the current pending decision (if any) and calls `touch_watch(id)` as a side effect.
-      Verify the side effect with a test: watch, then confirm `is_watched()` is true briefly after.
-- [x] 2.3 Add `POST /api/sessions/{id}/decisions/answer` (browser-facing; token + `X-Requested-With`
-      required like every other non-GET route). Body `{decision: "allow"|"deny", reason?: string}`;
-      resolves the pending `Event`; `409` if nothing is pending. Verify with a test for the happy path
-      and the `409` race.
-- [x] 2.4 Extend `GET /api/live`'s per-session payload with `pending_decision: {tool_name, tool_input} |
-      null`, sourced from `pending_decisions`. Verify with a `test_api_data.py` case.
-- [x] 2.5 Add `POST /api/sessions/{id}/open-repo` (token-gated): resolve `cwd` server-side from the live
-      registry (never from the request), then `subprocess.run` the repo's own
-      `hooks/scripts/Open-ClaudeRepoWindow.ps1` with a `claudecode://open?path=<encoded cwd>` argument.
-      404 for an unknown/non-live session. Verify with a test that stubs `subprocess.run` and asserts
-      the constructed command/URI, plus a 404 case.
-- [x] 2.6 Add an `is_local` locality check (reusing `security.py`'s existing local-request test) to
-      both `DELETE /api/sessions/{id}` and `DELETE /api/projects`, refusing either when the request
-      isn't local, independent of whether a valid token was presented. Add `is_local: bool` to
-      `GET /api/meta`'s response, computed the same way. Verify with `test_security.py`/`test_api_data.py`
-      cases: a local delete with no token succeeds, a remote delete with a valid token is refused, and
-      `/api/meta` reflects `is_local` correctly for a local vs. a simulated-remote request.
+- [ ] 2.1 Rework `api/pending_decisions.py`: per-session list of prompts `{id, tool_name, tool_input,
+      created_at, asyncio.Event, answer}` with API-generated ids; remove the `last_watched` heartbeat
+      and `is_watched()`. Add the Remote mode state (enabled, expires_at; auto-off after 8 hours;
+      starts off after every process start). Verify with unit tests: register -> answer -> resolve;
+      register -> cleared -> waiter released with no answer; two prompts for one session keep
+      independent ids; Remote mode expires and starts off.
+- [ ] 2.2 Add transcript-based clearing: a prompt is cleared when the session's transcript has a new
+      line written after the prompt's `created_at` (reusing `claude_context.py`'s tail-reading
+      approach), releasing its waiting hook request with no answer; add a maximum age (default 30
+      minutes, adjustable) as a backstop. Check on each live snapshot pass. Verify with tests over
+      temporary transcript files: a later line clears it, an unchanged transcript does not, the max
+      age drops it.
 
-## 3. Relay hook script
+## 3. Backend: routes (rework)
 
-- [x] 3.1 Create `hooks/ledgerScripts/Relay-PreToolUse.ps1`: parse the `PreToolUse` stdin payload,
-      read `$env:LEDGER_PORT` (default 8501), POST to `/api/sessions/<id>/decisions` with a
-      client-side timeout a few seconds above the server's own wait, and translate the response into
-      `hookSpecificOutput.permissionDecision` — `allow`, `deny` (+ `permissionDecisionReason`), or no
-      output at all for `decision: null`. Any connection failure also produces no output. Verify by
-      running it manually against a live local `api/` instance for both an answered and an unanswered
-      decision, and against a stopped backend to confirm silent, immediate pass-through.
+- [ ] 3.1 Rework `POST /api/sessions/{id}/decisions` (relay hook only, local request): always
+      registers the prompt, waits up to the configured wait, responds `{decision: "allow" | "deny" |
+      "answer" | null, ...}`. Verify with `TestClient` tests: answered, cleared with no answer, and
+      wait elapsed.
+- [ ] 3.2 Rework `GET /api/sessions/{id}/pending-decision`: remove the watch side effect; apply the
+      visibility rule (a non-local request sees a prompt only while Remote mode is on). Verify with
+      tests for local, non-local with Remote mode off, and non-local with it on.
+- [ ] 3.3 Rework the answer route to `POST /api/sessions/{id}/decisions/{prompt_id}/answer`: body is
+      `{decision: "allow"}`, `{decision: "deny", reason?}` or `{decision: "answer", answers: {...}}`;
+      validate answers against the stored prompt (option label or free text; an array only for
+      multi-select); token + `X-Requested-With` like other non-GET routes; `403` for a non-local
+      request while Remote mode is off; `409` when the prompt is gone. Verify with tests for each
+      shape, the invalid-answer case, `403` and `409`.
+- [ ] 3.4 Rework `GET /api/live`'s per-session `pending_decision` to `{id, tool_name, tool_input} |
+      null` (oldest first), omitted for a non-local request while Remote mode is off. Verify with
+      `test_api_data.py` cases.
+- [x] 3.5 `POST /api/sessions/{id}/open-repo` (already built; unchanged by this rework).
+- [x] 3.6 `is_local` locality check on both delete routes and `is_local` on `GET /api/meta`
+      (already built; unchanged by this rework).
+- [ ] 3.7 Add `remote_mode: {enabled, expires_at}` to `GET /api/meta` and `POST /api/remote-mode`
+      (`{enabled: bool}`), local-only using the same locality test as the delete routes. Verify with
+      tests: local switch works without a token; a non-local request with a valid token is refused;
+      `/api/meta` reflects the state for local and non-local requests.
 
-## 4. Install / uninstall
+## 4. Relay hook script (rework)
 
-- [x] 4.1 Add an `-IncludeSessionControl` switch to `Install-ClaudeHooks.ps1` that copies
-      `hooks/ledgerScripts/` to `%USERPROFILE%\.claude\hooks\ledgerScripts\` and merges the
-      `PreToolUse` hook entry (matcher `Bash|Edit|MultiEdit|Write|WebFetch`, hook `timeout` above the
-      script's 125s wait, e.g. 130) into `settings.json`, independent of the toast-hook install. Verify by running it in isolation (no toast hooks
-      selected) and inspecting the resulting `settings.json` and installed files.
-- [x] 4.2 Add the matching `-IncludeSessionControl` switch to `Uninstall-ClaudeHooks.ps1`, removing
-      only the `PreToolUse` entry (matched by its script path) and the `ledgerScripts` folder, leaving
-      any installed toast hooks untouched. Verify by installing both, uninstalling only the session
-      control hook, and confirming the toast hooks and `Notification`/`Stop` entries remain.
-- [x] 4.3 Update `hooks/README.md` with a new, clearly optional section documenting the relay hook:
-      what it does, its install/uninstall commands, and the matcher/timeout defaults.
+- [ ] 4.1 Create `hooks/ledgerScripts/Relay-PermissionRequest.ps1`: parse the `PermissionRequest`
+      stdin payload, read `$env:LEDGER_PORT` (default 8501), do a short loopback TCP probe, POST
+      `{tool_name, tool_input}` to `/api/sessions/<id>/decisions` with a client timeout a few seconds
+      above the server's wait, and translate the response into `hookSpecificOutput.decision`: allow
+      (for a question, `updatedInput = {...tool_input, answers, annotations: {}}`), or deny with a
+      `message`. Print nothing at all for no answer or any failure. Verify by running it manually
+      against a live local `api/` for an answered and an unanswered prompt, and against a stopped
+      backend to confirm silent, immediate exit.
 
-## 5. Frontend: live control view
+## 5. Install / uninstall (rework)
 
-- [x] 5.1 Add `pending_decision` to `web/src/api/types.ts`'s live-session shape and a query hook (e.g.
-      `usePendingDecision(sessionId)` polling `GET /api/sessions/{id}/pending-decision` while mounted)
-      and mutation hooks for answering a decision and triggering open-repo, in `web/src/api/queries.ts`.
-      Verify with `npm test` covering the new hooks' request shapes.
-- [x] 5.2 In `SessionDialog.tsx`, when `from === "live"`, render a new control-only view instead of
-      `Detail`: the pending decision (tool name + input) with Approve/Deny (Deny opens an optional
-      one-line reason field) when present, an "Open repo window" button always, and a `409`/timeout
-      state ("this session already moved on") handled gracefully. Verify by running the app against a
-      live session and a hook-driven permission prompt end to end (see task 6.1), and confirm `from ===
-      "all"` selections are visually unchanged.
-- [x] 5.3 Add a pending-decision badge to the Live list row itself (sourced from `GET /api/live`'s new
-      field), so a decision is visible without opening the dialog. Verify visually against a live
-      session with a pending decision.
-- [x] 5.4 Read `is_local` from `useMeta()` and hide both delete controls entirely when it's false:
-      `SessionDialog`'s `DeleteControls` (All-list detail view) and `ProjectsList`'s delete-row flow.
-      Verify with `npm test`/manual check: open the app through the gateway (or simulate a remote
-      request) and confirm neither delete control renders, while a local open still shows both.
+- [ ] 5.1 Rework `-IncludeSessionControl` in `Install-ClaudeHooks.ps1`: copy
+      `hooks/ledgerScripts/`, merge a `PermissionRequest` entry (empty matcher, hook `timeout` above
+      the script's wait) into `settings.json`, and remove any legacy `PreToolUse` relay entry.
+      Verify by running it in isolation on a `settings.json` that has the legacy entry.
+- [ ] 5.2 Rework the matching switch in `Uninstall-ClaudeHooks.ps1`: remove the `PermissionRequest`
+      relay entry (and a legacy `PreToolUse` one if present) and the `ledgerScripts` folder, leaving
+      toast hooks untouched. Verify by installing both, uninstalling only session control, and
+      confirming the toast hooks remain.
+- [ ] 5.3 Update `hooks/README.md`: the optional relay section describes the `PermissionRequest`
+      hook, the `-IncludeSessionControl` install/uninstall commands, the wait and timeout defaults,
+      and notes that its behavior was verified on Claude Code 2.1.281 and should be re-checked after
+      Claude Code upgrades.
 
-## 6. End-to-end verification
+## 6. Frontend (rework)
 
-- [ ] 6.1 With the relay hook installed, start a live session, trigger a matched tool call (e.g.
-      `Bash`) while the session's control view is open in a browser, and confirm: the decision appears
-      in the UI within a couple of seconds, Approve lets the tool run, Deny (with a reason) blocks it
-      and the session sees the reason.
-- [ ] 6.2 Confirm the "never changes local behavior" guarantees: (a) with the hook installed but the
-      control view closed, a matched tool call behaves exactly as before (prompts locally if it would
-      have, silent if pre-allowed); (b) with the backend stopped, same result, with no noticeable
-      delay.
-- [ ] 6.3 Confirm "Open repo window" both focuses an already-open VS Code window and opens a new one
+- [ ] 6.1 Rework `web/src/api/types.ts` and `queries.ts`: the new `pending_decision` shape, an
+      answer mutation for the three answer shapes, and hooks for Remote mode (read from `useMeta`,
+      set via `POST /api/remote-mode`). Verify with `npm test` covering the new request shapes.
+- [ ] 6.2 Rework `LiveControl.tsx`/`SessionDialog.tsx` control view into a prompt renderer: a
+      permission prompt shows tool name and input with Approve/Deny (Deny opens an optional reason);
+      a question shows each question with its options, multi-select where allowed, and a free-text
+      field; a `409`/gone state says "this session already moved on"; the "Open repo window" button
+      stays. Verify against a live session (see 7.1-7.3) and confirm `from === "all"` is unchanged.
+- [ ] 6.3 `LiveList.tsx`: keep the pending-prompt badge (now driven by the new field) and add the
+      Remote mode control: a switch when `is_local`, read-only text (state and time left) otherwise.
+      Verify visually and with `npm test`.
+- [x] 6.4 Read `is_local` from `useMeta()` and hide both delete controls when false (already built;
+      unchanged by this rework).
+
+## 7. End-to-end verification
+
+- [ ] 7.1 Permission prompt: with the relay hook installed and Remote mode on, trigger a Bash
+      permission dialog, answer it from the PC dashboard and from a phone: Approve runs the tool, Deny
+      with a reason blocks it and Claude sees the reason.
+- [ ] 7.2 Questions: trigger an `AskUserQuestion` and answer it from the dashboard with a single
+      choice, a multi-select, and free text ("Other"); confirm Claude receives exactly that answer.
+- [ ] 7.3 First answer wins: answer in the terminal and confirm the dashboard clears the prompt
+      within a few seconds and the hook exits; submit a late dashboard answer and confirm `409` and an
+      unaffected session; confirm a late hook result after a terminal answer is discarded.
+- [ ] 7.4 Remote mode gating: with it off, a phone sees no prompt and cannot answer, and the PC
+      dashboard and terminal still work; a phone cannot flip the switch even with a valid token;
+      confirm the 8-hour expiry and restart reset.
+- [ ] 7.5 Never-alters guarantees: with the hook installed and the backend stopped, a permission
+      dialog and a question appear with no noticeable delay; with Remote mode on or off the terminal
+      dialog is always shown and answerable.
+- [ ] 7.6 Edge cases: two prompts open at once (including a parallel allow + deny batch, where a
+      miss was once observed) each resolve to their own answer; note what `ExitPlanMode` does when
+      it reaches the hook.
+- [ ] 7.7 Confirm "Open repo window" both focuses an already-open VS Code window and opens a new one
       when the repo isn't open yet, from a live session's control view.
 
-## 7. Gateway: HTTPS
+## 8. Gateway: HTTPS
 
-- [ ] 7.1 Generate a self-signed certificate/key for the gateway (e.g. at Docker image build time via
+- [ ] 8.1 Generate a self-signed certificate/key for the gateway (e.g. at Docker image build time via
       `openssl` in the `Dockerfile`, so no manual step is needed) and point Nginx's `server` block at
       HTTPS (443 inside the container, published on `GATEWAY_PORT`) instead of HTTP; remove the plain-
       HTTP listener rather than adding HTTPS alongside it. Verify by rebuilding the gateway and
       confirming `http://` no longer connects while `https://` serves the app (with the expected
       self-signed-certificate warning).
-- [ ] 7.2 Update `api/gateway_signin.py` to print `https://` links and encode the QR with the HTTPS
+- [ ] 8.2 Update `api/gateway_signin.py` to print `https://` links and encode the QR with the HTTPS
       address. Verify with `test_gateway_signin.py` asserting the scheme.
-- [ ] 7.3 Confirm end-to-end: `Start-Gateway.ps1` prints an `https://` link, opening it on a phone
+- [ ] 8.3 Confirm end-to-end: `Start-Gateway.ps1` prints an `https://` link, opening it on a phone
       shows a one-time certificate warning, accepting it signs the device in exactly as before, and
       every subsequent request still carries the token correctly.
 
-## 8. Documentation
+## 9. Documentation
 
-- [ ] 8.1 Update CLAUDE.md: `hooks/` section notes it now also holds the optional, dashboard-coupled
-      `ledgerScripts/`; `api/` section documents its `subprocess` dependency on
-      `hooks/scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action and the new `is_local`
+- [ ] 9.1 Update CLAUDE.md: `hooks/` section notes it now also holds the optional, dashboard-coupled
+      `ledgerScripts/` (a `PermissionRequest` relay); `api/` section documents the pending-prompt
+      store and its transcript-based clearing, Remote mode, its `subprocess` dependency on
+      `hooks/scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action, and the `is_local`
       delete-locality check; `gateway/` section documents the HTTPS-only listener and self-signed
-      certificate; note the new routes and `is_local` in the existing endpoint table.
+      certificate; update the endpoint table for the new routes, `is_local` and `remote_mode`.

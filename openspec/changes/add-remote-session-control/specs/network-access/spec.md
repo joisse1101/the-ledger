@@ -2,13 +2,15 @@
 
 ### Requirement: Other devices must present an access token for data
 A request to any of the app's data endpoints (session, project, overview, and live data; refresh;
-answering a live session's pending decision; opening a session's repo window) that comes from
+answering a live session's pending prompt; opening a session's repo window) that comes from
 anywhere other than the machine the app runs on SHALL be refused, with no dashboard data returned and
 no action taken, unless it carries the app's access token. Requests from the same machine SHALL NOT
 need a token. A refused request SHALL receive an unauthorized response with a short message telling
-the user to open the address printed when the server started. Delete actions follow the stricter,
-local-only rule defined by "Delete actions require a local request" instead of this token rule. The
-app's page shell (the files that render the empty dashboard before any data loads) is not itself
+the user to open the address printed when the server started. Delete actions and switching Remote
+mode follow the stricter, local-only rules defined by "Delete actions require a local request" and
+"Switching Remote mode requires a local request" instead of this token rule. Whether another device
+may see or answer a pending prompt at all additionally depends on Remote mode, defined by the
+remote-session-control capability. The app's page shell (the files that render the empty dashboard before any data loads) is not itself
 gated by the token — see the following requirement.
 
 #### Scenario: No token from another device
@@ -33,8 +35,8 @@ gated by the token — see the following requirement.
 - **WHEN** a device on the network sends a delete request for a session or project without the token
 - **THEN** it is refused and nothing is deleted
 
-#### Scenario: Decision and open-repo actions require the token too
-- **WHEN** a device on the network sends a decision-answer or open-repo-window request without the
+#### Scenario: Prompt-answer and open-repo actions require the token too
+- **WHEN** a device on the network sends a prompt-answer or open-repo-window request without the
   token
 - **THEN** it is refused and no action is taken
 
@@ -115,3 +117,19 @@ local-request rule.
 - **WHEN** a device on the network sends a delete request for a session or project and presents the
   correct access token
 - **THEN** it is refused and nothing is deleted
+
+### Requirement: Switching Remote mode requires a local request
+Turning Remote mode on or off SHALL be refused unless the request comes from the machine the app
+runs on, using the same locality test the rest of the app uses (loopback address, no forwarded-for
+marker). This applies even when the request carries a valid access token: a token lets another
+device see and answer prompts while Remote mode is on, but SHALL NOT let it change Remote mode. A
+local request needs no token for this, per the existing local-request rule.
+
+#### Scenario: Local switch succeeds
+- **WHEN** a browser on the machine running the app turns Remote mode on or off
+- **THEN** it takes effect, without needing a token
+
+#### Scenario: Remote switch refused even with a valid token
+- **WHEN** a device on the network tries to turn Remote mode on or off and presents the correct
+  access token
+- **THEN** it is refused and Remote mode is unchanged

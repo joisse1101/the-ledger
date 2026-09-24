@@ -85,3 +85,18 @@ delete a project.
 #### Scenario: Remote device sees no delete control
 - **WHEN** the Projects page is open on a device that isn't the machine running the app
 - **THEN** there is no delete control for any project
+
+## ADDED Requirements
+
+### Requirement: The Remote mode switch is shown only on the machine running the app
+The Live list SHALL show Remote mode, whether it is on, and when on how long until it turns itself
+off. On the machine running the app it SHALL be a switch the user can flip; on any other device it
+SHALL be read-only text with no control, since only a local request can change it.
+
+#### Scenario: Switch on this machine
+- **WHEN** the Live list is open on the machine running the app
+- **THEN** a Remote mode switch is shown and flipping it turns Remote mode on or off
+
+#### Scenario: Read-only on another device
+- **WHEN** the Live list is open on a device that isn't the machine running the app
+- **THEN** Remote mode's state is shown as text, with no control to change it
