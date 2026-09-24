@@ -465,6 +465,65 @@
   background: var(--surface);
 }
 
+.question {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.question-text {
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.question-header {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.question-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--tap);
+  padding: 6px 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.question-option input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.question-option-note {
+  display: block;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+.question-other {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
 .detail-section > summary {
   cursor: pointer;
   padding: 6px 0;

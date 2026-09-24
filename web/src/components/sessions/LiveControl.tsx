@@ -1,9 +1,9 @@
-import type { UseMutationResult } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
-import { useAnswerDecision, useOpenRepo, usePendingDecision } from "../../api/queries";
-import type { DecisionAnswer, LiveSession, PendingDecision } from "../../api/types";
+import { useAnswerDecision, useMeta, useOpenRepo, usePendingDecision } from "../../api/queries";
+import type { DecisionAnswer, LiveSession } from "../../api/types";
 import { formatText } from "../../lib/format";
+import { DecisionPrompt } from "./DecisionPrompt";
 
 export interface LiveControlProps {
   sessionId: string;
@@ -14,97 +14,47 @@ export interface LiveControlProps {
   liveLoaded: boolean;
 }
 
-/** `answer` is owned by LiveControl, not this card: the card unmounts the moment the decision is
- *  gone, and a "too late" (409) result has to outlive that to be seen. */
-function DecisionCard({
-  decision,
-  answer,
-}: {
-  decision: PendingDecision;
-  answer: UseMutationResult<unknown, Error, DecisionAnswer>;
-}) {
-  const [denying, setDenying] = useState(false);
-  const [reason, setReason] = useState("");
-
-  const input = JSON.stringify(decision.tool_input, null, 2);
-
-  const submit = (choice: "allow" | "deny") => {
-    const trimmed = reason.trim();
-    answer.mutate(choice === "deny" && trimmed ? { decision: choice, reason: trimmed } : { decision: choice });
-  };
-
-  return (
-    <div className="detail-notice decision-card">
-      <p className="detail-heading">Waiting for your decision</p>
-      <p>
-        <strong>{decision.tool_name}</strong>
-      </p>
-      <pre className="decision-input">{input}</pre>
-
-      {denying ? (
-        <>
-          <label className="decision-reason">
-            <span className="detail-caption">Reason for denying (optional)</span>
-            <input
-              type="text"
-              value={reason}
-              maxLength={200}
-              autoFocus
-              onChange={(event) => setReason(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") submit("deny");
-              }}
-            />
-          </label>
-          <div className="detail-actions">
-            <button
-              type="button"
-              className="button button-danger"
-              disabled={answer.isPending}
-              onClick={() => submit("deny")}
-            >
-              {answer.isPending ? "Sending…" : "Confirm deny"}
-            </button>
-            <button type="button" className="button" disabled={answer.isPending} onClick={() => setDenying(false)}>
-              Back
-            </button>
-          </div>
-        </>
-      ) : (
-        <div className="detail-actions">
-          <button type="button" className="button" disabled={answer.isPending} onClick={() => submit("allow")}>
-            {answer.isPending ? "Sending…" : "Approve"}
-          </button>
-          <button type="button" className="button button-danger" disabled={answer.isPending} onClick={() => setDenying(true)}>
-            Deny
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The control-only view opened from the Live list: the session's pending tool-permission
- *  decision (if any) and an "Open repo window" button. Mounting it (and polling the pending
- *  decision) is what tells the server this session is being watched. */
+/** The control-only view opened from the Live list: the session's oldest pending prompt (a
+ *  permission request or a question) and an "Open repo window" button. `answer` lives here, not in
+ *  the prompt: the prompt unmounts the moment it is gone, and a "too late" (409) has to outlive that. */
 export function LiveControl({ sessionId, session, liveLoaded }: LiveControlProps) {
   const pending = usePendingDecision(sessionId);
   const answer = useAnswerDecision(sessionId);
   const openRepo = useOpenRepo(sessionId);
+  const meta = useMeta();
 
   const decision = pending.data?.pending_decision ?? null;
-  const decisionKey = decision ? `${decision.tool_name}
-${JSON.stringify(decision.tool_input)}` : null;
+  const decisionId = decision?.id ?? null;
 
-  // A new pending call starts from a clean slate: drop the previous answer's outcome. (Not when the
-  // decision merely disappears - that's exactly when a 409 or "sent" note needs to stay visible.)
+  // A prompt that vanishes without this view having answered it was resolved elsewhere (the
+  // terminal, another device) or timed out: say so instead of just going blank.
+  const previousId = useRef<string | null>(null);
+  const answeredId = useRef<string | null>(null);
+  const [movedOn, setMovedOn] = useState(false);
   useEffect(() => {
-    if (decisionKey !== null) answer.reset();
+    const previous = previousId.current;
+    previousId.current = decisionId;
+    if (decisionId !== null) {
+      // A new prompt starts from a clean slate. (Not when one merely disappears: that is exactly
+      // when a 409 or "sent" note needs to stay visible.)
+      setMovedOn(false);
+      answer.reset();
+    } else if (previous !== null && previous !== answeredId.current) {
+      setMovedOn(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `answer` is a fresh object every render
-  }, [decisionKey]);
+  }, [decisionId]);
+
+  const send = (promptId: string, body: DecisionAnswer) => {
+    answeredId.current = promptId;
+    setMovedOn(false);
+    answer.mutate({ promptId, answer: body });
+  };
 
   const tooLate = answer.error instanceof ApiError && answer.error.status === 409;
   const exited = liveLoaded && session === null;
+  // Another device can't see prompts at all while Remote mode is off; say why, not just "nothing".
+  const hiddenHere = meta.data !== undefined && !meta.data.is_local && !meta.data.remote_mode.enabled;
 
   return (
     <>
@@ -123,20 +73,28 @@ ${JSON.stringify(decision.tool_input)}` : null;
       {exited && <p className="detail-notice">This session is no longer live.</p>}
 
       {pending.isError && !decision && (
-        <p className="detail-caption">Couldn't check for a pending decision. Retrying…</p>
+        <p className="detail-caption">Couldn't check for a pending prompt. Retrying…</p>
       )}
       {decision ? (
-        <DecisionCard decision={decision} answer={answer} />
+        <DecisionPrompt
+          key={decision.id}
+          decision={decision}
+          busy={answer.isPending}
+          onAnswer={(body) => send(decision.id, body)}
+        />
       ) : (
         !exited && (
           <p className="muted">
-            Nothing is waiting on you. A tool-permission prompt will show up here as it happens, if the relay
-            hook is installed.
+            {hiddenHere
+              ? "Remote mode is off, so this device isn't shown this session's prompts. Turn it on from the PC that runs the app."
+              : "Nothing is waiting on you. A permission prompt or question will show up here as it happens, if the relay hook is installed."}
           </p>
         )
       )}
 
-      {tooLate && <p className="detail-caption">This session already moved on, so your answer wasn't used.</p>}
+      {(tooLate || (movedOn && !answer.isSuccess)) && (
+        <p className="detail-caption">This session already moved on{tooLate ? ", so your answer wasn't used" : ""}.</p>
+      )}
       {answer.isError && !tooLate && <p className="detail-caption">{answer.error.message}</p>}
       {answer.isSuccess && !decision && <p className="detail-caption">Answer sent.</p>}
 

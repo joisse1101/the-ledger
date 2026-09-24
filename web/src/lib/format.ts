@@ -44,3 +44,11 @@ export function formatText(value: string | null | undefined): string {
 export function formatCount(value: number | null | undefined): string {
   return value == null ? "--" : value.toLocaleString();
 }
+
+/** How long is left, coarsely: `7h 59m`, `45m`, or `<1m`. Nothing left (or a bad figure) is `<1m`. */
+export function formatTimeLeft(ms: number): string {
+  const minutes = Math.floor(Math.max(0, Number.isFinite(ms) ? ms : 0) / 60_000);
+  if (minutes < 1) return "<1m";
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}

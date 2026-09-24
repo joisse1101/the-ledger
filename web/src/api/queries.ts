@@ -13,6 +13,7 @@ import type {
   OverviewResponse,
   PendingDecisionResponse,
   ProjectsResponse,
+  RemoteMode,
   SessionResponse,
   TimeRange,
   TranscriptQuery,
@@ -20,7 +21,6 @@ import type {
 } from "./types";
 
 export const LIVE_POLL_MS = 2000;
-// Also the "someone is watching" heartbeat the relay hook's gate looks for (server window: ~5s).
 export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
 export const PAGE_SIZE = 50;
@@ -152,9 +152,8 @@ export function useDeleteProject() {
   });
 }
 
-/** A live session's pending tool-permission decision. Polling while `id` is set is what tells the
- *  server this session's control view is open (see api/pending_decisions.py), so pass null as soon
- *  as the view closes. */
+/** A live session's oldest pending prompt (null when none, or when this device may not see it -
+ *  another device while Remote mode is off). Pass a null `id` to not poll. */
 export function usePendingDecision(id: string | null) {
   return useQuery({
     queryKey: keys.pendingDecision(id ?? ""),
@@ -162,24 +161,45 @@ export function usePendingDecision(id: string | null) {
       apiFetch<PendingDecisionResponse>(`/api/sessions/${encodeURIComponent(id ?? "")}/pending-decision`),
     enabled: id !== null,
     refetchInterval: DECISION_POLL_MS,
-    refetchIntervalInBackground: false, // a hidden tab stops being a watcher
+    refetchIntervalInBackground: false,
   });
 }
 
-/** Rejects with an ApiError; 409 means the decision was already answered or timed out. */
-export function useAnswerDecision(id: string) {
+/** Answers one prompt, named by `promptId`, so two open at once can't be answered for each other.
+ *  Rejects with an ApiError: 409 the prompt is gone (the session already moved on), 403 Remote mode
+ *  is off for this device. */
+export function useAnswerDecision(sessionId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (answer: DecisionAnswer) =>
-      apiFetch<{ answered: string }>(`/api/sessions/${encodeURIComponent(id)}/decisions/answer`, {
+    mutationFn: ({ promptId, answer }: { promptId: string; answer: DecisionAnswer }) =>
+      apiFetch<{ answered: string }>(
+        `/api/sessions/${encodeURIComponent(sessionId)}/decisions/${encodeURIComponent(promptId)}/answer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(answer),
+        },
+      ),
+    // Answered or too late, that prompt is gone either way.
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.pendingDecision(sessionId) });
+      void client.invalidateQueries({ queryKey: keys.live });
+    },
+  });
+}
+
+/** Turns Remote mode on or off. Only the machine running the app may; anything else gets a 403. */
+export function useSetRemoteMode() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiFetch<RemoteMode>("/api/remote-mode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(answer),
+        body: JSON.stringify({ enabled }),
       }),
-    // Answered or too late, the pending entry is gone either way.
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: keys.pendingDecision(id) });
-      void client.invalidateQueries({ queryKey: keys.live });
+    onSuccess: (remoteMode) => {
+      client.setQueryData<Meta>(keys.meta, (meta) => (meta ? { ...meta, remote_mode: remoteMode } : meta));
     },
   });
 }

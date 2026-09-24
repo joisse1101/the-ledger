@@ -127,7 +127,7 @@
 
 ## 6. Frontend (rework)
 
-- [ ] 6.1 Rework `web/src/api/types.ts` and `queries.ts`: the new `pending_decision` shape, an
+- [x] 6.1 Rework `web/src/api/types.ts` and `queries.ts`: the new `pending_decision` shape, an
       answer mutation for the three answer shapes, and hooks for Remote mode (read from `useMeta`,
       set via `POST /api/remote-mode`). Verify with `npm test` covering the new request shapes.
       _Note (2026-09-24): the backend (group 3) is done, so the frontend is currently BROKEN against
@@ -137,14 +137,37 @@
       tool_input} | null`; answer to `/decisions/{prompt_id}/answer`; `useMeta` now also returns
       `remote_mode: {enabled, expires_at}`. A `409` means "session already moved on", a `422` is a
       client bug (the UI builds only valid shapes), a `403` means Remote mode is off._
-- [ ] 6.2 Rework `LiveControl.tsx`/`SessionDialog.tsx` control view into a prompt renderer: a
+      _Done (2026-09-24). `types.ts`: `PendingDecision.id`, `DecisionAnswer` as a union of the three
+      shapes, `RemoteMode`, `Meta.remote_mode`, `QUESTION_TOOL`. `queries.ts`: `useAnswerDecision(
+      sessionId)` now takes `{promptId, answer}` and posts to `/decisions/{prompt_id}/answer`;
+      `useSetRemoteMode()` posts `/api/remote-mode` and writes the reply into the cached meta; the
+      heartbeat wording is gone. Remote mode is read from `useMeta` (polled every 60s, so another
+      device sees a flip within about a minute, though prompts themselves arrive via the 1.5-2s
+      polls). `npm test` covers the URL, body and headers for each shape, a 409, the Remote mode
+      POST, and a 403._
+- [x] 6.2 Rework `LiveControl.tsx`/`SessionDialog.tsx` control view into a prompt renderer: a
       permission prompt shows tool name and input with Approve/Deny (Deny opens an optional reason);
       a question shows each question with its options, multi-select where allowed, and a free-text
       field; a `409`/gone state says "this session already moved on"; the "Open repo window" button
       stays. Verify against a live session (see 7.1-7.3) and confirm `from === "all"` is unchanged.
-- [ ] 6.3 `LiveList.tsx`: keep the pending-prompt badge (now driven by the new field) and add the
+      _Done (2026-09-24), except the live-session verification, which is 7.1-7.3 and NOT yet run.
+      New `DecisionPrompt.tsx` (permission card; question card with radios/checkboxes, a free-text
+      "Other", and Send disabled until every question is answered, mirroring the API's rules so the
+      UI only builds valid shapes) and `lib/prompt.ts` (parsing `questions[]`, building `answers`,
+      unit-tested). A question with no readable `questions[]` shows the input and says to answer in
+      the terminal, matching the API refusing it. `LiveControl.tsx` shows "already moved on" both for
+      a 409 and when a prompt vanishes without this view having answered it, and tells another
+      device why it sees nothing while Remote mode is off. `SessionDialog.tsx` is untouched, so
+      `from === "all"` is unchanged (only checked by reading, not in a browser). A multi-select
+      answer is still sent as an array; see the open question under 7.2._
+- [x] 6.3 `LiveList.tsx`: keep the pending-prompt badge (now driven by the new field) and add the
       Remote mode control: a switch when `is_local`, read-only text (state and time left) otherwise.
       Verify visually and with `npm test`.
+      _Done (2026-09-24), `npm test`/`tsc`/`npm run build` only - NOT verified visually in a browser
+      yet. New `RemoteModeControl.tsx` in the Live toolbar (switch with time left when local,
+      read-only "Remote mode: on, 7h 59m left" otherwise; it also reads as off the moment
+      `expires_at` passes, without waiting for the next meta refresh). The badge now reads "Asking a
+      question" for `AskUserQuestion`, else "Needs decision: <tool>"._
 - [x] 6.4 Read `is_local` from `useMeta()` and hide both delete controls when false (already built;
       unchanged by this rework).
 

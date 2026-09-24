@@ -3,13 +3,20 @@ import { useLive } from "../../api/queries";
 import { formatText, formatTime } from "../../lib/format";
 import type { ListColumn } from "../list/types";
 import { ResponsiveList } from "../list/ResponsiveList";
+import { QUESTION_TOOL } from "../../api/types";
 import type { LiveSession } from "../../api/types";
+import { RemoteModeControl } from "./RemoteModeControl";
 
-/** Shown on a row whose session is waiting on a tool-permission decision, so it's visible
+/** Shown on a row whose session is blocked on a permission prompt or a question, so it's visible
  *  without opening the control view. */
 function PendingBadge({ session }: { session: LiveSession }) {
-  if (!session.pending_decision) return null;
-  return <span className="pending-badge">Needs decision: {session.pending_decision.tool_name}</span>;
+  const pending = session.pending_decision;
+  if (!pending) return null;
+  return (
+    <span className="pending-badge">
+      {pending.tool_name === QUESTION_TOOL ? "Asking a question" : `Needs decision: ${pending.tool_name}`}
+    </span>
+  );
 }
 
 const columns: ListColumn<LiveSession>[] = [
@@ -98,6 +105,7 @@ export function LiveList({ onSelect }: LiveListProps) {
           />
           <span>Auto-refresh</span>
         </label>
+        <RemoteModeControl />
         <span className="muted sessions-toolbar-caption">
           Last refreshed: <time dateTime={lastRefreshed ?? undefined}>{formatTime(lastRefreshed)}</time>
         </span>
