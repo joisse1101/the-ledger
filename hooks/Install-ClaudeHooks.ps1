@@ -14,6 +14,11 @@ or deny a live session's tool calls from the Ledger dashboard on another device.
 (matcher Bash|Edit|MultiEdit|Write|WebFetch, timeout 130s). If nobody is watching that session in the
 dashboard, the hook stays silent and Claude Code behaves exactly as if it weren't installed.
 
+The relay hook has to know which port the Ledger API is on, so the install writes it into the hook's
+command as -Port. It's resolved the same way Start-Ledger.ps1 does (highest wins): -BackendPort, then
+BACKEND_PORT in the repo root's .env, then an already-set BACKEND_PORT environment variable, then
+8501. Re-run this install after changing BACKEND_PORT.
+
 Run this directly (in your own PowerShell prompt) rather than embedding $env:USERPROFILE inside a
 hook's "command" string in settings.json - Claude Code runs those via Git Bash or PowerShell
 depending on the machine, and the two disagree on environment-variable syntax. This script resolves
@@ -25,6 +30,10 @@ already there instead of duplicating them.
 
 .PARAMETER IncludeSessionControl
 Also install the optional Ledger relay hook (PreToolUse).
+
+.PARAMETER BackendPort
+The Ledger API's port to write into the relay hook. Only used with -IncludeSessionControl; when
+omitted it comes from .env, the environment, or 8501 (see above).
 
 .PARAMETER SkipToastHooks
 Leave the toast hooks alone: don't copy the toast scripts, register the claudecode:// handler, or
@@ -49,6 +58,7 @@ Installs only the relay hook.
 param(
     [switch]$IncludeSessionControl,
     [switch]$SkipToastHooks,
+    [int]$BackendPort,
     [switch]$Help
 )
 
@@ -132,10 +142,30 @@ function Add-ToastHook {
     Write-Host "Added $EventName hook for `"$Title`""
 }
 
-function Add-RelayHook {
-    param($Settings, [string]$ScriptPath, [string]$Matcher, [int]$Timeout)
+# Same precedence as Start-Ledger.ps1's Resolve-Port: explicit parameter, then the repo root's .env,
+# then an already-set BACKEND_PORT environment variable, then the default.
+function Resolve-BackendPort {
+    param([int]$Explicit)
+    if ($Explicit) { return $Explicit }
 
-    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+    $rootEnvFile = Join-Path $PSScriptRoot '..\.env'
+    if (Test-Path $rootEnvFile) {
+        foreach ($line in Get-Content $rootEnvFile) {
+            if ($line -match '^\s*BACKEND_PORT\s*=\s*(\d+)\s*$' -and $line -notmatch '^\s*#') {
+                return [int]$Matches[1]
+            }
+        }
+    }
+
+    $existing = [Environment]::GetEnvironmentVariable('BACKEND_PORT')
+    if ($existing -match '^\d+$') { return [int]$existing }
+    return 8501
+}
+
+function Add-RelayHook {
+    param($Settings, [string]$ScriptPath, [string]$Matcher, [int]$Timeout, [int]$Port)
+
+    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Port $Port"
 
     if (-not $Settings.hooks.PSObject.Properties['PreToolUse']) {
         $Settings.hooks | Add-Member -NotePropertyName 'PreToolUse' -NotePropertyValue @()
@@ -145,7 +175,7 @@ function Add-RelayHook {
         @($_.hooks) | Where-Object { $_.command -like '*Relay-PreToolUse.ps1*' }
     }
     if ($alreadyInstalled) {
-        Write-Host 'PreToolUse relay hook already present, updating path and timeout'
+        Write-Host 'PreToolUse relay hook already present, updating path, port and timeout'
         $alreadyInstalled[0].hooks[0].command = $command
         $alreadyInstalled[0].hooks[0].timeout = $Timeout
         return
@@ -168,7 +198,9 @@ if ($IncludeSessionControl) {
     New-Item -ItemType Directory -Force -Path $ledgerScriptsDir | Out-Null
     Copy-Item -Path (Join-Path $PSScriptRoot 'ledgerScripts\*') -Destination $ledgerScriptsDir -Force
     Write-Host "Copied session-control scripts to $ledgerScriptsDir"
-    Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout
+    $relayPort = Resolve-BackendPort -Explicit $BackendPort
+    Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout -Port $relayPort
+    Write-Host "Relay hook will talk to the Ledger API on port $relayPort (re-run this install if BACKEND_PORT changes)"
 }
 
 New-Item -ItemType Directory -Force -Path (Split-Path $settingsPath) | Out-Null

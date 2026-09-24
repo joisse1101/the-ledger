@@ -1,7 +1,8 @@
 <#
 Claude Code PreToolUse hook that relays a tool-permission decision to the Ledger dashboard. Reads
 the hook's JSON payload from stdin and POSTs the session's tool call to the local Ledger API
-(http://127.0.0.1:$env:LEDGER_PORT, default 8501). If that session's control view is open in a
+(http://127.0.0.1:<port>, where port is -Port, else $env:LEDGER_PORT, else 8501; the installer bakes
+-Port in from the repo's .env). If that session's control view is open in a
 browser, the API holds the request until someone approves/denies there, and this script turns the
 answer into hookSpecificOutput.permissionDecision ("allow" or "deny" plus a reason).
 
@@ -17,7 +18,9 @@ separately (see hooks/README.md). Register it with a hook timeout comfortably ab
 param(
     # A few seconds above the API's own wait (pending_decisions.DECISION_WAIT_SECONDS = 120), so the
     # API's "no opinion" reply normally arrives first instead of this client giving up on it.
-    [int]$TimeoutSeconds = 125
+    [int]$TimeoutSeconds = 125,
+    # The API's port. 0 = not given: fall back to $env:LEDGER_PORT, then 8501.
+    [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +39,7 @@ try {
     $toolInput = $payload.tool_input
     if ($null -eq $toolInput) { $toolInput = [ordered]@{} }
 
-    $port = if ($env:LEDGER_PORT -match '^\d+$') { [int]$env:LEDGER_PORT } else { 8501 }
+    $port = if ($Port -gt 0) { $Port } elseif ($env:LEDGER_PORT -match '^\d+$') { [int]$env:LEDGER_PORT } else { 8501 }
     $uri = "http://127.0.0.1:$port/api/sessions/$([System.Uri]::EscapeDataString($sessionId))/decisions"
 
     # Fail fast when the backend isn't running: on Windows a refused loopback connect is retried

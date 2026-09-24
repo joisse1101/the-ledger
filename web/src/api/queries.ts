@@ -7,9 +7,11 @@ import {
 } from "@tanstack/react-query";
 import { apiFetch, withQuery } from "./client";
 import type {
+  DecisionAnswer,
   LiveResponse,
   Meta,
   OverviewResponse,
+  PendingDecisionResponse,
   ProjectsResponse,
   SessionResponse,
   TimeRange,
@@ -18,6 +20,8 @@ import type {
 } from "./types";
 
 export const LIVE_POLL_MS = 2000;
+// Also the "someone is watching" heartbeat the relay hook's gate looks for (server window: ~5s).
+export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
 export const PAGE_SIZE = 50;
 
@@ -26,6 +30,7 @@ export const keys = {
   live: ["live"] as const,
   transcripts: ["transcripts"] as const,
   session: (id: string) => ["session", id] as const,
+  pendingDecision: (id: string) => ["pending-decision", id] as const,
   overview: (range: TimeRange) => ["overview", range] as const,
   projects: ["projects"] as const,
 };
@@ -54,10 +59,12 @@ export function useRefresh() {
   });
 }
 
-/** The Live list. `auto: false` stops the polling but keeps the last rows. */
-export function useLive({ auto }: { auto: boolean }) {
+/** The Live list. `auto: false` stops the polling but keeps the last rows; `enabled: false`
+ *  (default true) skips the query entirely. */
+export function useLive({ auto, enabled = true }: { auto: boolean; enabled?: boolean }) {
   return useQuery({
     queryKey: keys.live,
+    enabled,
     queryFn: () => apiFetch<LiveResponse>("/api/live"),
     refetchInterval: auto ? LIVE_POLL_MS : false,
     refetchIntervalInBackground: false, // nothing polls while the tab is hidden
@@ -142,5 +149,45 @@ export function useDeleteProject() {
         void client.invalidateQueries({ queryKey: key });
       }
     },
+  });
+}
+
+/** A live session's pending tool-permission decision. Polling while `id` is set is what tells the
+ *  server this session's control view is open (see api/pending_decisions.py), so pass null as soon
+ *  as the view closes. */
+export function usePendingDecision(id: string | null) {
+  return useQuery({
+    queryKey: keys.pendingDecision(id ?? ""),
+    queryFn: () =>
+      apiFetch<PendingDecisionResponse>(`/api/sessions/${encodeURIComponent(id ?? "")}/pending-decision`),
+    enabled: id !== null,
+    refetchInterval: DECISION_POLL_MS,
+    refetchIntervalInBackground: false, // a hidden tab stops being a watcher
+  });
+}
+
+/** Rejects with an ApiError; 409 means the decision was already answered or timed out. */
+export function useAnswerDecision(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (answer: DecisionAnswer) =>
+      apiFetch<{ answered: string }>(`/api/sessions/${encodeURIComponent(id)}/decisions/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(answer),
+      }),
+    // Answered or too late, the pending entry is gone either way.
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.pendingDecision(id) });
+      void client.invalidateQueries({ queryKey: keys.live });
+    },
+  });
+}
+
+/** Opens the session's repo in the editor on the machine running the app. */
+export function useOpenRepo(id: string) {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ opened: string }>(`/api/sessions/${encodeURIComponent(id)}/open-repo`, { method: "POST" }),
   });
 }

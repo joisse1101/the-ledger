@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { LIVE_POLL_MS, useDeleteSession, useSession } from "../../api/queries";
+import { LIVE_POLL_MS, useDeleteSession, useLive, useMeta, useSession } from "../../api/queries";
 import type { Compaction, SessionDetail, SessionRecap, Turn } from "../../api/types";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText, formatTime } from "../../lib/format";
 import { humanizeTokens } from "../../lib/tokens";
 import { CloseIcon } from "../icons";
+import { LiveControl } from "./LiveControl";
 import { TokensChart } from "./TokensChart";
 
 export interface SessionDialogProps {
   /** null when no session is selected: the dialog stays mounted, but closed. */
   sessionId: string | null;
-  /** All list selections get the recap block; Live list selections don't. */
+  /** All list selections get the recap and token detail; Live list selections open the
+   *  control-only view (pending decision + open repo) instead. */
   from: "live" | "all";
   onClose: () => void;
 }
@@ -285,7 +287,13 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
     setLive(false);
   }, [sessionId]);
 
-  const session = useSession(sessionId, { refetchMs: live ? LIVE_POLL_MS : undefined });
+  const fromAll = from === "all";
+  const session = useSession(fromAll ? sessionId : null, { refetchMs: live ? LIVE_POLL_MS : undefined });
+  // Only the control view needs the Live list (for its heading and to notice the session exiting).
+  const liveList = useLive({ auto: true, enabled: !fromAll && sessionId !== null });
+  const liveSession = liveList.data?.sessions.find((s) => s.session_id === sessionId) ?? null;
+  // Deletes are local-only server-side; this hides the control on any other device (and until known).
+  const isLocal = useMeta().data?.is_local === true;
 
   useEffect(() => {
     if (session.data) setLive(session.data.live);
@@ -310,10 +318,12 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
   }, [onClose]);
 
   const data = session.data;
-  const heading = data?.recap?.title || sessionId || "Session";
+  const heading = fromAll
+    ? data?.recap?.title || sessionId || "Session"
+    : liveSession?.title || liveSession?.name || sessionId || "Session";
 
   return (
-    <dialog ref={dialogRef} className="session-dialog" aria-label="Session detail">
+    <dialog ref={dialogRef} className="session-dialog" aria-label={fromAll ? "Session detail" : "Session control"}>
       <div className="session-dialog-scroll">
         <header className="session-dialog-header">
           <h2 className="session-dialog-title">{heading}</h2>
@@ -322,7 +332,15 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
           </button>
         </header>
         <div className="session-dialog-body">
-          {sessionId && (
+          {sessionId && !fromAll && (
+            <LiveControl
+              key={sessionId}
+              sessionId={sessionId}
+              session={liveSession}
+              liveLoaded={liveList.data !== undefined}
+            />
+          )}
+          {sessionId && fromAll && (
             <>
               {session.isPending && <p className="muted">Loading…</p>}
               {session.isError && (
@@ -335,10 +353,10 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
               )}
               {data && (
                 <>
-                  {from === "all" && data.recap && <Recap recap={data.recap} />}
+                  {data.recap && <Recap recap={data.recap} />}
                   {!data.readable && <p className="detail-notice">Couldn't read this session's transcript.</p>}
                   {data.readable && data.detail && <Detail detail={data.detail} />}
-                  {from === "all" && (
+                  {isLocal && (
                     <DeleteControls
                       key={data.session_id}
                       sessionId={data.session_id}

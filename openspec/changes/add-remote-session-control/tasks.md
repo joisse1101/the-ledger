@@ -62,20 +62,20 @@
 
 ## 5. Frontend: live control view
 
-- [ ] 5.1 Add `pending_decision` to `web/src/api/types.ts`'s live-session shape and a query hook (e.g.
+- [x] 5.1 Add `pending_decision` to `web/src/api/types.ts`'s live-session shape and a query hook (e.g.
       `usePendingDecision(sessionId)` polling `GET /api/sessions/{id}/pending-decision` while mounted)
       and mutation hooks for answering a decision and triggering open-repo, in `web/src/api/queries.ts`.
       Verify with `npm test` covering the new hooks' request shapes.
-- [ ] 5.2 In `SessionDialog.tsx`, when `from === "live"`, render a new control-only view instead of
+- [x] 5.2 In `SessionDialog.tsx`, when `from === "live"`, render a new control-only view instead of
       `Detail`: the pending decision (tool name + input) with Approve/Deny (Deny opens an optional
       one-line reason field) when present, an "Open repo window" button always, and a `409`/timeout
       state ("this session already moved on") handled gracefully. Verify by running the app against a
       live session and a hook-driven permission prompt end to end (see task 6.1), and confirm `from ===
       "all"` selections are visually unchanged.
-- [ ] 5.3 Add a pending-decision badge to the Live list row itself (sourced from `GET /api/live`'s new
+- [x] 5.3 Add a pending-decision badge to the Live list row itself (sourced from `GET /api/live`'s new
       field), so a decision is visible without opening the dialog. Verify visually against a live
       session with a pending decision.
-- [ ] 5.4 Read `is_local` from `useMeta()` and hide both delete controls entirely when it's false:
+- [x] 5.4 Read `is_local` from `useMeta()` and hide both delete controls entirely when it's false:
       `SessionDialog`'s `DeleteControls` (All-list detail view) and `ProjectsList`'s delete-row flow.
       Verify with `npm test`/manual check: open the app through the gateway (or simulate a remote
       request) and confirm neither delete control renders, while a local open still shows both.

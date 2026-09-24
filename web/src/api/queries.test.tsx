@@ -1,8 +1,10 @@
-import { QueryObserver } from "@tanstack/react-query";
+import { QueryClientProvider, QueryObserver } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "./queryClient";
 import { apiFetch } from "./client";
-import { keys, LIVE_POLL_MS } from "./queries";
+import { keys, LIVE_POLL_MS, useAnswerDecision, useOpenRepo, usePendingDecision } from "./queries";
 import type { LiveResponse } from "./types";
 
 function jsonResponse(body: unknown): Response {
@@ -51,6 +53,79 @@ describe("the Live query", () => {
     expect(observer.getCurrentResult().data?.sessions).toEqual(sessions);
 
     unsubscribe();
+    client.clear();
+  });
+});
+
+describe("the session control hooks", () => {
+  function wrapper(client: ReturnType<typeof createQueryClient>) {
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  it("polls a session's pending decision at its own endpoint, and not without an id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ pending_decision: null }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const idle = renderHook(() => usePendingDecision(null), { wrapper: wrapper(client) });
+    expect(idle.result.current.fetchStatus).toBe("idle");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const { result } = renderHook(() => usePendingDecision("abc-123"), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/sessions/abc-123/pending-decision");
+    client.clear();
+  });
+
+  it("answers a decision with a JSON body and the CSRF header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ answered: "abc" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useAnswerDecision("abc"), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync({ decision: "deny", reason: "not that file" }));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/sessions/abc/decisions/answer");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ decision: "deny", reason: "not that file" });
+    expect(init.headers.get("X-Requested-With")).toBe("ledger");
+    expect(init.headers.get("Content-Type")).toBe("application/json");
+    client.clear();
+  });
+
+  it("surfaces a 409 from answering as an ApiError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "no pending decision for this session" }), {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useAnswerDecision("abc"), { wrapper: wrapper(client) });
+    await expect(act(() => result.current.mutateAsync({ decision: "allow" }))).rejects.toMatchObject({ status: 409 });
+    client.clear();
+  });
+
+  it("opens a repo with a bodiless, CSRF-headed POST", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ opened: "abc" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useOpenRepo("abc"), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync());
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/sessions/abc/open-repo");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+    expect(init.headers.get("X-Requested-With")).toBe("ledger");
     client.clear();
   });
 });

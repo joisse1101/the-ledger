@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDeleteProject, useProjects } from "../../api/queries";
+import { useDeleteProject, useMeta, useProjects } from "../../api/queries";
 import type { Project } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
 import { ResponsiveList } from "../list/ResponsiveList";
@@ -61,9 +61,17 @@ const columns: ListColumn<Project>[] = [
 export function ProjectsList() {
   const projects = useProjects();
   const deleteProject = useDeleteProject();
+  // Deletes are local-only server-side; on any other device the list is read-only (and stays
+  // that way until /api/meta says otherwise).
+  const isLocal = useMeta().data?.is_local === true;
   const [pending, setPending] = useState<Project | null>(null);
 
   const rows = projects.data?.projects ?? [];
+
+  // Selecting a row only ever starts a delete, so it does nothing off the local machine.
+  const handleSelect = (project: Project) => {
+    if (isLocal) setPending(project);
+  };
 
   const handleConfirm = () => {
     if (!pending) return;
@@ -76,13 +84,13 @@ export function ProjectsList() {
         columns={columns}
         rows={rows}
         rowId={(p) => p.path}
-        onSelect={setPending}
+        onSelect={handleSelect}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
         rowClassName={(p) => (pending && p.path === pending.path ? "row-selected" : undefined)}
       />
 
-      {pending && (
+      {isLocal && pending && (
         <div className="detail-notice">
           <p>
             Delete project <code>{pending.path}</code> from ~/.claude.json and remove all of its on-disk session

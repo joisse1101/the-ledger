@@ -3,6 +3,8 @@
 
 export interface Meta {
   refreshed_at: string | null;
+  /** True only when this request comes from the machine running the app; delete controls key off it. */
+  is_local: boolean;
 }
 
 export interface LiveContext {
@@ -11,6 +13,21 @@ export interface LiveContext {
   history: number[];
   /** Ready-made text such as `394k ▲ +2.1k ▁▂▃`, from the server's format_context(). */
   label: string;
+}
+
+/** A tool call a live session is waiting on, relayed by the optional PreToolUse hook. */
+export interface PendingDecision {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+
+export interface PendingDecisionResponse {
+  pending_decision: PendingDecision | null;
+}
+
+export interface DecisionAnswer {
+  decision: "allow" | "deny";
+  reason?: string;
 }
 
 export interface LiveSession {
@@ -26,6 +43,7 @@ export interface LiveSession {
   last_message: string;
   first_prompt: string;
   context: LiveContext | null;
+  pending_decision: PendingDecision | null;
 }
 
 export interface LiveResponse {

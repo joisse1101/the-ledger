@@ -5,6 +5,13 @@ import type { ListColumn } from "../list/types";
 import { ResponsiveList } from "../list/ResponsiveList";
 import type { LiveSession } from "../../api/types";
 
+/** Shown on a row whose session is waiting on a tool-permission decision, so it's visible
+ *  without opening the control view. */
+function PendingBadge({ session }: { session: LiveSession }) {
+  if (!session.pending_decision) return null;
+  return <span className="pending-badge">Needs decision: {session.pending_decision.tool_name}</span>;
+}
+
 const columns: ListColumn<LiveSession>[] = [
   {
     key: "project",
@@ -53,6 +60,13 @@ const columns: ListColumn<LiveSession>[] = [
     render: (s) => s.context?.label ?? "--",
   },
   {
+    key: "pending_decision",
+    header: "Decision",
+    priority: "high",
+    cardPriority: "hidden",
+    render: (s) => <PendingBadge session={s} />,
+  },
+  {
     key: "session_id",
     header: "Session ID",
     priority: "low",
@@ -93,6 +107,7 @@ export function LiveList({ onSelect }: LiveListProps) {
         rows={live.data?.sessions ?? []}
         rowId={(s) => s.session_id}
         onSelect={onSelect}
+        rowBadge={(s) => <PendingBadge session={s} />}
         emptyMessage="No live sessions. Start a Claude Code session to see it here."
         ariaLabel="Live sessions"
       />

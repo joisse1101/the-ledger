@@ -147,7 +147,7 @@ it is **not** installed by default. It lets you approve or deny a live session's
 dashboard's Live list on another device.
 
 **What it does.** `ledgerScripts\Relay-PreToolUse.ps1` is a `PreToolUse` hook. Before a matched tool
-runs, it POSTs the call to the local Ledger API (`http://127.0.0.1:$env:LEDGER_PORT`, default `8501`).
+runs, it POSTs the call to the local Ledger API (`http://127.0.0.1:<port>`, see "Port" below).
 If that session's control view is open in a browser, the API holds the request until you approve or deny
 there (up to 120s), and the hook returns that as `allow`, or `deny` plus your reason. In every other case
 — nobody watching, no answer in time, backend not running — the hook prints nothing, so Claude Code
@@ -170,13 +170,21 @@ This copies `ledgerScripts\` to `%USERPROFILE%\.claude\hooks\ledgerScripts\` and
 entry to `settings.json`. Safe to re-run. `-SkipToastHooks` also skips the toast scripts and the
 `claudecode://` protocol handler.
 
+**Port.** The hook has to know which port the backend is on, so the install writes it into the hook's
+command as `-Port <n>`. It's resolved the way `Start-Ledger.ps1` does (highest wins): `-BackendPort`,
+then `BACKEND_PORT` in the repo root's `.env`, then an already-set `BACKEND_PORT` environment
+variable, then `8501`. **Re-run the install after changing `BACKEND_PORT`**, then start a new Claude
+Code session: the hook reads it from `settings.json` when a session starts. If a hook is run without
+`-Port` (e.g. an entry edited by hand), it falls back to the `LEDGER_PORT` environment variable, then
+`8501`.
+
 **Defaults** (edit the entry in `settings.json` afterwards to change them):
 
 | Setting | Default | Notes |
 |---|---|---|
 | `matcher` | `Bash\|Edit\|MultiEdit\|Write\|WebFetch` | The tools that most commonly need permission. Kept narrow on purpose: every matched call spawns a PowerShell process (~100-300ms), even when the tool would have been allowed silently. `*` works but taxes every tool call. |
 | `timeout` | `130` (seconds) | Must stay above the script's own wait (`-TimeoutSeconds`, default 125, itself just above the API's 120s), or Claude Code kills the hook mid-wait. |
-| `LEDGER_PORT` | `8501` | Set this environment variable if the backend runs on a different port (`python server.py --port`). |
+| `-Port` (in `command`) | from `.env`, else `8501` | Written by the install; see "Port" above. Without it the hook uses the `LEDGER_PORT` environment variable, then `8501`. |
 
 **Uninstall:**
 

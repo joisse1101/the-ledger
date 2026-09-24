@@ -300,6 +300,19 @@
   white-space: nowrap;
 }
 
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .list-table tbody tr.row-live {
   box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -417,7 +430,39 @@
 
 .detail-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.decision-card {
+  margin-bottom: 12px;
+}
+
+.decision-input {
+  max-height: 40vh;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.decision-reason {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.decision-reason input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--grid);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .detail-section > summary {
