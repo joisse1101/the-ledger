@@ -6,10 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:force": "vite --force",
-    "dev:link": "yalc link @joisse1101/ui-library && npm run dev:force",
-    "dev:update": "yalc update @joisse1101/ui-library && npm run dev:force",
     "build": "tsc --noEmit && vite build",
-    "build:unlink": "yalc retreat @joisse1101/ui-library && npm update @joisse1101/ui-library && npm install && npm run build",
     "preview": "vite preview",
     "test": "vitest run"
   },

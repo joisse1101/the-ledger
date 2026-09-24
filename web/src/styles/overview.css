@@ -17,22 +17,22 @@
   white-space: nowrap;
   min-height: var(--tap);
   padding: 0 14px;
-  border: 1px solid var(--grid);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
 
 .time-range-option:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .time-range-option.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
+  border-color: var(--brand-accent);
+  background: var(--brand-accent);
+  color: var(--text-on-accent);
 }
 
 /* ---- summary figures */
@@ -56,14 +56,14 @@
   gap: 4px;
   min-height: var(--tap);
   padding: 10px 14px;
-  border: 1px solid var(--grid);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .stat-tile-button {
   width: 100%;
-  border: 1px solid var(--grid);
+  border: 1px solid var(--border-subtle);
   font: inherit;
   color: inherit;
   text-align: left;
@@ -71,11 +71,11 @@
 }
 
 .stat-tile-button:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .stat-label {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -86,7 +86,7 @@
 
 .stat-note {
   margin-top: 2px;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.78rem;
   white-space: normal;
   word-break: break-word;
@@ -151,7 +151,7 @@
 
 .donut-legend-label {
   overflow: hidden;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -170,7 +170,7 @@
 
 .chart-caption {
   margin: 4px 0 12px;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 

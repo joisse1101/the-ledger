@@ -14,10 +14,10 @@ export function chartColors() {
   return {
     hues: Array.from({ length: 8 }, (_, i) => read(`--cat-${i}`)),
     muted: read("--muted-ink"),
-    surface: read("--surface"),
-    text: read("--text"),
-    text2: read("--text-2"),
-    grid: read("--grid"),
+    surface: read("--bg-surface"),
+    text: read("--text-main"),
+    text2: read("--text-muted"),
+    grid: read("--border-subtle"),
   };
 }
 

@@ -1,19 +1,88 @@
 /* Design tokens. Light is the default; dark applies when <html data-theme="dark">
    is set, or (before the app has set anything) when the device prefers dark.
-   The categorical slots are a fixed order: a project keeps its slot, so only which
-   prefix of the list is used may vary, never the order. */
+
+   The palette (backgrounds, text, brand, borders, feedback colours, syntax colours,
+   shadows, inputs) and the font families are a manual copy of the theme variables in
+   @joisse1101/ui-library v2.0.0 (dist/ui-library.css), under that library's own
+   variable names so components copied from it work unchanged. The package is not a
+   dependency: to refresh, re-copy the `:root`, `:root,[data-theme=dark]` and
+   `[data-theme=light]` variable blocks by hand (not the component --btn-* variables).
+   The fonts themselves are loaded by the <link> in index.html.
+
+   App-only tokens with no library equivalent: --warn-bg/--warn-text (the library's
+   warning chip is one fixed light colour, wrong on dark), --muted-ink and the --cat-*
+   categorical slots. The categorical slots are a fixed order: a project keeps its
+   slot, so only which prefix of the list is used may vary, never the order. */
+
+:root {
+  --font-family-display: Urbanist, system-ui, -apple-system, sans-serif;
+  --font-family-body: Figtree, system-ui, -apple-system, sans-serif;
+  --font-family-mono: JetBrains Mono, monospace;
+}
 
 :root {
   color-scheme: light;
 
-  --bg: #f4f3ef;
-  --surface: #fcfcfb;
-  --text: #0b0b0b;
-  --text-2: #52514e;
-  --grid: #e8e7e1;
-  --accent: #d6487e;
-  --on-accent: #ffffff;
-  --danger: #b42318;
+  --bg-main: #f3eef0;
+  --bg-surface: #fff;
+  --bg-surface-hover: #f7eef1;
+  --bg-overlay: #fbf3f6;
+  --bg-glass: #ffffffbf;
+  --text-main: #241820;
+  --text-muted: #6b5a61;
+  --text-dim: #7a686f;
+  --brand-accent: #8a4a5e;
+  --brand-hover: #9d5a70;
+  --brand-active: #6f3b4b;
+  --text-on-accent: #fff;
+  --brand-text: #8a4a5e;
+  --brand-text-hover: #6f3b4b;
+  --syntax-keyword: #7e22ce;
+  --syntax-string: #047857;
+  --brand-border-muted: #f0d8de;
+  --brand-border-strong: #c98da0;
+  --accent-pink-soft: #a1345f;
+  --brand-surface-subtle: #f6e3ea;
+  --brand-text-dark: #6e2e43;
+  --brand-disabled: #7a686f;
+  --color-stretch: #0e7490;
+  --color-success: #036b4d;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-info: #0369a1;
+  --disabled-bg: #ece6e8;
+  --disabled-text: #7a686f;
+  --border-subtle: #e7dfe2;
+  --border-color: #d8ccd1;
+  --border-focus: #c14b73;
+  --border-hover: #9d5a70;
+  --border-active: #f0d8de;
+  --input-bg: #fff;
+  --input-border: #8f7f86;
+  --input-focus-border: #c14b73;
+  --input-focus-ring: #c14b7340;
+  --shadow-sm: 0 1px 2px 0 #00000014;
+  --shadow-md: 0 4px 6px -1px #0000001a;
+  --shadow-lg: 0 10px 15px -3px #00000024;
+  --shadow-glow-md: 0 0 8px -3px #e8a2b82e;
+  --shadow-glow: 0 0 20px -3px #e8a2b82e;
+  --shadow-focus-ring: 0 0 0 3px #e8a2b826;
+  --shadow-hover-glow: 0 0 8px #24182014;
+  --shadow-text-sm: 0 1px 2px #00000014;
+  --shadow-text: 0 2px 3px #0000001a;
+  --color-success-rgb: 3 107 77;
+  --color-danger-rgb: 185 28 28;
+  --bg-surface-hover-rgb: 247 238 241;
+  --border-subtle-rgb: 231 223 226;
+  --brand-border-strong-rgb: 201 141 160;
+  --bg-glass-rgb: 255 255 255;
+  --brand-accent-rgb: 138 74 94;
+  --bg-main-rgb: 243 238 240;
+  --toast-success-icon: #066443;
+  --toast-warning-icon: #a24a0b;
+  --toast-danger-icon: #aa1924;
+  --toast-info-icon: #046499;
+
   --warn-bg: #fff4d6;
   --warn-text: #5c3d00;
 
@@ -31,14 +100,66 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #121211;
-  --surface: #1a1a19;
-  --text: #ffffff;
-  --text-2: #c3c2b7;
-  --grid: #2b2a27;
-  --accent: #c26d88;
-  --on-accent: #ffffff;
-  --danger: #f97066;
+  --bg-main: #121214;
+  --bg-surface: #1a1a1e;
+  --bg-surface-hover: #26262b;
+  --bg-overlay: #2d2d34;
+  --bg-glass: #1a1a1ebf;
+  --text-main: #fff;
+  --text-muted: #a1a1aa;
+  --text-dim: #94949d;
+  --brand-accent: #96556c;
+  --brand-hover: #a5607a;
+  --brand-active: #7d4457;
+  --text-on-accent: #fff;
+  --brand-text: #d17f9b;
+  --brand-text-hover: #e8a2ba;
+  --syntax-keyword: #c084fc;
+  --syntax-string: #34d399;
+  --brand-border-muted: #4d2c36;
+  --brand-border-strong: #b8738a;
+  --accent-pink-soft: #fce7f3;
+  --brand-surface-subtle: #fdf2f6;
+  --brand-text-dark: #6e2e43;
+  --brand-disabled: #94949d;
+  --color-stretch: #06b6d4;
+  --color-success: #70f4c3;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #38bdf8;
+  --disabled-bg: #27272a;
+  --disabled-text: #94949d;
+  --border-subtle: #27272a;
+  --border-color: #3f3f46;
+  --border-focus: #f2a9c4;
+  --border-hover: #a5607a;
+  --border-active: #4d2c36;
+  --input-bg: #18181b;
+  --input-border: #6b6b73;
+  --input-focus-border: #f2a9c4;
+  --input-focus-ring: #f2a9c440;
+  --shadow-sm: 0 1px 2px 0 #0006;
+  --shadow-md: 0 4px 6px -1px #00000080;
+  --shadow-lg: 0 10px 15px -3px #0009;
+  --shadow-glow-md: 0 0 8px -3px #e8a2b84d;
+  --shadow-glow: 0 0 20px -3px #e8a2b84d;
+  --shadow-focus-ring: 0 0 0 3px #e8a2b840;
+  --shadow-hover-glow: 0 0 8px #ffffff26;
+  --shadow-text-sm: 0 1px 2px #0006;
+  --shadow-text: 0 2px 3px #00000080;
+  --color-success-rgb: 112 244 195;
+  --color-danger-rgb: 248 113 113;
+  --bg-surface-hover-rgb: 38 38 43;
+  --border-subtle-rgb: 39 39 42;
+  --brand-border-strong-rgb: 184 115 138;
+  --bg-glass-rgb: 26 26 30;
+  --brand-accent-rgb: 150 85 108;
+  --bg-main-rgb: 18 18 20;
+  --toast-success-icon: #52c396;
+  --toast-warning-icon: #d4961e;
+  --toast-danger-icon: #d65560;
+  --toast-info-icon: #299fd6;
+
   --warn-bg: #3d2f00;
   --warn-text: #ffe29a;
 
@@ -57,13 +178,66 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #121211;
-    --surface: #1a1a19;
-    --text: #ffffff;
-    --text-2: #c3c2b7;
-    --grid: #2b2a27;
-    --accent: #c26d88;
-    --danger: #f97066;
+    --bg-main: #121214;
+    --bg-surface: #1a1a1e;
+    --bg-surface-hover: #26262b;
+    --bg-overlay: #2d2d34;
+    --bg-glass: #1a1a1ebf;
+    --text-main: #fff;
+    --text-muted: #a1a1aa;
+    --text-dim: #94949d;
+    --brand-accent: #96556c;
+    --brand-hover: #a5607a;
+    --brand-active: #7d4457;
+    --text-on-accent: #fff;
+    --brand-text: #d17f9b;
+    --brand-text-hover: #e8a2ba;
+    --syntax-keyword: #c084fc;
+    --syntax-string: #34d399;
+    --brand-border-muted: #4d2c36;
+    --brand-border-strong: #b8738a;
+    --accent-pink-soft: #fce7f3;
+    --brand-surface-subtle: #fdf2f6;
+    --brand-text-dark: #6e2e43;
+    --brand-disabled: #94949d;
+    --color-stretch: #06b6d4;
+    --color-success: #70f4c3;
+    --color-warning: #fbbf24;
+    --color-danger: #f87171;
+    --color-info: #38bdf8;
+    --disabled-bg: #27272a;
+    --disabled-text: #94949d;
+    --border-subtle: #27272a;
+    --border-color: #3f3f46;
+    --border-focus: #f2a9c4;
+    --border-hover: #a5607a;
+    --border-active: #4d2c36;
+    --input-bg: #18181b;
+    --input-border: #6b6b73;
+    --input-focus-border: #f2a9c4;
+    --input-focus-ring: #f2a9c440;
+    --shadow-sm: 0 1px 2px 0 #0006;
+    --shadow-md: 0 4px 6px -1px #00000080;
+    --shadow-lg: 0 10px 15px -3px #0009;
+    --shadow-glow-md: 0 0 8px -3px #e8a2b84d;
+    --shadow-glow: 0 0 20px -3px #e8a2b84d;
+    --shadow-focus-ring: 0 0 0 3px #e8a2b840;
+    --shadow-hover-glow: 0 0 8px #ffffff26;
+    --shadow-text-sm: 0 1px 2px #0006;
+    --shadow-text: 0 2px 3px #00000080;
+    --color-success-rgb: 112 244 195;
+    --color-danger-rgb: 248 113 113;
+    --bg-surface-hover-rgb: 38 38 43;
+    --border-subtle-rgb: 39 39 42;
+    --brand-border-strong-rgb: 184 115 138;
+    --bg-glass-rgb: 26 26 30;
+    --brand-accent-rgb: 150 85 108;
+    --bg-main-rgb: 18 18 20;
+    --toast-success-icon: #52c396;
+    --toast-warning-icon: #d4961e;
+    --toast-danger-icon: #d65560;
+    --toast-info-icon: #299fd6;
+
     --warn-bg: #3d2f00;
     --warn-text: #ffe29a;
 

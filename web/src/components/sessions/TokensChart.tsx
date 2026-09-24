@@ -55,9 +55,9 @@ function themeColors() {
   const read = (name: string) => style.getPropertyValue(name).trim();
   return {
     hues: [read("--cat-0"), read("--cat-1"), read("--cat-2")],
-    text: read("--text"),
-    text2: read("--text-2"),
-    grid: read("--grid"),
+    text: read("--text-main"),
+    text2: read("--text-muted"),
+    grid: read("--border-subtle"),
   };
 }
 

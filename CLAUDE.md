@@ -449,9 +449,18 @@ any unknown path) rendered inside `AppShell`.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button
   and every chart that needs to recolor on theme change — via `useSyncExternalStore`, the same
   pattern `useViewportClass` uses; a live media-query listener keeps it in sync with the OS if
-  nothing's been explicitly chosen yet. `theme/tokens.css` holds the light/dark CSS variables,
-  including the 8-slot categorical palette (`--cat-0`..`--cat-7`) and `--muted-ink`, at a fixed slot
-  order so a chart's `chartColors()`/`themeColors()` (see below) never has to duplicate a hex value.
+  nothing's been explicitly chosen yet. `theme/tokens.css` holds the light/dark CSS variables:
+  the palette (backgrounds, text, brand, borders, feedback, syntax, shadows, inputs) and font families
+  are a manual copy of `@joisse1101/ui-library`'s theme variables under that library's own names
+  (`--bg-main`, `--text-main`, `--brand-accent`, `--brand-text`, `--syntax-keyword`, …; provenance and
+  version are in the file's header comment), so components copied from the library work unchanged.
+  The package is **not** a dependency — refresh by re-copying the variable blocks from its
+  `dist/ui-library.css`. App-only tokens with no library equivalent stay alongside: the 8-slot
+  categorical palette (`--cat-0`..`--cat-7`, fixed slot order so a chart's `chartColors()`/
+  `themeColors()` (see below) never has to duplicate a hex value), `--muted-ink`, and
+  `--warn-bg`/`--warn-text`. Fonts (Figtree/Urbanist/JetBrains Mono) load from Google Fonts via
+  `index.html`, falling back to system fonts offline; the heading/link/code rules in `app.css`
+  mirror the library's `_core_theme.scss`.
 - **Responsive list** (`components/list/`): `ResponsiveList` picks `ListTable` (medium/wide) or
   `ListCards` (narrow) by viewport — only one is ever mounted, both take the same `columns`/`rows`/
   `rowId`/`onSelect`, so switching layouts never changes what's shown or its order. A `ListColumn`

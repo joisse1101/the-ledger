@@ -8,6 +8,3 @@ run_log.txt
 .ledger-run.json
 web/node_modules/
 web/dist/
-
-.yalc
-yalc.lock
