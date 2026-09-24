@@ -1,10 +1,10 @@
 ## 1. Backend: pending-decision store
 
-- [ ] 1.1 Add `api/pending_decisions.py`: lock-guarded, in-memory, per-session `{tool_name, tool_input,
+- [x] 1.1 Add `api/pending_decisions.py`: lock-guarded, in-memory, per-session `{tool_name, tool_input,
       created_at, asyncio.Event, answer}` plus a `last_watched: dict[session_id, float]` heartbeat map,
       following `live_snapshot.py`'s pattern. Verify with a unit test exercising register → answer →
       resolve, and register → timeout → pass-through, without touching any real session.
-- [ ] 1.2 Add `touch_watch(session_id)` / `is_watched(session_id)` helpers (heartbeat freshness window,
+- [x] 1.2 Add `touch_watch(session_id)` / `is_watched(session_id)` helpers (heartbeat freshness window,
       e.g. 5s) and a configurable decision wait timeout (default 120s). Verify with a unit test that an
       unwatched session's `request_decision()` returns immediately with `decision=None`.
 
