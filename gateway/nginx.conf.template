@@ -1,5 +1,10 @@
 server {
-    listen 80;
+    # HTTPS only - there is deliberately no plain-HTTP listener to be downgraded to.
+    listen 443 ssl;
+
+    ssl_certificate /etc/nginx/certs/gateway.crt;
+    ssl_certificate_key /etc/nginx/certs/gateway.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
 
     location /api/ {
         proxy_pass http://host.docker.internal:${BACKEND_PORT};

@@ -36,23 +36,26 @@ def read_token(directory=LEDGER_DIR, environ: Mapping[str, str] = os.environ) ->
 def build_signin_banner(
     *, gateway_port: int, token: str, addresses: Optional[list[str]] = None
 ) -> str:
-    """Same content as the backend's old `--lan` banner, just built from the gateway side."""
+    """The gateway's sign-in banner: one `https://` link per address, a QR for the first, and the
+    note that its self-signed certificate will draw a one-time browser warning."""
     if addresses is None:
         addresses = banner.discover_ipv4()
 
     lines = [""]
     if addresses:
         lines.append("Open on another device (the link signs that device in):")
-        lines += [f"  http://{address}:{gateway_port}/?token={token}" for address in addresses]
-        qr = banner.render_qr(f"http://{addresses[0]}:{gateway_port}/?token={token}")
+        lines += [f"  https://{address}:{gateway_port}/?token={token}" for address in addresses]
+        qr = banner.render_qr(f"https://{addresses[0]}:{gateway_port}/?token={token}")
         if qr:
             lines += ["", f"Scan to open {addresses[0]}:", qr.rstrip("\n")]
     else:
         lines.append("No network address was found for this machine.")
     lines += [
         "",
-        "This is plain HTTP: the token only keeps out devices that don't have it, and anyone",
-        "who can watch this network can read it. Only start the gateway on a network you trust.",
+        "The connection is encrypted with the gateway's own self-signed certificate, so your",
+        "browser will warn that it isn't trusted the first time - that's expected, accept it once",
+        "per device. The token is still what keeps out devices that don't have it, so only start",
+        "the gateway on a network you trust.",
         "If a phone can't connect, allow the gateway's port through Windows Firewall and check",
         "the phone is on the same network.",
         "",

@@ -257,17 +257,37 @@
 
 ## 8. Gateway: HTTPS
 
-- [ ] 8.1 Generate a self-signed certificate/key for the gateway (e.g. at Docker image build time via
+- [x] 8.1 Generate a self-signed certificate/key for the gateway (e.g. at Docker image build time via
       `openssl` in the `Dockerfile`, so no manual step is needed) and point Nginx's `server` block at
       HTTPS (443 inside the container, published on `GATEWAY_PORT`) instead of HTTP; remove the plain-
       HTTP listener rather than adding HTTPS alongside it. Verify by rebuilding the gateway and
       confirming `http://` no longer connects while `https://` serves the app (with the expected
       self-signed-certificate warning).
-- [ ] 8.2 Update `api/gateway_signin.py` to print `https://` links and encode the QR with the HTTPS
+      _Done (2026-09-24). `Dockerfile` generates an EC P-256 self-signed cert (10 years, SAN
+      `localhost`/`127.0.0.1`, CN `the-ledger-gateway`) via a throwaway `apk add openssl` layer; Docker's
+      layer cache keeps it across rebuilds, so a phone accepts it once until the image is rebuilt from
+      scratch. `nginx.conf.template` is `listen 443 ssl` only (TLS 1.2/1.3), `docker-compose.yml`
+      publishes `${GATEWAY_PORT}:443`. Verified on a rebuilt container: `https://` serves the app;
+      strict `curl` fails cert verification (exit 60) as expected. Caveat: the same published port still
+      answers a plain-`http://` request, but only with nginx's built-in `400 The plain HTTP request was
+      sent to HTTPS port` - no app content and no redirect, so there is no HTTP listener to be
+      downgraded to. The cert doesn't list the LAN IPs (unknown at build time); the browser warns
+      regardless._
+- [x] 8.2 Update `api/gateway_signin.py` to print `https://` links and encode the QR with the HTTPS
       address. Verify with `test_gateway_signin.py` asserting the scheme.
-- [ ] 8.3 Confirm end-to-end: `Start-Gateway.ps1` prints an `https://` link, opening it on a phone
+      _Done (2026-09-24). Links, the QR target and the banner text (self-signed cert, accept once)
+      updated; `test_gateway_signin.py` asserts the scheme, that the QR encodes the first address's
+      `https://` URL, and that no `http://` remains (11 tests pass)._
+- [x] 8.3 Confirm end-to-end: `Start-Gateway.ps1` prints an `https://` link, opening it on a phone
       shows a one-time certificate warning, accepting it signs the device in exactly as before, and
       every subsequent request still carries the token correctly.
+      _Partly verified (2026-09-24), NOT ticked: the phone half is still open. Done from this PC:
+      `Start-Gateway.ps1` prints `https://<lan address>:11080/?token=...` plus a QR; through that LAN
+      address over HTTPS, with the real backend/frontend running, no token -> 401, wrong token -> 401,
+      `Authorization: Bearer <token>` -> 200 (`is_local: false`), a remote delete with a valid token ->
+      403, and the page shell -> 200. Still to do on a real phone: scan the QR, accept the certificate
+      warning, confirm it signs in (token stored, stripped from the address bar) and the dashboard loads,
+      and that a Live-list prompt can be answered over HTTPS._
 
 ## 9. Documentation
 
