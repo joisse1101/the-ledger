@@ -27,7 +27,7 @@ export function RefreshControl() {
         aria-label="Refresh data"
         title="Rescan Claude Code's files"
       >
-        <span className={refresh.isPending ? "spin" : undefined}>
+        <span className={refresh.isPending ? "icon-wrap spin" : "icon-wrap"}>
           <RefreshIcon />
         </span>
       </button>

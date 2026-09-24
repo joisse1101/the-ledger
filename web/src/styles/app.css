@@ -121,9 +121,14 @@ textarea {
   flex: none;
 }
 
+.icon-wrap {
+  display: inline-flex;
+  height: fit-content;
+} 
+
 .icon-button:hover:not(:disabled),
 .button:hover:not(:disabled) {
-  background: var(--border-subtle);
+  color: var(--brand-text-hover);
 }
 
 .button:disabled,
