@@ -335,8 +335,17 @@
 
 /* ---- live session control panel (under the Live list) */
 
+/* On a phone (the only place the panel scrolls itself into view), tall enough that the page can always scroll far enough to put the panel's top at the top of
+   * the window, even when the panel is short or has only just mounted and is still loading. */
+@media (max-width: 639.98px) {
+  .live-panel-area {
+    min-height: calc(100dvh - var(--header-h) - env(safe-area-inset-top));
+  }
+}
+
 .live-panel {
   margin-top: 16px;
+  scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + 8px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--bg-surface);
