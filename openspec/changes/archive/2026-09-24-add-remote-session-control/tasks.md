@@ -291,7 +291,7 @@
 
 ## 9. Documentation
 
-- [ ] 9.1 Update CLAUDE.md: `hooks/` section notes it now also holds the optional, dashboard-coupled
+- [x] 9.1 Update CLAUDE.md: `hooks/` section notes it now also holds the optional, dashboard-coupled
       `ledgerScripts/` (a `PermissionRequest` relay); `api/` section documents the pending-prompt
       store and its transcript-based clearing, Remote mode, its `subprocess` dependency on
       `hooks/scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action, and the `is_local`
