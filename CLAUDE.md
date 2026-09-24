@@ -180,7 +180,12 @@ Python tests, one file per module under test:
   `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
   behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
   `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`),
-  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI).
+  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI),
+  `test_pending_decisions.py` (the pending-prompt store, transcript-based clearing, Remote mode),
+  `test_relay_hook.py` (runs the real `hooks/ledgerScripts/Relay-PermissionRequest.ps1` as a subprocess
+  against a real uvicorn server: answers become decisions, and every no-answer path prints nothing),
+  `test_hook_install.py` (the relay's `-IncludeSessionControl` install/uninstall against a throwaway
+  `USERPROFILE`, never the real `settings.json`). The last two are skipped off Windows.
 
 Frontend (`cd web`):
 

@@ -308,7 +308,13 @@ def live_context(session_id: str, cwd: str) -> Optional[LiveContext]:
 
 
 def _read_tail_latest_timestamp(path: Path) -> Optional[datetime]:
-    """The newest line timestamp near EOF, in a window that doubles until one is found."""
+    """The newest `user` line's timestamp near EOF, in a window that doubles until one is found.
+
+    Only `user` lines count (a tool result, or something the person typed): those are what appear
+    once a dialog has been answered. `assistant` lines and bookkeeping lines (`attachment`,
+    `system`, ...) can be written while a dialog is still open, e.g. a later tool call of the same
+    parallel batch still streaming in, and must not read as "the prompt was answered".
+    """
     window = _TAIL_WINDOW
     with path.open("rb") as f:
         size = f.seek(0, os.SEEK_END)
@@ -324,7 +330,9 @@ def _read_tail_latest_timestamp(path: Path) -> Optional[datetime]:
                     entry = json.loads(line)
                 except ValueError:
                     continue
-                stamp = claude_db._parse_iso_timestamp(entry.get("timestamp")) if isinstance(entry, dict) else None
+                if not isinstance(entry, dict) or entry.get("type") != "user":
+                    continue
+                stamp = claude_db._parse_iso_timestamp(entry.get("timestamp"))
                 if stamp is None:
                     continue
                 if stamp.tzinfo is None:
@@ -341,11 +349,12 @@ _activity_cache: dict[Path, tuple[tuple[int, int], Optional[datetime]]] = {}
 
 
 def latest_activity(session_id: str, cwd: str) -> Optional[datetime]:
-    """When the session's transcript last got a line (by the line's own timestamp), or None. Never raises.
+    """When the session's transcript last got a `user` line (by the line's own timestamp), or None. Never raises.
 
     Lets the pending-prompt store tell that a session moved on (a tool result was written) after a
     prompt was registered - the line's timestamp, not the file's mtime, so a line flushed late but
-    stamped before the prompt can't be mistaken for progress.
+    stamped before the prompt can't be mistaken for progress. Only `user` lines count; see
+    `_read_tail_latest_timestamp`.
     """
     try:
         path = transcript_path(session_id, cwd)

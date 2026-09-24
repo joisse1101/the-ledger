@@ -337,6 +337,43 @@ def test_sweep_uses_real_transcript_timestamps(isolated_db, write_transcript):
     assert asyncio.run(run()) == {"decision": None}
 
 
+def test_sweep_keeps_a_prompt_while_only_assistant_or_bookkeeping_lines_arrive(isolated_db, write_transcript):
+    """Parallel tool calls: a later call of the same batch (an assistant line), or an attachment or
+    system note, can be written while the first call's dialog is still open. Only a `user` line -
+    the tool result - means the dialog was answered."""
+    path = claude_context.claude_db.projects_dir() / claude_context.claude_db.sanitize_project_path("/x/proj") / "s1.jsonl"
+    stamp = lambda seconds: (T0 + timedelta(seconds=seconds)).isoformat()
+    store, clock = make_store()
+    clock.now = 10
+    lookup = lambda sid: claude_context.latest_activity(sid, "/x/proj")
+    earlier = [{"type": "user", "timestamp": stamp(1)}]
+    write_transcript(path, earlier)
+
+    async def run():
+        task = asyncio.create_task(store.request_decision("s1", "Bash", {}))
+        await asyncio.sleep(0)
+
+        clock.now = 12
+        write_transcript(
+            path,
+            earlier
+            + [
+                {"type": "assistant", "timestamp": stamp(11)},  # the next tool_use of the batch
+                {"type": "attachment", "timestamp": stamp(11.5)},
+                {"type": "system", "timestamp": stamp(11.8)},
+            ],
+        )
+        assert store.sweep(lookup) == []
+        assert len(store.for_session("s1")) == 1
+
+        clock.now = 14
+        write_transcript(path, earlier + [{"type": "assistant", "timestamp": stamp(11)}, {"type": "user", "timestamp": stamp(13)}])
+        assert len(store.sweep(lookup)) == 1  # the tool result
+        return await task
+
+    assert asyncio.run(run()) == {"decision": None}
+
+
 # ---------------------------------------------------------------- Remote mode
 
 

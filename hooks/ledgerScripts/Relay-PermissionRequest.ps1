@@ -20,10 +20,11 @@ running, a malformed payload - prints NOTHING and exits 0. Output of any kind is
 is what leaves the terminal dialog as the only way to answer, exactly as without this hook.
 
 TODO (tasks 7.2/7.3 of the add-remote-session-control change), not yet verified live:
-  - the "terminal answered first" path: the API's transcript sweep releasing this hook with
-    {decision: null}, and this script then printing nothing;
-  - a multi-select answer is forwarded into updatedInput.answers as a JSON array; check what Claude
-    Code's own dialog produces and, if it is a joined string, join it here rather than in the API.
+  - the "terminal answered first" path with a REAL terminal answer (tests/test_relay_hook.py covers
+    the sweep releasing this hook and it printing nothing, with the terminal answer simulated);
+  - a multi-select answer is forwarded into updatedInput.answers as a JSON array, which matches what
+    Claude Code's own dialog records (checked 2026-09-24); only the dashboard-answer round trip in a
+    live session (7.2) is still to confirm.
 
 Optional and dashboard-coupled, unlike the standalone toast scripts in hooks/scripts/; installed
 separately (see hooks/README.md). Register it with a hook timeout comfortably above

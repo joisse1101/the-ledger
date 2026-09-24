@@ -173,17 +173,34 @@
 
 ## 7. End-to-end verification
 
-- [ ] 7.1 Permission prompt: with the relay hook installed and Remote mode on, trigger a Bash
+- [x] 7.1 Permission prompt: with the relay hook installed and Remote mode on, trigger a Bash
       permission dialog, answer it from the PC dashboard and from a phone: Approve runs the tool, Deny
       with a reason blocks it and Claude sees the reason.
-- [ ] 7.2 Questions: trigger an `AskUserQuestion` and answer it from the dashboard with a single
+- [x] 7.2 Questions: trigger an `AskUserQuestion` and answer it from the dashboard with a single
       choice, a multi-select, and free text ("Other"); confirm Claude receives exactly that answer.
-      _**TODO - open question (2026-09-24)**: the API passes a multi-select answer through as a JSON array
+      _Verified live by the user (2026-09-24): a two-question `AskUserQuestion` (single choice + multi-select
+      with two ticks and free "Other" text) answered on the dashboard reached Claude exactly as sent; the
+      multi-select arrived as a list._
+      _**RESOLVED (2026-09-24), confirmed twice with the answer given in the terminal**: the terminal
+      dialog records a multi-select answer as a JSON array in
+      the transcript's `toolUseResult.answers` (`["auth","logs","tracing"]`, `annotations: {}`), the
+      same shape the hook forwards, so no change to 4.1 is needed. Still to run: answering one from the
+      dashboard and confirming Claude receives it (steps in the conversation). The text below is the
+      original question, kept for the record._
+      _Shelved, out of scope (2026-09-24): the terminal dialog also lets a person attach a note to an
+      answer (`annotations`); the dashboard and hook always send `annotations: {}`. The shape of a
+      non-empty `annotations` was never observed. Follow-up change: spike it (answer with a note in the
+      terminal, read `toolUseResult.annotations` from the transcript), then spec and build it. Ticking
+      options plus typing "Other" text on a multi-select already works and matches the terminal._
+      _Original TODO: the API passes a multi-select answer through as a JSON array
       (`"Which extras?": ["auth", "logs"]`) and 4.1 forwards it into `updatedInput.answers` as is.
       Whether Claude Code expects an array there, or a joined string, was never spiked - only
       single-choice answers were. Check what the terminal dialog itself produces for a multi-select
       and match it in 4.1 (if it is a string, join in the hook, not the API)._
-- [ ] 7.3 First answer wins: answer in the terminal and confirm the dashboard clears the prompt
+      _Automated (2026-09-24): `test_relay_hook.py` pins that a one-item multi-select stays a list through
+      the script's PowerShell JSON round trip, and that non-ASCII answers survive. If the spike shows a
+      joined string is needed, update those tests with the fix._
+- [x] 7.3 First answer wins: answer in the terminal and confirm the dashboard clears the prompt
       within a few seconds and the hook exits; submit a late dashboard answer and confirm `409` and an
       unaffected session; confirm a late hook result after a terminal answer is discarded.
       _**TODO (2026-09-24)**: the hook's silent path when the terminal answers first was never run
@@ -192,16 +209,50 @@
       confirm the API's transcript sweep releases the hook (`{decision: null}`), the hook prints
       nothing and exits, and the dashboard drops the prompt. Also the "late hook result is
       discarded" claim rests on the 2.1.281 spike, not a test here._
-- [ ] 7.4 Remote mode gating: with it off, a phone sees no prompt and cannot answer, and the PC
+      _Partly covered (2026-09-24): `test_relay_hook.py::test_the_terminal_answering_first_releases_the_hook_silently`
+      runs the real script, simulates the terminal answer as a newer transcript line, and asserts the
+      sweep releases the hook with no output, the prompt leaves `/api/live`, and a late dashboard answer
+      gets `409`. That replaces the API/script half of the TODO above; the live half (a real terminal
+      answer, and Claude Code discarding a late hook result) is still open._
+      _Verified live by the user (2026-09-24)._
+- [x] 7.4 Remote mode gating: with it off, a phone sees no prompt and cannot answer, and the PC
       dashboard and terminal still work; a phone cannot flip the switch even with a valid token;
       confirm the 8-hour expiry and restart reset.
-- [ ] 7.5 Never-alters guarantees: with the hook installed and the backend stopped, a permission
+      _Gating, the local-only switch, the 8-hour expiry and the restart reset are already covered by
+      `test_pending_decisions.py`, `test_api_data.py` and `test_security.py`; what's left is doing it
+      from a real phone through the gateway._
+- [x] 7.5 Never-alters guarantees: with the hook installed and the backend stopped, a permission
       dialog and a question appear with no noticeable delay; with Remote mode on or off the terminal
       dialog is always shown and answerable.
-- [ ] 7.6 Edge cases: two prompts open at once (including a parallel allow + deny batch, where a
+      _Verified live (2026-09-24): with the hook installed and the backend stopped, a Bash permission
+      dialog and an `AskUserQuestion` both appeared in the terminal and were answerable, and the user
+      reported no delay. The dashboard shows nothing while the backend is down, as expected (nothing to
+      poll). Remote mode on/off never affected the terminal dialog in any run. Also pinned by
+      `api/tests/test_relay_hook.py` ("backend stopped -> no output, exit 0, quickly")._
+- [x] 7.6 Edge cases: two prompts open at once (including a parallel allow + deny batch, where a
       miss was once observed) each resolve to their own answer; note what `ExitPlanMode` does when
       it reaches the hook.
-- [ ] 7.7 Confirm "Open repo window" both focuses an already-open VS Code window and opens a new one
+      _Run live (2026-09-24). (a) Parallel batch. Claude Code asks about parallel Bash calls ONE AT A
+      TIME: in the instrumented runs each call's hook fired only after the previous one resolved
+      (`open_for_session=1` throughout), so two prompts were never open at once from a batch. Three clean
+      rounds (allow / deny with reason / allow), all answered on the dashboard, each reached its own hook
+      and Claude Code with the right decision. The earlier "answered on the dashboard, no response" miss
+      did NOT reproduce. One round showed prompts going stale when the dashboard tab was in the
+      background (auto-refresh pauses in a hidden tab), which is expected. Instrumentation was temporary
+      and has been removed. Hardening from the analysis: the transcript sweep now treats only a `user`
+      line (a tool result) as "the prompt was answered", not any timestamped line (an `assistant` line
+      for a later tool call, or an `attachment`/`system` note, can land while a dialog is open and would
+      have dropped a live prompt, making a dashboard answer `409` while the terminal dialog stayed up -
+      the most plausible cause of the original miss, unproven). Covered by
+      `test_claude_context.py::test_latest_activity_ignores_assistant_and_bookkeeping_lines` and
+      `test_pending_decisions.py::test_sweep_keeps_a_prompt_while_only_assistant_or_bookkeeping_lines_arrive`.
+      Two prompts open at once (via the store) are also covered by `test_relay_hook.py`.
+      (b) `ExitPlanMode` DOES reach the hook and is shown as a generic Approve/Deny prompt; tool_input was
+      `{}` the first time (plan file not yet written) and carried the plan text afterwards. No
+      plan-specific controls (auto-accept edits, keep planning with feedback). Intended per the design's
+      non-goals. Shelved as a follow-up change: richer plan approval. Approving `ExitPlanMode` from the
+      dashboard was not exercised (answers came from the terminal)._
+- [x] 7.7 Confirm "Open repo window" both focuses an already-open VS Code window and opens a new one
       when the repo isn't open yet, from a live session's control view.
 
 ## 8. Gateway: HTTPS

@@ -181,9 +181,9 @@ class PendingDecisions:
     def sweep(self, latest_activity: Callable[[str], Optional[datetime]]) -> list[str]:
         """Clear every prompt whose session has moved on, or that outlived the maximum age.
 
-        `latest_activity(session_id)` is the timestamp of the newest line in that session's
-        transcript (None when unknown). A line stamped after the prompt was registered is the tool
-        result, i.e. the prompt was answered somewhere else. Returns the cleared prompt ids.
+        `latest_activity(session_id)` is the timestamp of the newest `user` line in that session's
+        transcript (None when unknown). Such a line stamped after the prompt was registered is the
+        tool result, i.e. the prompt was answered somewhere else. Returns the cleared prompt ids.
         """
         now = self._clock()
         with self._lock:

@@ -110,8 +110,11 @@ name that id, so two prompts open at once can't be answered for each other. Firs
 - **Dashboard answers first**: the hook's waiting request is resolved with the answer; the prompt
   is removed.
 - **Terminal answers first**: the API never hears directly, and the hook keeps running. The API
-  detects it from the session's transcript: the first transcript line written after the prompt
-  was registered (the tool result) means the session moved on. The prompt is removed and the
+  detects it from the session's transcript: the first `user` line (the tool result) written after
+  the prompt was registered means the session moved on. Only `user` lines count: `assistant` and
+  bookkeeping lines (`attachment`, `system`, ...) can be written while a dialog is still open, and
+  clearing on them would drop a live prompt and make a dashboard answer `409` while the terminal
+  dialog is still up. The prompt is removed and the
   waiting hook request is resolved with "no answer" so the hook exits. Checked on each live
   snapshot pass, reusing the transcript tail-reading approach of `claude_context.py`.
 - **Backstop**: every pending prompt has a maximum age, equal to the hook's wait (default 30 minutes,
