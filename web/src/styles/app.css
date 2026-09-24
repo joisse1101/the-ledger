@@ -256,6 +256,7 @@ textarea {
   min-height: var(--tap);
   padding: 0 14px;
   border-radius: var(--radius);
+  text-decoration: none;
 }
 
 .nav--top .nav-link:hover {
@@ -273,7 +274,7 @@ textarea {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);

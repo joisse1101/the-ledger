@@ -5,7 +5,8 @@ import { OverviewIcon, ProjectsIcon, SessionsIcon } from "./icons";
 const PAGES = [
   { to: "/", label: "Sessions", icon: <SessionsIcon />, end: true },
   { to: "/overview", label: "Overview", icon: <OverviewIcon />, end: false },
-  { to: "/projects", label: "Projects", icon: <ProjectsIcon />, end: false },
+  { to: "/projects", label: "Manage Projects", icon: <ProjectsIcon />, end: false },
+  { to: "/sessions", label: "Manage Sessions", icon: <SessionsIcon />, end: false },
 ];
 
 /** The same three links either way: inline in the top bar (medium, wide) or a tab
