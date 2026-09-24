@@ -1,18 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { LIVE_POLL_MS, useDeleteSession, useLive, useMeta, useSession } from "../../api/queries";
+import { LIVE_POLL_MS, useDeleteSession, useMeta, useSession } from "../../api/queries";
 import type { Compaction, SessionDetail, SessionRecap, Turn } from "../../api/types";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText, formatTime } from "../../lib/format";
 import { humanizeTokens } from "../../lib/tokens";
 import { CloseIcon } from "../icons";
-import { LiveControl } from "./LiveControl";
 import { TokensChart } from "./TokensChart";
 
 export interface SessionDialogProps {
   /** null when no session is selected: the dialog stays mounted, but closed. */
   sessionId: string | null;
-  /** All list selections get the recap and token detail; Live list selections open the
-   *  control-only view (pending decision + open repo) instead. */
-  from: "live" | "all";
   onClose: () => void;
 }
 
@@ -230,8 +226,8 @@ function Detail({ detail }: { detail: SessionDetail }) {
   );
 }
 
-/** The delete flow for an All-list session. Not offered from the Live list — a live session is
- *  always disabled here too, in case a race makes it live between load and click.
+/** The delete flow for an All-list session. A live session is always disabled here, in case a
+ *  race makes it live between load and click.
  *  `key={sessionId}` on the call site resets `confirming` when a different session's dialog opens. */
 function DeleteControls({ sessionId, live, onDeleted }: { sessionId: string; live: boolean; onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
@@ -279,7 +275,7 @@ function DeleteControls({ sessionId, live, onDeleted }: { sessionId: string; liv
 /** The session detail view: a native `<dialog>` kept mounted so opening/closing never remounts
  *  it, which is what lets a Live poll update its content in place without disturbing scroll
  *  position. */
-export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) {
+export function SessionDialog({ sessionId, onClose }: SessionDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [live, setLive] = useState(false);
 
@@ -287,11 +283,7 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
     setLive(false);
   }, [sessionId]);
 
-  const fromAll = from === "all";
-  const session = useSession(fromAll ? sessionId : null, { refetchMs: live ? LIVE_POLL_MS : undefined });
-  // Only the control view needs the Live list (for its heading and to notice the session exiting).
-  const liveList = useLive({ auto: true, enabled: !fromAll && sessionId !== null });
-  const liveSession = liveList.data?.sessions.find((s) => s.session_id === sessionId) ?? null;
+  const session = useSession(sessionId, { refetchMs: live ? LIVE_POLL_MS : undefined });
   // Deletes are local-only server-side; this hides the control on any other device (and until known).
   const isLocal = useMeta().data?.is_local === true;
 
@@ -318,12 +310,10 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
   }, [onClose]);
 
   const data = session.data;
-  const heading = fromAll
-    ? data?.recap?.title || sessionId || "Session"
-    : liveSession?.title || liveSession?.name || sessionId || "Session";
+  const heading = data?.recap?.title || sessionId || "Session";
 
   return (
-    <dialog ref={dialogRef} className="session-dialog" aria-label={fromAll ? "Session detail" : "Session control"}>
+    <dialog ref={dialogRef} className="session-dialog" aria-label="Session detail">
       <div className="session-dialog-scroll">
         <header className="session-dialog-header">
           <h2 className="session-dialog-title">{heading}</h2>
@@ -332,15 +322,7 @@ export function SessionDialog({ sessionId, from, onClose }: SessionDialogProps) 
           </button>
         </header>
         <div className="session-dialog-body">
-          {sessionId && !fromAll && (
-            <LiveControl
-              key={sessionId}
-              sessionId={sessionId}
-              session={liveSession}
-              liveLoaded={liveList.data !== undefined}
-            />
-          )}
-          {sessionId && fromAll && (
+          {sessionId && (
             <>
               {session.isPending && <p className="muted">Loading…</p>}
               {session.isError && (

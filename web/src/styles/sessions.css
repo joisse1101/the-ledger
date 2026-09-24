@@ -333,6 +333,40 @@
   margin-top: 12px;
 }
 
+/* ---- live session control panel (under the Live list) */
+
+.live-panel {
+  margin-top: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.live-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.live-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
 /* ---- session detail dialog */
 
 .session-dialog {
