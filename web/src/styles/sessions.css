@@ -189,16 +189,50 @@
 
 /* ---- All list: filters, sort, paging */
 
+/* One row (search grows, filters keep their size); two rows under 640px (the
+   `narrow` viewport class): search on top, the three filters sharing the second. */
 .sessions-filters {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
   margin-bottom: 12px;
 }
 
+.filter-multiselect-container {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 8px;
+}
+
+@media (max-width: 639px) {
+  .sessions-filters {
+    flex-direction: column;
+  }
+
+  /* in a column, flex-basis is the height, so don't let the search box grow */
+  .sessions-filters .sessions-search {
+    flex: none;
+  }
+
+  .filter-multiselect-container .filter-multiselect {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .filter-multiselect-container .filter-multiselect-summary {
+    justify-content: center;
+  }
+
+  /* keep the last dropdown inside the viewport */
+  .filter-multiselect-container .filter-multiselect:last-child .filter-multiselect-options {
+    left: auto;
+    right: 0;
+  }
+}
+
 .sessions-search {
-  flex: 1 1 220px;
+  flex: 1 1 0;
   min-width: 0;
   min-height: var(--tap);
   padding: 0 12px;
@@ -213,8 +247,10 @@
   flex: none;
 }
 
+/* `flex`, not `inline-flex`: an inline box sits on a text baseline inside its <details>, which
+   adds a few px of descender space below it and makes the filters taller than the search box. */
 .filter-multiselect-summary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   min-height: var(--tap);
