@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Tooltip } from './Tooltip';
 import styles from './Switch.module.css';
 
 export interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'onChange' | 'className'> {
@@ -10,6 +11,8 @@ export interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputEle
     /** Applied to the outer <label>, for layout. Every other prop goes to the <input>. */
     className?: string;
     onChange?: (checked: boolean) => void;
+    /** Optional tooltip text displayed alongside the switch. */
+    tooltip?: string;
 }
 
 /**
@@ -24,6 +27,7 @@ export const Switch: React.FC<SwitchProps> = ({
     label,
     className,
     onChange,
+    tooltip,
     ...restProps
 }) => {
     const isControlled = checked !== undefined;
@@ -49,20 +53,24 @@ export const Switch: React.FC<SwitchProps> = ({
     const rootClass = [styles.root, size === 'sm' && styles.small, className].filter(Boolean).join(' ');
 
     return (
-        <label className={rootClass}>
-            <input
-                {...restProps}
-                className={styles.input}
-                type="checkbox"
-                role="switch"
-                checked={currentChecked}
-                disabled={disabled}
-                onChange={handleChange}
-            />
-            <span className={styles.track} aria-hidden="true">
-                <span className={styles.thumb} />
-            </span>
-            {label && <span className={styles.label}>{label}</span>}
-        </label>
+        <span className={styles.field}>
+            <label className={rootClass}>
+                <input
+                    {...restProps}
+                    className={styles.input}
+                    type="checkbox"
+                    role="switch"
+                    checked={currentChecked}
+                    disabled={disabled}
+                    onChange={handleChange}
+                />
+                <span className={styles.track} aria-hidden="true">
+                    <span className={styles.thumb} />
+                </span>
+                {label && <span className={styles.label}>{label}</span>}
+            </label>
+            {/* A sibling of the <label>, not inside it: inside, tapping the trigger would toggle the switch. */}
+            {tooltip && <Tooltip tooltip={tooltip} label={label} />}
+        </span>
     );
 };

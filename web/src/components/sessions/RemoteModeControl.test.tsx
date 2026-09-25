@@ -36,14 +36,15 @@ describe("RemoteModeControl", () => {
     const fetchMock = stubApi(true, { enabled: false, expires_at: null });
     const client = renderControl();
 
-    const toggle = await screen.findByRole("checkbox", { name: /Remote mode/ });
+    const toggle = await screen.findByRole("switch", { name: /Remote mode/ });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
 
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Remote mode/ })).toBeChecked());
+    await waitFor(() => expect(screen.getByRole("switch", { name: /Remote mode/ })).toBeChecked());
     const post = fetchMock.mock.calls.find(([url]) => url === "/api/remote-mode");
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ enabled: true });
-    expect(screen.getByText(/8h 0m left/)).toBeInTheDocument();
+    // The time left lives in the switch's tooltip.
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/8h 0m left/);
     client.clear();
   });
 
@@ -52,7 +53,7 @@ describe("RemoteModeControl", () => {
     const client = renderControl();
 
     expect(await screen.findByText(/Remote mode: on, 3h 0m left/)).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     client.clear();
   });
 
@@ -61,7 +62,7 @@ describe("RemoteModeControl", () => {
     const client = renderControl();
 
     expect(await screen.findByText("Remote mode: off")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     client.clear();
   });
 });

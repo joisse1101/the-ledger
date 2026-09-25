@@ -103,6 +103,23 @@ describe("Switch", () => {
     expect(small).not.toBe(rootClass());
   });
 
+  it("tooltip: shows the text beside the switch, and tapping its trigger doesn't toggle the switch", () => {
+    const onChange = vi.fn();
+    render(<Switch label="Auto-refresh" tooltip="Refreshes every 2s" onChange={onChange} />);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Refreshes every 2s");
+    fireEvent.click(screen.getByRole("button", { name: "About Auto-refresh" }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("switch")).not.toBeChecked();
+  });
+
+  it("has no tooltip trigger without tooltip text", () => {
+    render(<Switch label="Auto-refresh" />);
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("puts className on the outer label, keeping the component's own class, not on the input", () => {
     const { container } = render(<Switch label="A" className="toolbar-gap" />);
 

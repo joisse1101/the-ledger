@@ -165,20 +165,20 @@
   margin-bottom: 12px;
   min-height: var(--tap);
 }
-
-.switch-field {
-  display: inline-flex;
-  align-items: center;
+.sessions-toolbar-controls {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  cursor: pointer;
-  min-height: var(--tap);
 }
 
-.switch-field input {
-  width: 36px;
-  height: 20px;
-  accent-color: var(--brand-accent);
-  cursor: pointer;
+@media (max-width: 600px) {
+  .sessions-toolbar {
+    align-items: flex-end;
+  }
+  .sessions-toolbar-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .sessions-toolbar-caption {
