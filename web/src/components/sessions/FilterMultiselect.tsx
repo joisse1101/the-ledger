@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 export interface FilterMultiselectProps {
   label: string;
   options: string[];
@@ -13,8 +15,20 @@ export function FilterMultiselect({ label, options, selected, onChange }: Filter
     onChange(selected.includes(option) ? selected.filter((o) => o !== option) : [...selected, option]);
   };
 
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  // A click anywhere outside this control closes it (native `<details>` only closes on its own summary).
+  useEffect(() => {
+    const closeOnOutsideClick = (e: MouseEvent) => {
+      const details = detailsRef.current;
+      if (details && !details.contains(e.target as Node)) details.open = false;
+    };
+    document.addEventListener("click", closeOnOutsideClick);
+    return () => document.removeEventListener("click", closeOnOutsideClick);
+  }, []);
+
   return (
-    <details className="filter-multiselect">
+    <details className="filter-multiselect" ref={detailsRef}>
       <summary className="filter-multiselect-summary">
         {label}
         {selected.length > 0 && <span className="filter-multiselect-count">{selected.length}</span>}
