@@ -42,15 +42,18 @@ export const Tooltip: React.FC<TooltipProps> = ({ label, tooltip, size = 'md' })
         };
     }, [tipOpen]);
 
-    // Runs just before the bubble can appear (hover, focus, tap). It's laid out even while hidden,
-    // so it can be measured then. Written straight to the element: it's pure layout, no re-render.
+    // Runs just before the bubble can appear (hover, focus, tap). While closed it's `display: none`
+    // (so it can't stretch the page past the screen edge), so it's shown for the instant it takes
+    // to measure it. Written straight to the element: it's pure layout, no re-render.
     const place = () => {
         const tip = tipRef.current;
         const bubble = bubbleRef.current;
         if (!tip || !bubble) return;
 
         const anchor = tip.getBoundingClientRect();
+        bubble.style.display = 'block';
         const { width, height } = bubble.getBoundingClientRect();
+        bubble.style.display = '';
         const viewportWidth = document.documentElement.clientWidth;
         const viewportHeight = document.documentElement.clientHeight;
 

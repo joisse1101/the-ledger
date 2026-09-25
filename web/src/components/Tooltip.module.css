@@ -59,7 +59,9 @@
   box-shadow: var(--shadow-sm);
   font-size: var(--font-xs);
   white-space: pre-line;
-  visibility: hidden;
+  /* Not just `visibility: hidden`: a hidden bubble still takes up layout space, and sitting at
+     `left: 0` it can stick out past the screen edge and make the page scroll sideways. */
+  display: none;
 }
 
 .bubble[data-side="top"] {
@@ -70,7 +72,7 @@
 
 .tipButton:focus-visible + .bubble,
 .bubbleOpen {
-  visibility: visible;
+  display: block;
 }
 
 /* Only where hovering is real. A touch screen fakes :hover on tap and leaves it stuck on until
@@ -78,6 +80,6 @@
    (scroll, second tap, Escape). There, .bubbleOpen alone decides. */
 @media (hover: hover) {
   .tip:hover .bubble {
-    visibility: visible;
+    display: block;
   }
 }

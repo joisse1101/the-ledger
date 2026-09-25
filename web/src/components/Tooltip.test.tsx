@@ -169,6 +169,23 @@ describe("Tooltip", () => {
       expect(bubble.style.left).toBe("-78px"); // 400 - 8 - 100 = 292; 292 - 370
     });
 
+    it("shows the bubble only while measuring it (it's display: none when closed)", () => {
+      render(<Tooltip label="Auto-refresh" tooltip="Refreshes every 2s" />);
+      const tip = screen.getByRole("button").parentElement!;
+      const bubbleEl = screen.getByRole("tooltip");
+      vi.spyOn(tip, "getBoundingClientRect").mockReturnValue(rect(190, 100, 20, 20));
+      const displayWhenMeasured: string[] = [];
+      vi.spyOn(bubbleEl, "getBoundingClientRect").mockImplementation(() => {
+        displayWhenMeasured.push(bubbleEl.style.display);
+        return rect(0, 0, 100, 30);
+      });
+
+      fireEvent.mouseEnter(tip);
+
+      expect(displayWhenMeasured).toEqual(["block"]);
+      expect(bubbleEl.style.display).toBe("");
+    });
+
     it("flips above the icon when there's no room below", () => {
       const bubble = renderAt(rect(190, 570, 20, 20), rect(0, 0, 100, 30));
 
