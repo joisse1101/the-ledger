@@ -20,6 +20,6 @@
 
 ## 4. Docs and verification
 
-- [ ] 4.1 Update `CLAUDE.md`: the Projects section (row click selects, delete is a button + modal), the `/api/overview` row in the routes table (`project`, `group_by`, `groups`), the frontend test list, and `ConfirmDialog`. Verify no remaining text describes row-click-to-delete or `project_order`.
-- [ ] 4.2 Run `npm test` and `npm run build` in `web/` and `pytest` in `api/`, and verify all pass; then run `openspec validate add-project-charts --strict` and verify it passes.
-- [ ] 4.3 Manually check in a real browser (per CLAUDE.md there is no E2E harness): select a project, change ranges, delete with the modal (cancel and confirm), reload with `?project=`, and view through the gateway on a phone to confirm the delete button is absent and the charts still render.
+- [x] 4.1 Update `CLAUDE.md`: the Projects section (row click selects, delete is a button + modal), the `/api/overview` row in the routes table (`project`, `group_by`, `groups`), the frontend test list, and `ConfirmDialog`. Verify no remaining text describes row-click-to-delete or `project_order`.
+- [x] 4.2 Run `npm test` and `npm run build` in `web/` and `pytest` in `api/`, and verify all pass; then run `openspec validate add-project-charts --strict` and verify it passes.
+- [x] 4.3 Manually check in a real browser (per CLAUDE.md there is no E2E harness): select a project, change ranges, delete with the modal (cancel and confirm), reload with `?project=`, and view through the gateway on a phone to confirm the delete button is absent and the charts still render.
