@@ -409,8 +409,12 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
 ### `web/` — the React + TypeScript frontend
 
 Vite + React + TypeScript + React Router + TanStack Query; plain hand-written CSS (no component
-library) in `styles/` (`app.css`, `overview.css`, `sessions.css`), inline SVG icons in
-`components/icons.tsx`. Both `npm run dev` and `npm run preview` proxy `/api` to
+library, no Sass): global stylesheets in `styles/` (`app.css`, `overview.css`, `sessions.css`) plus
+`theme/tokens.css`, and newer components as colocated CSS modules (`Switch.tsx` +
+`Switch.module.css`: one flat camelCase class per element, sizes/variants as component-scoped custom
+properties, colours only from the `tokens.css` variables, `className` on the root element and every
+other prop on the underlying control). Migrate a component to a module when touching it; don't
+rewrite `styles/` wholesale. Inline SVG icons in `components/icons.tsx`. Both `npm run dev` and `npm run preview` proxy `/api` to
 `http://127.0.0.1:8501` (`vite.config.ts`'s `server.proxy`/`preview.proxy`, kept in sync), so the
 page is always same-origin with the API whether run directly or through the gateway — the frontend
 never needs a different-origin API client. `web/src/main.tsx` wires up

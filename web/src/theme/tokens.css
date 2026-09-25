@@ -18,6 +18,9 @@
   --font-family-display: Urbanist, system-ui, -apple-system, sans-serif;
   --font-family-body: Figtree, system-ui, -apple-system, sans-serif;
   --font-family-mono: JetBrains Mono, monospace;
+
+  --font-xs: 0.625rem;
+  --font-sm: 0.75rem;
 }
 
 :root {
