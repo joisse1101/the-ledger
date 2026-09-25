@@ -85,6 +85,8 @@ export function ProjectsList() {
         rows={rows}
         rowId={(p) => p.path}
         onSelect={handleSelect}
+        // Selecting starts a delete, so say that rather than leaving the button named just "demo".
+        rowLabel={(p) => (isLocal ? `Select project ${p.name} to delete` : p.name)}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
         rowClassName={(p) => (pending && p.path === pending.path ? "row-selected" : undefined)}

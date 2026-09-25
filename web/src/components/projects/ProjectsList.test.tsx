@@ -72,6 +72,18 @@ describe("ProjectsList delete flow", () => {
     client.clear();
   });
 
+  it("names the row button for what selecting it does", async () => {
+    stubApi(true);
+    const client = renderList();
+    await screen.findAllByText("demo");
+
+    // The label depends on /api/meta having answered, so wait for it.
+    const button = await screen.findByRole("button", { name: "Select project demo to delete" });
+    fireEvent.click(button);
+    expect(await screen.findByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
+    client.clear();
+  });
+
   it("never offers it from another device", async () => {
     stubApi(false);
     const client = renderList();

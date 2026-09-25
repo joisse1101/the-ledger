@@ -55,6 +55,29 @@
   white-space: nowrap;
 }
 
+/* The keyboard/screen-reader entry point for a row: a real button in its first cell that reads as
+   plain cell text (the whole row is also clickable for a pointer). It fills the cell so a long
+   value still ellipsizes, and the focus ring is drawn inside it because the cell's
+   overflow: hidden would clip an outside one. */
+.list-table .row-select {
+  display: block;
+  max-width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-table .row-select:focus-visible {
+  outline-offset: -2px;
+}
+
 /* ---- card renderer (narrow) */
 
 .list-cards {

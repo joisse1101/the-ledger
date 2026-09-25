@@ -1,4 +1,3 @@
-import type { KeyboardEvent } from "react";
 import type { ResponsiveListProps } from "./types";
 
 export interface ListTableProps<T> extends ResponsiveListProps<T> {
@@ -7,7 +6,8 @@ export interface ListTableProps<T> extends ResponsiveListProps<T> {
 }
 
 /** Table renderer: sortable headers (when `sort` is given and a column has a `sortKey`), one row
- *  per item, the whole row clickable and keyboard-activatable. */
+ *  per item. The whole row is clickable for pointer users, but the row keeps its table semantics:
+ *  keyboard and screen-reader users select it through a real button in its first visible cell. */
 export function ListTable<T>({
   columns,
   rows,
@@ -17,6 +17,7 @@ export function ListTable<T>({
   ariaLabel,
   sort,
   rowClassName,
+  rowLabel,
   showAllColumns,
 }: ListTableProps<T>) {
   const visible = columns.filter((column) => showAllColumns || column.priority === "high");
@@ -25,27 +26,28 @@ export function ListTable<T>({
     return <p className="list-empty">{emptyMessage}</p>;
   }
 
-  const activate = (row: T) => (event: KeyboardEvent<HTMLTableRowElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onSelect(row);
-    }
-  };
-
   return (
     <div className="list-table-scroll">
       <table className="list-table" aria-label={ariaLabel}>
         <thead>
           <tr>
             {visible.map((column) => (
-              <th key={column.key} scope="col" data-align={column.align ?? "start"}>
+              <th
+                key={column.key}
+                scope="col"
+                data-align={column.align ?? "start"}
+                aria-sort={
+                  column.sortKey && sort
+                    ? sort.field === column.sortKey
+                      ? sort.dir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                    : undefined
+                }
+              >
                 {column.sortKey && sort ? (
-                  <button
-                    type="button"
-                    className="sort-header"
-                    onClick={() => sort.onChange(column.sortKey!)}
-                    aria-sort={sort.field === column.sortKey ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-                  >
+                  <button type="button" className="sort-header" onClick={() => sort.onChange(column.sortKey!)}>
                     {column.header}
                     {sort.field === column.sortKey && (
                       <span aria-hidden="true">{sort.dir === "asc" ? " ▲" : " ▼"}</span>
@@ -62,18 +64,25 @@ export function ListTable<T>({
           {rows.map((row) => {
             const id = rowId(row);
             return (
-              <tr
-                key={id}
-                data-row-id={id}
-                tabIndex={0}
-                role="button"
-                className={rowClassName?.(row)}
-                onClick={() => onSelect(row)}
-                onKeyDown={activate(row)}
-              >
-                {visible.map((column) => (
+              <tr key={id} data-row-id={id} className={rowClassName?.(row)} onClick={() => onSelect(row)}>
+                {visible.map((column, index) => (
                   <td key={column.key} data-align={column.align ?? "start"}>
-                    {column.render(row)}
+                    {index === 0 ? (
+                      <button
+                        type="button"
+                        className="row-select"
+                        aria-label={rowLabel?.(row)}
+                        onClick={(event) => {
+                          // The row's own onClick would select a second time as this bubbles.
+                          event.stopPropagation();
+                          onSelect(row);
+                        }}
+                      >
+                        {column.render(row)}
+                      </button>
+                    ) : (
+                      column.render(row)
+                    )}
                   </td>
                 ))}
               </tr>

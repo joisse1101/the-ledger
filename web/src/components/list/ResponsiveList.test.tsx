@@ -84,6 +84,78 @@ describe("ListTable and ListCards", () => {
     expect(screen.queryByText("Detail")).not.toBeInTheDocument();
   });
 
+  it("keeps real table rows, with one select button in each row's first cell", () => {
+    render(
+      <ListTable columns={columns} rows={rows} rowId={(r) => r.id} onSelect={vi.fn()} emptyMessage="none" ariaLabel="Rows" showAllColumns />,
+    );
+    // Header row + one per item; none of them is flattened into a button.
+    expect(screen.getAllByRole("row")).toHaveLength(rows.length + 1);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(rows.length);
+    for (const [index, button] of buttons.entries()) {
+      expect(button.tagName).toBe("BUTTON");
+      expect(button).toHaveAttribute("type", "button");
+      expect(button).toHaveTextContent(rows[index].name);
+      expect(button.closest("td")).toBe(button.closest("tr")!.querySelector("td"));
+    }
+  });
+
+  it("selects exactly once whether the button or another part of the row is clicked", () => {
+    const onSelect = vi.fn();
+    render(
+      <ListTable columns={columns} rows={rows} rowId={(r) => r.id} onSelect={onSelect} emptyMessage="none" ariaLabel="Rows" showAllColumns />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith(rows[1]);
+
+    fireEvent.click(screen.getByText("third"));
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith(rows[2]);
+  });
+
+  it("names the row button from rowLabel when one is supplied", () => {
+    const onSelect = vi.fn();
+    render(
+      <ListTable
+        columns={columns}
+        rows={rows}
+        rowId={(r) => r.id}
+        onSelect={onSelect}
+        emptyMessage="none"
+        ariaLabel="Rows"
+        showAllColumns
+        rowLabel={(r) => `Open ${r.name}`}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open Alpha" }));
+    expect(onSelect).toHaveBeenCalledWith(rows[1]);
+  });
+
+  it("puts aria-sort on the sortable column headers, not on their buttons", () => {
+    const sortable: ListColumn<Row>[] = [
+      { ...columns[0], sortKey: "name" },
+      { ...columns[1], sortKey: "detail" },
+      { key: "plain", header: "Plain", priority: "high", render: () => "x" },
+    ];
+    render(
+      <ListTable
+        columns={sortable}
+        rows={rows}
+        rowId={(r) => r.id}
+        onSelect={vi.fn()}
+        emptyMessage="none"
+        ariaLabel="Rows"
+        showAllColumns
+        sort={{ field: "name", dir: "desc", onChange: vi.fn() }}
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("columnheader", { name: /Detail/ })).toHaveAttribute("aria-sort", "none");
+    expect(screen.getByRole("columnheader", { name: "Plain" })).not.toHaveAttribute("aria-sort");
+    expect(screen.getByRole("button", { name: /Name/ })).not.toHaveAttribute("aria-sort");
+  });
+
   it("drops a column marked cardPriority hidden from the card", () => {
     const hiddenColumns: ListColumn<Row>[] = [
       columns[0],
