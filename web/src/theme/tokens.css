@@ -21,6 +21,8 @@
 
   --font-xs: 0.625rem;
   --font-sm: 0.75rem;
+
+  --radius-md: 0.5rem;
 }
 
 :root {

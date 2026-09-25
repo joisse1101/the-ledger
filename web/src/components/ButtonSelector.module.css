@@ -1,0 +1,127 @@
+/* A segmented row of option buttons (the ui-library's `.btn.btn-option` inside a `.form-group`)
+   that scrolls sideways inside its own box instead of wrapping. When there's more past an edge,
+   that edge fades out (a mask on the scroller itself, so it works over any background) - the cue
+   that the strip can be swiped. Colours, shadows and font sizes come from tokens.css. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.scroller {
+  --fade-size: 2rem;
+  --fade-start: 0px;
+  --fade-end: 0px;
+  --glow-room: 1.5rem; /* about how far --shadow-glow (a 20px blur) visibly reaches */
+
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The scroller clips whatever it overflows, including the focus ring and hover glow drawn
+     outside the buttons; this padding gives them room and the negative margin cancels it out.
+     No `width`: a negative margin only widens a block whose width is auto (it's a stretched flex
+     item here), whereas a fixed 100% would just shift it sideways. */
+  padding: var(--glow-room);
+  margin: calc(-1 * var(--glow-room));
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.scroller[data-fade-start] {
+  --fade-start: var(--fade-size);
+}
+
+.scroller[data-fade-end] {
+  --fade-end: var(--fade-size);
+}
+
+.option {
+  --option-min-height: var(--tap); /* the library's is 2.5rem; the app's touch-target minimum wins */
+  --option-padding: 0.625rem 1.25rem;
+
+  all: unset;
+  box-sizing: border-box;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--option-min-height);
+  padding: var(--option-padding);
+
+  font-family: var(--font-family-body);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-shadow: var(--shadow-text-sm);
+  color: var(--text-main);
+
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
+}
+
+.option:first-child {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+
+.option:last-child {
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+.option:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-glow);
+}
+
+.option:active {
+  transform: scale(0.98);
+}
+
+.selected,
+.selected:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-color);
+}
+
+/* Last, so the ring still shows on a button that's also hovered or selected. */
+.option:focus-visible {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-focus-ring);
+}

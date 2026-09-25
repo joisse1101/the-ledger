@@ -197,7 +197,7 @@ Frontend (`cd web`):
 
 ```powershell
 npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
-                   # list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
+                   # components/ButtonSelector, list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
                    # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
                    # hooks/useViewportClass, lib/format, lib/tokens
 npm run build      # tsc --noEmit, then vite build -> web/dist
@@ -502,8 +502,17 @@ any unknown path) rendered inside `AppShell`.
   bundle cost until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the
   theme change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers
   and dashed compaction rules.
+- **`ButtonSelector`** (`components/ButtonSelector.tsx` + `.module.css`): a controlled row of toggle
+  buttons (`value`/`onChange`, generic over string/number values) — single-select by default (radio
+  group, `onChange(value)`), or `multiple` (toggle buttons, `value`/`onChange` are arrays). On a narrow
+  screen it scrolls sideways inside its own box, and `hooks/useCanSideScroll` fades whichever edge has
+  more to reveal (a CSS mask on the scroller, driven by `data-fade-start`/`data-fade-end`). The
+  look is the ui-library's `.btn.btn-option` (joined segments, only the outer corners rounded, via
+  `--radius-md` in `tokens.css`) at the app's `--tap` height. The scroller's padding and matching
+  negative margin (`--glow-room`, no fixed `width`) exist so its clipping doesn't cut off the focus
+  ring and hover glow. No form binding: this app has no forms. `test-setup.ts` stubs `ResizeObserver` since jsdom lacks it.
 - **Overview** (`components/overview/`, `pages/OverviewPage.tsx`): `TimeRangeSelector` is a
-  horizontally-scrollable segmented control over the same seven ranges as `overview_stats.TIME_RANGES`.
+  `ButtonSelector` (single-select, hidden label) over the same seven ranges as `overview_stats.TIME_RANGES`.
   `chartTheme.ts`'s `chartColors()`/`projectColorScale()`/`projectColorMap()` centralize reading the
   CSS-variable palette and turning the API's `project_order` into a Vega-Lite domain/range (`"Other"`
   always the muted ink) shared by `ProjectDonutChart` and `ProjectBarChart`; `ProjectDonutChart` draws
