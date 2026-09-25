@@ -19,9 +19,14 @@ import banner
 from security import LEDGER_DIR, TOKEN_ENV
 
 DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml's GATEWAY_PORT default
+DEFAULT_FRONTEND_PORT = (
+    4173  # matches frontend/docker-compose.yml's FRONTEND_PORT default
+)
 
 
-def read_token(directory=LEDGER_DIR, environ: Mapping[str, str] = os.environ) -> Optional[str]:
+def read_token(
+    directory=LEDGER_DIR, environ: Mapping[str, str] = os.environ
+) -> Optional[str]:
     """The already-provisioned token, or None if the backend hasn't started yet."""
     configured = environ.get(TOKEN_ENV, "").strip()
     if configured:
@@ -34,7 +39,11 @@ def read_token(directory=LEDGER_DIR, environ: Mapping[str, str] = os.environ) ->
 
 
 def build_signin_banner(
-    *, gateway_port: int, token: str, addresses: Optional[list[str]] = None
+    *,
+    gateway_port: int,
+    frontend_port: int,
+    token: str,
+    addresses: Optional[list[str]] = None,
 ) -> str:
     """The gateway's sign-in banner: one `https://` link per address, a QR for the first, and the
     note that its self-signed certificate will draw a one-time browser warning."""
@@ -42,9 +51,15 @@ def build_signin_banner(
         addresses = banner.discover_ipv4()
 
     lines = [""]
+
+    lines.append("Open on this device:")
+    lines += [f"  http://localhost:{frontend_port}", ""]
     if addresses:
         lines.append("Open on another device (the link signs that device in):")
-        lines += [f"  https://{address}:{gateway_port}/?token={token}" for address in addresses]
+        lines += [
+            f"  https://{address}:{gateway_port}/?token={token}"
+            for address in addresses
+        ]
         qr = banner.render_qr(f"https://{addresses[0]}:{gateway_port}/?token={token}")
         if qr:
             lines += ["", f"Scan to open {addresses[0]}:", qr.rstrip("\n")]
@@ -74,6 +89,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=int(os.environ.get("GATEWAY_PORT", DEFAULT_GATEWAY_PORT)),
         help=f"port the gateway is published on (default {DEFAULT_GATEWAY_PORT}, env GATEWAY_PORT)",
     )
+    parser.add_argument(
+        "--frontend-port",
+        type=int,
+        default=int(os.environ.get("FRONTEND_PORT", DEFAULT_FRONTEND_PORT)),
+        help=f"port the frontend is published on (default {DEFAULT_FRONTEND_PORT}, env FRONTEND_PORT)",
+    )
     args = parser.parse_args(argv)
 
     token = read_token(LEDGER_DIR)
@@ -85,7 +106,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return 1
 
-    print(build_signin_banner(gateway_port=args.gateway_port, token=token), flush=True)
+    print(
+        build_signin_banner(
+            gateway_port=args.gateway_port,
+            frontend_port=args.frontend_port,
+            token=token,
+        ),
+        flush=True,
+    )
     return 0
 
 
