@@ -6,7 +6,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem; /* keeps the tooltip trigger's 44px hit area from overlapping much of the label */
+  gap: 0.5rem; /* keeps the tooltip trigger's 2.75rem hit area from overlapping much of the label */
 }
 
 .root {
@@ -97,12 +97,12 @@
 
 .input:checked + .track .thumb {
   background-color: var(--text-on-accent);
-  transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 6px));
+  transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 0.375rem));
 }
 
 .input:focus-visible + .track {
   outline: none;
-  box-shadow: 0 0 0 3px var(--input-focus-ring);
+  box-shadow: 0 0 0 0.1875rem var(--input-focus-ring);
 }
 
 .input:disabled + .track {

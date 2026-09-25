@@ -3,10 +3,10 @@
   display: inline-flex;
 }
 
-/* Padding + matching negative margin widens the touch target to --tap (44px around the 16px
+/* Padding + matching negative margin widens the touch target to --tap (2.75rem around the 1rem
    icon) without moving the icon. */
 .tipButton {
-  --tip-pad: calc((var(--tap) - 16px) / 2);
+  --tip-pad: calc((var(--tap) - 1rem) / 2);
 
   display: inline-flex;
   align-items: center;
@@ -26,7 +26,7 @@
 
 .tipButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--input-focus-ring);
+  box-shadow: 0 0 0 0.1875rem var(--input-focus-ring);
   border-radius: 50%;
 }
 

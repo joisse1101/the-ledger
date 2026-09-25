@@ -6,8 +6,17 @@
   box-sizing: border-box;
 }
 
+/* Every size in the stylesheets is rem, so this root size is the one knob for how big the UI is.
+   Desktop is a notch smaller (compact type, tighter margins); phones and tablets keep the full
+   size. Media queries are in px on purpose: they don't follow the root size. */
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 80%;
+  }
 }
 
 body {
@@ -15,7 +24,7 @@ body {
   background: var(--bg-main);
   color: var(--text-main);
   font-family: var(--font-family-body);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -36,7 +45,7 @@ h6 {
 }
 
 h1 {
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   font-size: 1.4rem;
   font-weight: 800;
 }
@@ -73,19 +82,19 @@ a {
 a:hover {
   color: var(--brand-text-hover);
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: 0.25rem;
 }
 
 .muted {
   color: var(--text-muted);
 }
 
-/* iOS Safari zooms the page when a field under 16px is focused. */
+/* iOS Safari zooms the page when a field under 1rem is focused. */
 input,
 select,
 textarea {
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
   color: inherit;
 }
 
@@ -112,7 +121,7 @@ textarea {
 }
 
 .button {
-  padding: 0 16px;
+  padding: 0 1rem;
 }
 
 .icon-button {
@@ -174,7 +183,7 @@ textarea {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   min-height: calc(var(--header-h) + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) calc(var(--gutter) + env(safe-area-inset-right)) 0
     calc(var(--gutter) + env(safe-area-inset-left));
@@ -186,7 +195,7 @@ textarea {
   font-weight: 700;
   font-size: 1.05rem;
   white-space: nowrap;
-  margin-right: 8px;
+  margin-right: 0.5rem;
 }
 
 .spacer {
@@ -216,7 +225,7 @@ textarea {
   flex: 1;
   width: 100%;
   min-width: 0;
-  max-width: 1400px;
+  max-width: 87.5rem;
   margin: 0 auto;
   padding: var(--gutter) calc(var(--gutter) + env(safe-area-inset-right)) var(--gutter)
     calc(var(--gutter) + env(safe-area-inset-left));
@@ -249,12 +258,12 @@ textarea {
 
 .nav--top {
   display: flex;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .nav--top .nav-link {
   min-height: var(--tap);
-  padding: 0 14px;
+  padding: 0 0.875rem;
   border-radius: var(--radius);
   text-decoration: none;
 }
@@ -292,8 +301,8 @@ textarea {
 .banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px calc(var(--gutter) + env(safe-area-inset-right)) 8px calc(var(--gutter) + env(safe-area-inset-left));
+  gap: 0.75rem;
+  padding: 0.5rem calc(var(--gutter) + env(safe-area-inset-right)) 0.5rem calc(var(--gutter) + env(safe-area-inset-left));
   background: var(--warn-bg);
   color: var(--warn-text);
 }

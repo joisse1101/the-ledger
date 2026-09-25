@@ -256,9 +256,9 @@
 }
 
 :root {
-  --tap: 44px; /* minimum touch target */
-  --gutter: 16px;
-  --radius: 10px;
-  --tabbar-h: 56px;
-  --header-h: 56px;
+  --tap: 2.75rem; /* minimum touch target */
+  --gutter: 1rem;
+  --radius: 0.625rem;
+  --tabbar-h: 3.5rem;
+  --header-h: 3.5rem;
 }

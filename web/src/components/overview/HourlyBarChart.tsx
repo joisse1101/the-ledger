@@ -2,6 +2,8 @@ import { useMemo, useRef } from "react";
 import type { HourlyBucket } from "../../api/types";
 import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
+import { useScaled } from "../../hooks/useScaled";
+import type { Scaled } from "../../lib/uiScale";
 import { formatCount } from "../../lib/format";
 import { chartColors, FONT_STACK } from "./chartTheme";
 
@@ -23,7 +25,7 @@ function records(hourly: HourlyBucket[]): Record_[] {
   return rows;
 }
 
-function buildSpec(hourly: HourlyBucket[]) {
+function buildSpec(hourly: HourlyBucket[], scaled: Scaled) {
   const { hues, text2, grid } = chartColors();
   const hourOrder = hourly.map((bucket) => bucket.label);
   // "Messages" keeps the hue it has in the project chart above (color follows the measure,
@@ -34,11 +36,11 @@ function buildSpec(hourly: HourlyBucket[]) {
     $schema: "https://vega.github.io/schema/vega-lite/v5.json",
     background: null,
     width: "container",
-    height: 260,
+    height: scaled(260),
     view: { stroke: null },
-    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: 12 } },
+    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: scaled(12) } },
     data: { values: records(hourly) },
-    mark: { type: "bar", cornerRadiusTopLeft: 3, cornerRadiusTopRight: 3 },
+    mark: { type: "bar", cornerRadiusTopLeft: scaled(3), cornerRadiusTopRight: scaled(3) },
     encoding: {
       x: {
         field: "label",
@@ -50,7 +52,7 @@ function buildSpec(hourly: HourlyBucket[]) {
           ticks: false,
           labelAngle: 0,
           labelColor: text2,
-          labelFontSize: 9,
+          labelFontSize: scaled(9),
           labelOverlap: "parity",
         },
       },
@@ -63,7 +65,7 @@ function buildSpec(hourly: HourlyBucket[]) {
           domain: false,
           gridColor: grid,
           labelColor: text2,
-          labelFontSize: 10,
+          labelFontSize: scaled(10),
           titleColor: text2,
           values: [0, 25, 50, 75, 100],
         },
@@ -93,10 +95,11 @@ export interface HourlyBarChartProps {
 export function HourlyBarChart({ hourly }: HourlyBarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const scaled = useScaled();
   const spec = useMemo(
-    () => buildSpec(hourly),
+    () => buildSpec(hourly, scaled),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a rebuild for new colors
-    [hourly, theme],
+    [hourly, theme, scaled],
   );
   useVegaEmbed(containerRef, spec);
 

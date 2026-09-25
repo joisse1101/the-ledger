@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import type { Result } from "vega-embed";
 import type { Compaction, Turn } from "../../api/types";
 import { useTheme } from "../../theme/theme";
+import { useScaled } from "../../hooks/useScaled";
+import type { Scaled } from "../../lib/uiScale";
 
 export interface TokensChartProps {
   turns: Turn[];
@@ -61,7 +63,7 @@ function themeColors() {
   };
 }
 
-function buildSpec(turns: Turn[], compactions: Compaction[]) {
+function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled) {
   const { hues, text, text2, grid } = themeColors();
   const count = turns.length;
   const xAxis = {
@@ -69,7 +71,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
     ticks: false,
     labelAngle: 0,
     labelColor: text2,
-    labelFontSize: 10,
+    labelFontSize: scaled(10),
     labelOverlap: "parity",
     titleColor: text2,
   };
@@ -94,7 +96,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
           domain: false,
           gridColor: grid,
           labelColor: text2,
-          labelFontSize: 10,
+          labelFontSize: scaled(10),
           titleColor: text2,
           format: "~s",
         },
@@ -122,7 +124,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
   if (misses.length > 0) {
     layers.push({
       data: { values: misses },
-      mark: { type: "point", shape: "triangle-down", filled: true, size: 90, color: text, yOffset: -8 },
+      mark: { type: "point", shape: "triangle-down", filled: true, size: scaled(90), color: text, yOffset: -scaled(8) },
       encoding: {
         x,
         y: { field: "Total", type: "quantitative" },
@@ -153,11 +155,11 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
     $schema: "https://vega.github.io/schema/vega-lite/v5.json",
     background: null,
     width: "container",
-    height: 260,
+    height: scaled(260),
     view: { stroke: null },
     config: {
       font: "system-ui, -apple-system, 'Segoe UI', sans-serif",
-      legend: { labelColor: text2, labelFontSize: 12 },
+      legend: { labelColor: text2, labelFontSize: scaled(12) },
     },
     layer: layers,
   };
@@ -172,6 +174,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[]) {
 export function TokensChart({ turns, compactions }: TokensChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const scaled = useScaled();
 
   useEffect(() => {
     if (turns.length === 0) return;
@@ -183,7 +186,7 @@ export function TokensChart({ turns, compactions }: TokensChartProps) {
 
     import("vega-embed").then(({ default: vegaEmbed }) => {
       if (cancelled) return;
-      vegaEmbed(container, buildSpec(turns, compactions) as never, { actions: false, renderer: "svg" }).then((embedded) => {
+      vegaEmbed(container, buildSpec(turns, compactions, scaled) as never, { actions: false, renderer: "svg" }).then((embedded) => {
         if (cancelled) {
           embedded.finalize();
           return;
@@ -197,7 +200,7 @@ export function TokensChart({ turns, compactions }: TokensChartProps) {
       result?.finalize();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a re-embed for new colors
-  }, [turns, compactions, theme]);
+  }, [turns, compactions, theme, scaled]);
 
   if (turns.length === 0) return null;
 

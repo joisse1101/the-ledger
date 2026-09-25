@@ -2,9 +2,11 @@ import { useMemo, useRef } from "react";
 import type { ProjectTotals } from "../../api/types";
 import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
+import { useScaled } from "../../hooks/useScaled";
+import type { Scaled } from "../../lib/uiScale";
 import { chartColors, FONT_STACK, projectColorMap, projectColorScale } from "./chartTheme";
 
-function buildSpec(projects: ProjectTotals[], order: string[]) {
+function buildSpec(projects: ProjectTotals[], order: string[], scaled: Scaled) {
   const { hues, muted, surface, text, text2 } = chartColors();
   const { domain, range } = projectColorScale(order, hues, muted);
   const totalSessions = projects.reduce((sum, row) => sum + row.sessions, 0);
@@ -12,14 +14,14 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
   return {
     $schema: "https://vega.github.io/schema/vega-lite/v5.json",
     background: null,
-    width: 220,
-    height: 220,
+    width: scaled(220),
+    height: scaled(220),
     view: { stroke: null },
     config: { font: FONT_STACK },
     layer: [
       {
         data: { values: projects },
-        mark: { type: "arc", innerRadius: 62, outerRadius: 108, stroke: surface, strokeWidth: 2 },
+        mark: { type: "arc", innerRadius: scaled(62), outerRadius: scaled(108), stroke: surface, strokeWidth: 2 },
         encoding: {
           theta: { field: "sessions", type: "quantitative" },
           order: { field: "sessions", sort: "descending" },
@@ -36,12 +38,12 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
       },
       {
         data: { values: [{ label: totalSessions.toLocaleString() }] },
-        mark: { type: "text", fontSize: 26, fontWeight: 600, color: text },
+        mark: { type: "text", fontSize: scaled(26), fontWeight: 600, color: text },
         encoding: { text: { field: "label", type: "nominal" } },
       },
       {
         data: { values: [{ label: "sessions" }] },
-        mark: { type: "text", dy: 20, fontSize: 11, color: text2 },
+        mark: { type: "text", dy: scaled(20), fontSize: scaled(11), color: text2 },
         encoding: { text: { field: "label", type: "nominal" } },
       },
     ],
@@ -75,10 +77,11 @@ export interface ProjectDonutChartProps {
 export function ProjectDonutChart({ projects, projectOrder }: ProjectDonutChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const scaled = useScaled();
   const spec = useMemo(
-    () => buildSpec(projects, projectOrder),
+    () => buildSpec(projects, projectOrder, scaled),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a rebuild for new colors
-    [projects, projectOrder, theme],
+    [projects, projectOrder, theme, scaled],
   );
   useVegaEmbed(containerRef, spec);
 

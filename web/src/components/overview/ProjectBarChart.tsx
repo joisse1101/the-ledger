@@ -2,6 +2,8 @@ import { useMemo, useRef } from "react";
 import type { ProjectTotals } from "../../api/types";
 import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
+import { useScaled } from "../../hooks/useScaled";
+import type { Scaled } from "../../lib/uiScale";
 import { formatCost, formatCount } from "../../lib/format";
 import { chartColors, FONT_STACK } from "./chartTheme";
 
@@ -23,7 +25,7 @@ function records(projects: ProjectTotals[]): Record_[] {
   return rows;
 }
 
-function buildSpec(projects: ProjectTotals[], order: string[]) {
+function buildSpec(projects: ProjectTotals[], order: string[], scaled: Scaled) {
   const { hues, text2, grid } = chartColors();
   // "Messages" stays on categorical slot 0 everywhere it appears on this page (also the hourly
   // chart below), so that measure's color is consistent across both charts.
@@ -33,14 +35,14 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
     $schema: "https://vega.github.io/schema/vega-lite/v5.json",
     background: null,
     width: "container",
-    height: 280,
+    height: scaled(280),
     view: { stroke: null },
-    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: 12 } },
+    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: scaled(12) } },
     data: { values: records(projects) },
     // A per-bar value label has nowhere to go without
     // overlapping its neighbor once more than a couple of project groups are on screen - the
     // axis plus the tooltip (which does carry the exact formatted value) cover that instead.
-    mark: { type: "bar", cornerRadiusTopLeft: 3, cornerRadiusTopRight: 3 },
+    mark: { type: "bar", cornerRadiusTopLeft: scaled(3), cornerRadiusTopRight: scaled(3) },
     encoding: {
       x: {
         field: "project",
@@ -51,9 +53,9 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
           domain: false,
           ticks: false,
           labelColor: text2,
-          labelFontSize: 11,
+          labelFontSize: scaled(11),
           labelAngle: -25,
-          labelLimit: 110,
+          labelLimit: scaled(110),
         },
       },
       xOffset: { field: "metric", sort: METRICS },
@@ -66,7 +68,7 @@ function buildSpec(projects: ProjectTotals[], order: string[]) {
           domain: false,
           gridColor: grid,
           labelColor: text2,
-          labelFontSize: 10,
+          labelFontSize: scaled(10),
           titleColor: text2,
           values: [0, 25, 50, 75, 100],
         },
@@ -96,10 +98,11 @@ export interface ProjectBarChartProps {
 export function ProjectBarChart({ projects, projectOrder }: ProjectBarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const scaled = useScaled();
   const spec = useMemo(
-    () => buildSpec(projects, projectOrder),
+    () => buildSpec(projects, projectOrder, scaled),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a rebuild for new colors
-    [projects, projectOrder, theme],
+    [projects, projectOrder, theme, scaled],
   );
   useVegaEmbed(containerRef, spec);
 
