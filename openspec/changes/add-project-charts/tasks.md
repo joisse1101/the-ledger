@@ -1,10 +1,10 @@
 ## 1. API: grouping and project filter
 
-- [ ] 1.1 In `api/overview_stats.py`, turn `project_totals` into `group_totals(transcripts, key)` (top 7 + "Other", `share`/`messages_pct`/`cost_pct` unchanged), with rows keyed `group`; add a branch key mapping `""` to `"(no branch)"`. Verify with `test_overview_stats.py` cases for project grouping, branch grouping, the "(no branch)" label, and the top-7 fold.
-- [ ] 1.2 Add `filter_by_project(transcripts, folder)` matching `transcript.path.parent.name`. Verify with a test where two transcripts in differently-filed projects share the same `project` basename and only the requested folder's one is returned.
-- [ ] 1.3 Change `overview()` to take `project_folder` and `group_by` and return `groups` / `group_order` instead of `projects` / `project_order`. Verify with `test_overview_stats.py` that the empty case, the ordering, and the activity buckets are unchanged.
-- [ ] 1.4 In `api/server.py`, add optional `project` (path) and `group_by` (`project` | `branch`) to `GET /api/overview`: 404 unless `project` exactly matches a known project, 422 for an unknown `group_by`, folder via `claude_db.sanitize_project_path`. Verify with `test_api_data.py` via `TestClient`: scoped results, 404 unknown project, 422 bad `group_by`, two same-basename projects not merged, range still applied, and the default call unchanged apart from the key rename.
-- [ ] 1.5 Run `pytest` from `api/` and verify the whole suite passes.
+- [x] 1.1 In `api/overview_stats.py`, turn `project_totals` into `group_totals(transcripts, key)` (top 7 + "Other", `share`/`messages_pct`/`cost_pct` unchanged), with rows keyed `group`; add a branch key mapping `""` to `"(no branch)"`. Verify with `test_overview_stats.py` cases for project grouping, branch grouping, the "(no branch)" label, and the top-7 fold.
+- [x] 1.2 Add `filter_by_project(transcripts, folder)` matching `transcript.path.parent.name`. Verify with a test where two transcripts in differently-filed projects share the same `project` basename and only the requested folder's one is returned.
+- [x] 1.3 Change `overview()` to take `project_folder` and `group_by` and return `groups` / `group_order` instead of `projects` / `project_order`. Verify with `test_overview_stats.py` that the empty case, the ordering, and the activity buckets are unchanged.
+- [x] 1.4 In `api/server.py`, add optional `project` (path) and `group_by` (`project` | `branch`) to `GET /api/overview`: 404 unless `project` exactly matches a known project, 422 for an unknown `group_by`, folder via `claude_db.sanitize_project_path`. Verify with `test_api_data.py` via `TestClient`: scoped results, 404 unknown project, 422 bad `group_by`, two same-basename projects not merged, range still applied, and the default call unchanged apart from the key rename.
+- [x] 1.5 Run `pytest` from `api/` and verify the whole suite passes.
 
 ## 2. Frontend: data layer and reusable pieces
 

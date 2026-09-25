@@ -1,4 +1,4 @@
-"""Overview-page aggregation: time-range filtering, per-project totals, time-of-day activity, summary figures.
+"""Overview-page aggregation: time-range and project filtering, per-group totals, time-of-day activity, summary figures.
 
 Plain Python over `ClaudeTranscript`s - no pandas, no UI - so the API can serve the
 numbers and the chart-ready arrays straight to the browser.
@@ -7,7 +7,7 @@ numbers and the chart-ready arrays straight to the browser.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from claude_transcripts import ClaudeTranscript
 
@@ -26,8 +26,14 @@ TIME_RANGES: dict[str, Optional[tuple[int, int]]] = {
     "Past year": (364, 0),
 }
 
-MAX_PROJECT_SLICES = 7  # beyond this, fold the tail into "Other"
+MAX_GROUP_SLICES = 7  # beyond this, fold the tail into "Other"
 OTHER = "Other"
+NO_BRANCH = "(no branch)"
+
+GROUP_KEYS: dict[str, Callable[[ClaudeTranscript], str]] = {
+    "project": lambda transcript: transcript.project,
+    "branch": lambda transcript: transcript.git_branch or NO_BRANCH,
+}
 
 
 def filter_by_range(
@@ -58,20 +64,34 @@ def filter_by_range(
     return result
 
 
-def project_totals(
-    transcripts: Sequence[ClaudeTranscript], top_n: int = MAX_PROJECT_SLICES
-) -> list[dict[str, Any]]:
-    """Per-project totals, top-N by session count + an "Other" row for the rest.
+def filter_by_project(
+    transcripts: Sequence[ClaudeTranscript], folder: str
+) -> list[ClaudeTranscript]:
+    """Transcripts filed under one project's on-disk folder.
 
-    Every project chart shares this split, so a project's color/identity never
-    shifts between charts. Each row also carries `share` (% of all sessions) and
-    `messages_pct`/`cost_pct`: that measure as a % of the largest row's, so the
-    two measures can share one 0-100 axis instead of a dual-axis chart.
+    Matches the transcript file's parent folder name (`claude_db.sanitize_project_path` of the
+    project path), not `transcript.project`, which is only a basename: two projects whose folders
+    share a name must not be merged.
+    """
+    return [t for t in transcripts if t.path.parent.name == folder]
+
+
+def group_totals(
+    transcripts: Sequence[ClaudeTranscript],
+    key: Callable[[ClaudeTranscript], str],
+    top_n: int = MAX_GROUP_SLICES,
+) -> list[dict[str, Any]]:
+    """Per-group totals (`key` names a transcript's group), top-N by session count + an "Other" row.
+
+    Every grouped chart shares this split, so a group's color/identity never shifts between
+    charts. Each row also carries `share` (% of all sessions) and `messages_pct`/`cost_pct`: that
+    measure as a % of the largest row's, so the two measures can share one 0-100 axis instead of a
+    dual-axis chart.
     """
     totals: dict[str, dict[str, Any]] = {}
     for transcript in transcripts:
         row = totals.setdefault(
-            transcript.project, {"sessions": 0, "messages": 0, "cost": 0.0}
+            key(transcript), {"sessions": 0, "messages": 0, "cost": 0.0}
         )
         row["sessions"] += 1
         row["messages"] += transcript.message_count
@@ -81,11 +101,11 @@ def project_totals(
 
     ranked = sorted(totals.items(), key=lambda item: item[1]["sessions"], reverse=True)
     top, rest = ranked[:top_n], ranked[top_n:]
-    rows = [{"project": name, **values} for name, values in top]
+    rows = [{"group": name, **values} for name, values in top]
     if rest:
         rows.append(
             {
-                "project": OTHER,
+                "group": OTHER,
                 "sessions": sum(values["sessions"] for _, values in rest),
                 "messages": sum(values["messages"] for _, values in rest),
                 "cost": sum(values["cost"] for _, values in rest),
@@ -219,21 +239,30 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     }
 
 
-def overview(transcripts: Sequence[ClaudeTranscript], range_label: str) -> dict[str, Any]:
-    """Everything the Overview page shows for one time range.
+def overview(
+    transcripts: Sequence[ClaudeTranscript],
+    range_label: str,
+    project_folder: Optional[str] = None,
+    group_by: str = "project",
+) -> dict[str, Any]:
+    """Everything the Overview page (or one project's panel) shows for one time range.
 
-    `project_order` is the one ordering every project chart uses (colors follow
-    a project's index in it; "Other", when present, is last).
+    `project_folder`, when given, limits it to that project's transcripts (see
+    `filter_by_project`). `group_by` (`GROUP_KEYS`) picks what the donut/bar rows are grouped by.
+    `group_order` is the one ordering every grouped chart uses (colors follow a group's index in
+    it; "Other", when present, is last).
     """
+    if project_folder is not None:
+        transcripts = filter_by_project(transcripts, project_folder)
     filtered = filter_by_range(transcripts, range_label)
     if not filtered:
         return {"range": range_label, "empty": True}
-    projects = project_totals(filtered)
+    groups = group_totals(filtered, GROUP_KEYS[group_by])
     return {
         "range": range_label,
         "empty": False,
         "summary": summary(filtered),
-        "projects": projects,
-        "project_order": [row["project"] for row in projects],
+        "groups": groups,
+        "group_order": [row["group"] for row in groups],
         "activity": time_of_day_activity(filtered),
     }
