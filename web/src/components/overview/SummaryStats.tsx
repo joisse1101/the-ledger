@@ -1,6 +1,6 @@
-import { useState } from "react";
 import type { OverviewSummary } from "../../api/types";
 import { formatCount } from "../../lib/format";
+import { Tooltip } from "../Tooltip";
 
 interface Extreme {
   label: string;
@@ -39,47 +39,28 @@ function extremeNote(extreme: Extreme): string | null {
   return extreme.project && extreme.session_id ? `${extreme.project} — ${extreme.session_id}` : null;
 }
 
-/** A figure that also names which session it came from: a `title` attribute covers hover on a
- *  pointer device, and tapping toggles the same text inline for touch (no hover to rely on). */
-function ExtremeStatTile({ label, value, extreme }: { label: string; value: string; extreme: Extreme }) {
-  const [open, setOpen] = useState(false);
-  const note = extremeNote(extreme);
-
-  return (
-    <button
-      type="button"
-      className="stat-tile stat-tile-button"
-      onClick={() => setOpen((current) => !current)}
-      aria-expanded={open}
-      title={note ?? undefined}
-    >
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {open && note && <span className="stat-note">{note}</span>}
-    </button>
-  );
-}
-
 export interface SummaryStatsProps {
   summary: OverviewSummary;
 }
 
 /** The Overview KPI grid: counts, session-duration figures, and session-cost figures for the
- *  selected time range. The four extreme figures (longest/shortest/most-expensive/cheapest) are
- *  buttons that reveal which project and session they belong to. */
+ *  selected time range. The four extreme figures (longest/shortest/most-expensive/cheapest) carry a
+ *  tooltip naming the project and session they belong to. */
 export function SummaryStats({ summary }: SummaryStatsProps) {
   return (
     <div className="stat-grid">
-      {tiles(summary).map((tile) =>
-        tile.extreme ? (
-          <ExtremeStatTile key={tile.label} label={tile.label} value={tile.value} extreme={tile.extreme} />
-        ) : (
-          <div key={tile.label} className="stat-tile">
-            <span className="stat-label">{tile.label}</span>
-            <span className="stat-value">{tile.value}</span>
+      {tiles(summary).map(({ label, value, extreme }) => {
+        const note = extreme && extremeNote(extreme);
+        return (
+          <div key={label} className="stat-tile">
+            <span className="stat-label">
+              {label}
+              {note && <Tooltip tooltip={note} size="sm" />}
+            </span>
+            <span className="stat-value">{value}</span>
           </div>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

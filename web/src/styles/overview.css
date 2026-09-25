@@ -17,7 +17,7 @@
 
 @media (--medium-up) {
   .stat-grid {
-    grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
 }
 
@@ -28,40 +28,19 @@
   gap: 0.25rem;
   min-height: var(--tap);
   padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--bg-surface);
-}
-
-.stat-tile-button {
-  width: 100%;
-  border: 1px solid var(--border-subtle);
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.stat-tile-button:hover {
-  background: var(--border-subtle);
 }
 
 .stat-label {
   color: var(--text-muted);
   font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .stat-value {
   font-size: 1.25rem;
   font-weight: 700;
-}
-
-.stat-note {
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  white-space: normal;
-  word-break: break-word;
 }
 
 /* ---- layout: donut beside the figures at wide, stacked below that */
