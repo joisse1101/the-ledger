@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useAnswerDecision, useMeta, useOpenRepo, usePendingDecision } from "../../api/queries";
 import type { DecisionAnswer, LiveSession } from "../../api/types";
-import { formatText } from "../../lib/format";
+import { formatDateTime, formatText } from "../../lib/format";
 import { DecisionPrompt } from "./DecisionPrompt";
 
 export interface LiveControlProps {
@@ -69,6 +69,14 @@ export function LiveControl({ sessionId, session, liveLoaded, onAnswered }: Live
           <div className="session-recap-stat">
             <dt>Status</dt>
             <dd>{formatText(session.status)}</dd>
+          </div>
+          <div className="session-recap-stat">
+            <dt>Started At</dt>
+            <dd>{formatDateTime(session.started_at)}</dd>
+          </div>
+          <div className="session-recap-stat">
+            <dt>Updated At</dt>
+            <dd>{formatDateTime(session.updated_at)}</dd>
           </div>
         </dl>
       )}

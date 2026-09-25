@@ -657,7 +657,14 @@
   gap: 8px 20px;
   margin: 8px 0 0;
   padding: 0;
+
 }
+  @media (max-width: 600px) {
+    .session-recap-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+  }
 
 .session-recap-stat {
   display: flex;
