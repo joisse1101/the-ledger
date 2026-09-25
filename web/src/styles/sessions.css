@@ -171,7 +171,7 @@
   gap: 0.5rem;
 }
 
-@media (max-width: 600px) {
+@media (--narrow) {
   .sessions-toolbar {
     align-items: flex-end;
   }
@@ -189,8 +189,8 @@
 
 /* ---- All list: filters, sort, paging */
 
-/* One row (search grows, filters keep their size); two rows under 40rem (the
-   `narrow` viewport class): search on top, the three filters sharing the second. */
+/* One row (search grows, filters keep their size); two rows on the `narrow`
+   viewport class: search on top, the three filters sharing the second. */
 .sessions-filters {
   display: flex;
   align-items: stretch;
@@ -205,7 +205,7 @@
   gap: 0.5rem;
 }
 
-@media (max-width: 639px) {
+@media (--narrow) {
   .sessions-filters {
     flex-direction: column;
   }
@@ -396,7 +396,7 @@
 
 /* On a phone (the only place the panel scrolls itself into view), tall enough that the page can always scroll far enough to put the panel's top at the top of
    * the window, even when the panel is short or has only just mounted and is still loading. */
-@media (max-width: 639.98px) {
+@media (--narrow) {
   .live-panel-area {
     min-height: calc(100dvh - var(--header-h) - env(safe-area-inset-top));
   }
@@ -459,7 +459,7 @@
 }
 
 /* Full-screen sheet under 40rem, with the header always visible while the body scrolls. */
-@media (max-width: 639.98px) {
+@media (--narrow) {
   .session-dialog {
     position: fixed;
     inset: 0;
@@ -659,7 +659,7 @@
   padding: 0;
 
 }
-  @media (max-width: 600px) {
+  @media (--narrow) {
     .session-recap-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;

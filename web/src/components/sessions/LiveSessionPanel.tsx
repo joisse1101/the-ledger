@@ -1,11 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useLive, useMeta } from "../../api/queries";
-import { MEDIUM_MIN } from "../../hooks/useViewportClass";
+import { NARROW_QUERY } from "../../lib/breakpoints";
 import { CloseIcon } from "../icons";
 import { LiveControl } from "./LiveControl";
-
-/** Same boundary as `useViewportClass`'s "narrow" (under `MEDIUM_MIN`). */
-const NARROW_QUERY = `(max-width: ${MEDIUM_MIN - 0.02}px)`;
 
 const isNarrow = () => window.matchMedia(NARROW_QUERY).matches;
 

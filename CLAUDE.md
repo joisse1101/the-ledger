@@ -443,7 +443,9 @@ any unknown path) rendered inside `AppShell`.
   JSON shapes 1:1 (dates as ISO strings; the client formats/`--`s them).
 - **Shell** (`web/src/components/AppShell.tsx`, `Nav.tsx`, `RefreshControl.tsx`, `ServerBanner.tsx`,
   `ThemeToggle.tsx`): `AppShell` picks a `useViewportClass()` (`narrow`/`medium`/`wide`, matchMedia
-  at 640/1024px, `hooks/useViewportClass.ts`) and renders `Nav` as a top bar (medium/wide) or a fixed
+  at 640/1024px, `hooks/useViewportClass.ts`; the boundaries live only in `src/lib/breakpoints.ts`, and the
+  stylesheets write `@media (--narrow)`/`(--medium-up)`/`(--wide-up)`, which `web/build/mediaAliases.ts`, a
+  PostCSS plugin wired in `vite.config.ts`, swaps for the real queries at build time) and renders `Nav` as a top bar (medium/wide) or a fixed
   bottom tab bar (narrow, `viewport !== "narrow"` puts it in the header instead). `ServerBanner`
   shows a dismissible-by-retry notice above the page when a query is failing but keeps the page's
   last data visible underneath; `unauthorized` instead swaps the whole `<Outlet/>` for `SignInNeeded`

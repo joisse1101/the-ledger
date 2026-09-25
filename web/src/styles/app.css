@@ -8,12 +8,12 @@
 
 /* Every size in the stylesheets is rem, so this root size is the one knob for how big the UI is.
    Desktop is a notch smaller (compact type, tighter margins); phones and tablets keep the full
-   size. Media queries are in px on purpose: they don't follow the root size. */
+   size. Width boundaries are `@media (--wide-up)` etc., defined in src/lib/breakpoints.ts. */
 html {
   -webkit-text-size-adjust: 100%;
 }
 
-@media (min-width: 1024px) {
+@media (--wide-up) {
   html {
     font-size: 80%;
   }
