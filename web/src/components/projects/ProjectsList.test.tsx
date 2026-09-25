@@ -44,55 +44,57 @@ function stubApi(isLocal: boolean) {
   );
 }
 
-function renderList() {
+function renderList(selectedPath: string | null = null) {
   const client = createQueryClient();
+  const onSelect = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ProjectsList />
+      <ProjectsList selectedPath={selectedPath} onSelect={onSelect} />
     </QueryClientProvider>,
   );
-  return client;
+  return { client, onSelect };
 }
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("ProjectsList delete flow", () => {
-  it("offers the delete confirmation on the machine running the app", async () => {
-    stubApi(true);
-    const client = renderList();
-    const row = (await screen.findAllByText("demo"))[0];
+describe.each([
+  ["on the machine running the app", true],
+  ["on another device", false],
+])("ProjectsList selection %s", (_where, isLocal) => {
+  it("selects the clicked project and starts no delete", async () => {
+    stubApi(isLocal);
+    const { client, onSelect } = renderList();
+    const button = await screen.findByRole("button", { name: "Select project demo" });
 
-    // Clicking is idempotent, so retry until /api/meta has answered and the click is honored.
-    await waitFor(() => {
-      fireEvent.click(row);
-      expect(screen.getByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
-    });
-    client.clear();
-  });
-
-  it("names the row button for what selecting it does", async () => {
-    stubApi(true);
-    const client = renderList();
-    await screen.findAllByText("demo");
-
-    // The label depends on /api/meta having answered, so wait for it.
-    const button = await screen.findByRole("button", { name: "Select project demo to delete" });
     fireEvent.click(button);
-    expect(await screen.findByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ path: project.path }));
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => (init as RequestInit | undefined)?.method !== "DELETE")).toBe(
+      true,
+    );
+    client.clear();
+  });
+});
+
+describe("ProjectsList", () => {
+  it("accents only the selected project's row", async () => {
+    stubApi(true);
+    const { client } = renderList(project.path);
+
+    await waitFor(() => expect(document.querySelector("tr.row-selected")).not.toBeNull());
     client.clear();
   });
 
-  it("never offers it from another device", async () => {
-    stubApi(false);
-    const client = renderList();
-    const row = (await screen.findAllByText("demo"))[0];
-    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/meta", expect.anything()));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+  it("accents nothing while no project is selected", async () => {
+    stubApi(true);
+    const { client } = renderList(null);
+    await screen.findByRole("button", { name: "Select project demo" });
 
-    fireEvent.click(row);
-    expect(screen.queryByRole("button", { name: "Confirm delete" })).not.toBeInTheDocument();
+    expect(document.querySelector(".row-selected")).toBeNull();
     client.clear();
   });
 });

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useDeleteProject, useMeta, useProjects } from "../../api/queries";
+import { useProjects } from "../../api/queries";
 import type { Project } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
 import { ResponsiveList } from "../list/ResponsiveList";
@@ -53,30 +52,18 @@ const columns: ListColumn<Project>[] = [
   },
 ];
 
-/** The Projects page's list: every project Claude Code has been run or trusted in, plus a
- *  select-a-row-to-delete flow (there's no other per-project action here, unlike Sessions'
- *  detail dialog, so selecting a row doubles as "I want to delete this one"). Confirming removes
- *  the entry from ~/.claude.json and its on-disk transcripts, then refetches projects, the All
- *  sessions list, and Overview (wired into useDeleteProject's onSuccess). */
-export function ProjectsList() {
+export interface ProjectsListProps {
+  /** Path of the selected project, if any; its row is accented. */
+  selectedPath: string | null;
+  onSelect: (project: Project) => void;
+}
+
+/** The Projects page's list: every project Claude Code has been run or trusted in. Selecting a row
+ *  only reports the choice (the page shows that project's charts); it never deletes anything, and
+ *  it works on every device. */
+export function ProjectsList({ selectedPath, onSelect }: ProjectsListProps) {
   const projects = useProjects();
-  const deleteProject = useDeleteProject();
-  // Deletes are local-only server-side; on any other device the list is read-only (and stays
-  // that way until /api/meta says otherwise).
-  const isLocal = useMeta().data?.is_local === true;
-  const [pending, setPending] = useState<Project | null>(null);
-
   const rows = projects.data?.projects ?? [];
-
-  // Selecting a row only ever starts a delete, so it does nothing off the local machine.
-  const handleSelect = (project: Project) => {
-    if (isLocal) setPending(project);
-  };
-
-  const handleConfirm = () => {
-    if (!pending) return;
-    deleteProject.mutate(pending.path, { onSuccess: () => setPending(null) });
-  };
 
   return (
     <section aria-label="Projects">
@@ -84,41 +71,12 @@ export function ProjectsList() {
         columns={columns}
         rows={rows}
         rowId={(p) => p.path}
-        onSelect={handleSelect}
-        // Selecting starts a delete, so say that rather than leaving the button named just "demo".
-        rowLabel={(p) => (isLocal ? `Select project ${p.name} to delete` : p.name)}
+        onSelect={onSelect}
+        rowLabel={(p) => `Select project ${p.name}`}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
-        rowClassName={(p) => (pending && p.path === pending.path ? "row-selected" : undefined)}
+        rowClassName={(p) => (p.path === selectedPath ? "row-selected" : undefined)}
       />
-
-      {isLocal && pending && (
-        <div className="detail-notice">
-          <p>
-            Delete project <code>{pending.path}</code> from ~/.claude.json and remove all of its on-disk session
-            transcripts? This cannot be undone.
-          </p>
-          <div className="detail-actions">
-            <button
-              type="button"
-              className="button button-danger"
-              disabled={deleteProject.isPending}
-              onClick={handleConfirm}
-            >
-              {deleteProject.isPending ? "Deleting…" : "Confirm delete"}
-            </button>
-            <button
-              type="button"
-              className="button"
-              disabled={deleteProject.isPending}
-              onClick={() => setPending(null)}
-            >
-              Cancel
-            </button>
-          </div>
-          {deleteProject.isError && <p className="detail-caption">{deleteProject.error.message}</p>}
-        </div>
-      )}
     </section>
   );
 }
