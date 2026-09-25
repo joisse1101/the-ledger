@@ -588,7 +588,7 @@ def test_overview_all_time_has_summary_and_chart_arrays(api):
     assert body["summary"]["sessions"] == 3
     assert body["summary"]["projects"] == 2
     assert [row["project"] for row in body["projects"]] == ["alpha", "beta"]
-    assert body["hourly"]
+    assert body["activity"]
 
 
 def test_overview_unknown_range_is_422(api):

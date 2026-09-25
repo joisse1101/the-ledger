@@ -1,4 +1,4 @@
-"""Overview-page aggregation: time-range filtering, per-project totals, hourly activity, summary figures.
+"""Overview-page aggregation: time-range filtering, per-project totals, time-of-day activity, summary figures.
 
 Plain Python over `ClaudeTranscript`s - no pandas, no UI - so the API can serve the
 numbers and the chart-ready arrays straight to the browser.
@@ -102,42 +102,45 @@ def project_totals(
     return rows
 
 
-def format_hour(hour: int) -> str:
+BUCKET_MINUTES = 30
+BUCKETS_PER_DAY = 24 * 60 // BUCKET_MINUTES
+
+
+def format_bucket(minute: int) -> str:
+    """Clock label for a bucket's start, `minute` minutes after local midnight: `9:30am`."""
+    hour, mins = divmod(minute, 60)
     period = "am" if hour < 12 else "pm"
-    display = hour % 12 or 12
-    return f"{display}{period}"
+    return f"{hour % 12 or 12}:{mins:02d}{period}"
 
 
-def hourly_activity(transcripts: Sequence[ClaudeTranscript]) -> list[dict[str, Any]]:
-    """Session/message counts per local hour of day, trimmed to the hours with any activity.
+def time_of_day_activity(transcripts: Sequence[ClaudeTranscript]) -> list[dict[str, Any]]:
+    """Session/message counts per local 30-minute block of the day, trimmed to the span with activity.
 
-    With no activity at all, all 24 hours are returned (zero-filled). Each row also
-    carries `sessions_pct`/`messages_pct`: that measure as a % of its busiest hour.
+    A session counts in the block its start time falls in. Blocks between the first and last
+    active one are zero-filled; with no activity at all, all 48 blocks are returned.
+    Each row's `minute` is the block's start, in minutes after midnight.
     """
-    sessions = [0] * 24
-    messages = [0] * 24
+    sessions = [0] * BUCKETS_PER_DAY
+    messages = [0] * BUCKETS_PER_DAY
     for transcript in transcripts:
         anchor = transcript.started_at or transcript.updated_at
         if anchor is None:
             continue
-        hour = anchor.astimezone().hour
-        sessions[hour] += 1
-        messages[hour] += transcript.message_count
+        local = anchor.astimezone()
+        bucket = (local.hour * 60 + local.minute) // BUCKET_MINUTES
+        sessions[bucket] += 1
+        messages[bucket] += transcript.message_count
 
-    active = [hour for hour, count in enumerate(sessions) if count > 0]
-    first, last = (min(active), max(active)) if active else (0, 23)
-    max_sessions = max(sessions[first : last + 1]) or 1
-    max_messages = max(messages[first : last + 1]) or 1
+    active = [bucket for bucket, count in enumerate(sessions) if count > 0]
+    first, last = (min(active), max(active)) if active else (0, BUCKETS_PER_DAY - 1)
     return [
         {
-            "hour": hour,
-            "label": format_hour(hour),
-            "sessions": sessions[hour],
-            "messages": messages[hour],
-            "sessions_pct": 100 * sessions[hour] / max_sessions,
-            "messages_pct": 100 * messages[hour] / max_messages,
+            "minute": bucket * BUCKET_MINUTES,
+            "label": format_bucket(bucket * BUCKET_MINUTES),
+            "sessions": sessions[bucket],
+            "messages": messages[bucket],
         }
-        for hour in range(first, last + 1)
+        for bucket in range(first, last + 1)
     ]
 
 
@@ -232,5 +235,5 @@ def overview(transcripts: Sequence[ClaudeTranscript], range_label: str) -> dict[
         "summary": summary(filtered),
         "projects": projects,
         "project_order": [row["project"] for row in projects],
-        "hourly": hourly_activity(filtered),
+        "activity": time_of_day_activity(filtered),
     }

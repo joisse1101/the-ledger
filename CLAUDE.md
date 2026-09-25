@@ -199,7 +199,8 @@ Frontend (`cd web`):
 npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
                    # components/ButtonSelector, list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
                    # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
-                   # hooks/useViewportClass, lib/format, lib/tokens
+                   # hooks/useViewportClass, lib/format, lib/tokens, lib/activityTrend,
+                   # components/overview/ActivityLineChart (compiles the chart spec: one shared legend)
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
@@ -394,8 +395,8 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
 - `api/overview_stats.py` — the pure aggregation behind `/api/overview`, no pandas: `TIME_RANGES`
   (All time/Today/Yesterday/Past week/Past month/Past quarter/Past year, bucketed by *local calendar
   date*, not a rolling window), `filter_by_range`, `project_totals` (top-7 + `"Other"`,
-  `share`/`messages_pct`/`cost_pct`), `hourly_activity` (24-hour buckets trimmed to the contiguous
-  active range, `sessions_pct`/`messages_pct`), `format_duration`, and `summary()` (the KPI figures,
+  `share`/`messages_pct`/`cost_pct`), `time_of_day_activity` (48 half-hour buckets trimmed to the contiguous
+  active range, zero-filled between; each row is `{minute, label, sessions, messages}`), `format_duration`, and `summary()` (the KPI figures,
   extremes annotated with `project`/`session_id` via `_with_session`). `overview()` ties it together
   into the `/api/overview` response, including `project_order` — the one ordering every chart on the
   page uses so a project's color never shifts between them.
@@ -517,10 +518,12 @@ any unknown path) rendered inside `AppShell`.
   CSS-variable palette and turning the API's `project_order` into a Vega-Lite domain/range (`"Other"`
   always the muted ink) shared by `ProjectDonutChart` and `ProjectBarChart`; `ProjectDonutChart` draws
   its own color key as a plain HTML list (`ProjectLegend`) instead of a Vega-Lite legend so long
-  project names wrap instead of clipping. `ProjectBarChart` ("Messages & Cost by Project") and
-  `HourlyBarChart` ("Activity by Hour of Day") both normalize each measure to % of its own peak (a
-  deliberate non-dual-axis choice so two differently-scaled measures can share one axis) and keep
-  "Messages" on the same categorical hue (`hues[0]`) in both charts. All three charts use the shared `useVegaEmbed` hook
+  project names wrap instead of clipping. `ProjectBarChart` ("Messages & Cost by Project")
+  normalizes each measure to % of its own peak (a non-dual-axis choice so two differently-scaled
+  measures can share one axis). `ActivityLineChart` ("Activity by Hour of Day", in 30-minute blocks, smoothed lines, plus a grey "Activity trend" layer from `lib/activityTrend.ts`: each measure as a share of its own peak, averaged, then a 3-block moving average, on its own hidden 0-100 scale, with the calculation explained in a caption note) instead is a layered
+  dual-axis line chart of absolute counts — Sessions on the left axis, Messages on the right
+  (`resolve.scale.y: "independent"`), gridlines on the left only. Both keep "Messages" on the same
+  categorical hue (`hues[0]`). All three charts use the shared `useVegaEmbed` hook
   (lazy `vega-embed` import, re-embeds on spec change, `useVegaEmbed.ts` — the general form of the
   pattern `TokensChart` uses directly). `SummaryStats` renders the KPI tiles; the four extreme
   figures are buttons that toggle an inline disclosure naming their project/session (plus a `title`

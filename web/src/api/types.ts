@@ -257,13 +257,12 @@ export interface ProjectTotals {
   cost_pct: number;
 }
 
-export interface HourlyBucket {
-  hour: number;
+/** One 30-minute block of the local day; `minute` is its start, in minutes after midnight. */
+export interface ActivityBucket {
+  minute: number;
   label: string;
   sessions: number;
   messages: number;
-  sessions_pct: number;
-  messages_pct: number;
 }
 
 export type OverviewResponse =
@@ -275,5 +274,5 @@ export type OverviewResponse =
       projects: ProjectTotals[];
       /** The one order every project chart uses; colors follow a project's index in it. */
       project_order: string[];
-      hourly: HourlyBucket[];
+      activity: ActivityBucket[];
     };

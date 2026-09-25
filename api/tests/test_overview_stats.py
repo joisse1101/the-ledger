@@ -153,58 +153,49 @@ def test_project_totals_with_all_zero_measures_does_not_divide_by_zero():
 
 
 # ---------------------------------------------------------------------------
-# hourly_activity
+# time_of_day_activity
 # ---------------------------------------------------------------------------
 
 
-def test_hourly_activity_with_no_transcripts_zero_fills_all_24_hours():
-    rows = overview.hourly_activity([])
-    assert len(rows) == 24
+def test_time_of_day_activity_with_no_transcripts_zero_fills_all_48_blocks():
+    rows = overview.time_of_day_activity([])
+    assert len(rows) == 48
     assert sum(row["sessions"] for row in rows) == 0
     assert sum(row["messages"] for row in rows) == 0
 
 
-def test_hourly_activity_buckets_by_local_start_hour():
+def test_time_of_day_activity_buckets_by_local_start_half_hour():
     transcripts = [
-        _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0), message_count=4),
-        _transcript(started_at=datetime(2024, 6, 15, 9, 45, 0), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=4),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 29, 59), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0), message_count=3),
         _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0), message_count=2),
     ]
-    rows = {row["label"]: row for row in overview.hourly_activity(transcripts)}
-    assert rows["9am"]["sessions"] == 2
-    assert rows["9am"]["messages"] == 10
-    assert rows["2pm"]["sessions"] == 1
+    rows = {row["label"]: row for row in overview.time_of_day_activity(transcripts)}
+    assert rows["9:00am"]["sessions"] == 2
+    assert rows["9:00am"]["messages"] == 10
+    assert rows["9:30am"]["sessions"] == 1
+    assert rows["2:00pm"]["sessions"] == 1
 
 
-def test_hourly_activity_trims_to_hours_with_activity():
+def test_time_of_day_activity_trims_and_zero_fills_between_first_and_last_active_block():
     transcripts = [
         _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0)),
-        _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0)),
+        _transcript(started_at=datetime(2024, 6, 15, 11, 0, 0)),
     ]
-    rows = overview.hourly_activity(transcripts)
-    assert [row["label"] for row in rows] == [overview.format_hour(h) for h in range(9, 15)]
+    rows = overview.time_of_day_activity(transcripts)
+    assert [row["label"] for row in rows] == ["9:30am", "10:00am", "10:30am", "11:00am"]
+    assert [row["sessions"] for row in rows] == [1, 0, 0, 1]
+    assert [row["minute"] for row in rows] == [570, 600, 630, 660]
 
 
-def test_hourly_activity_normalizes_each_measure_to_its_busiest_hour():
-    transcripts = [
-        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=10),
-        _transcript(started_at=datetime(2024, 6, 15, 9, 5, 0), message_count=10),
-        _transcript(started_at=datetime(2024, 6, 15, 10, 0, 0), message_count=40),
-    ]
-    rows = {row["label"]: row for row in overview.hourly_activity(transcripts)}
-    assert rows["9am"]["sessions_pct"] == pytest.approx(100.0)
-    assert rows["10am"]["sessions_pct"] == pytest.approx(50.0)
-    assert rows["9am"]["messages_pct"] == pytest.approx(50.0)
-    assert rows["10am"]["messages_pct"] == pytest.approx(100.0)
-
-
-def test_hourly_activity_skips_transcript_with_no_timestamps():
+def test_time_of_day_activity_skips_transcript_with_no_timestamps():
     t = _transcript(started_at=None, updated_at=None)
-    assert sum(row["sessions"] for row in overview.hourly_activity([t])) == 0
+    assert sum(row["sessions"] for row in overview.time_of_day_activity([t])) == 0
 
 
 # ---------------------------------------------------------------------------
-# format_duration / format_hour
+# format_duration / format_bucket
 # ---------------------------------------------------------------------------
 
 
@@ -217,11 +208,11 @@ def test_format_duration(seconds, expected):
 
 
 @pytest.mark.parametrize(
-    "hour,expected",
-    [(0, "12am"), (9, "9am"), (12, "12pm"), (13, "1pm"), (23, "11pm")],
+    "minute,expected",
+    [(0, "12:00am"), (570, "9:30am"), (720, "12:00pm"), (810, "1:30pm"), (1410, "11:30pm")],
 )
-def test_format_hour(hour, expected):
-    assert overview.format_hour(hour) == expected
+def test_format_bucket(minute, expected):
+    assert overview.format_bucket(minute) == expected
 
 
 # ---------------------------------------------------------------------------

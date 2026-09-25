@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useOverview } from "../api/queries";
 import type { TimeRange } from "../api/types";
-import { HourlyBarChart } from "../components/overview/HourlyBarChart";
+import { ActivityLineChart } from "../components/overview/ActivityLineChart";
 import { ProjectBarChart } from "../components/overview/ProjectBarChart";
 import { ProjectDonutChart } from "../components/overview/ProjectDonutChart";
 import { SummaryStats } from "../components/overview/SummaryStats";
@@ -24,7 +24,7 @@ export function OverviewPage() {
             <SummaryStats summary={data.summary} />
           </div>
           <ProjectBarChart projects={data.projects} projectOrder={data.project_order} />
-          <HourlyBarChart hourly={data.hourly} />
+          <ActivityLineChart activity={data.activity} />
         </>
       )}
 
