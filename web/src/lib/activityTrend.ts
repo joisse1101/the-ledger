@@ -1,6 +1,6 @@
 import type { ActivityBucket } from "../api/types";
 
-/** Blocks averaged per trend point (centered): 3 half-hour blocks = a 1.5-hour window. */
+/** Blocks averaged per trend point (centered): 3 blocks, i.e. 1.5 hours of half-hour blocks or 3 of hourly. */
 export const TREND_WINDOW = 3;
 
 /** A combined "how busy is this time of day" curve, 0-100, one value per block.

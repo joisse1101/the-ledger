@@ -27,7 +27,7 @@ export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDet
   const panelRef = useRef<HTMLElement>(null);
   const [range, setRange] = useState<TimeRange>("All time");
   const [confirming, setConfirming] = useState(false);
-  const overview = useOverview(range, { project: project.path, groupBy: "branch" });
+  const overview = useOverview(range, { project: project.path, groupBy: "branch", bucketMinutes: 60 });
   const deleteProject = useDeleteProject();
   // Deletes are local-only server-side, so no other device is even shown the button.
   const isLocal = useMeta().data?.is_local === true;
@@ -73,7 +73,7 @@ export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDet
         <>
           <GroupDonutChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
           <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
-          <ActivityLineChart activity={data.activity} />
+          <ActivityLineChart activity={data.activity} bucketMinutes={60} />
         </>
       )}
 

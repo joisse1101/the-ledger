@@ -236,6 +236,20 @@ def test_time_of_day_activity_trims_and_zero_fills_between_first_and_last_active
     assert [row["minute"] for row in rows] == [570, 600, 630, 660]
 
 
+def test_time_of_day_activity_can_bucket_by_hour():
+    transcripts = [
+        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=4),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 45, 0), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 11, 10, 0), message_count=3),
+    ]
+    rows = overview.time_of_day_activity(transcripts, 60)
+    assert [row["label"] for row in rows] == ["9:00am", "10:00am", "11:00am"]
+    assert [row["minute"] for row in rows] == [540, 600, 660]
+    assert [row["sessions"] for row in rows] == [2, 0, 1]
+    assert [row["messages"] for row in rows] == [10, 0, 3]
+    assert len(overview.time_of_day_activity([], 60)) == 24
+
+
 def test_time_of_day_activity_skips_transcript_with_no_timestamps():
     t = _transcript(started_at=None, updated_at=None)
     assert sum(row["sessions"] for row in overview.time_of_day_activity([t])) == 0

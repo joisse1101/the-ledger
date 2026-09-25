@@ -4,7 +4,7 @@ import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import type { Scaled } from "../../lib/uiScale";
-import { activityTrend } from "../../lib/activityTrend";
+import { activityTrend, TREND_WINDOW } from "../../lib/activityTrend";
 import { chartColors, FONT_STACK } from "./chartTheme";
 
 /** X-axis extent in minutes after midnight, widened when everything falls in one block. */
@@ -139,12 +139,14 @@ export function buildSpec(activity: ActivityBucket[], scaled: Scaled) {
 
 export interface ActivityLineChartProps {
   activity: ActivityBucket[];
+  /** Block size the server bucketed `activity` by (30 or 60); only affects the captions. */
+  bucketMinutes?: 30 | 60;
 }
 
-/** Sessions (left axis) and messages (right axis) by local time of day in 30-minute blocks, as
+/** Sessions (left axis) and messages (right axis) by local time of day in 30- or 60-minute blocks, as
  *  absolute counts on two independent y scales. The server already trims `activity` to the span
  *  between the first and last block that had any activity. */
-export function ActivityLineChart({ activity }: ActivityLineChartProps) {
+export function ActivityLineChart({ activity, bucketMinutes = 30 }: ActivityLineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const scaled = useScaled();
@@ -157,19 +159,22 @@ export function ActivityLineChart({ activity }: ActivityLineChartProps) {
 
   if (activity.length === 0) return null;
 
+  const blockName = bucketMinutes === 60 ? "hour" : "30-minute block";
+  const trendSpan = (TREND_WINDOW * bucketMinutes) / 60;
+
   return (
     <div className="overview-chart">
       <h2 className="chart-heading">Activity by Hour of Day</h2>
       <p className="chart-caption">
-        Absolute counts per 30-minute block, by the time a session started: Sessions read against
+        Absolute counts per {blockName}, by the time a session started: Sessions read against
         the left axis, Messages against the right. The two axes have different scales, so compare
         the shapes of the lines rather than their heights.
       </p>
       <p className="chart-caption">
-        <strong>How the Activity trend is calculated:</strong> for each block, Sessions and Messages
+        <strong>How the Activity trend is calculated:</strong> for each {blockName}, Sessions and Messages
         are each turned into a share of their own busiest block (0–100%), then the two shares are
         averaged so both count equally. That series is then smoothed with a moving average over
-        three neighbouring blocks (1.5 hours). It's drawn on its own 0–100 scale, so read it as
+        three neighbouring blocks ({trendSpan} hours). It's drawn on its own 0–100 scale, so read it as
         "how busy this time of day is compared with the busiest, across both measures", not as a
         count. Its value shows in the tooltip.
       </p>

@@ -33,8 +33,8 @@ export const keys = {
   session: (id: string) => ["session", id] as const,
   pendingDecision: (id: string) => ["pending-decision", id] as const,
   // Always starts ["overview", ...] so invalidating ["overview"] covers every scope and grouping.
-  overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy) =>
-    ["overview", range, project ?? null, groupBy ?? "project"] as const,
+  overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy, bucketMinutes?: number) =>
+    ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? 30] as const,
   projects: ["projects"] as const,
 };
 
@@ -115,15 +115,22 @@ export function useSession(id: string | null, { refetchMs }: { refetchMs?: numbe
 }
 
 /** Overview figures for `range`. `project` (a project path) scopes them to that one project;
- *  `groupBy` picks what the donut/bar rows are grouped by (the server defaults to "project"). */
+ *  `groupBy` picks what the donut/bar rows are grouped by (the server defaults to "project");
+ *  `bucketMinutes` (30 or 60, server default 30) is the block size of the time-of-day activity. */
 export function useOverview(
   range: TimeRange,
-  { project, groupBy }: { project?: string; groupBy?: OverviewGroupBy } = {},
+  {
+    project,
+    groupBy,
+    bucketMinutes,
+  }: { project?: string; groupBy?: OverviewGroupBy; bucketMinutes?: number } = {},
 ) {
   return useQuery({
-    queryKey: keys.overview(range, project, groupBy),
+    queryKey: keys.overview(range, project, groupBy, bucketMinutes),
     queryFn: () =>
-      apiFetch<OverviewResponse>(withQuery("/api/overview", { range, project, group_by: groupBy })),
+      apiFetch<OverviewResponse>(
+        withQuery("/api/overview", { range, project, group_by: groupBy, bucket_minutes: bucketMinutes }),
+      ),
     placeholderData: keepPreviousData,
   });
 }

@@ -99,6 +99,7 @@ describe("ProjectDetailPanel charts", () => {
     const params = new URL(url, "http://x").searchParams;
     expect(params.get("project")).toBe(project.path);
     expect(params.get("group_by")).toBe("branch");
+    expect(params.get("bucket_minutes")).toBe("60");
     expect(params.get("range")).toBe("All time");
     client.clear();
   });

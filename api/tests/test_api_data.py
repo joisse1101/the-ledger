@@ -619,6 +619,18 @@ def test_overview_group_by_project_is_the_default_for_a_scoped_call(with_project
     assert [row["group"] for row in body["groups"]] == ["beta"]
 
 
+def test_overview_bucket_minutes_sets_the_activity_block_size(api):
+    half_hour = api.get("/api/overview").json()["activity"]
+    hourly = api.get("/api/overview", params={"bucket_minutes": 60}).json()["activity"]
+    assert all(row["minute"] % 30 == 0 for row in half_hour)
+    assert all(row["minute"] % 60 == 0 for row in hourly)
+    assert sum(r["sessions"] for r in hourly) == sum(r["sessions"] for r in half_hour)
+
+
+def test_overview_unknown_bucket_minutes_is_422(api):
+    assert api.get("/api/overview", params={"bucket_minutes": 45}).status_code == 422
+
+
 def test_overview_unknown_group_by_is_422(api):
     assert api.get("/api/overview", params={"group_by": "author"}).status_code == 422
 

@@ -123,7 +123,7 @@ def group_totals(
 
 
 BUCKET_MINUTES = 30
-BUCKETS_PER_DAY = 24 * 60 // BUCKET_MINUTES
+BUCKET_SIZES = (30, 60)
 
 
 def format_bucket(minute: int) -> str:
@@ -133,30 +133,34 @@ def format_bucket(minute: int) -> str:
     return f"{hour % 12 or 12}:{mins:02d}{period}"
 
 
-def time_of_day_activity(transcripts: Sequence[ClaudeTranscript]) -> list[dict[str, Any]]:
-    """Session/message counts per local 30-minute block of the day, trimmed to the span with activity.
+def time_of_day_activity(
+    transcripts: Sequence[ClaudeTranscript], bucket_minutes: int = BUCKET_MINUTES
+) -> list[dict[str, Any]]:
+    """Session/message counts per local block of the day (`bucket_minutes` long, one of
+    `BUCKET_SIZES`), trimmed to the span with activity.
 
     A session counts in the block its start time falls in. Blocks between the first and last
-    active one are zero-filled; with no activity at all, all 48 blocks are returned.
+    active one are zero-filled; with no activity at all, every block of the day is returned.
     Each row's `minute` is the block's start, in minutes after midnight.
     """
-    sessions = [0] * BUCKETS_PER_DAY
-    messages = [0] * BUCKETS_PER_DAY
+    buckets_per_day = 24 * 60 // bucket_minutes
+    sessions = [0] * buckets_per_day
+    messages = [0] * buckets_per_day
     for transcript in transcripts:
         anchor = transcript.started_at or transcript.updated_at
         if anchor is None:
             continue
         local = anchor.astimezone()
-        bucket = (local.hour * 60 + local.minute) // BUCKET_MINUTES
+        bucket = (local.hour * 60 + local.minute) // bucket_minutes
         sessions[bucket] += 1
         messages[bucket] += transcript.message_count
 
     active = [bucket for bucket, count in enumerate(sessions) if count > 0]
-    first, last = (min(active), max(active)) if active else (0, BUCKETS_PER_DAY - 1)
+    first, last = (min(active), max(active)) if active else (0, buckets_per_day - 1)
     return [
         {
-            "minute": bucket * BUCKET_MINUTES,
-            "label": format_bucket(bucket * BUCKET_MINUTES),
+            "minute": bucket * bucket_minutes,
+            "label": format_bucket(bucket * bucket_minutes),
             "sessions": sessions[bucket],
             "messages": messages[bucket],
         }
@@ -244,13 +248,15 @@ def overview(
     range_label: str,
     project_folder: Optional[str] = None,
     group_by: str = "project",
+    bucket_minutes: int = BUCKET_MINUTES,
 ) -> dict[str, Any]:
     """Everything the Overview page (or one project's panel) shows for one time range.
 
     `project_folder`, when given, limits it to that project's transcripts (see
     `filter_by_project`). `group_by` (`GROUP_KEYS`) picks what the donut/bar rows are grouped by.
     `group_order` is the one ordering every grouped chart uses (colors follow a group's index in
-    it; "Other", when present, is last).
+    it; "Other", when present, is last). `bucket_minutes` (`BUCKET_SIZES`) sets the block size of
+    the time-of-day `activity`.
     """
     if project_folder is not None:
         transcripts = filter_by_project(transcripts, project_folder)
@@ -264,5 +270,5 @@ def overview(
         "summary": summary(filtered),
         "groups": groups,
         "group_order": [row["group"] for row in groups],
-        "activity": time_of_day_activity(filtered),
+        "activity": time_of_day_activity(filtered, bucket_minutes),
     }
