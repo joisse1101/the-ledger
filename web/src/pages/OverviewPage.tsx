@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useOverview } from "../api/queries";
 import type { TimeRange } from "../api/types";
 import { ActivityLineChart } from "../components/overview/ActivityLineChart";
-import { ProjectBarChart } from "../components/overview/ProjectBarChart";
-import { ProjectDonutChart } from "../components/overview/ProjectDonutChart";
+import { GroupBarChart } from "../components/overview/GroupBarChart";
+import { GroupDonutChart } from "../components/overview/GroupDonutChart";
 import { SummaryStats } from "../components/overview/SummaryStats";
 import { TimeRangeSelector } from "../components/overview/TimeRangeSelector";
 
@@ -20,10 +20,10 @@ export function OverviewPage() {
       {data && !data.empty && (
         <>
           <div className="overview-top">
-            <ProjectDonutChart projects={data.projects} projectOrder={data.project_order} />
+            <GroupDonutChart groups={data.groups} groupOrder={data.group_order} groupLabel="project" />
             <SummaryStats summary={data.summary} />
           </div>
-          <ProjectBarChart projects={data.projects} projectOrder={data.project_order} />
+          <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="project" />
           <ActivityLineChart activity={data.activity} />
         </>
       )}

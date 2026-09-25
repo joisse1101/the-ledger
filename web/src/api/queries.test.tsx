@@ -8,7 +8,9 @@ import {
   keys,
   LIVE_POLL_MS,
   useAnswerDecision,
+  useDeleteProject,
   useOpenRepo,
+  useOverview,
   usePendingDecision,
   useSetRemoteMode,
 } from "./queries";
@@ -197,6 +199,75 @@ describe("the session control hooks", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
     expect(init.headers.get("X-Requested-With")).toBe("ledger");
+    client.clear();
+  });
+});
+
+describe("the overview query", () => {
+  function wrapper(client: ReturnType<typeof createQueryClient>) {
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  it("asks for the range alone by default", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ range: "All time", empty: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useOverview("All time"), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/overview?range=All+time");
+    client.clear();
+  });
+
+  it("carries the project path and grouping to the server", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ range: "Past week", empty: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(
+      () => useOverview("Past week", { project: "C:\code\app", groupBy: "branch" }),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const params = new URL(fetchMock.mock.calls[0][0], "http://x").searchParams;
+    expect(params.get("range")).toBe("Past week");
+    expect(params.get("project")).toBe("C:\code\app");
+    expect(params.get("group_by")).toBe("branch");
+    client.clear();
+  });
+
+  it("keeps a separate cache entry per project and grouping", () => {
+    expect(keys.overview("All time", "/a", "branch")).not.toEqual(keys.overview("All time", "/b", "branch"));
+    expect(keys.overview("All time")).not.toEqual(keys.overview("All time", "/a", "branch"));
+  });
+
+  it("is refetched when a project is deleted", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        url.startsWith("/api/overview")
+          ? jsonResponse({ range: "All time", empty: true })
+          : jsonResponse({ deleted: "/a" }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const overview = renderHook(() => useOverview("All time", { project: "/a", groupBy: "branch" }), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(overview.result.current.isSuccess).toBe(true));
+    const before = fetchMock.mock.calls.filter(([url]) => url.startsWith("/api/overview")).length;
+
+    const remove = renderHook(() => useDeleteProject(), { wrapper: wrapper(client) });
+    await act(() => remove.result.current.mutateAsync("/a"));
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([url]) => url.startsWith("/api/overview")).length).toBeGreaterThan(before),
+    );
     client.clear();
   });
 });

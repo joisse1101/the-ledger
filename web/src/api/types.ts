@@ -247,8 +247,9 @@ export interface OverviewSummary {
   };
 }
 
-export interface ProjectTotals {
-  project: string;
+/** One donut/bar row: a project on Overview, a git branch on a project's own charts. */
+export interface GroupTotals {
+  group: string;
   sessions: number;
   messages: number;
   cost: number;
@@ -265,14 +266,16 @@ export interface ActivityBucket {
   messages: number;
 }
 
+export type OverviewGroupBy = "project" | "branch";
+
 export type OverviewResponse =
   | { range: string; empty: true }
   | {
       range: string;
       empty: false;
       summary: OverviewSummary;
-      projects: ProjectTotals[];
-      /** The one order every project chart uses; colors follow a project's index in it. */
-      project_order: string[];
+      groups: GroupTotals[];
+      /** The one order every grouped chart uses; colors follow a group's index in it. */
+      group_order: string[];
       activity: ActivityBucket[];
     };

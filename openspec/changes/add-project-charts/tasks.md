@@ -8,9 +8,9 @@
 
 ## 2. Frontend: data layer and reusable pieces
 
-- [ ] 2.1 Update `web/src/api/types.ts` (`OverviewResponse` uses `groups` / `group_order`, rows keyed `group`) and extend `useOverview(range, {project?, groupBy?})` in `queries.ts` with a query key that keeps the `["overview", ...]` prefix. Verify with `queries` tests that the request carries `project`/`group_by` and that `useDeleteProject` invalidation still hits it.
-- [ ] 2.2 `git mv` `ProjectDonutChart` / `ProjectBarChart` to `GroupDonutChart` / `GroupBarChart` and switch them to `groups`, `groupOrder`, `groupLabel` (headings, aria labels, tooltip titles, "% of top …" caption). Update `OverviewPage` to match. Verify `npm run build` passes and Overview's wording is unchanged for `groupLabel="project"`.
-- [ ] 2.3 Add `components/ConfirmDialog.tsx` + `ConfirmDialog.module.css` (native `<dialog>`, `open`/`title`/`children`/`confirmLabel`/`pending`/`error`/`onConfirm`/`onCancel`; Esc, backdrop and button dismissal blocked while `pending`). Stub `showModal`/`close` in `test-setup.ts` if jsdom lacks them. Verify with a component test: opens and closes with `open`, Cancel calls `onCancel`, buttons disabled and Esc ignored while pending, error text shown.
+- [x] 2.1 Update `web/src/api/types.ts` (`OverviewResponse` uses `groups` / `group_order`, rows keyed `group`) and extend `useOverview(range, {project?, groupBy?})` in `queries.ts` with a query key that keeps the `["overview", ...]` prefix. Verify with `queries` tests that the request carries `project`/`group_by` and that `useDeleteProject` invalidation still hits it.
+- [x] 2.2 `git mv` `ProjectDonutChart` / `ProjectBarChart` to `GroupDonutChart` / `GroupBarChart` and switch them to `groups`, `groupOrder`, `groupLabel` (headings, aria labels, tooltip titles, "% of top …" caption). Update `OverviewPage` to match. Verify `npm run build` passes and Overview's wording is unchanged for `groupLabel="project"`.
+- [x] 2.3 Add `components/ConfirmDialog.tsx` + `ConfirmDialog.module.css` (native `<dialog>`, `open`/`title`/`children`/`confirmLabel`/`pending`/`error`/`onConfirm`/`onCancel`; Esc, backdrop and button dismissal blocked while `pending`). Stub `showModal`/`close` in `test-setup.ts` if jsdom lacks them. Verify with a component test: opens and closes with `open`, Cancel calls `onCancel`, buttons disabled and Esc ignored while pending, error text shown.
 
 ## 3. Frontend: Projects page
 

@@ -10,6 +10,7 @@ import type {
   DecisionAnswer,
   LiveResponse,
   Meta,
+  OverviewGroupBy,
   OverviewResponse,
   PendingDecisionResponse,
   ProjectsResponse,
@@ -31,7 +32,9 @@ export const keys = {
   transcripts: ["transcripts"] as const,
   session: (id: string) => ["session", id] as const,
   pendingDecision: (id: string) => ["pending-decision", id] as const,
-  overview: (range: TimeRange) => ["overview", range] as const,
+  // Always starts ["overview", ...] so invalidating ["overview"] covers every scope and grouping.
+  overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy) =>
+    ["overview", range, project ?? null, groupBy ?? "project"] as const,
   projects: ["projects"] as const,
 };
 
@@ -111,10 +114,16 @@ export function useSession(id: string | null, { refetchMs }: { refetchMs?: numbe
   });
 }
 
-export function useOverview(range: TimeRange) {
+/** Overview figures for `range`. `project` (a project path) scopes them to that one project;
+ *  `groupBy` picks what the donut/bar rows are grouped by (the server defaults to "project"). */
+export function useOverview(
+  range: TimeRange,
+  { project, groupBy }: { project?: string; groupBy?: OverviewGroupBy } = {},
+) {
   return useQuery({
-    queryKey: keys.overview(range),
-    queryFn: () => apiFetch<OverviewResponse>(withQuery("/api/overview", { range })),
+    queryKey: keys.overview(range, project, groupBy),
+    queryFn: () =>
+      apiFetch<OverviewResponse>(withQuery("/api/overview", { range, project, group_by: groupBy })),
     placeholderData: keepPreviousData,
   });
 }

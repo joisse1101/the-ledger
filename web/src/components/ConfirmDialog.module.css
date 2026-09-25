@@ -1,0 +1,50 @@
+.root {
+  padding: 0; /* the body carries the padding, so a click on the dialog element itself is the backdrop */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  width: min(28rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  box-shadow: var(--shadow-lg);
+}
+
+.root::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem; /* same as the session dialog's title */
+}
+
+.content {
+  overflow-wrap: anywhere; /* a long path must wrap rather than widen the dialog */
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
