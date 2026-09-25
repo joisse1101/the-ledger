@@ -197,7 +197,7 @@ Frontend (`cd web`):
 
 ```powershell
 npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
-                   # list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
+                   # components/ButtonSelector, list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
                    # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
                    # hooks/useViewportClass, lib/format, lib/tokens
 npm run build      # tsc --noEmit, then vite build -> web/dist
@@ -409,8 +409,12 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
 ### `web/` — the React + TypeScript frontend
 
 Vite + React + TypeScript + React Router + TanStack Query; plain hand-written CSS (no component
-library) in `styles/` (`app.css`, `overview.css`, `sessions.css`), inline SVG icons in
-`components/icons.tsx`. Both `npm run dev` and `npm run preview` proxy `/api` to
+library, no Sass): global stylesheets in `styles/` (`app.css`, `overview.css`, `sessions.css`) plus
+`theme/tokens.css`, and newer components as colocated CSS modules (`Switch.tsx` +
+`Switch.module.css`: one flat camelCase class per element, sizes/variants as component-scoped custom
+properties, colours only from the `tokens.css` variables, `className` on the root element and every
+other prop on the underlying control). Migrate a component to a module when touching it; don't
+rewrite `styles/` wholesale. Inline SVG icons in `components/icons.tsx`. Both `npm run dev` and `npm run preview` proxy `/api` to
 `http://127.0.0.1:8501` (`vite.config.ts`'s `server.proxy`/`preview.proxy`, kept in sync), so the
 page is always same-origin with the API whether run directly or through the gateway — the frontend
 never needs a different-origin API client. `web/src/main.tsx` wires up
@@ -439,7 +443,9 @@ any unknown path) rendered inside `AppShell`.
   JSON shapes 1:1 (dates as ISO strings; the client formats/`--`s them).
 - **Shell** (`web/src/components/AppShell.tsx`, `Nav.tsx`, `RefreshControl.tsx`, `ServerBanner.tsx`,
   `ThemeToggle.tsx`): `AppShell` picks a `useViewportClass()` (`narrow`/`medium`/`wide`, matchMedia
-  at 640/1024px, `hooks/useViewportClass.ts`) and renders `Nav` as a top bar (medium/wide) or a fixed
+  at 640/1024px, `hooks/useViewportClass.ts`; the boundaries live only in `src/lib/breakpoints.ts`, and the
+  stylesheets write `@media (--narrow)`/`(--medium-up)`/`(--wide-up)`, which `web/build/mediaAliases.ts`, a
+  PostCSS plugin wired in `vite.config.ts`, swaps for the real queries at build time) and renders `Nav` as a top bar (medium/wide) or a fixed
   bottom tab bar (narrow, `viewport !== "narrow"` puts it in the header instead). `ServerBanner`
   shows a dismissible-by-retry notice above the page when a query is failing but keeps the page's
   last data visible underneath; `unauthorized` instead swaps the whole `<Outlet/>` for `SignInNeeded`
@@ -449,9 +455,18 @@ any unknown path) rendered inside `AppShell`.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button
   and every chart that needs to recolor on theme change — via `useSyncExternalStore`, the same
   pattern `useViewportClass` uses; a live media-query listener keeps it in sync with the OS if
-  nothing's been explicitly chosen yet. `theme/tokens.css` holds the light/dark CSS variables,
-  including the 8-slot categorical palette (`--cat-0`..`--cat-7`) and `--muted-ink`, at a fixed slot
-  order so a chart's `chartColors()`/`themeColors()` (see below) never has to duplicate a hex value.
+  nothing's been explicitly chosen yet. `theme/tokens.css` holds the light/dark CSS variables:
+  the palette (backgrounds, text, brand, borders, feedback, syntax, shadows, inputs) and font families
+  are a manual copy of `@joisse1101/ui-library`'s theme variables under that library's own names
+  (`--bg-main`, `--text-main`, `--brand-accent`, `--brand-text`, `--syntax-keyword`, …; provenance and
+  version are in the file's header comment), so components copied from the library work unchanged.
+  The package is **not** a dependency — refresh by re-copying the variable blocks from its
+  `dist/ui-library.css`. App-only tokens with no library equivalent stay alongside: the 8-slot
+  categorical palette (`--cat-0`..`--cat-7`, fixed slot order so a chart's `chartColors()`/
+  `themeColors()` (see below) never has to duplicate a hex value), `--muted-ink`, and
+  `--warn-bg`/`--warn-text`. Fonts (Figtree/Urbanist/JetBrains Mono) load from Google Fonts via
+  `index.html`, falling back to system fonts offline; the heading/link/code rules in `app.css`
+  mirror the library's `_core_theme.scss`.
 - **Responsive list** (`components/list/`): `ResponsiveList` picks `ListTable` (medium/wide) or
   `ListCards` (narrow) by viewport — only one is ever mounted, both take the same `columns`/`rows`/
   `rowId`/`onSelect`, so switching layouts never changes what's shown or its order. A `ListColumn`
@@ -459,36 +474,45 @@ any unknown path) rendered inside `AppShell`.
   `cardPriority` (`"primary"`/`"secondary"`/`"hidden"`, defaulted from `priority` when omitted) for
   the narrow card layout, plus an optional `sortKey` that makes `ListTable`'s header (or `AllList`'s
   narrow-screen "Sort by" `<select>`, since cards have no headers) clickable/sortable.
-- **Sessions** (`components/sessions/`, `pages/SessionsPage.tsx`): the open detail view lives in the
-  URL (`?session=<id>&from=live|all`), not component state, so a reload/shared link reopens it and
-  `SessionDialog` can stay mounted across selections rather than being conditionally rendered — that
-  mounted-ness is what lets a Live poll update its content in place without losing scroll position
-  (the dialog is a native `<dialog>`, opened with `showModal()`, so Esc/focus-trapping/inert
-  background come for free; CSS turns it into a full-screen sheet under 640px). `LiveList` polls via
-  `useLive`, with its own "Auto-refresh" switch and frozen "Last refreshed" caption when off.
-  `AllList` debounces its search box (`useDebouncedValue`, 300ms), drives `Project`/`Version`/`Branch`
-  `FilterMultiselect`s (`<details>`-based checkbox lists — no popover/portal machinery needed) off
-  the API's option lists, and pages 50-at-a-time via `useTranscripts`'s "Load more". `SessionDialog`
-  shows the recap block only when opened `from="all"`; its `Detail` section (current-context figure,
-  `TokensChart`, "All responses" table, "what filled the context" by-tool/largest-increases tables)
-  and `DeleteControls` (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409
-  mid-confirm surfaces the server's message; hidden entirely when `useMeta().is_local` is false)
-  round it out. **A Live-list selection (`from="live"`) opens `LiveControl` instead of any of
-  that** — a control-only view: the session's oldest pending prompt rendered by `DecisionPrompt`
-  (Approve/Deny with an optional reason for a permission prompt; the real options, multi-select and
-  free text for an `AskUserQuestion`, via `lib/prompt.ts`) and an "Open repo window" button
-  (`useOpenRepo`). `usePendingDecision` polls while it's mounted; a prompt that vanishes without this
-  view having answered it says the session already moved on (as does a 409) instead of going blank,
-  and it shows nothing on a non-local device while Remote mode is off. `LiveList` badges a row
-  (`pending-badge`) from `/api/live`'s `pending_decision`, and carries `RemoteModeControl`: a switch
-  on the machine running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere.
-  `TokensChart` lazily `import()`s
-  `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its bundle cost
-  until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the theme
-  change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers and
-  dashed compaction rules.
+- **Sessions** (`components/sessions/`, `pages/LiveSessionsPage.tsx` at `/`, `pages/SessionsPage.tsx` at
+  `/sessions`): Live and All are separate pages. Each keeps its selection in the URL (`?session=<id>`),
+  so a reload/shared link reopens it. **Live** (`LiveSessionsPage`): `LiveList` polls via `useLive`, with
+  its own "Auto-refresh" switch and frozen "Last refreshed" caption when off; selecting a row renders
+  `LiveSessionPanel` *under the list* (not a dialog) with `LiveControl` — a control-only view: the
+  session's oldest pending prompt rendered by `DecisionPrompt` (Approve/Deny with an optional reason
+  for a permission prompt; the real options, multi-select and free text for an `AskUserQuestion`, via
+  `lib/prompt.ts`) and an "Open repo window" button (`useOpenRepo`). The panel reads the Live list from
+  the query cache with `auto: false`, so only `LiveList`'s switch drives polling.
+  `usePendingDecision` polls while it's mounted; a prompt that vanishes without this view having
+  answered it says the session already moved on (as does a 409) instead of going blank, and it shows
+  nothing on a non-local device while Remote mode is off. `LiveList` badges a row (`pending-badge`)
+  from `/api/live`'s `pending_decision`, and carries `RemoteModeControl`: a switch on the machine
+  running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere. **All**
+  (`SessionsPage`): `AllList` debounces its search box (`useDebouncedValue`, 300ms), drives
+  `Project`/`Version`/`Branch` `FilterMultiselect`s (`<details>`-based checkbox lists — no
+  popover/portal machinery needed) off the API's option lists, and pages 50-at-a-time via
+  `useTranscripts`'s "Load more". A row opens `SessionDialog`, a native `<dialog>` (`showModal()`, so
+  Esc/focus-trapping/inert background come for free; CSS turns it into a full-screen sheet under
+  640px) kept mounted across selections so a poll updates it in place without losing scroll position.
+  It shows the recap block, its `Detail` section (current-context figure, `TokensChart`, "All
+  responses" table, "what filled the context" by-tool/largest-increases tables) and `DeleteControls`
+  (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409 mid-confirm surfaces the
+  server's message; hidden entirely when `useMeta().is_local` is false). `TokensChart` lazily
+  `import()`s `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its
+  bundle cost until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the
+  theme change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers
+  and dashed compaction rules.
+- **`ButtonSelector`** (`components/ButtonSelector.tsx` + `.module.css`): a controlled row of toggle
+  buttons (`value`/`onChange`, generic over string/number values) — single-select by default (radio
+  group, `onChange(value)`), or `multiple` (toggle buttons, `value`/`onChange` are arrays). On a narrow
+  screen it scrolls sideways inside its own box, and `hooks/useCanSideScroll` fades whichever edge has
+  more to reveal (a CSS mask on the scroller, driven by `data-fade-start`/`data-fade-end`). The
+  look is the ui-library's `.btn.btn-option` (joined segments, only the outer corners rounded, via
+  `--radius-md` in `tokens.css`) at the app's `--tap` height. The scroller's padding and matching
+  negative margin (`--glow-room`, no fixed `width`) exist so its clipping doesn't cut off the focus
+  ring and hover glow. No form binding: this app has no forms. `test-setup.ts` stubs `ResizeObserver` since jsdom lacks it.
 - **Overview** (`components/overview/`, `pages/OverviewPage.tsx`): `TimeRangeSelector` is a
-  horizontally-scrollable segmented control over the same seven ranges as `overview_stats.TIME_RANGES`.
+  `ButtonSelector` (single-select, hidden label) over the same seven ranges as `overview_stats.TIME_RANGES`.
   `chartTheme.ts`'s `chartColors()`/`projectColorScale()`/`projectColorMap()` centralize reading the
   CSS-variable palette and turning the API's `project_order` into a Vega-Lite domain/range (`"Other"`
   always the muted ink) shared by `ProjectDonutChart` and `ProjectBarChart`; `ProjectDonutChart` draws

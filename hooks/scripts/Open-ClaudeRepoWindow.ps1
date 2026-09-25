@@ -1,13 +1,32 @@
 <#
-Invoked by Windows when a "claudecode://open?path=<encoded repo path>" URI is
-activated (i.e. when the user clicks a Claude Code toast notification).
-Focuses the existing VS Code window for that repo if one is open, otherwise
-opens a new VS Code window for it.
+.SYNOPSIS
+Focuses (or opens) the VS Code window for a repo, from a claudecode:// URI.
+
+.DESCRIPTION
+Invoked by Windows when a "claudecode://open?path=<encoded repo path>" URI is activated (i.e. when
+the user clicks a Claude Code toast notification). Focuses the existing VS Code window for that repo
+if one is open, otherwise opens a new VS Code window for it. Also run by the Ledger API's open-repo
+action.
+
+.PARAMETER Uri
+The claudecode://open?path=<url-encoded repo path> URI to open.
+
+.PARAMETER Help
+Show this help and exit (-h works too).
+
+.EXAMPLE
+.\Open-ClaudeRepoWindow.ps1 'claudecode://open?path=C%3A%5CUsers%5Cme%5Crepo'
 #>
 param(
     [Parameter(Position = 0)]
-    [string]$Uri
+    [string]$Uri,
+    [switch]$Help
 )
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
 
 function Get-QueryParam {
     param([string]$Uri, [string]$Name)

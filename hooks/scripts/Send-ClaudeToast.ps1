@@ -1,18 +1,44 @@
 <#
-Shows a BurntToast notification for a Claude Code hook event. Reads the
-hook's JSON payload from stdin to get the repo path (cwd) and, when present,
-the session transcript (transcript_path), from which a third "Context 394k"
-line is added; that line is simply omitted if it can't be worked out. Clicking
-the toast launches the claudecode:// protocol, which Open-ClaudeRepoWindow.ps1
-handles by focusing (or opening) the matching VS Code window.
+.SYNOPSIS
+Shows a BurntToast notification for a Claude Code hook event.
+
+.DESCRIPTION
+Reads the hook's JSON payload from stdin to get the repo path (cwd) and, when present, the session
+transcript (transcript_path), from which a third "Context 394k" line is added; that line is simply
+omitted if it can't be worked out. Clicking the toast launches the claudecode:// protocol, which
+Open-ClaudeRepoWindow.ps1 handles by focusing (or opening) the matching VS Code window.
+
+Meant to be run by Claude Code's Notification/Stop hooks (see hooks\Install-ClaudeHooks.ps1), not by
+hand.
+
+.PARAMETER Title
+The toast's title.
+
+.PARAMETER BodyTemplate
+The toast's body, a format string where {0} is the repo name, e.g. "Finished task in {0}!".
+
+.PARAMETER Help
+Show this help and exit (-h works too).
+
+.EXAMPLE
+'{"cwd":"C:\\repo"}' | .\Send-ClaudeToast.ps1 -Title 'Claude Code' -BodyTemplate 'Finished task in {0}!'
 #>
+[CmdletBinding(DefaultParameterSetName = 'Run')]
 param(
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Run')]
     [string]$Title,
 
-    [Parameter(Mandatory)]
-    [string]$BodyTemplate  # e.g. "Finished task in {0}!"
+    [Parameter(Mandatory, ParameterSetName = 'Run')]
+    [string]$BodyTemplate,  # e.g. "Finished task in {0}!"
+
+    [Parameter(Mandatory, ParameterSetName = 'Help')]
+    [switch]$Help
 )
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
 
 # Context size = input + cache read + cache written tokens on the latest real
 # main-thread assistant turn. Same rule as claude_context.py;

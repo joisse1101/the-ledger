@@ -6,6 +6,7 @@ import { ResponsiveList } from "../list/ResponsiveList";
 import { QUESTION_TOOL } from "../../api/types";
 import type { LiveSession } from "../../api/types";
 import { RemoteModeControl } from "./RemoteModeControl";
+import { Switch } from "../Switch";
 
 /** Shown on a row whose session is blocked on a permission prompt or a question, so it's visible
  *  without opening the control view. */
@@ -97,15 +98,16 @@ export function LiveList({ onSelect }: LiveListProps) {
   return (
     <section aria-label="Live sessions">
       <div className="sessions-toolbar">
-        <label className="switch-field">
-          <input
-            type="checkbox"
+        <div className="sessions-toolbar-controls">
+          <Switch
+            size="sm"
             checked={auto}
-            onChange={(event) => setAuto(event.target.checked)}
+            onChange={setAuto}
+            label="Auto-refresh"
+            tooltip="Automatically refresh the list every 2 seconds"
           />
-          <span>Auto-refresh</span>
-        </label>
-        <RemoteModeControl />
+          <RemoteModeControl />
+        </div>
         <span className="muted sessions-toolbar-caption">
           Last refreshed: <time dateTime={lastRefreshed ?? undefined}>{formatTime(lastRefreshed)}</time>
         </span>

@@ -143,9 +143,11 @@ export function AllList({ onSelect }: AllListProps) {
           aria-label="Search sessions"
           className="sessions-search"
         />
-        <FilterMultiselect label="Project" options={options.projects} selected={projects} onChange={setProjects} />
-        <FilterMultiselect label="Version" options={options.versions} selected={versions} onChange={setVersions} />
-        <FilterMultiselect label="Branch" options={options.branches} selected={branches} onChange={setBranches} />
+        <div className="filter-multiselect-container">
+          <FilterMultiselect label="Project" options={options.projects} selected={projects} onChange={setProjects} />
+          <FilterMultiselect label="Version" options={options.versions} selected={versions} onChange={setVersions} />
+          <FilterMultiselect label="Branch" options={options.branches} selected={branches} onChange={setBranches} />
+        </div>
       </div>
 
       {viewport === "narrow" && (

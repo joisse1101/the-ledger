@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useAnswerDecision, useMeta, useOpenRepo, usePendingDecision } from "../../api/queries";
 import type { DecisionAnswer, LiveSession } from "../../api/types";
-import { formatText } from "../../lib/format";
+import { formatDateTime, formatText } from "../../lib/format";
 import { DecisionPrompt } from "./DecisionPrompt";
 
 export interface LiveControlProps {
@@ -12,12 +12,14 @@ export interface LiveControlProps {
   session: LiveSession | null;
   /** True once the Live list has loaded at least once, so "not in it" can mean "no longer live". */
   liveLoaded: boolean;
+  /** Called once an answer has been accepted by the server. */
+  onAnswered?: () => void;
 }
 
 /** The control-only view opened from the Live list: the session's oldest pending prompt (a
  *  permission request or a question) and an "Open repo window" button. `answer` lives here, not in
  *  the prompt: the prompt unmounts the moment it is gone, and a "too late" (409) has to outlive that. */
-export function LiveControl({ sessionId, session, liveLoaded }: LiveControlProps) {
+export function LiveControl({ sessionId, session, liveLoaded, onAnswered }: LiveControlProps) {
   const pending = usePendingDecision(sessionId);
   const answer = useAnswerDecision(sessionId);
   const openRepo = useOpenRepo(sessionId);
@@ -48,7 +50,7 @@ export function LiveControl({ sessionId, session, liveLoaded }: LiveControlProps
   const send = (promptId: string, body: DecisionAnswer) => {
     answeredId.current = promptId;
     setMovedOn(false);
-    answer.mutate({ promptId, answer: body });
+    answer.mutate({ promptId, answer: body }, { onSuccess: onAnswered });
   };
 
   const tooLate = answer.error instanceof ApiError && answer.error.status === 409;
@@ -67,6 +69,14 @@ export function LiveControl({ sessionId, session, liveLoaded }: LiveControlProps
           <div className="session-recap-stat">
             <dt>Status</dt>
             <dd>{formatText(session.status)}</dd>
+          </div>
+          <div className="session-recap-stat">
+            <dt>Started At</dt>
+            <dd>{formatDateTime(session.started_at)}</dd>
+          </div>
+          <div className="session-recap-stat">
+            <dt>Updated At</dt>
+            <dd>{formatDateTime(session.updated_at)}</dd>
           </div>
         </dl>
       )}

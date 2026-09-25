@@ -1,6 +1,7 @@
 import { useMeta, useSetRemoteMode } from "../../api/queries";
 import { useNow } from "../../hooks/useNow";
 import { formatTimeLeft } from "../../lib/format";
+import { Switch } from "../Switch";
 
 /** Remote mode on the Live list: a switch on the machine running the app, read-only text on any
  *  other device (only a local request can change it - the server refuses everyone else, so
@@ -28,16 +29,14 @@ export function RemoteModeControl() {
 
   return (
     <>
-      <label className="switch-field">
-        <input
-          type="checkbox"
-          checked={on}
-          disabled={setRemoteMode.isPending}
-          onChange={(event) => setRemoteMode.mutate(event.target.checked)}
-        />
-        <span>Remote mode</span>
-        <span className="muted sessions-toolbar-caption">{on ? timeLeft ?? "on" : "off"}</span>
-      </label>
+      <Switch
+        size="sm"
+        checked={on}
+        disabled={setRemoteMode.isPending}
+        onChange={(checked) => setRemoteMode.mutate(checked)}
+        label="Remote mode"
+        tooltip={`${timeLeft ? `${timeLeft}\n` : ""}Toggle whether the Ledger can be remotely accessed`}
+      />
       {setRemoteMode.isError && <span className="detail-caption">{setRemoteMode.error.message}</span>}
     </>
   );

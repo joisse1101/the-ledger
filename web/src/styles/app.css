@@ -6,44 +6,100 @@
   box-sizing: border-box;
 }
 
+/* Every size in the stylesheets is rem, so this root size is the one knob for how big the UI is.
+   Desktop is a notch smaller (compact type, tighter margins); phones and tablets keep the full
+   size. Width boundaries are `@media (--wide-up)` etc., defined in src/lib/breakpoints.ts. */
 html {
   -webkit-text-size-adjust: 100%;
 }
 
+@media (--wide-up) {
+  html {
+    font-size: 80%;
+  }
+}
+
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 15px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-family-body);
+  font-size: 0.9375rem;
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography follows @joisse1101/ui-library's _core_theme.scss (fonts, colours, heading
+   tracking/weights); sizes and spacing stay the app's own. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-family-display);
+  color: var(--text-main);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 h1 {
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   font-size: 1.4rem;
+  font-weight: 800;
+}
+
+h2 {
+  font-weight: 700;
+}
+
+h3 {
+  font-weight: 600;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-family-mono);
 }
 
 code {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.92em;
+  color: var(--brand-text);
+}
+
+pre code {
+  color: inherit;
+}
+
+a {
+  color: var(--brand-text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+a:hover {
+  color: var(--brand-text-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
 }
 
 .muted {
-  color: var(--text-2);
+  color: var(--text-muted);
 }
 
-/* iOS Safari zooms the page when a field under 16px is focused. */
+/* iOS Safari zooms the page when a field under 1rem is focused. */
 input,
 select,
 textarea {
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
   color: inherit;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-accent);
   outline-offset: 2px;
 }
 
@@ -56,16 +112,16 @@ textarea {
   justify-content: center;
   min-height: var(--tap);
   min-width: var(--tap);
-  border: 1px solid var(--grid);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-main);
   font: inherit;
   cursor: pointer;
 }
 
 .button {
-  padding: 0 16px;
+  padding: 0 1rem;
 }
 
 .icon-button {
@@ -74,9 +130,14 @@ textarea {
   flex: none;
 }
 
+.icon-wrap {
+  display: inline-flex;
+  height: fit-content;
+} 
+
 .icon-button:hover:not(:disabled),
 .button:hover:not(:disabled) {
-  background: var(--grid);
+  color: var(--brand-text-hover);
 }
 
 .button:disabled,
@@ -86,8 +147,8 @@ textarea {
 }
 
 .button-danger {
-  border-color: var(--danger);
-  color: var(--danger);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .spin {
@@ -122,19 +183,19 @@ textarea {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   min-height: calc(var(--header-h) + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) calc(var(--gutter) + env(safe-area-inset-right)) 0
     calc(var(--gutter) + env(safe-area-inset-left));
-  background: var(--surface);
-  border-bottom: 1px solid var(--grid);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .brand {
   font-weight: 700;
   font-size: 1.05rem;
   white-space: nowrap;
-  margin-right: 8px;
+  margin-right: 0.5rem;
 }
 
 .spacer {
@@ -150,21 +211,21 @@ textarea {
 }
 
 .refresh-caption {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.85rem;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .refresh-failed {
-  color: var(--danger);
+  color: var(--color-danger);
 }
 
 .content {
   flex: 1;
   width: 100%;
   min-width: 0;
-  max-width: 1400px;
+  max-width: 87.5rem;
   margin: 0 auto;
   padding: var(--gutter) calc(var(--gutter) + env(safe-area-inset-right)) var(--gutter)
     calc(var(--gutter) + env(safe-area-inset-left));
@@ -186,32 +247,33 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-2);
+  color: var(--text-muted);
   text-decoration: none;
   font-weight: 600;
 }
 
 .nav-link.active {
-  color: var(--accent);
+  color: var(--brand-text);
 }
 
 .nav--top {
   display: flex;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .nav--top .nav-link {
   min-height: var(--tap);
-  padding: 0 14px;
+  padding: 0 0.875rem;
   border-radius: var(--radius);
+  text-decoration: none;
 }
 
 .nav--top .nav-link:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .nav--top .nav-link.active {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
 }
 
 .nav--bottom {
@@ -221,10 +283,10 @@ textarea {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: var(--surface);
-  border-top: 1px solid var(--grid);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .nav--bottom .nav-link {
@@ -239,8 +301,8 @@ textarea {
 .banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px calc(var(--gutter) + env(safe-area-inset-right)) 8px calc(var(--gutter) + env(safe-area-inset-left));
+  gap: 0.75rem;
+  padding: 0.5rem calc(var(--gutter) + env(safe-area-inset-right)) 0.5rem calc(var(--gutter) + env(safe-area-inset-left));
   background: var(--warn-bg);
   color: var(--warn-text);
 }

@@ -1,0 +1,66 @@
+/* Shown on hover, keyboard focus, or tap (.bubbleOpen). */
+.tip {
+  display: inline-flex;
+}
+
+/* Padding + matching negative margin widens the touch target to --tap (2.75rem around the 1rem
+   icon) without moving the icon. */
+.tipButton {
+  --tip-pad: calc((var(--tap) - 1rem) / 2);
+
+  display: inline-flex;
+  align-items: center;
+  padding: var(--tip-pad);
+  margin: calc(-1 * var(--tip-pad));
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  cursor: help;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tipButton:hover,
+.tipButton:focus-visible {
+  color: var(--text-main);
+}
+
+.tipButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.1875rem var(--input-focus-ring);
+  border-radius: 50%;
+}
+
+/* Positioned against the nearest positioned ancestor (Switch's .field), so it lines up with the
+   control's left edge instead of the "?" icon and stays on screen at phone widths. */
+.bubble {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  margin-top: 0.25rem;
+  width: max-content;
+  max-width: min(18rem, 80vw);
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--input-border);
+  border-radius: 0.375rem;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-xs);
+  white-space: pre-line;
+  visibility: hidden;
+}
+
+.tipButton:focus-visible + .bubble,
+.bubbleOpen {
+  visibility: visible;
+}
+
+/* Only where hovering is real. A touch screen fakes :hover on tap and leaves it stuck on until
+   another element is tapped, which would keep the bubble showing after the JS state closed it
+   (scroll, second tap, Escape). There, .bubbleOpen alone decides. */
+@media (hover: hover) {
+  .tip:hover .bubble {
+    visibility: visible;
+  }
+}

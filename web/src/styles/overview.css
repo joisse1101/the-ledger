@@ -4,35 +4,7 @@
 /* ---- time range selector */
 
 .time-range {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-  margin-bottom: 16px;
-}
-
-.time-range-option {
-  flex: none;
-  white-space: nowrap;
-  min-height: var(--tap);
-  padding: 0 14px;
-  border: 1px solid var(--grid);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.time-range-option:hover {
-  background: var(--grid);
-}
-
-.time-range-option.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
+  margin-bottom: 1rem;
 }
 
 /* ---- summary figures */
@@ -40,12 +12,12 @@
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 0.625rem;
 }
 
-@media (min-width: 640px) {
+@media (--medium-up) {
   .stat-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
   }
 }
 
@@ -53,17 +25,17 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   min-height: var(--tap);
-  padding: 10px 14px;
-  border: 1px solid var(--grid);
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .stat-tile-button {
   width: 100%;
-  border: 1px solid var(--grid);
+  border: 1px solid var(--border-subtle);
   font: inherit;
   color: inherit;
   text-align: left;
@@ -71,11 +43,11 @@
 }
 
 .stat-tile-button:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .stat-label {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -86,7 +58,7 @@
 
 .stat-note {
   margin-top: 2px;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.78rem;
   white-space: normal;
   word-break: break-word;
@@ -96,14 +68,14 @@
 
 .overview-top {
   display: grid;
-  gap: 16px;
-  margin: 16px 0;
+  gap: 1rem;
+  margin: 1rem 0;
   align-items: start;
 }
 
-@media (min-width: 1024px) {
+@media (--wide-up) {
   .overview-top {
-    grid-template-columns: minmax(220px, 260px) 1fr;
+    grid-template-columns: minmax(13.75rem, 16.25rem) 1fr;
   }
 }
 
@@ -111,13 +83,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  min-height: 260px;
+  gap: 0.5rem;
+  min-height: 16.25rem;
 }
 
 .donut-chart {
-  width: 220px;
-  height: 220px;
+  width: 13.75rem;
+  height: 13.75rem;
 }
 
 .donut-chart .vega-embed {
@@ -128,7 +100,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px 14px;
+  gap: 0.375rem 0.875rem;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -138,20 +110,20 @@
 .donut-legend-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 160px;
+  gap: 0.375rem;
+  max-width: 10rem;
 }
 
 .donut-legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 0.625rem;
+  height: 0.625rem;
   flex: none;
   border-radius: 50%;
 }
 
 .donut-legend-label {
   overflow: hidden;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -160,22 +132,22 @@
 /* ---- bar charts */
 
 .overview-chart {
-  margin: 24px 0 0;
+  margin: 1.5rem 0 0;
 }
 
 .chart-heading {
-  margin: 0 0 4px;
+  margin: 0 0 0.25rem;
   font-size: 1.05rem;
 }
 
 .chart-caption {
-  margin: 4px 0 12px;
-  color: var(--text-2);
+  margin: 0.25rem 0 0.75rem;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
 .bar-chart {
-  min-height: 260px;
+  min-height: 16.25rem;
 }
 
 .bar-chart .vega-embed {

@@ -2,8 +2,8 @@
    toolbars and its detail sheet. Colors come only from tokens.css. */
 
 .list-empty {
-  color: var(--text-2);
-  padding: 24px 0;
+  color: var(--text-muted);
+  padding: 1.5rem 0;
 }
 
 /* ---- table renderer (medium/wide) */
@@ -22,9 +22,9 @@
 
 .list-table th,
 .list-table td {
-  padding: 8px 10px;
+  padding: 0.5rem 0.625rem;
   text-align: left;
-  border-bottom: 1px solid var(--grid);
+  border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -41,7 +41,7 @@
 }
 
 .list-table tbody tr:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .sort-header {
@@ -55,6 +55,29 @@
   white-space: nowrap;
 }
 
+/* The keyboard/screen-reader entry point for a row: a real button in its first cell that reads as
+   plain cell text (the whole row is also clickable for a pointer). It fills the cell so a long
+   value still ellipsizes, and the focus ring is drawn inside it because the cell's
+   overflow: hidden would clip an outside one. */
+.list-table .row-select {
+  display: block;
+  max-width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-table .row-select:focus-visible {
+  outline-offset: -2px;
+}
+
 /* ---- card renderer (narrow) */
 
 .list-cards {
@@ -63,7 +86,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .list-cards > li {
@@ -73,14 +96,14 @@
 .list-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
   width: 100%;
   min-width: 0;
   min-height: var(--tap);
-  padding: 10px 12px;
-  border: 1px solid var(--grid);
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -88,14 +111,14 @@
 }
 
 .list-card:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .list-card-primary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 0.25rem 0.625rem;
   min-width: 0;
 }
 
@@ -106,15 +129,15 @@
 .list-card-secondary {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  color: var(--text-2);
+  gap: 0.375rem 0.875rem;
+  color: var(--text-muted);
   font-size: 0.85rem;
   min-width: 0;
 }
 
 .list-card-chip {
   display: inline-flex;
-  gap: 4px;
+  gap: 0.25rem;
   min-width: 0;
   max-width: 100%;
 }
@@ -137,25 +160,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
   min-height: var(--tap);
 }
-
-.switch-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  min-height: var(--tap);
+.sessions-toolbar-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
-.switch-field input {
-  width: 36px;
-  height: 20px;
-  accent-color: var(--accent);
-  cursor: pointer;
+@media (--narrow) {
+  .sessions-toolbar {
+    align-items: flex-end;
+  }
+  .sessions-toolbar-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .sessions-toolbar-caption {
@@ -166,22 +189,56 @@
 
 /* ---- All list: filters, sort, paging */
 
+/* One row (search grows, filters keep their size); two rows on the `narrow`
+   viewport class: search on top, the three filters sharing the second. */
 .sessions-filters {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-multiselect-container {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+@media (--narrow) {
+  .sessions-filters {
+    flex-direction: column;
+  }
+
+  /* in a column, flex-basis is the height, so don't let the search box grow */
+  .sessions-filters .sessions-search {
+    flex: none;
+  }
+
+  .filter-multiselect-container .filter-multiselect {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .filter-multiselect-container .filter-multiselect-summary {
+    justify-content: center;
+  }
+
+  /* keep the last dropdown inside the viewport */
+  .filter-multiselect-container .filter-multiselect:last-child .filter-multiselect-options {
+    left: auto;
+    right: 0;
+  }
 }
 
 .sessions-search {
-  flex: 1 1 220px;
+  flex: 1 1 0;
   min-width: 0;
   min-height: var(--tap);
-  padding: 0 12px;
-  border: 1px solid var(--grid);
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: inherit;
 }
 
@@ -190,15 +247,17 @@
   flex: none;
 }
 
+/* `flex`, not `inline-flex`: an inline box sits on a text baseline inside its <details>, which
+   adds a few px of descender space below it and makes the filters taller than the search box. */
 .filter-multiselect-summary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   min-height: var(--tap);
-  padding: 0 14px;
-  border: 1px solid var(--grid);
+  padding: 0 0.875rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -209,19 +268,19 @@
 }
 
 .filter-multiselect[open] .filter-multiselect-summary {
-  border-color: var(--accent);
+  border-color: var(--brand-accent);
 }
 
 .filter-multiselect-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.25rem;
+  border-radius: 62.4375rem;
+  background: var(--brand-accent);
+  color: var(--text-on-accent);
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -229,49 +288,49 @@
 .filter-multiselect-options {
   position: absolute;
   z-index: 10;
-  top: calc(100% + 4px);
+  top: calc(100% + 0.25rem);
   left: 0;
-  min-width: 200px;
-  max-height: 260px;
+  min-width: 12.5rem;
+  max-height: 16.25rem;
   overflow-y: auto;
-  padding: 6px;
-  border: 1px solid var(--grid);
+  padding: 0.375rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  background: var(--bg-surface);
+  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.15);
 }
 
 .filter-multiselect-empty {
-  padding: 6px 8px;
+  padding: 0.375rem 0.5rem;
   font-size: 0.85rem;
 }
 
 .filter-multiselect-option {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   min-height: var(--tap);
-  padding: 0 8px;
+  padding: 0 0.5rem;
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .filter-multiselect-option:hover {
-  background: var(--grid);
+  background: var(--border-subtle);
 }
 
 .sort-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .sort-field-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -280,21 +339,21 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: var(--tap);
-  padding: 0 10px;
-  border: 1px solid var(--grid);
+  padding: 0 0.625rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: inherit;
 }
 
 .live-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
+  min-height: 1.25rem;
+  padding: 0 0.5rem;
+  border-radius: 62.4375rem;
+  background: var(--brand-accent);
+  color: var(--text-on-accent);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
@@ -303,9 +362,9 @@
 .pending-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
+  min-height: 1.25rem;
+  padding: 0 0.5rem;
+  border-radius: 62.4375rem;
   background: var(--warn-bg);
   color: var(--warn-text);
   font-size: 0.72rem;
@@ -314,23 +373,66 @@
 }
 
 .list-table tbody tr.row-live {
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 0.1875rem 0 0 var(--brand-accent);
 }
 
 /* Shared by any list's "this row is the pending action's target" state, e.g. the
    Projects list's select-a-row-to-delete flow. */
 .list-table tbody tr.row-selected,
 .list-card.row-selected {
-  box-shadow: inset 3px 0 0 var(--danger);
+  box-shadow: inset 0.1875rem 0 0 var(--color-danger);
 }
 
 .sessions-load-more {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 0.75rem;
+}
+
+/* ---- live session control panel (under the Live list) */
+
+/* On a phone (the only place the panel scrolls itself into view), tall enough that the page can always scroll far enough to put the panel's top at the top of
+   * the window, even when the panel is short or has only just mounted and is still loading. */
+@media (--narrow) {
+  .live-panel-area {
+    min-height: calc(100dvh - var(--header-h) - env(safe-area-inset-top));
+  }
+}
+
+.live-panel {
+  margin-top: 1rem;
+  scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + 0.5rem);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.live-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.live-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
 }
 
 /* ---- session detail dialog */
@@ -339,12 +441,12 @@
   padding: 0;
   border: none;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: inherit;
-  width: min(640px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
+  width: min(40rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
   max-height: 85vh;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.25);
 }
 
 .session-dialog::backdrop {
@@ -356,8 +458,8 @@
   overflow-y: auto;
 }
 
-/* Full-screen sheet under 640px, with the header always visible while the body scrolls. */
-@media (max-width: 639.98px) {
+/* Full-screen sheet under 40rem, with the header always visible while the body scrolls. */
+@media (--narrow) {
   .session-dialog {
     position: fixed;
     inset: 0;
@@ -381,11 +483,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px calc(var(--gutter) + env(safe-area-inset-right)) 10px
+  gap: 0.75rem;
+  padding: 0.625rem calc(var(--gutter) + env(safe-area-inset-right)) 0.625rem
     calc(var(--gutter) + env(safe-area-inset-left));
-  background: var(--surface);
-  border-bottom: 1px solid var(--grid);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .session-dialog-title {
@@ -400,52 +502,52 @@
 .session-dialog-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px calc(var(--gutter) + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+  gap: 1rem;
+  padding: 1rem calc(var(--gutter) + env(safe-area-inset-right)) calc(1.5rem + env(safe-area-inset-bottom))
     calc(var(--gutter) + env(safe-area-inset-left));
 }
 
 .detail-heading {
-  margin: 0 0 4px;
+  margin: 0 0 0.25rem;
   font-size: 0.95rem;
   font-weight: 700;
 }
 
 .detail-caption {
-  margin: 4px 0;
-  color: var(--text-2);
+  margin: 0.25rem 0;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
 .detail-notice {
-  padding: 10px 12px;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--radius);
   background: var(--warn-bg);
   color: var(--warn-text);
 }
 
 .detail-notice p {
-  margin: 0 0 8px;
+  margin: 0 0 0.5rem;
 }
 
 .detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .decision-card {
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
 
 .decision-input {
   max-height: 40vh;
-  margin: 0 0 10px;
-  padding: 8px 10px;
+  margin: 0 0 0.625rem;
+  padding: 0.5rem 0.625rem;
   overflow: auto;
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-main);
   font-size: 0.85rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -453,38 +555,38 @@
 
 .decision-reason {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
 }
 
 .decision-reason input {
   width: 100%;
   min-height: var(--tap);
-  padding: 0 10px;
-  border: 1px solid var(--grid);
+  padding: 0 0.625rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .question {
   min-width: 0;
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   padding: 0;
   border: 0;
 }
 
 .question-text {
   padding: 0;
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
   font-weight: 600;
 }
 
 .question-header {
   display: inline-block;
-  margin-right: 8px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-2);
+  margin-right: 0.5rem;
+  padding: 0 0.5rem;
+  border-radius: 62.4375rem;
+  background: var(--bg-surface);
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 600;
   vertical-align: middle;
@@ -493,40 +595,40 @@
 .question-option {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 0.625rem;
   min-height: var(--tap);
-  padding: 6px 0;
+  padding: 0.375rem 0;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 
 .question-option input {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   margin-top: 2px;
-  accent-color: var(--accent);
+  accent-color: var(--brand-accent);
   cursor: pointer;
 }
 
 .question-option-note {
   display: block;
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
 .question-other {
   width: 100%;
   min-height: var(--tap);
-  padding: 0 10px;
-  border: 1px solid var(--grid);
+  padding: 0 0.625rem;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .detail-section > summary {
   cursor: pointer;
-  padding: 6px 0;
+  padding: 0.375rem 0;
   font-weight: 600;
 }
 
@@ -538,9 +640,9 @@
 
 .detail-table th,
 .detail-table td {
-  padding: 6px 8px;
+  padding: 0.375rem 0.5rem;
   text-align: left;
-  border-bottom: 1px solid var(--grid);
+  border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
@@ -552,10 +654,17 @@
 .session-recap-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  margin: 8px 0 0;
+  gap: 0.5rem 1.25rem;
+  margin: 0.5rem 0 0;
   padding: 0;
+
 }
+  @media (--narrow) {
+    .session-recap-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+  }
 
 .session-recap-stat {
   display: flex;
@@ -564,7 +673,7 @@
 }
 
 .session-recap-stat dt {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -589,7 +698,7 @@
 .tokens-chart {
   /* Matches the chart spec's own height, so the dialog doesn't jump once the lazily
      imported chart module resolves and renders into this container. */
-  min-height: 260px;
+  min-height: 16.25rem;
 }
 
 .tokens-chart .vega-embed {

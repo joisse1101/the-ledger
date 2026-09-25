@@ -13,6 +13,16 @@ const common = {
   focusable: false,
 };
 
+export function LiveIcon() {
+  return (
+    <svg {...common}>
+      {/* Central Ring/Dot */} <circle cx="12" cy="12" r="2" /> {/* Inner Left Arc */} <path
+        d="M 8.5 8 A 5 5 0 0 0 8.5 16" /> {/* Inner Right Arc */} <path d="M 15.5 8 A 5 5 0 0 1 15.5 16" />
+      {/* Outer Left Arc */} <path d="M 6 5.5 A 8.5 8.5 0 0 0 6 18.5" /> {/* Outer Right Arc */} <path
+        d="M 18 5.5 A 8.5 8.5 0 0 1 18 18.5" />
+    </svg>
+  );
+}
 export function SessionsIcon() {
   return (
     <svg {...common}>
@@ -66,6 +76,16 @@ export function CloseIcon() {
   return (
     <svg {...common}>
       <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+export function TooltipIcon(props?: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...common} {...props}>
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
     </svg>
   );
 }

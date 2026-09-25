@@ -38,6 +38,10 @@ export interface ResponsiveListProps<T> {
   rowClassName?: (row: T) => string | undefined;
   /** Rendered alongside the card's primary fields, e.g. a "Live" badge. */
   rowBadge?: (row: T) => ReactNode;
+  /** Accessible name for the table row's select button, when the first cell's own text doesn't
+   *  say what selecting does (e.g. "Select project X to delete"). Table only: a card's button
+   *  already names itself from all its fields, which a label here would replace. */
+  rowLabel?: (row: T) => string;
 }
 
 export function cardPriorityOf<T>(column: ListColumn<T>): CardPriority {

@@ -1,5 +1,9 @@
 <#
-Claude Code PermissionRequest hook that relays a blocking prompt to the Ledger dashboard. Claude Code
+.SYNOPSIS
+Claude Code PermissionRequest hook that relays a blocking prompt to the Ledger dashboard.
+
+.DESCRIPTION
+Claude Code
 fires this event only when a dialog is about to be shown - a tool-permission prompt, or an
 AskUserQuestion question - and runs it ALONGSIDE the terminal dialog, never in front of it. This script
 reads the hook's JSON payload from stdin and POSTs {tool_name, tool_input} to the local Ledger API
@@ -29,16 +33,34 @@ TODO (tasks 7.2/7.3 of the add-remote-session-control change), not yet verified 
 Optional and dashboard-coupled, unlike the standalone toast scripts in hooks/scripts/; installed
 separately (see hooks/README.md). Register it with a hook timeout comfortably above
 -TimeoutSeconds, or Claude Code kills it mid-wait.
+
+Meant to be run by Claude Code as a PermissionRequest hook (see hooks\Install-ClaudeHooks.ps1
+-IncludeSessionControl), not by hand.
+
+.PARAMETER TimeoutSeconds
+How long to wait for the dashboard's answer. Default 1805.
+
+.PARAMETER Port
+The Ledger API's port. Default: $env:LEDGER_PORT, else 8501.
+
+.PARAMETER Help
+Show this help and exit (-h works too). Prints help only - never a decision.
 #>
 param(
     # A few seconds above the API's own wait (pending_decisions.PROMPT_MAX_AGE_SECONDS = 30 minutes),
     # so the API's "no answer" reply normally arrives first instead of this client giving up on it.
     [int]$TimeoutSeconds = 1805,
     # The API's port. 0 = not given: fall back to $env:LEDGER_PORT, then 8501.
-    [int]$Port = 0
+    [int]$Port = 0,
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    return
+}
 
 try {
     # Read stdin as UTF-8 explicitly: [Console]::In uses the OEM code page on Windows PowerShell 5.1

@@ -1,10 +1,8 @@
 import { useSyncExternalStore } from "react";
+import { MEDIUM_MIN, MEDIUM_UP_QUERY, WIDE_MIN, WIDE_UP_QUERY } from "../lib/breakpoints";
 
 export type ViewportClass = "narrow" | "medium" | "wide";
 
-/** Class boundaries in CSS px: narrow < 640 <= medium < 1024 <= wide. */
-export const MEDIUM_MIN = 640;
-export const WIDE_MIN = 1024;
 
 export function classForWidth(width: number): ViewportClass {
   if (width >= WIDE_MIN) return "wide";
@@ -12,17 +10,14 @@ export function classForWidth(width: number): ViewportClass {
   return "narrow";
 }
 
-const mediumQuery = `(min-width: ${MEDIUM_MIN}px)`;
-const wideQuery = `(min-width: ${WIDE_MIN}px)`;
-
 function currentClass(): ViewportClass {
-  if (window.matchMedia(wideQuery).matches) return "wide";
-  if (window.matchMedia(mediumQuery).matches) return "medium";
+  if (window.matchMedia(WIDE_UP_QUERY).matches) return "wide";
+  if (window.matchMedia(MEDIUM_UP_QUERY).matches) return "medium";
   return "narrow";
 }
 
 function subscribe(onChange: () => void): () => void {
-  const queries = [window.matchMedia(mediumQuery), window.matchMedia(wideQuery)];
+  const queries = [window.matchMedia(MEDIUM_UP_QUERY), window.matchMedia(WIDE_UP_QUERY)];
   queries.forEach((query) => query.addEventListener("change", onChange));
   return () => queries.forEach((query) => query.removeEventListener("change", onChange));
 }
