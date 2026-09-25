@@ -576,9 +576,10 @@ and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment varia
 8501/4173). `Start-Gateway.ps1` loads the root `.env` (see "Setup & Run" above), runs
 `docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
 `Stop-Gateway.ps1` runs `docker compose down` and touches nothing else. `api/gateway_signin.py`
-prints `https://` links and encodes the QR with the same HTTPS address, with a note that the
-self-signed certificate will draw a one-time browser warning; it
-reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
+prints an "Open on this device" `http://localhost:<frontend port>` line (`--frontend-port`, env
+`FRONTEND_PORT`, default 4173), then `https://` links for the other devices, encoding the QR with the
+first HTTPS address, with a note that the self-signed certificate will draw a one-time browser
+warning; it reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
 `banner.render_qr()` (not its own copy) so address-discovery logic still lives in exactly one place.
 
 ### `hooks/`

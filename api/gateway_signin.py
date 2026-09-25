@@ -19,9 +19,7 @@ import banner
 from security import LEDGER_DIR, TOKEN_ENV
 
 DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml's GATEWAY_PORT default
-DEFAULT_FRONTEND_PORT = (
-    4173  # matches frontend/docker-compose.yml's FRONTEND_PORT default
-)
+DEFAULT_FRONTEND_PORT = 4173  # matches .env.example's FRONTEND_PORT default
 
 
 def read_token(
