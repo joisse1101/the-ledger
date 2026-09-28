@@ -76,6 +76,19 @@ Both delete paths gain an equivalent history-side delete, using the same folder-
 `transcript_paths_for_project`/`delete_transcript_rows_by_project` already use (history rows carry
 the same `path`/`cwd` columns).
 
+A session known only from `history.db` (already pruned from disk and absent from `ledger.db`)
+still needs to be deletable, since the merge surfaces it in the All list exactly like a live one.
+Today, `DELETE /api/sessions/{id}` (`server.py:329-333`) 404s via
+`claude_db.transcript_path_for_session()`, which only queries `ledger.db`, and
+`claude_transcripts.delete_transcript()` unconditionally `unlink()`s the path it finds - neither
+recognizes a history-only session as real:
+- `claude_db.transcript_path_for_session()` (or a new sibling the route's existence check calls
+  instead) also consults `history.db` when the session isn't in `ledger.db`, so the 404 check
+  passes for a history-only session too.
+- `claude_transcripts.delete_transcript()` treats `FileNotFoundError` from `unlink()` as "already
+  gone, nothing to remove on disk" rather than a failure, then purges whichever of
+  `ledger.db`/`history.db` actually has a row for that `session_id`.
+
 ### Backup script is standalone, reuses `claude_db`'s existing scan
 
 `api/backup_history.py` calls `claude_db.refresh()` (or the lower-level `_scan_projects`/

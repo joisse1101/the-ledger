@@ -11,11 +11,13 @@ def isolated_db(tmp_path, monkeypatch):
     """Point claude_db at a throwaway db/config/projects-dir under tmp_path
     so tests never touch the real ~/.claude.json or ~/.claude/projects/."""
     db_file = tmp_path / "ledger.db"
+    history_db_file = tmp_path / "history.db"
     config_file = tmp_path / "claude.json"
     projects_dir = tmp_path / "projects"
     projects_dir.mkdir()
 
     monkeypatch.setattr(claude_db, "db_path", lambda: db_file)
+    monkeypatch.setattr(claude_db, "history_db_path", lambda: history_db_file)
     monkeypatch.setattr(claude_db, "config_path", lambda: config_file)
     monkeypatch.setattr(claude_db, "projects_dir", lambda: projects_dir)
 

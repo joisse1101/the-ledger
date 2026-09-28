@@ -1,12 +1,12 @@
 ## 1. Durable history store foundation
 
-- [ ] 1.1 In `claude_db.py`, add `history_db_path()` (`api/.history/history.db`) and schema setup for
+- [x] 1.1 In `claude_db.py`, add `history_db_path()` (`api/.history/history.db`) and schema setup for
       a `transcripts` table matching `ledger.db`'s columns; verify by running it once and confirming
       the file and table exist (`sqlite3 api/.history/history.db ".schema transcripts"`).
-- [ ] 1.2 Add an upsert function (`INSERT ... ON CONFLICT(session_id) DO UPDATE SET ...`) for
+- [x] 1.2 Add an upsert function (`INSERT ... ON CONFLICT(session_id) DO UPDATE SET ...`) for
       writing scanned transcript rows into `history.db`; verify with a unit test that upserting the
       same `session_id` twice with different values leaves exactly one row with the latest values.
-- [ ] 1.3 Add a fetch function returning every row from `history.db`'s `transcripts` table; verify
+- [x] 1.3 Add a fetch function returning every row from `history.db`'s `transcripts` table; verify
       with a unit test against a small fixture db.
 
 ## 2. Merge into live reads
@@ -23,8 +23,13 @@
 ## 3. Delete propagation
 
 - [ ] 3.1 Extend the session-delete path so deleting a transcript also removes its row from
-      `history.db`; verify with a unit test: after delete, the `session_id` is absent from both the
-      merged `fetch_transcripts()` output and a raw fetch of `history.db`.
+      `history.db`, including a session known only from `history.db` (already pruned from disk and
+      absent from `ledger.db`) - the existence check backing `DELETE /api/sessions/{id}`'s 404 must
+      recognize it as known, and the delete itself must tolerate the file already being gone rather
+      than failing; verify with unit tests: (a) after deleting a session present in both stores, its
+      `session_id` is absent from both the merged `fetch_transcripts()` output and a raw fetch of
+      `history.db`; (b) deleting a history-only session succeeds (no 404/500) and purges its
+      `history.db` row.
 - [ ] 3.2 Extend the project-delete path (`delete_transcript_rows_by_project`) to remove that
       project's rows from `history.db` too, using the same on-disk-folder matching the live path
       already uses; verify with a unit test covering a project that has sessions in `history.db`

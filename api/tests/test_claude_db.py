@@ -541,6 +541,73 @@ def test_transcript_lookup_and_delete_by_session_id(isolated_db, write_config, w
     assert claude_db.fetch_transcripts() == []
 
 
+# ---------------------------------------------------------------------------
+# history.db - durable store (schema, upsert, fetch)
+# ---------------------------------------------------------------------------
+
+
+def _history_row(session_id="s1", **overrides):
+    row = {
+        "session_id": session_id,
+        "path": Path("/tmp/some/s1.jsonl"),
+        "cwd": "/tmp/some",
+        "version": "1.0.0",
+        "git_branch": "main",
+        "started_at": datetime(2024, 1, 1, 10, 0, 0),
+        "updated_at": datetime(2024, 1, 1, 10, 5, 0),
+        "message_count": 1,
+        "cost": 0.01,
+        "context": 100,
+        "project": "some",
+        "title": "",
+        "last_message": "",
+        "first_prompt": "",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_history_schema_creates_db_file_and_transcripts_table(isolated_db):
+    with claude_db._connect_history() as conn:
+        tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+    assert "transcripts" in tables
+    assert claude_db.history_db_path().is_file()
+
+
+def test_upsert_history_transcripts_is_a_noop_for_empty_rows(isolated_db):
+    claude_db.upsert_history_transcripts([])
+    assert claude_db.fetch_history_transcripts() == []
+
+
+def test_upsert_history_transcripts_inserts_new_rows(isolated_db):
+    claude_db.upsert_history_transcripts([_history_row("s1"), _history_row("s2")])
+    rows = claude_db.fetch_history_transcripts()
+    assert {row["session_id"] for row in rows} == {"s1", "s2"}
+
+
+def test_upsert_history_transcripts_updates_existing_row_in_place(isolated_db):
+    claude_db.upsert_history_transcripts([_history_row("s1", cost=0.01, message_count=1)])
+    claude_db.upsert_history_transcripts([_history_row("s1", cost=0.05, message_count=3)])
+
+    rows = claude_db.fetch_history_transcripts()
+    assert len(rows) == 1
+    assert rows[0]["session_id"] == "s1"
+    assert rows[0]["cost"] == 0.05
+    assert rows[0]["message_count"] == 3
+
+
+def test_fetch_history_transcripts_returns_all_rows(isolated_db):
+    claude_db.upsert_history_transcripts([_history_row("s1"), _history_row("s2")])
+    rows = claude_db.fetch_history_transcripts()
+    assert len(rows) == 2
+    assert {row["session_id"] for row in rows} == {"s1", "s2"}
+
+
 def _db_files(directory):
     return sorted(p.name for p in directory.glob("ledger.db*"))
 

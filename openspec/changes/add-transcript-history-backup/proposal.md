@@ -42,7 +42,11 @@ is currently no way to see historical usage older than Claude Code's own retenti
 ## Impact
 
 - `api/claude_db.py`: new durable history storage (schema, upsert, fetch) and a merge step in the
-  transcript read path; delete paths extended to also purge history rows.
+  transcript read path; delete paths extended to also purge history rows, including recognizing a
+  history-only session that's already gone from `ledger.db`.
+- `api/server.py`/`api/claude_transcripts.py`: `DELETE /api/sessions/{id}`'s existence check and
+  `delete_transcript()` extended so a history-only session is deletable (tolerating its file already
+  being gone) instead of 404/500ing.
 - New `api/backup_history.py`: standalone script for the scheduled task.
 - `.gitignore`: new durable-history file location.
 - `openspec/specs/web-dashboard/spec.md`: delta to the All list requirement.
