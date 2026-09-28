@@ -10,6 +10,7 @@ import type {
   DecisionAnswer,
   LiveResponse,
   Meta,
+  OverviewGroupBy,
   OverviewResponse,
   PendingDecisionResponse,
   ProjectsResponse,
@@ -24,6 +25,9 @@ export const LIVE_POLL_MS = 2000;
 export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
 export const PAGE_SIZE = 50;
+// Matches the server's own default (overview_stats.BUCKET_MINUTES), so an unscoped cache key
+// collides with one that named it explicitly.
+const DEFAULT_BUCKET_MINUTES = 30;
 
 export const keys = {
   meta: ["meta"] as const,
@@ -31,7 +35,9 @@ export const keys = {
   transcripts: ["transcripts"] as const,
   session: (id: string) => ["session", id] as const,
   pendingDecision: (id: string) => ["pending-decision", id] as const,
-  overview: (range: TimeRange) => ["overview", range] as const,
+  // Always starts ["overview", ...] so invalidating ["overview"] covers every scope and grouping.
+  overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy, bucketMinutes?: number) =>
+    ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? DEFAULT_BUCKET_MINUTES] as const,
   projects: ["projects"] as const,
 };
 
@@ -111,10 +117,23 @@ export function useSession(id: string | null, { refetchMs }: { refetchMs?: numbe
   });
 }
 
-export function useOverview(range: TimeRange) {
+/** Overview figures for `range`. `project` (a project path) scopes them to that one project;
+ *  `groupBy` picks what the donut/bar rows are grouped by (the server defaults to "project");
+ *  `bucketMinutes` (30 or 60, server default 30) is the block size of the time-of-day activity. */
+export function useOverview(
+  range: TimeRange,
+  {
+    project,
+    groupBy,
+    bucketMinutes,
+  }: { project?: string; groupBy?: OverviewGroupBy; bucketMinutes?: number } = {},
+) {
   return useQuery({
-    queryKey: keys.overview(range),
-    queryFn: () => apiFetch<OverviewResponse>(withQuery("/api/overview", { range })),
+    queryKey: keys.overview(range, project, groupBy, bucketMinutes),
+    queryFn: () =>
+      apiFetch<OverviewResponse>(
+        withQuery("/api/overview", { range, project, group_by: groupBy, bucket_minutes: bucketMinutes }),
+      ),
     placeholderData: keepPreviousData,
   });
 }

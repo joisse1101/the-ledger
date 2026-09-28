@@ -10,6 +10,18 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
+// jsdom doesn't implement <dialog>'s showModal()/close(). These stand-ins do the two things the
+// components rely on: toggle `open`, and fire `close` when an open dialog closes. They can't model
+// the real browser's focus trap, inert background or Esc handling.
+HTMLDialogElement.prototype.showModal ??= function showModal(this: HTMLDialogElement) {
+  this.setAttribute("open", "");
+};
+HTMLDialogElement.prototype.close ??= function close(this: HTMLDialogElement) {
+  if (!this.hasAttribute("open")) return;
+  this.removeAttribute("open");
+  this.dispatchEvent(new Event("close"));
+};
+
 // Unmounts whatever the previous test rendered so DOM queries in the next test
 // (screen.getByText etc.) only ever see that test's own output.
 afterEach(cleanup);

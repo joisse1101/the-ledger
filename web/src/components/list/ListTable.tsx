@@ -1,4 +1,6 @@
+import { Fragment } from "react";
 import type { ResponsiveListProps } from "./types";
+import { useClosingIds } from "./useClosingIds";
 
 export interface ListTableProps<T> extends ResponsiveListProps<T> {
   /** Wide shows every column; medium (false) hides "low" priority ones. */
@@ -18,9 +20,12 @@ export function ListTable<T>({
   sort,
   rowClassName,
   rowLabel,
+  expandedIds,
+  renderExpanded,
   showAllColumns,
 }: ListTableProps<T>) {
   const visible = columns.filter((column) => showAllColumns || column.priority === "high");
+  const { isClosing, onClosed } = useClosingIds(expandedIds);
 
   if (rows.length === 0) {
     return <p className="list-empty">{emptyMessage}</p>;
@@ -63,29 +68,48 @@ export function ListTable<T>({
         <tbody>
           {rows.map((row) => {
             const id = rowId(row);
+            const expanded = expandedIds?.has(id) === true;
             return (
-              <tr key={id} data-row-id={id} className={rowClassName?.(row)} onClick={() => onSelect(row)}>
-                {visible.map((column, index) => (
-                  <td key={column.key} data-align={column.align ?? "start"}>
-                    {index === 0 ? (
-                      <button
-                        type="button"
-                        className="row-select"
-                        aria-label={rowLabel?.(row)}
-                        onClick={(event) => {
-                          // The row's own onClick would select a second time as this bubbles.
-                          event.stopPropagation();
-                          onSelect(row);
+              <Fragment key={id}>
+                <tr data-row-id={id} className={rowClassName?.(row)} onClick={() => onSelect(row)}>
+                  {visible.map((column, index) => (
+                    <td key={column.key} data-align={column.align ?? "start"}>
+                      {index === 0 ? (
+                        <button
+                          type="button"
+                          className="row-select"
+                          aria-label={rowLabel?.(row)}
+                          aria-expanded={renderExpanded ? expanded : undefined}
+                          onClick={(event) => {
+                            // The row's own onClick would select a second time as this bubbles.
+                            event.stopPropagation();
+                            onSelect(row);
+                          }}
+                        >
+                          {column.render(row)}
+                        </button>
+                      ) : (
+                        column.render(row)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                {(expanded || isClosing(id)) && renderExpanded && (
+                  <tr className="list-table-expanded-row">
+                    <td colSpan={visible.length}>
+                      <div
+                        className="list-expand"
+                        data-collapsed={!expanded}
+                        onTransitionEnd={(event) => {
+                          if (event.target === event.currentTarget && !expanded) onClosed(id);
                         }}
                       >
-                        {column.render(row)}
-                      </button>
-                    ) : (
-                      column.render(row)
-                    )}
-                  </td>
-                ))}
-              </tr>
+                        <div className="list-expand-inner">{renderExpanded(row)}</div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             );
           })}
         </tbody>

@@ -21,14 +21,15 @@ def frozen_now(monkeypatch):
 
 
 def _transcript(
-    started_at=None, updated_at=None, message_count=0, cost=0.0, project="proj", session_id="s"
+    started_at=None, updated_at=None, message_count=0, cost=0.0, project="proj", session_id="s",
+    branch="main", path="x.jsonl", context=None,
 ):
     return ClaudeTranscript(
         session_id=session_id,
-        path=Path("x.jsonl"),
+        path=Path(path),
         cwd="/x",
         version="1.0",
-        git_branch="main",
+        git_branch=branch,
         started_at=started_at,
         updated_at=updated_at,
         message_count=message_count,
@@ -37,6 +38,7 @@ def _transcript(
         title="",
         last_message="",
         first_prompt="",
+        context=context,
     )
 
 
@@ -79,28 +81,48 @@ def test_filter_skips_transcript_with_no_timestamps():
 
 
 # ---------------------------------------------------------------------------
-# project_totals
+# filter_by_project
 # ---------------------------------------------------------------------------
 
 
-def test_project_totals_empty_returns_empty_list():
-    assert overview.project_totals([]) == []
+def test_filter_by_project_matches_the_folder_not_the_project_name():
+    # Both projects are displayed as "app", but filed under different folders.
+    one = _transcript(project="app", path="projects/-h-one-app/s1.jsonl")
+    other = _transcript(project="app", path="projects/-h-other-app/s2.jsonl")
+    assert overview.filter_by_project([one, other], "-h-one-app") == [one]
+    assert overview.filter_by_project([one, other], "-h-other-app") == [other]
 
 
-def test_project_totals_aggregates_per_project():
+def test_filter_by_project_with_no_match_is_empty():
+    assert overview.filter_by_project([_transcript(path="projects/-h-a/s.jsonl")], "-h-b") == []
+
+
+# ---------------------------------------------------------------------------
+# group_totals
+# ---------------------------------------------------------------------------
+
+by_project = overview.GROUP_KEYS["project"]
+by_branch = overview.GROUP_KEYS["branch"]
+
+
+def test_group_totals_empty_returns_empty_list():
+    assert overview.group_totals([], by_project) == []
+
+
+def test_group_totals_aggregates_per_project():
     transcripts = [
         _transcript(project="a", message_count=10, cost=1.0),
         _transcript(project="a", message_count=5, cost=0.5),
         _transcript(project="b", message_count=3, cost=0.25),
     ]
-    rows = {row["project"]: row for row in overview.project_totals(transcripts)}
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}
     assert rows["a"]["sessions"] == 2
     assert rows["a"]["messages"] == 15
     assert rows["a"]["cost"] == pytest.approx(1.5)
     assert rows["b"]["sessions"] == 1
 
 
-def test_project_totals_folds_tail_into_other_ranked_by_sessions():
+def test_group_totals_folds_tail_into_other_ranked_by_sessions():
     # 3 sessions for "a", 2 for "b", 1 each for c/d/e -> top_n=2 keeps a, b.
     transcripts = (
         [_transcript(project="a")] * 3
@@ -109,102 +131,149 @@ def test_project_totals_folds_tail_into_other_ranked_by_sessions():
         + [_transcript(project="d")]
         + [_transcript(project="e")]
     )
-    rows = overview.project_totals(transcripts, top_n=2)
-    assert [row["project"] for row in rows] == ["a", "b", "Other"]
+    rows = overview.group_totals(transcripts, by_project, top_n=2)
+    assert [row["group"] for row in rows] == ["a", "b", "Other"]
     assert rows[2]["sessions"] == 3  # c + d + e
 
 
-def test_project_totals_with_ten_projects_shows_seven_plus_other():
+def test_group_totals_with_ten_projects_shows_seven_plus_other():
     # Projects p0..p9 with 10, 9, ... 1 sessions: the seven busiest stay, p7..p9 fold.
     transcripts = [
         _transcript(project=f"p{i}", message_count=1, cost=1.0)
         for i in range(10)
         for _ in range(10 - i)
     ]
-    rows = overview.project_totals(transcripts)
-    assert [row["project"] for row in rows] == [f"p{i}" for i in range(7)] + ["Other"]
+    rows = overview.group_totals(transcripts, by_project)
+    assert [row["group"] for row in rows] == [f"p{i}" for i in range(7)] + ["Other"]
     assert rows[-1]["sessions"] == 3 + 2 + 1
     assert rows[-1]["messages"] == 6
 
 
-def test_project_totals_share_sums_to_100():
+def test_group_totals_sums_context_tokens_per_group():
+    transcripts = [
+        _transcript(project="a", context=1000),
+        _transcript(project="a", context=500),
+        _transcript(project="b", context=2000),
+    ]
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}
+    assert rows["a"]["tokens"] == 1500
+    assert rows["b"]["tokens"] == 2000
+
+
+def test_group_totals_treats_a_missing_context_as_zero_tokens():
+    rows = overview.group_totals([_transcript(project="a", context=None)], by_project)
+    assert rows[0]["tokens"] == 0
+
+
+def test_group_totals_share_sums_to_100():
     transcripts = [_transcript(project="a")] * 3 + [_transcript(project="b")]
-    rows = {row["project"]: row for row in overview.project_totals(transcripts)}
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}
     assert rows["a"]["share"] == pytest.approx(75.0)
     assert rows["b"]["share"] == pytest.approx(25.0)
 
 
-def test_project_totals_normalizes_each_measure_to_its_own_peak():
+def test_group_totals_normalizes_each_measure_to_its_own_peak():
     transcripts = [
         _transcript(project="a", message_count=100, cost=1.0),
         _transcript(project="b", message_count=50, cost=4.0),
     ]
-    rows = {row["project"]: row for row in overview.project_totals(transcripts)}
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}
     assert rows["a"]["messages_pct"] == pytest.approx(100.0)
     assert rows["b"]["messages_pct"] == pytest.approx(50.0)
     assert rows["a"]["cost_pct"] == pytest.approx(25.0)
     assert rows["b"]["cost_pct"] == pytest.approx(100.0)
 
 
-def test_project_totals_with_all_zero_measures_does_not_divide_by_zero():
-    rows = overview.project_totals([_transcript(project="a")])
+def test_group_totals_with_all_zero_measures_does_not_divide_by_zero():
+    rows = overview.group_totals([_transcript(project="a")], by_project)
     assert rows[0]["messages_pct"] == 0
     assert rows[0]["cost_pct"] == 0
 
 
+def test_group_totals_by_branch_counts_a_session_under_its_recorded_branch():
+    transcripts = [
+        _transcript(branch="main", message_count=4),
+        _transcript(branch="main", message_count=6),
+        _transcript(branch="dev", message_count=1),
+    ]
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_branch)}
+    assert rows["main"]["sessions"] == 2
+    assert rows["main"]["messages"] == 10
+    assert rows["dev"]["sessions"] == 1
+
+
+def test_group_totals_by_branch_labels_a_missing_branch():
+    rows = overview.group_totals([_transcript(branch="")], by_branch)
+    assert [row["group"] for row in rows] == ["(no branch)"]
+
+
+def test_group_totals_by_branch_folds_the_tail_into_other():
+    transcripts = [
+        _transcript(branch=f"b{i}") for i in range(10) for _ in range(10 - i)
+    ]
+    rows = overview.group_totals(transcripts, by_branch)
+    assert [row["group"] for row in rows] == [f"b{i}" for i in range(7)] + ["Other"]
+    assert rows[-1]["sessions"] == 3 + 2 + 1
+
+
 # ---------------------------------------------------------------------------
-# hourly_activity
+# time_of_day_activity
 # ---------------------------------------------------------------------------
 
 
-def test_hourly_activity_with_no_transcripts_zero_fills_all_24_hours():
-    rows = overview.hourly_activity([])
-    assert len(rows) == 24
+def test_time_of_day_activity_with_no_transcripts_zero_fills_all_48_blocks():
+    rows = overview.time_of_day_activity([])
+    assert len(rows) == 48
     assert sum(row["sessions"] for row in rows) == 0
     assert sum(row["messages"] for row in rows) == 0
 
 
-def test_hourly_activity_buckets_by_local_start_hour():
+def test_time_of_day_activity_buckets_by_local_start_half_hour():
     transcripts = [
-        _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0), message_count=4),
-        _transcript(started_at=datetime(2024, 6, 15, 9, 45, 0), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=4),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 29, 59), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0), message_count=3),
         _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0), message_count=2),
     ]
-    rows = {row["label"]: row for row in overview.hourly_activity(transcripts)}
-    assert rows["9am"]["sessions"] == 2
-    assert rows["9am"]["messages"] == 10
-    assert rows["2pm"]["sessions"] == 1
+    rows = {row["label"]: row for row in overview.time_of_day_activity(transcripts)}
+    assert rows["9:00am"]["sessions"] == 2
+    assert rows["9:00am"]["messages"] == 10
+    assert rows["9:30am"]["sessions"] == 1
+    assert rows["2:00pm"]["sessions"] == 1
 
 
-def test_hourly_activity_trims_to_hours_with_activity():
+def test_time_of_day_activity_trims_and_zero_fills_between_first_and_last_active_block():
     transcripts = [
         _transcript(started_at=datetime(2024, 6, 15, 9, 30, 0)),
-        _transcript(started_at=datetime(2024, 6, 15, 14, 0, 0)),
+        _transcript(started_at=datetime(2024, 6, 15, 11, 0, 0)),
     ]
-    rows = overview.hourly_activity(transcripts)
-    assert [row["label"] for row in rows] == [overview.format_hour(h) for h in range(9, 15)]
+    rows = overview.time_of_day_activity(transcripts)
+    assert [row["label"] for row in rows] == ["9:30am", "10:00am", "10:30am", "11:00am"]
+    assert [row["sessions"] for row in rows] == [1, 0, 0, 1]
+    assert [row["minute"] for row in rows] == [570, 600, 630, 660]
 
 
-def test_hourly_activity_normalizes_each_measure_to_its_busiest_hour():
+def test_time_of_day_activity_can_bucket_by_hour():
     transcripts = [
-        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=10),
-        _transcript(started_at=datetime(2024, 6, 15, 9, 5, 0), message_count=10),
-        _transcript(started_at=datetime(2024, 6, 15, 10, 0, 0), message_count=40),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 0, 0), message_count=4),
+        _transcript(started_at=datetime(2024, 6, 15, 9, 45, 0), message_count=6),
+        _transcript(started_at=datetime(2024, 6, 15, 11, 10, 0), message_count=3),
     ]
-    rows = {row["label"]: row for row in overview.hourly_activity(transcripts)}
-    assert rows["9am"]["sessions_pct"] == pytest.approx(100.0)
-    assert rows["10am"]["sessions_pct"] == pytest.approx(50.0)
-    assert rows["9am"]["messages_pct"] == pytest.approx(50.0)
-    assert rows["10am"]["messages_pct"] == pytest.approx(100.0)
+    rows = overview.time_of_day_activity(transcripts, 60)
+    assert [row["label"] for row in rows] == ["9:00am", "10:00am", "11:00am"]
+    assert [row["minute"] for row in rows] == [540, 600, 660]
+    assert [row["sessions"] for row in rows] == [2, 0, 1]
+    assert [row["messages"] for row in rows] == [10, 0, 3]
+    assert len(overview.time_of_day_activity([], 60)) == 24
 
 
-def test_hourly_activity_skips_transcript_with_no_timestamps():
+def test_time_of_day_activity_skips_transcript_with_no_timestamps():
     t = _transcript(started_at=None, updated_at=None)
-    assert sum(row["sessions"] for row in overview.hourly_activity([t])) == 0
+    assert sum(row["sessions"] for row in overview.time_of_day_activity([t])) == 0
 
 
 # ---------------------------------------------------------------------------
-# format_duration / format_hour
+# format_duration / format_bucket
 # ---------------------------------------------------------------------------
 
 
@@ -217,11 +286,11 @@ def test_format_duration(seconds, expected):
 
 
 @pytest.mark.parametrize(
-    "hour,expected",
-    [(0, "12am"), (9, "9am"), (12, "12pm"), (13, "1pm"), (23, "11pm")],
+    "minute,expected",
+    [(0, "12:00am"), (570, "9:30am"), (720, "12:00pm"), (810, "1:30pm"), (1410, "11:30pm")],
 )
-def test_format_hour(hour, expected):
-    assert overview.format_hour(hour) == expected
+def test_format_bucket(minute, expected):
+    assert overview.format_bucket(minute) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -232,16 +301,17 @@ def test_format_hour(hour, expected):
 def test_summary_counts_and_names_the_extreme_sessions():
     transcripts = [
         _transcript(
-            project="a", session_id="quick", message_count=4, cost=0.5,
+            project="a", session_id="quick", message_count=4, cost=0.5, branch="main", context=1000,
             started_at=datetime(2024, 6, 15, 9, 0, 0), updated_at=datetime(2024, 6, 15, 9, 0, 30),
         ),
         _transcript(
-            project="b", session_id="slow", message_count=6, cost=2.0,
+            project="b", session_id="slow", message_count=6, cost=2.0, branch="dev", context=3000,
             started_at=datetime(2024, 6, 15, 10, 0, 0), updated_at=datetime(2024, 6, 15, 11, 1, 0),
         ),
     ]
     result = overview.summary(transcripts)
     assert result["projects"] == 2
+    assert result["branches"] == 2
     assert result["sessions"] == 2
     assert result["messages"] == 10
     assert result["avg_messages_per_session"] == pytest.approx(5.0)
@@ -253,15 +323,35 @@ def test_summary_counts_and_names_the_extreme_sessions():
     assert result["cost"]["cheapest"]["session_id"] == "quick"
     assert result["cost"]["total"]["label"] == "$2.50"
     assert result["cost"]["average"]["label"] == "$1.25"
+    assert result["tokens"]["total"] == 4000
+    assert result["tokens"]["average"] == pytest.approx(2000.0)
+    assert result["tokens"]["most"]["amount"] == 3000
+    assert result["tokens"]["most"]["session_id"] == "slow"
+    assert result["tokens"]["least"]["amount"] == 1000
+    assert result["tokens"]["least"]["session_id"] == "quick"
+
+
+def test_summary_tokens_ignores_transcripts_with_no_context_recorded():
+    transcripts = [_transcript(session_id="a", context=None), _transcript(session_id="b", context=500)]
+    result = overview.summary(transcripts)
+    assert result["tokens"]["total"] == 500
+    assert result["tokens"]["average"] == pytest.approx(500.0)
+    assert result["tokens"]["most"]["session_id"] == "b"
+    assert result["tokens"]["least"]["session_id"] == "b"
 
 
 def test_summary_of_nothing_is_placeholders_not_errors():
     result = overview.summary([])
     assert result["sessions"] == 0
+    assert result["branches"] == 0
     assert result["avg_messages_per_session"] is None
     assert result["duration"]["longest"]["label"] == "—"
     assert result["duration"]["longest"]["session_id"] is None
     assert result["cost"]["most_expensive"]["label"] == "$0.00"
+    assert result["tokens"]["total"] == 0
+    assert result["tokens"]["average"] == 0
+    assert result["tokens"]["most"]["amount"] == 0
+    assert result["tokens"]["most"]["session_id"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -269,13 +359,62 @@ def test_summary_of_nothing_is_placeholders_not_errors():
 # ---------------------------------------------------------------------------
 
 
+def test_available_ranges_lists_only_ranges_with_a_session_in_display_order():
+    today = overview.datetime.now().astimezone()
+    assert overview.available_ranges([]) == []
+    assert overview.available_ranges([_transcript(started_at=datetime(2020, 1, 1))]) == ["All time"]
+    assert overview.available_ranges([_transcript(started_at=today)]) == [
+        "All time",
+        "Today",
+        "Past week",
+        "Past month",
+        "Past quarter",
+        "Past year",
+    ]
+
+
 def test_overview_for_an_empty_range_is_an_empty_state_not_an_error():
     old = _transcript(started_at=datetime(2020, 1, 1))
-    assert overview.overview([old], "Yesterday") == {"range": "Yesterday", "empty": True}
+    assert overview.overview([old], "Yesterday") == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
-def test_overview_project_order_matches_project_rows():
+def test_overview_group_order_matches_group_rows():
     transcripts = [_transcript(project="a")] * 2 + [_transcript(project="b")]
     result = overview.overview(transcripts, "All time")
     assert result["empty"] is False
-    assert result["project_order"] == [row["project"] for row in result["projects"]] == ["a", "b"]
+    assert result["group_order"] == [row["group"] for row in result["groups"]] == ["a", "b"]
+
+
+def test_overview_can_group_by_branch():
+    transcripts = [_transcript(branch="main")] * 2 + [_transcript(branch="dev")]
+    result = overview.overview(transcripts, "All time", group_by="branch")
+    assert result["group_order"] == ["main", "dev"]
+
+
+def test_overview_scoped_to_a_project_folder_ignores_the_others():
+    mine = _transcript(project="app", path="projects/-h-one-app/s1.jsonl", message_count=3)
+    other = _transcript(project="app", path="projects/-h-other-app/s2.jsonl", message_count=9)
+    result = overview.overview([mine, other], "All time", "-h-one-app")
+    assert result["summary"]["sessions"] == 1
+    assert result["summary"]["messages"] == 3
+    assert result["groups"][0]["sessions"] == 1
+
+
+def test_overview_scoped_to_a_project_with_nothing_in_range_is_empty():
+    old = _transcript(started_at=datetime(2020, 1, 1), path="projects/-h-a/s.jsonl")
+    assert overview.overview([old], "Yesterday", "-h-a") == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
+
+
+def test_overview_activity_buckets_are_unchanged_by_grouping():
+    t = _transcript(started_at=datetime(2024, 6, 15, 9, 30), message_count=2)
+    by_project_result = overview.overview([t], "All time")["activity"]
+    by_branch_result = overview.overview([t], "All time", group_by="branch")["activity"]
+    assert by_project_result == by_branch_result == overview.time_of_day_activity([t])

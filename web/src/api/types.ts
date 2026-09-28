@@ -225,11 +225,19 @@ export interface MoneyFigure {
   label: string;
 }
 
+/** A raw token count - unlike DurationFigure/MoneyFigure, not pre-formatted server-side; the
+ *  frontend humanises it the same way as the Context column/detail figures (`formatContext`). */
+export interface TokenFigure {
+  amount: number;
+}
+
 /** Extremes also say which session they came from. */
 export type WithSession<T> = T & { project: string | null; session_id: string | null };
 
 export interface OverviewSummary {
   projects: number;
+  /** Distinct git branches among these transcripts (the same key `group_by: "branch"` uses). */
+  branches: number;
   sessions: number;
   messages: number;
   avg_messages_per_session: number | null;
@@ -245,35 +253,46 @@ export interface OverviewSummary {
     cheapest: WithSession<MoneyFigure>;
     total: MoneyFigure;
   };
+  tokens: {
+    total: number;
+    average: number;
+    most: WithSession<TokenFigure>;
+    least: WithSession<TokenFigure>;
+  };
 }
 
-export interface ProjectTotals {
-  project: string;
+/** One donut/bar row: a project on Overview, a git branch on a project's own charts. */
+export interface GroupTotals {
+  group: string;
   sessions: number;
   messages: number;
   cost: number;
+  tokens: number;
   share: number;
   messages_pct: number;
   cost_pct: number;
 }
 
-export interface HourlyBucket {
-  hour: number;
+/** One 30-minute block of the local day; `minute` is its start, in minutes after midnight. */
+export interface ActivityBucket {
+  minute: number;
   label: string;
   sessions: number;
   messages: number;
-  sessions_pct: number;
-  messages_pct: number;
 }
 
+export type OverviewGroupBy = "project" | "branch";
+
 export type OverviewResponse =
-  | { range: string; empty: true }
+  | { range: string; empty: true; available_ranges: string[] }
   | {
       range: string;
       empty: false;
+      /** The time ranges that contain at least one session (within the project, when scoped to one). */
+      available_ranges: string[];
       summary: OverviewSummary;
-      projects: ProjectTotals[];
-      /** The one order every project chart uses; colors follow a project's index in it. */
-      project_order: string[];
-      hourly: HourlyBucket[];
+      groups: GroupTotals[];
+      /** The one order every grouped chart uses; colors follow a group's index in it. */
+      group_order: string[];
+      activity: ActivityBucket[];
     };

@@ -587,8 +587,8 @@ def test_overview_all_time_has_summary_and_chart_arrays(api):
     assert body["empty"] is False
     assert body["summary"]["sessions"] == 3
     assert body["summary"]["projects"] == 2
-    assert [row["project"] for row in body["projects"]] == ["alpha", "beta"]
-    assert body["hourly"]
+    assert [row["group"] for row in body["groups"]] == ["alpha", "beta"]
+    assert body["activity"]
 
 
 def test_overview_unknown_range_is_422(api):
@@ -599,12 +599,78 @@ def test_overview_empty_range_is_an_empty_state_not_an_error(api):
     # The seeded sessions are all from January 2024.
     response = api.get("/api/overview", params={"range": "Yesterday"})
     assert response.status_code == 200
-    assert response.json() == {"range": "Yesterday", "empty": True}
+    assert response.json() == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
-def test_overview_project_order_is_shared_by_the_chart_arrays(api):
+def test_overview_group_order_is_shared_by_the_chart_arrays(api):
     body = api.get("/api/overview").json()
-    assert body["project_order"] == [row["project"] for row in body["projects"]]
+    assert body["group_order"] == [row["group"] for row in body["groups"]]
+
+
+def test_overview_scoped_to_a_project_only_counts_its_sessions(with_projects):
+    body = with_projects.get("/api/overview", params={"project": "/h/alpha", "group_by": "branch"}).json()
+    assert body["summary"]["sessions"] == 2
+    assert {row["group"] for row in body["groups"]} == {"main", "dev"}
+    assert all(row["sessions"] == 1 for row in body["groups"])
+
+
+def test_overview_group_by_project_is_the_default_for_a_scoped_call(with_projects):
+    body = with_projects.get("/api/overview", params={"project": "/h/beta"}).json()
+    assert [row["group"] for row in body["groups"]] == ["beta"]
+
+
+def test_overview_bucket_minutes_sets_the_activity_block_size(api):
+    half_hour = api.get("/api/overview").json()["activity"]
+    hourly = api.get("/api/overview", params={"bucket_minutes": 60}).json()["activity"]
+    assert all(row["minute"] % 30 == 0 for row in half_hour)
+    assert all(row["minute"] % 60 == 0 for row in hourly)
+    assert sum(r["sessions"] for r in hourly) == sum(r["sessions"] for r in half_hour)
+
+
+def test_overview_unknown_bucket_minutes_is_422(api):
+    assert api.get("/api/overview", params={"bucket_minutes": 45}).status_code == 422
+
+
+def test_overview_unknown_group_by_is_422(api):
+    assert api.get("/api/overview", params={"group_by": "author"}).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/h/alph", "/h/alpha/", "..", ""])
+def test_overview_for_an_unknown_project_is_404(with_projects, path):
+    assert with_projects.get("/api/overview", params={"project": path}).status_code == 404
+
+
+def test_overview_scoped_projects_with_the_same_basename_are_not_merged(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    write_config(isolated_db / "claude.json", {"/h/one/app": {}, "/h/two/app": {}})
+    _add_session(isolated_db, write_transcript, "one-1", "/h/one/app", branch="main")
+    _add_session(isolated_db, write_transcript, "two-1", "/h/two/app", branch="dev")
+    _add_session(isolated_db, write_transcript, "two-2", "/h/two/app", branch="dev")
+    claude_db.refresh()
+    _use_live(monkeypatch)
+    client = _client()
+
+    one = client.get("/api/overview", params={"project": "/h/one/app", "group_by": "branch"}).json()
+    two = client.get("/api/overview", params={"project": "/h/two/app", "group_by": "branch"}).json()
+
+    assert one["summary"]["sessions"] == 1 and one["group_order"] == ["main"]
+    assert two["summary"]["sessions"] == 2 and two["group_order"] == ["dev"]
+
+
+def test_overview_scoped_call_still_applies_the_range(with_projects):
+    # Every seeded session is from January 2024, so a recent range leaves the project empty.
+    response = with_projects.get("/api/overview", params={"project": "/h/alpha", "range": "Past week"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "range": "Past week",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
 # ---------------------------------------------------------------- /api/sessions/{id}

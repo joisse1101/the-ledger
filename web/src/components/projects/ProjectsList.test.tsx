@@ -1,7 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../api/queryClient";
+import type { Project } from "../../api/types";
 import { ProjectsList } from "./ProjectsList";
 
 const project = {
@@ -44,55 +46,132 @@ function stubApi(isLocal: boolean) {
   );
 }
 
-function renderList() {
+function renderList(expandedPaths: string[] = []) {
+  const client = createQueryClient();
+  const onToggle = vi.fn();
+  render(
+    <QueryClientProvider client={client}>
+      <ProjectsList
+        expandedPaths={new Set(expandedPaths)}
+        onToggle={onToggle}
+        renderExpanded={(p) => <div>Details for {p.name}</div>}
+      />
+    </QueryClientProvider>,
+  );
+  return { client, onToggle };
+}
+
+/** Drives ProjectsList with real toggle state, the way ProjectsPage does - a click actually
+ *  flips `expandedPaths`, which is what the scroll-into-view effect reacts to. `renderList`'s
+ *  fixed prop can't exercise that: it never transitions from closed to open. */
+function ToggleableList() {
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const onToggle = (p: Project) => {
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(p.path)) next.delete(p.path);
+      else next.add(p.path);
+      return next;
+    });
+  };
+  return <ProjectsList expandedPaths={expandedPaths} onToggle={onToggle} renderExpanded={(p) => <div>Details for {p.name}</div>} />;
+}
+
+function renderToggleableList() {
   const client = createQueryClient();
   render(
     <QueryClientProvider client={client}>
-      <ProjectsList />
+      <ToggleableList />
     </QueryClientProvider>,
   );
   return client;
 }
 
+/** jsdom doesn't implement scrollIntoView at all; the component itself guards every call with
+ *  `?.` for that gap (see ProjectsList.tsx), so this stub is only here to observe the calls. */
+function stubScrollIntoView() {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  return scrollIntoView;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
 });
 
-describe("ProjectsList delete flow", () => {
-  it("offers the delete confirmation on the machine running the app", async () => {
-    stubApi(true);
-    const client = renderList();
-    const row = (await screen.findAllByText("demo"))[0];
+describe.each([
+  ["on the machine running the app", true],
+  ["on another device", false],
+])("ProjectsList toggling %s", (_where, isLocal) => {
+  it("toggles the clicked project and starts no delete", async () => {
+    stubApi(isLocal);
+    const { client, onToggle } = renderList();
+    const button = await screen.findByRole("button", { name: "Show details for demo" });
 
-    // Clicking is idempotent, so retry until /api/meta has answered and the click is honored.
-    await waitFor(() => {
-      fireEvent.click(row);
-      expect(screen.getByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
-    });
-    client.clear();
-  });
-
-  it("names the row button for what selecting it does", async () => {
-    stubApi(true);
-    const client = renderList();
-    await screen.findAllByText("demo");
-
-    // The label depends on /api/meta having answered, so wait for it.
-    const button = await screen.findByRole("button", { name: "Select project demo to delete" });
     fireEvent.click(button);
-    expect(await screen.findByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith(expect.objectContaining({ path: project.path }));
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => (init as RequestInit | undefined)?.method !== "DELETE")).toBe(
+      true,
+    );
+    client.clear();
+  });
+});
+
+describe("ProjectsList", () => {
+  it("accents and shows details for an expanded project's row", async () => {
+    stubApi(true);
+    const { client } = renderList([project.path]);
+
+    await waitFor(() => expect(document.querySelector("tr.row-selected")).not.toBeNull());
+    expect(await screen.findByText("Details for demo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide details for demo" })).toBeInTheDocument();
     client.clear();
   });
 
-  it("never offers it from another device", async () => {
-    stubApi(false);
-    const client = renderList();
-    const row = (await screen.findAllByText("demo"))[0];
-    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/meta", expect.anything()));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+  it("accents nothing and shows no details while no project is expanded", async () => {
+    stubApi(true);
+    const { client } = renderList([]);
+    await screen.findByRole("button", { name: "Show details for demo" });
 
-    fireEvent.click(row);
-    expect(screen.queryByRole("button", { name: "Confirm delete" })).not.toBeInTheDocument();
+    expect(document.querySelector(".row-selected")).toBeNull();
+    expect(screen.queryByText("Details for demo")).not.toBeInTheDocument();
+    client.clear();
+  });
+
+  it("scrolls the row to the top once its panel opens, but not when it closes again", async () => {
+    stubApi(true);
+    const scrollIntoView = stubScrollIntoView();
+    const client = renderToggleableList();
+
+    const openButton = await screen.findByRole("button", { name: "Show details for demo" });
+    fireEvent.click(openButton);
+    await screen.findByText("Details for demo");
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+
+    scrollIntoView.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Hide details for demo" }));
+    // The panel animates closed (see useClosingIds' fallback timer) rather than vanishing the
+    // instant the row collapses, so this outlives waitFor's default 1000ms timeout.
+    await waitFor(() => expect(screen.queryByText("Details for demo")).not.toBeInTheDocument(), { timeout: 2000 });
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("doesn't scroll a row that's already expanded on mount", async () => {
+    stubApi(true);
+    const scrollIntoView = stubScrollIntoView();
+    const { client } = renderList([project.path]);
+
+    await screen.findByText("Details for demo");
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
     client.clear();
   });
 });

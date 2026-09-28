@@ -1,12 +1,18 @@
 /* Shown on hover, keyboard focus, or tap (.bubbleOpen). */
 .tip {
+  --tip-icon: 1.25rem;
+
+  position: relative; /* the bubble anchors to the icon itself, not a distant ancestor */
   display: inline-flex;
 }
 
-/* Padding + matching negative margin widens the touch target to --tap (2.75rem around the 1rem
-   icon) without moving the icon. */
+.small {
+  --tip-icon: 1rem;
+}
+
+/* Padding + matching negative margin widens the touch target to --tap without moving the icon. */
 .tipButton {
-  --tip-pad: calc((var(--tap) - 1rem) / 2);
+  --tip-pad: calc((var(--tap) - var(--tip-icon)) / 2);
 
   display: inline-flex;
   align-items: center;
@@ -17,6 +23,11 @@
   color: var(--text-dim);
   cursor: help;
   -webkit-tap-highlight-color: transparent;
+}
+
+.tipButton svg {
+  width: var(--tip-icon);
+  height: var(--tip-icon);
 }
 
 .tipButton:hover,
@@ -30,8 +41,8 @@
   border-radius: 50%;
 }
 
-/* Positioned against the nearest positioned ancestor (Switch's .field), so it lines up with the
-   control's left edge instead of the "?" icon and stays on screen at phone widths. */
+/* Just below the icon. Tooltip.tsx overrides `left` (clamped to the viewport) and sets
+   data-side="top" to flip it above the icon when there's no room below. */
 .bubble {
   position: absolute;
   top: 100%;
@@ -48,12 +59,20 @@
   box-shadow: var(--shadow-sm);
   font-size: var(--font-xs);
   white-space: pre-line;
-  visibility: hidden;
+  /* Not just `visibility: hidden`: a hidden bubble still takes up layout space, and sitting at
+     `left: 0` it can stick out past the screen edge and make the page scroll sideways. */
+  display: none;
+}
+
+.bubble[data-side="top"] {
+  top: auto;
+  bottom: 100%;
+  margin: 0 0 0.25rem;
 }
 
 .tipButton:focus-visible + .bubble,
 .bubbleOpen {
-  visibility: visible;
+  display: block;
 }
 
 /* Only where hovering is real. A touch screen fakes :hover on tap and leaves it stuck on until
@@ -61,6 +80,6 @@
    (scroll, second tap, Escape). There, .bubbleOpen alone decides. */
 @media (hover: hover) {
   .tip:hover .bubble {
-    visibility: visible;
+    display: block;
   }
 }

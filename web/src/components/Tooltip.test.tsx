@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Tooltip } from "./Tooltip";
 
 describe("Tooltip", () => {
@@ -126,6 +126,77 @@ describe("Tooltip", () => {
 
     expect(addSpy.mock.calls.filter(([type]) => type === "touchmove")).toHaveLength(0);
     addSpy.mockRestore();
+  });
+
+  describe("placement", () => {
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height }) as DOMRect;
+
+    // jsdom lays nothing out, so hand the tooltip and its bubble fixed boxes.
+    const renderAt = (anchor: DOMRect, bubble: DOMRect) => {
+      render(<Tooltip label="Auto-refresh" tooltip="Refreshes every 2s" />);
+      const tip = screen.getByRole("button").parentElement!;
+      const bubbleEl = screen.getByRole("tooltip");
+      vi.spyOn(tip, "getBoundingClientRect").mockReturnValue(anchor);
+      vi.spyOn(bubbleEl, "getBoundingClientRect").mockReturnValue(bubble);
+      fireEvent.mouseEnter(tip);
+      return bubbleEl;
+    };
+
+    beforeEach(() => {
+      vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(400);
+      vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(600);
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("centres the bubble under the icon", () => {
+      const bubble = renderAt(rect(190, 100, 20, 20), rect(0, 0, 100, 30));
+
+      expect(bubble.style.left).toBe("-40px"); // icon centre 200 - half the bubble (50) = 150; 150 - 190
+      expect(bubble).toHaveAttribute("data-side", "bottom");
+    });
+
+    it("keeps the bubble inside the left edge", () => {
+      const bubble = renderAt(rect(2, 100, 20, 20), rect(0, 0, 100, 30));
+
+      expect(bubble.style.left).toBe("6px"); // clamped to 8px from the viewport, relative to the icon at 2
+    });
+
+    it("keeps the bubble inside the right edge", () => {
+      const bubble = renderAt(rect(370, 100, 20, 20), rect(0, 0, 100, 30));
+
+      expect(bubble.style.left).toBe("-78px"); // 400 - 8 - 100 = 292; 292 - 370
+    });
+
+    it("shows the bubble only while measuring it (it's display: none when closed)", () => {
+      render(<Tooltip label="Auto-refresh" tooltip="Refreshes every 2s" />);
+      const tip = screen.getByRole("button").parentElement!;
+      const bubbleEl = screen.getByRole("tooltip");
+      vi.spyOn(tip, "getBoundingClientRect").mockReturnValue(rect(190, 100, 20, 20));
+      const displayWhenMeasured: string[] = [];
+      vi.spyOn(bubbleEl, "getBoundingClientRect").mockImplementation(() => {
+        displayWhenMeasured.push(bubbleEl.style.display);
+        return rect(0, 0, 100, 30);
+      });
+
+      fireEvent.mouseEnter(tip);
+
+      expect(displayWhenMeasured).toEqual(["block"]);
+      expect(bubbleEl.style.display).toBe("");
+    });
+
+    it("flips above the icon when there's no room below", () => {
+      const bubble = renderAt(rect(190, 570, 20, 20), rect(0, 0, 100, 30));
+
+      expect(bubble).toHaveAttribute("data-side", "top");
+    });
+
+    it("stays below when there's no room above either", () => {
+      const bubble = renderAt(rect(190, 5, 20, 590), rect(0, 0, 100, 30));
+
+      expect(bubble).toHaveAttribute("data-side", "bottom");
+    });
   });
 
   it("gives each tooltip its own id so several can share a page", () => {

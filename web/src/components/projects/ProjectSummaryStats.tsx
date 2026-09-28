@@ -4,7 +4,7 @@ import { StatGrid, type StatTile } from "../StatGrid";
 
 function tiles(summary: OverviewSummary): StatTile[] {
   return [
-    { label: "Projects", value: formatCount(summary.projects) },
+    { label: "Branches", value: formatCount(summary.branches) },
     { label: "Sessions", value: formatCount(summary.sessions) },
     { label: "Messages", value: formatCount(summary.messages) },
     {
@@ -29,13 +29,15 @@ function tiles(summary: OverviewSummary): StatTile[] {
   ];
 }
 
-export interface SummaryStatsProps {
+export interface ProjectSummaryStatsProps {
   summary: OverviewSummary;
 }
 
-/** The Overview KPI grid: counts, session-duration, session-cost, and context-token figures for the
- *  selected time range. The six extreme figures (longest/shortest/most-expensive/cheapest/most-tokens/
- *  least-tokens) carry a tooltip naming the project and session they belong to. */
-export function SummaryStats({ summary }: SummaryStatsProps) {
+/** The Projects panel's KPI grid: like Overview's `SummaryStats`, but a branch count instead of a
+ *  project count (the panel is already scoped to one project, so that count would always read 1)
+ *  and adds context-token totals/extremes alongside the existing cost ones. The four extreme tiles
+ *  carry a tooltip naming the branch's session (project is fixed here, so it's mostly the session
+ *  id, kept alongside project for consistency with `SummaryStats`). */
+export function ProjectSummaryStats({ summary }: ProjectSummaryStatsProps) {
   return <StatGrid tiles={tiles(summary)} />;
 }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useDeleteProject, useMeta, useProjects } from "../../api/queries";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useProjects } from "../../api/queries";
 import type { Project } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
 import { ResponsiveList } from "../list/ResponsiveList";
@@ -53,72 +53,73 @@ const columns: ListColumn<Project>[] = [
   },
 ];
 
-/** The Projects page's list: every project Claude Code has been run or trusted in, plus a
- *  select-a-row-to-delete flow (there's no other per-project action here, unlike Sessions'
- *  detail dialog, so selecting a row doubles as "I want to delete this one"). Confirming removes
- *  the entry from ~/.claude.json and its on-disk transcripts, then refetches projects, the All
- *  sessions list, and Overview (wired into useDeleteProject's onSuccess). */
-export function ProjectsList() {
+export interface ProjectsListProps {
+  /** Paths of the projects currently expanded; any number can be open at once, each accented and
+   *  showing `renderExpanded`'s content inline beneath its row. */
+  expandedPaths: Set<string>;
+  /** Clicking a row toggles whether that project's panel is open. */
+  onToggle: (project: Project) => void;
+  /** The panel rendered inline beneath an expanded project's row. */
+  renderExpanded: (project: Project) => ReactNode;
+}
+
+/** The Projects page's list: every project Claude Code has been run or trusted in. Clicking a row
+ *  opens or closes that project's detail panel directly beneath it - it never deletes anything,
+ *  and it works on every device. */
+export function ProjectsList({ expandedPaths, onToggle, renderExpanded }: ProjectsListProps) {
   const projects = useProjects();
-  const deleteProject = useDeleteProject();
-  // Deletes are local-only server-side; on any other device the list is read-only (and stays
-  // that way until /api/meta says otherwise).
-  const isLocal = useMeta().data?.is_local === true;
-  const [pending, setPending] = useState<Project | null>(null);
-
   const rows = projects.data?.projects ?? [];
+  const sectionRef = useRef<HTMLElement>(null);
+  // The path a click just opened, so the effect below knows which row to scroll to once its panel
+  // has actually rendered - closing a row, or a re-render for any other reason, scrolls nothing.
+  const pendingScrollPath = useRef<string | null>(null);
 
-  // Selecting a row only ever starts a delete, so it does nothing off the local machine.
   const handleSelect = (project: Project) => {
-    if (isLocal) setPending(project);
+    if (!expandedPaths.has(project.path)) pendingScrollPath.current = project.path;
+    onToggle(project);
   };
 
-  const handleConfirm = () => {
-    if (!pending) return;
-    deleteProject.mutate(pending.path, { onSuccess: () => setPending(null) });
-  };
+  useEffect(() => {
+    const path = pendingScrollPath.current;
+    if (path === null || !expandedPaths.has(path)) return;
+    pendingScrollPath.current = null;
+    const row = Array.from(sectionRef.current?.querySelectorAll<HTMLElement>("[data-row-id]") ?? []).find(
+      (el) => el.dataset.rowId === path,
+    );
+    if (!row) return;
+
+    const scrollRowIntoView = () => row.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    scrollRowIntoView();
+
+    // The row's own position doesn't move once its panel (the very next sibling) starts rendering
+    // beneath it, but the panel's content (the overview query, then its charts) can still be
+    // loading at that first scroll - the page isn't tall enough yet for the browser to bring the
+    // row all the way to the top. Keep re-scrolling as the panel grows until it settles.
+    const panel = row.nextElementSibling;
+    if (!panel) return;
+    const observer = new ResizeObserver(scrollRowIntoView);
+    observer.observe(panel);
+    const stopWatching = window.setTimeout(() => observer.disconnect(), 2000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(stopWatching);
+    };
+  }, [expandedPaths]);
 
   return (
-    <section aria-label="Projects">
+    <section aria-label="Projects" ref={sectionRef}>
       <ResponsiveList
         columns={columns}
         rows={rows}
         rowId={(p) => p.path}
         onSelect={handleSelect}
-        // Selecting starts a delete, so say that rather than leaving the button named just "demo".
-        rowLabel={(p) => (isLocal ? `Select project ${p.name} to delete` : p.name)}
+        rowLabel={(p) => `${expandedPaths.has(p.path) ? "Hide" : "Show"} details for ${p.name}`}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
-        rowClassName={(p) => (pending && p.path === pending.path ? "row-selected" : undefined)}
+        rowClassName={(p) => (expandedPaths.has(p.path) ? "row-selected" : undefined)}
+        expandedIds={expandedPaths}
+        renderExpanded={renderExpanded}
       />
-
-      {isLocal && pending && (
-        <div className="detail-notice">
-          <p>
-            Delete project <code>{pending.path}</code> from ~/.claude.json and remove all of its on-disk session
-            transcripts? This cannot be undone.
-          </p>
-          <div className="detail-actions">
-            <button
-              type="button"
-              className="button button-danger"
-              disabled={deleteProject.isPending}
-              onClick={handleConfirm}
-            >
-              {deleteProject.isPending ? "Deleting…" : "Confirm delete"}
-            </button>
-            <button
-              type="button"
-              className="button"
-              disabled={deleteProject.isPending}
-              onClick={() => setPending(null)}
-            >
-              Cancel
-            </button>
-          </div>
-          {deleteProject.isError && <p className="detail-caption">{deleteProject.error.message}</p>}
-        </div>
-      )}
     </section>
   );
 }

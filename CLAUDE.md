@@ -197,9 +197,13 @@ Frontend (`cd web`):
 
 ```powershell
 npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/queries, api/token,
-                   # components/ButtonSelector, list/ResponsiveList, projects/ProjectsList (delete hidden off-machine),
+                   # components/ButtonSelector, components/ConfirmDialog (pending blocks Esc/buttons),
+                   # list/ResponsiveList, projects/ProjectsList (a row click selects, never deletes),
+                   # projects/ProjectDetailPanel (charts, empty range, delete button hidden off-machine,
+                   # confirm/error flow), pages/ProjectsPage (`?project=` selection, range reset),
                    # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
-                   # hooks/useViewportClass, lib/format, lib/tokens
+                   # hooks/useViewportClass, lib/format, lib/tokens, lib/activityTrend,
+                   # components/overview/ActivityLineChart (compiles the chart spec: one shared legend)
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
@@ -316,7 +320,7 @@ frontend is a wholly separate process (see `web/` below). Routes:
 | `DELETE /api/sessions/{id}` | **Local requests only** (403 otherwise — a valid token doesn't authorize a delete); 409 if `live.is_live_now(id)` (a *fresh* registry read, not the ≤1s snapshot — a session that just started can't be deleted on stale data), 404 if unknown, else `claude_transcripts.delete_transcript` under the refresh lock |
 | `GET /api/projects` | `{projects: [...]}` |
 | `DELETE /api/projects?path=` | **Local requests only**, like the session delete; 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
-| `GET /api/overview?range=` | 422 for an unknown range label; otherwise `overview_stats.overview()`'s payload |
+| `GET /api/overview?range=&project=&group_by=` | 422 for an unknown range label or `group_by` (`project` default, or `branch`); `project` (a path from `/api/projects`) scopes it to that project's transcripts and 404s unless it exactly matches a known project (its folder is derived server-side via `claude_db.sanitize_project_path`); otherwise `overview_stats.overview()`'s payload, whose donut/bar rows are `groups` (each keyed `group`) plus `group_order`; every response (empty or not) also carries `available_ranges`, the `TIME_RANGES` labels with at least one session in scope (the project's, when scoped), which the Projects panel uses to disable empty range buttons |
 
 There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
 `GZipMiddleware` and `SecurityMiddleware` (added first so it's outermost — nothing else runs for a
@@ -393,12 +397,16 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
   is otherwise standalone. It needs no install step, only that the API run from this checkout.
 - `api/overview_stats.py` — the pure aggregation behind `/api/overview`, no pandas: `TIME_RANGES`
   (All time/Today/Yesterday/Past week/Past month/Past quarter/Past year, bucketed by *local calendar
-  date*, not a rolling window), `filter_by_range`, `project_totals` (top-7 + `"Other"`,
-  `share`/`messages_pct`/`cost_pct`), `hourly_activity` (24-hour buckets trimmed to the contiguous
-  active range, `sessions_pct`/`messages_pct`), `format_duration`, and `summary()` (the KPI figures,
+  date*, not a rolling window), `filter_by_range`, `filter_by_project` (matches a transcript's
+  on-disk parent folder, `path.parent.name`, not its `project` basename, so two same-named projects
+  never merge), `group_totals` (grouped by a `GROUP_KEYS` key — project name or git branch, `""`
+  shown as `"(no branch)"`; top-7 + `"Other"`, `share`/`messages_pct`/`cost_pct`), `time_of_day_activity` (48 half-hour buckets trimmed to the contiguous
+  active range, zero-filled between; each row is `{minute, label, sessions, messages}`), `format_duration`, and `summary()` (the KPI figures,
   extremes annotated with `project`/`session_id` via `_with_session`). `overview()` ties it together
-  into the `/api/overview` response, including `project_order` — the one ordering every chart on the
-  page uses so a project's color never shifts between them.
+  into the `/api/overview` response, including `group_order` — the one ordering every chart on the
+  page uses so a group's color never shifts between them. `overview()` takes an optional
+  `project_folder` and a `group_by`, so the Overview page and the Projects page's per-project panel
+  share one aggregation path.
 - `api/transcript_query.py` — the filter/sort logic behind `/api/transcripts`: `filter_transcripts`
   (literal case-insensitive substring over session ID/last message/first prompt, AND-combined with
   project/version/branch membership), `sort_transcripts` (stable, missing values last either
@@ -513,28 +521,48 @@ any unknown path) rendered inside `AppShell`.
   ring and hover glow. No form binding: this app has no forms. `test-setup.ts` stubs `ResizeObserver` since jsdom lacks it.
 - **Overview** (`components/overview/`, `pages/OverviewPage.tsx`): `TimeRangeSelector` is a
   `ButtonSelector` (single-select, hidden label) over the same seven ranges as `overview_stats.TIME_RANGES`.
-  `chartTheme.ts`'s `chartColors()`/`projectColorScale()`/`projectColorMap()` centralize reading the
-  CSS-variable palette and turning the API's `project_order` into a Vega-Lite domain/range (`"Other"`
-  always the muted ink) shared by `ProjectDonutChart` and `ProjectBarChart`; `ProjectDonutChart` draws
-  its own color key as a plain HTML list (`ProjectLegend`) instead of a Vega-Lite legend so long
-  project names wrap instead of clipping. `ProjectBarChart` ("Messages & Cost by Project") and
-  `HourlyBarChart` ("Activity by Hour of Day") both normalize each measure to % of its own peak (a
-  deliberate non-dual-axis choice so two differently-scaled measures can share one axis) and keep
-  "Messages" on the same categorical hue (`hues[0]`) in both charts. All three charts use the shared `useVegaEmbed` hook
+  `chartTheme.ts`'s `chartColors()`/`groupColorScale()`/`groupColorMap()` centralize reading the
+  CSS-variable palette and turning the API's `group_order` into a Vega-Lite domain/range (`"Other"`
+  always the muted ink) shared by `GroupDonutChart` and `GroupBarChart`; both take `groups`,
+  `groupOrder` and a `groupLabel` (`"project"` on Overview, `"branch"` in the Projects panel) that
+  drives their headings, aria labels, tooltip titles and captions. `GroupDonutChart` draws
+  its own color key as a plain HTML list (`GroupLegend`) instead of a Vega-Lite legend so long
+  group names wrap instead of clipping. `GroupBarChart` ("Messages & Cost by Project"/"…by Branch")
+  normalizes each measure to % of its own peak (a non-dual-axis choice so two differently-scaled
+  measures can share one axis). `ActivityLineChart` ("Activity by Hour of Day", in 30-minute blocks, smoothed lines, plus a grey "Activity trend" layer from `lib/activityTrend.ts`: each measure as a share of its own peak, averaged, then a 3-block moving average, on its own hidden 0-100 scale, with the calculation explained in a caption note) instead is a layered
+  dual-axis line chart of absolute counts — Sessions on the left axis, Messages on the right
+  (`resolve.scale.y: "independent"`), gridlines on the left only. Both keep "Messages" on the same
+  categorical hue (`hues[0]`). All three charts use the shared `useVegaEmbed` hook
   (lazy `vega-embed` import, re-embeds on spec change, `useVegaEmbed.ts` — the general form of the
   pattern `TokensChart` uses directly). `SummaryStats` renders the KPI tiles; the four extreme
   figures are buttons that toggle an inline disclosure naming their project/session (plus a `title`
   attribute for hover on pointer devices) since there's no hover-only affordance on a touchscreen.
-- **Projects** (`components/projects/ProjectsList.tsx`, `pages/ProjectsPage.tsx`) renders every
-  field from `useProjects()` (name, path, trust, last session, version, last cost, last start, lines
-  +/-, MCP servers) through the same `ResponsiveList` the Sessions lists use. There's no per-project
-  detail view here, so — unlike
-  Sessions, where a row click opens a dialog — a row click doubles as "delete this one" (a
-  dedicated per-row delete button isn't possible without nesting a `<button>` inside `ListCards`'
-  card-as-button); selecting a row shows an inline `detail-notice` confirmation naming the exact
-  path before Confirm/Cancel — but only when `useMeta().is_local`; on another device a row click
-  does nothing, since the API refuses remote deletes. Confirming calls `useDeleteProject`, whose `onSuccess` already
-  invalidates the `projects`, `transcripts`, and `overview` queries.
+- **Projects** (`components/projects/ProjectsList.tsx`, `ProjectDetailPanel.tsx`,
+  `pages/ProjectsPage.tsx`): `ProjectsList` renders every field from `useProjects()` (name, path,
+  trust, last session, version, last cost, last start, lines +/-, MCP servers) through the same
+  `ResponsiveList` the Sessions lists use, as a selection-only list (`selectedPath`/`onSelect`,
+  `row-selected` class): a row click selects on every device and never deletes. Like Sessions, the
+  selection lives in the URL (`?project=<path>`, via `useSearchParams` in `ProjectsPage`), so a reload
+  or shared link reopens it; a `?project=` that isn't a known project (deleted, or stale) is dropped
+  once the list has loaded. The page renders `ProjectDetailPanel` under the list with
+  `key={project.path}`, so its time range (`TimeRangeSelector`, default "All time") resets on every
+  newly selected project and a fresh query never shows the previous project's charts; selecting
+  scrolls the panel into view. The panel feeds `useOverview(range, {project, groupBy: "branch"})` into
+  `GroupDonutChart`, `GroupBarChart` (both `groupLabel="branch"`) and `ActivityLineChart`, or says
+  no sessions were found for an empty range. A session counts under the last branch recorded in its
+  transcript. The panel also owns delete: a "Delete project" button, shown only when
+  `useMeta().is_local` (the API refuses remote deletes anyway), opens a `ConfirmDialog` naming the
+  exact path and that it can't be undone. Confirming calls `useDeleteProject`, whose `onSuccess`
+  already invalidates the `projects`, `transcripts`, and `overview` queries (the panel's
+  `["overview", ...]` query key shares that prefix); on success the page clears `?project=`, and on
+  failure the error stays in the dialog.
+- **`ConfirmDialog`** (`components/ConfirmDialog.tsx` + `.module.css`): a small generic confirmation
+  modal on a native `<dialog>` kept mounted and synced to `open` (`showModal()`/`close()`, like
+  `SessionDialog`, but not full-screen on narrow viewports). Props: `open`, `title`, `children`,
+  `confirmLabel`, `pending`, `error`, `onConfirm`, `onCancel`. While `pending`, both buttons are
+  disabled and Esc/backdrop clicks are ignored; otherwise all three call `onCancel`. `test-setup.ts`
+  stubs `showModal`/`close` where jsdom lacks them, so tests can't check native behavior such as
+  focus trapping — that's verified by hand. Sessions' inline `DeleteControls` still confirms inline.
 - **`lib/format.ts`** — display formatting for API values (`formatTime`, `formatDateTime`,
   `formatCost`, `formatContext`, `formatText`, `formatCount`; every one renders `"--"` for a missing
   value). **`lib/tokens.ts`** — `humanizeTokens`/`formatGrowth`, a deliberate port of
@@ -573,9 +601,10 @@ and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment varia
 8501/4173). `Start-Gateway.ps1` loads the root `.env` (see "Setup & Run" above), runs
 `docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
 `Stop-Gateway.ps1` runs `docker compose down` and touches nothing else. `api/gateway_signin.py`
-prints `https://` links and encodes the QR with the same HTTPS address, with a note that the
-self-signed certificate will draw a one-time browser warning; it
-reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
+prints an "Open on this device" `http://localhost:<frontend port>` line (`--frontend-port`, env
+`FRONTEND_PORT`, default 4173), then `https://` links for the other devices, encoding the QR with the
+first HTTPS address, with a note that the self-signed certificate will draw a one-time browser
+warning; it reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
 `banner.render_qr()` (not its own copy) so address-discovery logic still lives in exactly one place.
 
 ### `hooks/`

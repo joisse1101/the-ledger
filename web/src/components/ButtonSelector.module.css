@@ -21,6 +21,9 @@
   --fade-start: 0px;
   --fade-end: 0px;
   --glow-room: 1.5rem; /* about how far --shadow-glow (a 20px blur) visibly reaches */
+  /* Sideways it can't reach further than the page gutter, or the negative margin below pushes the
+     scroller past the screen edge and the whole page scrolls sideways. */
+  --glow-room-x: min(var(--glow-room), var(--gutter));
 
   display: flex;
   overflow-x: auto;
@@ -29,8 +32,8 @@
      outside the buttons; this padding gives them room and the negative margin cancels it out.
      No `width`: a negative margin only widens a block whose width is auto (it's a stretched flex
      item here), whereas a fixed 100% would just shift it sideways. */
-  padding: var(--glow-room);
-  margin: calc(-1 * var(--glow-room));
+  padding: var(--glow-room) var(--glow-room-x);
+  margin: calc(-1 * var(--glow-room)) calc(-1 * var(--glow-room-x));
   -webkit-mask-image: linear-gradient(
     to right,
     transparent,
@@ -118,6 +121,20 @@
 .selected:hover {
   background-color: var(--bg-surface-hover);
   border-color: var(--border-color);
+}
+
+.option:disabled,
+.option:disabled:hover {
+  color: var(--muted-ink);
+  background-color: var(--bg-surface);
+  border-color: var(--border-subtle);
+  box-shadow: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.option:disabled:active {
+  transform: none;
 }
 
 /* Last, so the ring still shows on a button that's also hovered or selected. */
