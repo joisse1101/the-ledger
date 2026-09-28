@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+import claude_db
+import claude_transcripts
 import overview_stats as overview
 from claude_transcripts import ClaudeTranscript
 
@@ -418,3 +420,46 @@ def test_overview_activity_buckets_are_unchanged_by_grouping():
     by_project_result = overview.overview([t], "All time")["activity"]
     by_branch_result = overview.overview([t], "All time", group_by="branch")["activity"]
     assert by_project_result == by_branch_result == overview.time_of_day_activity([t])
+
+
+# ---------------------------------------------------------------------------
+# A history-only (pruned-from-disk) session flows through claude_transcripts.
+# load_transcripts() into overview() unchanged - no code here is aware of
+# history.db at all.
+# ---------------------------------------------------------------------------
+
+
+def _history_only_row(session_id="pruned", **overrides):
+    row = {
+        "session_id": session_id,
+        "path": Path("/tmp/some/pruned.jsonl"),
+        "cwd": "/tmp/some",
+        "version": "1.0.0",
+        "git_branch": "main",
+        "started_at": datetime(2024, 6, 15, 9, 0, 0),
+        "updated_at": datetime(2024, 6, 15, 9, 5, 0),
+        "message_count": 4,
+        "cost": 0.5,
+        "context": 1000,
+        "project": "some",
+        "title": "",
+        "last_message": "",
+        "first_prompt": "",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_overview_counts_a_history_only_session_with_unmodified_code(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()  # nothing left on disk - the session only exists in history.db
+    claude_db.upsert_history_transcripts([_history_only_row()])
+
+    transcripts = claude_transcripts.load_transcripts()
+    result = overview.overview(transcripts, "All time")
+
+    assert result["empty"] is False
+    assert result["summary"]["sessions"] == 1
+    assert result["summary"]["messages"] == 4
+    assert [row["group"] for row in result["groups"]] == ["some"]
+    assert result["groups"][0]["sessions"] == 1

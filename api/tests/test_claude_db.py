@@ -608,6 +608,42 @@ def test_fetch_history_transcripts_returns_all_rows(isolated_db):
     assert {row["session_id"] for row in rows} == {"s1", "s2"}
 
 
+# ---------------------------------------------------------------------------
+# fetch_transcripts() - merges live ledger.db rows with history.db's durable rows
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_transcripts_includes_history_only_session(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()  # no live transcripts on disk
+
+    claude_db.upsert_history_transcripts([_history_row("history-only")])
+
+    transcripts = claude_db.fetch_transcripts()
+    assert [row["session_id"] for row in transcripts] == ["history-only"]
+
+
+def test_fetch_transcripts_prefers_live_row_over_history_row(
+    isolated_db, write_config, write_transcript
+):
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    write_transcript(
+        tmp_path / "projects" / folder / "s1.jsonl",
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj", "sessionId": "s1"}],
+    )
+    claude_db.refresh()
+
+    claude_db.upsert_history_transcripts([_history_row("s1", cost=999.0, message_count=999)])
+
+    transcripts = claude_db.fetch_transcripts()
+    assert len(transcripts) == 1
+    assert transcripts[0]["session_id"] == "s1"
+    assert transcripts[0]["message_count"] == 1
+    assert transcripts[0]["cost"] == 0.0
+
+
 def _db_files(directory):
     return sorted(p.name for p in directory.glob("ledger.db*"))
 

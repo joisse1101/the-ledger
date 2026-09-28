@@ -11,11 +11,11 @@
 
 ## 2. Merge into live reads
 
-- [ ] 2.1 Change `claude_db.fetch_transcripts()` to merge live `ledger.db` rows with `history.db`
+- [x] 2.1 Change `claude_db.fetch_transcripts()` to merge live `ledger.db` rows with `history.db`
       rows by `session_id`, preferring the live row on conflict; verify with a unit test: a
       session present only in history appears in the merged output, and a session present in both
       returns the live row's field values.
-- [ ] 2.2 Confirm `claude_transcripts.load_transcripts()`, `overview_stats.py`, and
+- [x] 2.2 Confirm `claude_transcripts.load_transcripts()`, `overview_stats.py`, and
       `transcript_query.py` need no code changes; verify by extending `test_overview_stats.py` and
       `test_transcript_query.py` with a case that includes a history-only (no longer on-disk)
       session and asserting it's counted/listed correctly with existing, unmodified code.

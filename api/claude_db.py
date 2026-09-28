@@ -650,11 +650,19 @@ def fetch_projects() -> list[sqlite3.Row]:
 
 
 def fetch_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row, newest-updated first (NULLs last)."""
+    """Every transcript row, live `ledger.db` rows merged with `history.db`'s durable rows by
+    `session_id` (the live row wins whenever a session exists in both - it's the fresher scan),
+    newest-updated first (NULLs last)."""
     with _connect() as conn:
-        return conn.execute(
-            "SELECT * FROM transcripts ORDER BY updated_at IS NULL, updated_at DESC"
-        ).fetchall()
+        live_rows = conn.execute("SELECT * FROM transcripts").fetchall()
+    history_rows = fetch_history_transcripts()
+
+    merged: dict[str, sqlite3.Row] = {row["session_id"]: row for row in history_rows}
+    merged.update({row["session_id"]: row for row in live_rows})
+
+    # Empty string sorts before any ISO timestamp, so `reverse=True` puts NULLs
+    # (mapped to "") last while still ordering real timestamps newest-first.
+    return sorted(merged.values(), key=lambda row: row["updated_at"] or "", reverse=True)
 
 
 def delete_project_row(project_path: str) -> None:
