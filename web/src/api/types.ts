@@ -269,10 +269,12 @@ export interface ActivityBucket {
 export type OverviewGroupBy = "project" | "branch";
 
 export type OverviewResponse =
-  | { range: string; empty: true }
+  | { range: string; empty: true; available_ranges: string[] }
   | {
       range: string;
       empty: false;
+      /** The time ranges that contain at least one session (within the project, when scoped to one). */
+      available_ranges: string[];
       summary: OverviewSummary;
       groups: GroupTotals[];
       /** The one order every grouped chart uses; colors follow a group's index in it. */

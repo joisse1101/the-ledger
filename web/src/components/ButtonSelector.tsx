@@ -5,6 +5,8 @@ import styles from "./ButtonSelector.module.css";
 export interface ButtonSelectorOption<T extends string | number> {
   value: T;
   label: ReactNode;
+  /** Greys the button out and stops it being chosen. */
+  disabled?: boolean;
 }
 
 interface CommonProps<T extends string | number> {
@@ -89,6 +91,7 @@ export function ButtonSelector<T extends string | number>(props: ButtonSelectorP
               {...(props.multiple
                 ? { "aria-pressed": selected }
                 : { role: "radio", "aria-checked": selected })}
+              disabled={option.disabled}
               className={selected ? `${styles.option} ${styles.selected}` : styles.option}
               onClick={() => select(option.value)}
             >

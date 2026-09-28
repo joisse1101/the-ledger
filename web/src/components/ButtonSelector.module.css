@@ -123,6 +123,20 @@
   border-color: var(--border-color);
 }
 
+.option:disabled,
+.option:disabled:hover {
+  color: var(--muted-ink);
+  background-color: var(--bg-surface);
+  border-color: var(--border-subtle);
+  box-shadow: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.option:disabled:active {
+  transform: none;
+}
+
 /* Last, so the ring still shows on a button that's also hovered or selected. */
 .option:focus-visible {
   border-color: var(--border-focus);

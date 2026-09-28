@@ -38,6 +38,7 @@ const project: Project = {
 const populated = {
   range: "All time",
   empty: false,
+  available_ranges: ["All time", "Past week", "Past year"],
   summary: {},
   groups: [{ group: "main", sessions: 2, messages: 4, cost: 1, share: 100, messages_pct: 100, cost_pct: 100 }],
   group_order: ["main"],
@@ -121,7 +122,7 @@ describe("ProjectDetailPanel charts", () => {
   });
 
   it("says so, instead of drawing empty charts, when the range has no sessions", async () => {
-    stubApi({ overview: { range: "All time", empty: true } });
+    stubApi({ overview: { range: "All time", empty: true, available_ranges: [] } });
     const { client } = renderPanel();
 
     expect(await screen.findByText("No sessions found for this project.")).toBeInTheDocument();
@@ -129,8 +130,20 @@ describe("ProjectDetailPanel charts", () => {
     client.clear();
   });
 
+  it("disables the time ranges that have no sessions for the project", async () => {
+    stubApi({ overview: populated });
+    const { client } = renderPanel();
+    await screen.findByTestId("donut");
+
+    expect(screen.getByRole("radio", { name: "All time" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Past week" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Today" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Past month" })).toBeDisabled();
+    client.clear();
+  });
+
   it("names the range in the empty message for any other range", async () => {
-    stubApi({ overview: { range: "Today", empty: true } });
+    stubApi({ overview: { range: "Today", empty: true, available_ranges: ["All time", "Today"] } });
     const { client } = renderPanel();
     await screen.findByText("No sessions found for this project.");
 

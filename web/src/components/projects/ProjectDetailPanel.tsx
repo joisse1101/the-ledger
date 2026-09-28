@@ -67,7 +67,7 @@ export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDet
         )}
       </header>
 
-      <TimeRangeSelector value={range} onChange={setRange} />
+      <TimeRangeSelector value={range} onChange={setRange} availableRanges={data?.available_ranges} />
 
       {data && !data.empty && (
         <>

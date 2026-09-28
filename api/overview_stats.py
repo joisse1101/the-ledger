@@ -64,6 +64,12 @@ def filter_by_range(
     return result
 
 
+def available_ranges(transcripts: Sequence[ClaudeTranscript]) -> list[str]:
+    """The `TIME_RANGES` labels (in display order) that contain at least one of these transcripts,
+    so the UI can disable a range that would only show nothing."""
+    return [label for label in TIME_RANGES if filter_by_range(transcripts, label)]
+
+
 def filter_by_project(
     transcripts: Sequence[ClaudeTranscript], folder: str
 ) -> list[ClaudeTranscript]:
@@ -260,13 +266,15 @@ def overview(
     """
     if project_folder is not None:
         transcripts = filter_by_project(transcripts, project_folder)
+    available = available_ranges(transcripts)
     filtered = filter_by_range(transcripts, range_label)
     if not filtered:
-        return {"range": range_label, "empty": True}
+        return {"range": range_label, "empty": True, "available_ranges": available}
     groups = group_totals(filtered, GROUP_KEYS[group_by])
     return {
         "range": range_label,
         "empty": False,
+        "available_ranges": available,
         "summary": summary(filtered),
         "groups": groups,
         "group_order": [row["group"] for row in groups],

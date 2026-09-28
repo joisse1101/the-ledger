@@ -321,9 +321,27 @@ def test_summary_of_nothing_is_placeholders_not_errors():
 # ---------------------------------------------------------------------------
 
 
+def test_available_ranges_lists_only_ranges_with_a_session_in_display_order():
+    today = overview.datetime.now().astimezone()
+    assert overview.available_ranges([]) == []
+    assert overview.available_ranges([_transcript(started_at=datetime(2020, 1, 1))]) == ["All time"]
+    assert overview.available_ranges([_transcript(started_at=today)]) == [
+        "All time",
+        "Today",
+        "Past week",
+        "Past month",
+        "Past quarter",
+        "Past year",
+    ]
+
+
 def test_overview_for_an_empty_range_is_an_empty_state_not_an_error():
     old = _transcript(started_at=datetime(2020, 1, 1))
-    assert overview.overview([old], "Yesterday") == {"range": "Yesterday", "empty": True}
+    assert overview.overview([old], "Yesterday") == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
 def test_overview_group_order_matches_group_rows():
@@ -350,7 +368,11 @@ def test_overview_scoped_to_a_project_folder_ignores_the_others():
 
 def test_overview_scoped_to_a_project_with_nothing_in_range_is_empty():
     old = _transcript(started_at=datetime(2020, 1, 1), path="projects/-h-a/s.jsonl")
-    assert overview.overview([old], "Yesterday", "-h-a") == {"range": "Yesterday", "empty": True}
+    assert overview.overview([old], "Yesterday", "-h-a") == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
 def test_overview_activity_buckets_are_unchanged_by_grouping():

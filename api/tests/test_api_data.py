@@ -599,7 +599,11 @@ def test_overview_empty_range_is_an_empty_state_not_an_error(api):
     # The seeded sessions are all from January 2024.
     response = api.get("/api/overview", params={"range": "Yesterday"})
     assert response.status_code == 200
-    assert response.json() == {"range": "Yesterday", "empty": True}
+    assert response.json() == {
+        "range": "Yesterday",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
 def test_overview_group_order_is_shared_by_the_chart_arrays(api):
@@ -662,7 +666,11 @@ def test_overview_scoped_call_still_applies_the_range(with_projects):
     # Every seeded session is from January 2024, so a recent range leaves the project empty.
     response = with_projects.get("/api/overview", params={"project": "/h/alpha", "range": "Past week"})
     assert response.status_code == 200
-    assert response.json() == {"range": "Past week", "empty": True}
+    assert response.json() == {
+        "range": "Past week",
+        "empty": True,
+        "available_ranges": ["All time"],
+    }
 
 
 # ---------------------------------------------------------------- /api/sessions/{id}
