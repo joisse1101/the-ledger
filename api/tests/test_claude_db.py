@@ -644,6 +644,88 @@ def test_fetch_transcripts_prefers_live_row_over_history_row(
     assert transcripts[0]["cost"] == 0.0
 
 
+# ---------------------------------------------------------------------------
+# Delete propagation - deleting a session/project purges history.db too
+# ---------------------------------------------------------------------------
+
+
+def test_delete_transcript_row_purges_both_stores(isolated_db, write_config, write_transcript):
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    write_transcript(
+        tmp_path / "projects" / folder / "s1.jsonl",
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj", "sessionId": "s1"}],
+    )
+    claude_db.refresh()
+    claude_db.upsert_history_transcripts([_history_row("s1")])
+
+    claude_db.delete_transcript_row("s1")
+
+    assert claude_db.fetch_transcripts() == []
+    assert claude_db.fetch_history_transcripts() == []
+
+
+def test_delete_transcript_row_purges_history_only_session(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()
+    claude_db.upsert_history_transcripts([_history_row("history-only")])
+
+    claude_db.delete_transcript_row("history-only")
+
+    assert claude_db.fetch_transcripts() == []
+    assert claude_db.fetch_history_transcripts() == []
+
+
+def test_transcript_path_for_session_falls_back_to_history(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()
+    claude_db.upsert_history_transcripts(
+        [_history_row("history-only", path=Path("/tmp/some/history-only.jsonl"))]
+    )
+
+    assert claude_db.transcript_path_for_session("history-only") == Path(
+        "/tmp/some/history-only.jsonl"
+    )
+    assert claude_db.transcript_path_for_session("nonexistent") is None
+
+
+def test_delete_transcript_rows_by_project_purges_both_stores(
+    isolated_db, write_config, write_transcript
+):
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    write_transcript(
+        tmp_path / "projects" / folder / "s1.jsonl",
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj", "sessionId": "s1"}],
+    )
+    claude_db.refresh()
+    claude_db.upsert_history_transcripts(
+        [_history_row("s1", path=tmp_path / "projects" / folder / "s1.jsonl")]
+    )
+
+    claude_db.delete_transcript_rows_by_project("/home/x/proj")
+
+    assert claude_db.fetch_transcripts() == []
+    assert claude_db.fetch_history_transcripts() == []
+
+
+def test_delete_transcript_rows_by_project_purges_history_only_sessions(isolated_db, write_config):
+    """A project whose sessions are already pruned from disk and absent from ledger.db still
+    has its history.db rows removed, matched by the same on-disk folder name."""
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    claude_db.upsert_history_transcripts(
+        [_history_row("history-only", path=Path(f"/whatever/{folder}/history-only.jsonl"))]
+    )
+
+    claude_db.delete_transcript_rows_by_project("/home/x/proj")
+
+    assert claude_db.fetch_history_transcripts() == []
+
+
 def _db_files(directory):
     return sorted(p.name for p in directory.glob("ledger.db*"))
 

@@ -683,9 +683,10 @@ def transcript_paths_for_project(project_path: str) -> list[Path]:
     return [Path(row["path"]) for row in rows if Path(row["path"]).parent.name == folder]
 
 
-def delete_transcript_rows_by_project(project_path: str) -> None:
-    folder = sanitize_project_path(project_path)
-    with _connect() as conn:
+def _delete_transcript_rows_by_project_in(
+    connect: Callable[[], Any], folder: str
+) -> None:
+    with connect() as conn:
         rows = conn.execute("SELECT session_id, path FROM transcripts").fetchall()
         session_ids = [row["session_id"] for row in rows if Path(row["path"]).parent.name == folder]
         if session_ids:
@@ -695,8 +696,29 @@ def delete_transcript_rows_by_project(project_path: str) -> None:
             )
 
 
+def delete_transcript_rows_by_project(project_path: str) -> None:
+    """Remove a project's transcript rows from both `ledger.db` and `history.db`.
+
+    Matched by the same on-disk folder name `transcript_paths_for_project` uses, since a
+    `history.db` row (a session already pruned from disk) carries the same `path` shape.
+    """
+    folder = sanitize_project_path(project_path)
+    _delete_transcript_rows_by_project_in(_connect, folder)
+    _delete_transcript_rows_by_project_in(_connect_history, folder)
+
+
 def transcript_path_for_session(session_id: str) -> Optional[Path]:
+    """A session's transcript path from `ledger.db`, falling back to `history.db` when the
+    session is no longer live (e.g. already pruned from disk) - so callers checking whether a
+    session is known at all (the delete route's 404 check) recognize a history-only session too.
+    """
     with _connect() as conn:
+        row = conn.execute(
+            "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
+        ).fetchone()
+    if row is not None:
+        return Path(row["path"])
+    with _connect_history() as conn:
         row = conn.execute(
             "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -704,5 +726,8 @@ def transcript_path_for_session(session_id: str) -> Optional[Path]:
 
 
 def delete_transcript_row(session_id: str) -> None:
+    """Remove one session's row from whichever of `ledger.db`/`history.db` has it."""
     with _connect() as conn:
+        conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))
+    with _connect_history() as conn:
         conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))

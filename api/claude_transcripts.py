@@ -75,12 +75,19 @@ def delete_project_transcripts(project_path: str) -> int:
 
 
 def delete_transcript(session_id: str) -> bool:
-    """Delete one session's transcript file and its SQLite row; True if it was found."""
+    """Delete one session's transcript file and its SQLite row(s); True if it was found.
+
+    A history-only session (already pruned from disk, known only from `history.db`) has no
+    file left to remove - `unlink()`'s `FileNotFoundError` is treated as "already gone" rather
+    than a failure, and the row purge still runs against whichever store has it.
+    """
     path = claude_db.transcript_path_for_session(session_id)
     if path is None:
         return False
     try:
         path.unlink()
+    except FileNotFoundError:
+        pass
     except OSError:
         return False
     claude_db.delete_transcript_row(session_id)

@@ -22,7 +22,7 @@
 
 ## 3. Delete propagation
 
-- [ ] 3.1 Extend the session-delete path so deleting a transcript also removes its row from
+- [x] 3.1 Extend the session-delete path so deleting a transcript also removes its row from
       `history.db`, including a session known only from `history.db` (already pruned from disk and
       absent from `ledger.db`) - the existence check backing `DELETE /api/sessions/{id}`'s 404 must
       recognize it as known, and the delete itself must tolerate the file already being gone rather
@@ -30,7 +30,7 @@
       `session_id` is absent from both the merged `fetch_transcripts()` output and a raw fetch of
       `history.db`; (b) deleting a history-only session succeeds (no 404/500) and purges its
       `history.db` row.
-- [ ] 3.2 Extend the project-delete path (`delete_transcript_rows_by_project`) to remove that
+- [x] 3.2 Extend the project-delete path (`delete_transcript_rows_by_project`) to remove that
       project's rows from `history.db` too, using the same on-disk-folder matching the live path
       already uses; verify with a unit test covering a project that has sessions in `history.db`
       only (already pruned from disk and from `ledger.db`).
