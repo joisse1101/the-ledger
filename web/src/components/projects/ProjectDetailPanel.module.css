@@ -1,7 +1,5 @@
 .root {
-  margin-top: 1rem;
   padding: 1rem;
-  scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + 0.5rem);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--bg-surface);

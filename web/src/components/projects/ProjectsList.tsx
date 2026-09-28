@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useProjects } from "../../api/queries";
 import type { Project } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
@@ -53,15 +54,19 @@ const columns: ListColumn<Project>[] = [
 ];
 
 export interface ProjectsListProps {
-  /** Path of the selected project, if any; its row is accented. */
-  selectedPath: string | null;
-  onSelect: (project: Project) => void;
+  /** Paths of the projects currently expanded; any number can be open at once, each accented and
+   *  showing `renderExpanded`'s content inline beneath its row. */
+  expandedPaths: Set<string>;
+  /** Clicking a row toggles whether that project's panel is open. */
+  onToggle: (project: Project) => void;
+  /** The panel rendered inline beneath an expanded project's row. */
+  renderExpanded: (project: Project) => ReactNode;
 }
 
-/** The Projects page's list: every project Claude Code has been run or trusted in. Selecting a row
- *  only reports the choice (the page shows that project's charts); it never deletes anything, and
- *  it works on every device. */
-export function ProjectsList({ selectedPath, onSelect }: ProjectsListProps) {
+/** The Projects page's list: every project Claude Code has been run or trusted in. Clicking a row
+ *  opens or closes that project's detail panel directly beneath it - it never deletes anything,
+ *  and it works on every device. */
+export function ProjectsList({ expandedPaths, onToggle, renderExpanded }: ProjectsListProps) {
   const projects = useProjects();
   const rows = projects.data?.projects ?? [];
 
@@ -71,11 +76,13 @@ export function ProjectsList({ selectedPath, onSelect }: ProjectsListProps) {
         columns={columns}
         rows={rows}
         rowId={(p) => p.path}
-        onSelect={onSelect}
-        rowLabel={(p) => `Select project ${p.name}`}
+        onSelect={onToggle}
+        rowLabel={(p) => `${expandedPaths.has(p.path) ? "Hide" : "Show"} details for ${p.name}`}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
-        rowClassName={(p) => (p.path === selectedPath ? "row-selected" : undefined)}
+        rowClassName={(p) => (expandedPaths.has(p.path) ? "row-selected" : undefined)}
+        expandedIds={expandedPaths}
+        renderExpanded={renderExpanded}
       />
     </section>
   );

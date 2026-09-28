@@ -376,6 +376,28 @@
   box-shadow: inset 0.1875rem 0 0 var(--brand-accent);
 }
 
+/* ---- expandable row/card content (e.g. the Projects list's per-project panel) */
+
+.list-table tbody tr.list-table-expanded-row {
+  cursor: default;
+}
+
+.list-table tbody tr.list-table-expanded-row:hover {
+  background: transparent;
+}
+
+.list-table tbody tr.list-table-expanded-row td {
+  padding: 0.75rem;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.list-card-expanded {
+  margin-top: 0.5rem;
+}
+
 /* Shared by any list's "this is the selected row" state, e.g. the Projects list's
    selected project (whose charts are shown under the list). */
 .list-table tbody tr.row-selected,

@@ -42,6 +42,11 @@ export interface ResponsiveListProps<T> {
    *  say what selecting does (e.g. "Select project X"). Table only: a card's button
    *  already names itself from all its fields, which a label here would replace. */
   rowLabel?: (row: T) => string;
+  /** Row ids currently expanded; paired with `renderExpanded` to show inline content directly
+   *  beneath that row/card. Any number of rows can be expanded at once. */
+  expandedIds?: Set<string>;
+  /** Content rendered inline beneath an expanded row/card, e.g. a detail panel. */
+  renderExpanded?: (row: T) => ReactNode;
 }
 
 export function cardPriorityOf<T>(column: ListColumn<T>): CardPriority {

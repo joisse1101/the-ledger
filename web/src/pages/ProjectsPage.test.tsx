@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../api/queryClient";
@@ -78,23 +78,24 @@ function renderPage(entry = "/projects") {
 }
 
 const search = () => new URLSearchParams(screen.getByTestId("search").textContent ?? "");
+const openProjects = () => search().getAll("project");
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("ProjectsPage", () => {
-  it("shows no panel until a project is selected, then shows that project's and puts it in the URL", async () => {
+  it("shows no panel until a project is opened, then shows that project's inline and puts it in the URL", async () => {
     stubApi();
     const client = renderPage();
-    const select = await screen.findByRole("button", { name: "Select project alpha" });
+    const open = await screen.findByRole("button", { name: "Show details for alpha" });
     expect(screen.queryByRole("region", { name: /Charts for/ })).not.toBeInTheDocument();
 
-    fireEvent.click(select);
+    fireEvent.click(open);
 
     expect(await screen.findByRole("region", { name: "Charts for alpha" })).toBeInTheDocument();
     expect(await screen.findByTestId("donut")).toBeInTheDocument();
-    expect(search().get("project")).toBe(alpha.path);
+    expect(openProjects()).toEqual([alpha.path]);
     client.clear();
   });
 
@@ -103,7 +104,7 @@ describe("ProjectsPage", () => {
     const client = renderPage(`/projects?project=${encodeURIComponent(beta.path)}`);
 
     expect(await screen.findByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
-    expect(search().get("project")).toBe(beta.path);
+    expect(openProjects()).toEqual([beta.path]);
     client.clear();
   });
 
@@ -111,36 +112,66 @@ describe("ProjectsPage", () => {
     stubApi();
     const client = renderPage(`/projects?project=${encodeURIComponent("C:\\repos\\gone")}`);
 
-    await waitFor(() => expect(search().get("project")).toBeNull());
+    await waitFor(() => expect(openProjects()).toEqual([]));
     expect(screen.queryByRole("region", { name: /Charts for/ })).not.toBeInTheDocument();
     client.clear();
   });
 
-  it("replaces the charts, and resets the range to All time, when another project is selected", async () => {
+  it("drops only the stale entry, keeping any other still-known project open", async () => {
+    stubApi();
+    const client = renderPage(
+      `/projects?project=${encodeURIComponent("C:\\repos\\gone")}&project=${encodeURIComponent(alpha.path)}`,
+    );
+
+    await waitFor(() => expect(openProjects()).toEqual([alpha.path]));
+    expect(await screen.findByRole("region", { name: "Charts for alpha" })).toBeInTheDocument();
+    client.clear();
+  });
+
+  it("opens a second project's panel alongside the first, each keeping its own range", async () => {
     stubApi();
     const client = renderPage(`/projects?project=${encodeURIComponent(alpha.path)}`);
     await screen.findByRole("region", { name: "Charts for alpha" });
     fireEvent.click(screen.getByRole("radio", { name: "Past week" }));
     expect(screen.getByRole("radio", { name: "Past week" })).toBeChecked();
 
-    fireEvent.click(screen.getByRole("button", { name: "Select project beta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show details for beta" }));
 
     expect(await screen.findByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "All time" })).toBeChecked();
-    expect(search().get("project")).toBe(beta.path);
+    expect(screen.getByRole("region", { name: "Charts for alpha" })).toBeInTheDocument();
+    expect(openProjects().sort()).toEqual([alpha.path, beta.path].sort());
     client.clear();
   });
 
-  it("clears the selection once the project is deleted", async () => {
+  it("closes a project's panel without touching any other open one", async () => {
     stubApi();
-    const client = renderPage(`/projects?project=${encodeURIComponent(alpha.path)}`);
-    fireEvent.click(await screen.findByRole("button", { name: "Delete project" }));
+    const client = renderPage(
+      `/projects?project=${encodeURIComponent(alpha.path)}&project=${encodeURIComponent(beta.path)}`,
+    );
+    await screen.findByRole("region", { name: "Charts for alpha" });
+    await screen.findByRole("region", { name: "Charts for beta" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide details for alpha" }));
 
-    await waitFor(() => expect(search().get("project")).toBeNull());
-    expect(screen.queryByRole("region", { name: /Charts for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
+    expect(openProjects()).toEqual([beta.path]);
+    client.clear();
+  });
+
+  it("closes just that project's panel once it is deleted", async () => {
+    stubApi();
+    const client = renderPage(
+      `/projects?project=${encodeURIComponent(alpha.path)}&project=${encodeURIComponent(beta.path)}`,
+    );
+    const alphaPanel = await screen.findByRole("region", { name: "Charts for alpha" });
+
+    fireEvent.click(await within(alphaPanel).findByRole("button", { name: "Delete project" }));
+    fireEvent.click(within(alphaPanel).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(openProjects()).toEqual([beta.path]));
+    expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
     client.clear();
   });
 });

@@ -11,6 +11,8 @@ export function ListCards<T>({
   ariaLabel,
   rowClassName,
   rowBadge,
+  expandedIds,
+  renderExpanded,
 }: ResponsiveListProps<T>) {
   if (rows.length === 0) {
     return <p className="list-empty">{emptyMessage}</p>;
@@ -23,12 +25,14 @@ export function ListCards<T>({
     <ul className="list-cards" aria-label={ariaLabel}>
       {rows.map((row) => {
         const id = rowId(row);
+        const expanded = expandedIds?.has(id) === true;
         return (
           <li key={id}>
             <button
               type="button"
               className={["list-card", rowClassName?.(row)].filter(Boolean).join(" ")}
               data-row-id={id}
+              aria-expanded={renderExpanded ? expanded : undefined}
               onClick={() => onSelect(row)}
             >
               <div className="list-card-primary">
@@ -50,6 +54,7 @@ export function ListCards<T>({
                 </div>
               )}
             </button>
+            {expanded && renderExpanded && <div className="list-card-expanded">{renderExpanded(row)}</div>}
           </li>
         );
       })}

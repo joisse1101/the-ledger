@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useDeleteProject, useMeta, useOverview } from "../../api/queries";
 import type { Project, TimeRange } from "../../api/types";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -10,21 +10,16 @@ import styles from "./ProjectDetailPanel.module.css";
 
 export interface ProjectDetailPanelProps {
   project: Project;
-  /** Changes each time the panel should be scrolled into view, even for the project already open.
-   *  0 (the initial value) means "don't scroll", so reopening the page from a `?project=` link
-   *  leaves the scroll position alone. */
-  scrollKey: number;
-  /** The project was deleted: the page clears its selection. */
+  /** The project was deleted: the page closes its panel. */
   onDeleted: () => void;
 }
 
-/** The selected project's panel, shown under the Projects list: the Overview time range plus that
- *  project's charts grouped by git branch, and (on the machine running the app only) a "Delete
- *  project" button that opens a confirmation modal. The page renders it with `key={project.path}`,
- *  so the range starts at "All time" for every newly selected project and a fresh query never
- *  shows the previous project's charts. */
-export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDetailPanelProps) {
-  const panelRef = useRef<HTMLElement>(null);
+/** One project's panel, shown inline beneath its row in the Projects list: the Overview time range
+ *  plus that project's charts grouped by git branch, and (on the machine running the app only) a
+ *  "Delete project" button that opens a confirmation modal. The page renders it with
+ *  `key={project.path}`, so the range starts at "All time" for every newly opened project and a
+ *  fresh query never shows a previous project's charts. */
+export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelProps) {
   const [range, setRange] = useState<TimeRange>("All time");
   const [confirming, setConfirming] = useState(false);
   const overview = useOverview(range, { project: project.path, groupBy: "branch", bucketMinutes: 60 });
@@ -32,12 +27,6 @@ export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDet
   // Deletes are local-only server-side, so no other device is even shown the button.
   const isLocal = useMeta().data?.is_local === true;
   const data = overview.data;
-
-  // CSS `scroll-margin-top` keeps the panel's top clear of the sticky top bar.
-  useEffect(() => {
-    if (scrollKey === 0) return;
-    panelRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-  }, [scrollKey]);
 
   const closeConfirm = () => {
     setConfirming(false);
@@ -54,7 +43,7 @@ export function ProjectDetailPanel({ project, scrollKey, onDeleted }: ProjectDet
   };
 
   return (
-    <section ref={panelRef} className={styles.root} aria-label={`Charts for ${project.name}`}>
+    <section className={styles.root} aria-label={`Charts for ${project.name}`}>
       <header className={styles.header}>
         <div className={styles.heading}>
           <h2 className={styles.title}>{project.name}</h2>

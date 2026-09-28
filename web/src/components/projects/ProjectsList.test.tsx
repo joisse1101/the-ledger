@@ -44,15 +44,19 @@ function stubApi(isLocal: boolean) {
   );
 }
 
-function renderList(selectedPath: string | null = null) {
+function renderList(expandedPaths: string[] = []) {
   const client = createQueryClient();
-  const onSelect = vi.fn();
+  const onToggle = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ProjectsList selectedPath={selectedPath} onSelect={onSelect} />
+      <ProjectsList
+        expandedPaths={new Set(expandedPaths)}
+        onToggle={onToggle}
+        renderExpanded={(p) => <div>Details for {p.name}</div>}
+      />
     </QueryClientProvider>,
   );
-  return { client, onSelect };
+  return { client, onToggle };
 }
 
 afterEach(() => {
@@ -62,16 +66,16 @@ afterEach(() => {
 describe.each([
   ["on the machine running the app", true],
   ["on another device", false],
-])("ProjectsList selection %s", (_where, isLocal) => {
-  it("selects the clicked project and starts no delete", async () => {
+])("ProjectsList toggling %s", (_where, isLocal) => {
+  it("toggles the clicked project and starts no delete", async () => {
     stubApi(isLocal);
-    const { client, onSelect } = renderList();
-    const button = await screen.findByRole("button", { name: "Select project demo" });
+    const { client, onToggle } = renderList();
+    const button = await screen.findByRole("button", { name: "Show details for demo" });
 
     fireEvent.click(button);
 
-    expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ path: project.path }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith(expect.objectContaining({ path: project.path }));
     expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.every(([, init]) => (init as RequestInit | undefined)?.method !== "DELETE")).toBe(
       true,
@@ -81,20 +85,23 @@ describe.each([
 });
 
 describe("ProjectsList", () => {
-  it("accents only the selected project's row", async () => {
+  it("accents and shows details for an expanded project's row", async () => {
     stubApi(true);
-    const { client } = renderList(project.path);
+    const { client } = renderList([project.path]);
 
     await waitFor(() => expect(document.querySelector("tr.row-selected")).not.toBeNull());
+    expect(await screen.findByText("Details for demo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide details for demo" })).toBeInTheDocument();
     client.clear();
   });
 
-  it("accents nothing while no project is selected", async () => {
+  it("accents nothing and shows no details while no project is expanded", async () => {
     stubApi(true);
-    const { client } = renderList(null);
-    await screen.findByRole("button", { name: "Select project demo" });
+    const { client } = renderList([]);
+    await screen.findByRole("button", { name: "Show details for demo" });
 
     expect(document.querySelector(".row-selected")).toBeNull();
+    expect(screen.queryByText("Details for demo")).not.toBeInTheDocument();
     client.clear();
   });
 });

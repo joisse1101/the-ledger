@@ -164,4 +164,52 @@ describe("ListTable and ListCards", () => {
     render(<ListCards columns={hiddenColumns} rows={rows} rowId={(r) => r.id} onSelect={vi.fn()} emptyMessage="none" ariaLabel="Rows" />);
     expect(screen.queryByText("Detail")).not.toBeInTheDocument();
   });
+
+  it("shows renderExpanded content for every id in expandedIds at once, marking those rows aria-expanded", () => {
+    render(
+      <ListTable
+        columns={columns}
+        rows={rows}
+        rowId={(r) => r.id}
+        onSelect={vi.fn()}
+        emptyMessage="none"
+        ariaLabel="Rows"
+        showAllColumns
+        expandedIds={new Set(["b", "c"])}
+        renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+      />,
+    );
+    expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+    expect(screen.getByText("Expanded: Gamma")).toBeInTheDocument();
+    expect(screen.queryByText("Expanded: Alpha")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Beta" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Alpha" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("shows renderExpanded content beneath a card, outside the card's own button", () => {
+    render(
+      <ListCards
+        columns={columns}
+        rows={rows}
+        rowId={(r) => r.id}
+        onSelect={vi.fn()}
+        emptyMessage="none"
+        ariaLabel="Rows"
+        expandedIds={new Set(["a"])}
+        renderExpanded={(r) => <div data-testid={`expanded-${r.id}`}>Expanded: {r.name}</div>}
+      />,
+    );
+    const expanded = screen.getByTestId("expanded-a");
+    const button = screen.getByRole("button", { name: /Alpha/ });
+    expect(expanded).toBeInTheDocument();
+    expect(button).not.toContainElement(expanded);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("renders no aria-expanded attribute when renderExpanded is not supplied", () => {
+    render(
+      <ListTable columns={columns} rows={rows} rowId={(r) => r.id} onSelect={vi.fn()} emptyMessage="none" ariaLabel="Rows" showAllColumns />,
+    );
+    expect(screen.getByRole("button", { name: "Alpha" })).not.toHaveAttribute("aria-expanded");
+  });
 });

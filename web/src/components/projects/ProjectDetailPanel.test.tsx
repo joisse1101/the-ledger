@@ -73,7 +73,7 @@ function renderPanel(onDeleted = vi.fn()) {
   const client = createQueryClient();
   const view = render(
     <QueryClientProvider client={client}>
-      <ProjectDetailPanel project={project} scrollKey={0} onDeleted={onDeleted} />
+      <ProjectDetailPanel project={project} onDeleted={onDeleted} />
     </QueryClientProvider>,
   );
   const dialog = view.container.querySelector("dialog") as HTMLDialogElement;
