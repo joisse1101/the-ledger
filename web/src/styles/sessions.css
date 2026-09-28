@@ -399,10 +399,12 @@
 }
 
 /* Shared by any list's "this is the selected row" state, e.g. the Projects list's
-   selected project (whose charts are shown under the list). */
+   selected project (whose charts are shown under the list). scroll-margin-top keeps a row
+   scrolled into view clear of the sticky top bar, the same way .live-panel does. */
 .list-table tbody tr.row-selected,
 .list-card.row-selected {
   box-shadow: inset 0.1875rem 0 0 var(--brand-accent);
+  scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + 0.5rem);
 }
 
 .sessions-load-more {

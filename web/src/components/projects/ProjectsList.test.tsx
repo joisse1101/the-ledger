@@ -1,7 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../api/queryClient";
+import type { Project } from "../../api/types";
 import { ProjectsList } from "./ProjectsList";
 
 const project = {
@@ -59,8 +61,43 @@ function renderList(expandedPaths: string[] = []) {
   return { client, onToggle };
 }
 
+/** Drives ProjectsList with real toggle state, the way ProjectsPage does - a click actually
+ *  flips `expandedPaths`, which is what the scroll-into-view effect reacts to. `renderList`'s
+ *  fixed prop can't exercise that: it never transitions from closed to open. */
+function ToggleableList() {
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const onToggle = (p: Project) => {
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(p.path)) next.delete(p.path);
+      else next.add(p.path);
+      return next;
+    });
+  };
+  return <ProjectsList expandedPaths={expandedPaths} onToggle={onToggle} renderExpanded={(p) => <div>Details for {p.name}</div>} />;
+}
+
+function renderToggleableList() {
+  const client = createQueryClient();
+  render(
+    <QueryClientProvider client={client}>
+      <ToggleableList />
+    </QueryClientProvider>,
+  );
+  return client;
+}
+
+/** jsdom doesn't implement scrollIntoView at all; the component itself guards every call with
+ *  `?.` for that gap (see ProjectsList.tsx), so this stub is only here to observe the calls. */
+function stubScrollIntoView() {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  return scrollIntoView;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
 });
 
 describe.each([
@@ -102,6 +139,37 @@ describe("ProjectsList", () => {
 
     expect(document.querySelector(".row-selected")).toBeNull();
     expect(screen.queryByText("Details for demo")).not.toBeInTheDocument();
+    client.clear();
+  });
+
+  it("scrolls the row to the top once its panel opens, but not when it closes again", async () => {
+    stubApi(true);
+    const scrollIntoView = stubScrollIntoView();
+    const client = renderToggleableList();
+
+    const openButton = await screen.findByRole("button", { name: "Show details for demo" });
+    fireEvent.click(openButton);
+    await screen.findByText("Details for demo");
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+
+    scrollIntoView.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Hide details for demo" }));
+    await waitFor(() => expect(screen.queryByText("Details for demo")).not.toBeInTheDocument());
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("doesn't scroll a row that's already expanded on mount", async () => {
+    stubApi(true);
+    const scrollIntoView = stubScrollIntoView();
+    const { client } = renderList([project.path]);
+
+    await screen.findByText("Details for demo");
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
     client.clear();
   });
 });

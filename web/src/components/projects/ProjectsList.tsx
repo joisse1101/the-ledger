@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useProjects } from "../../api/queries";
 import type { Project } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
@@ -69,14 +69,50 @@ export interface ProjectsListProps {
 export function ProjectsList({ expandedPaths, onToggle, renderExpanded }: ProjectsListProps) {
   const projects = useProjects();
   const rows = projects.data?.projects ?? [];
+  const sectionRef = useRef<HTMLElement>(null);
+  // The path a click just opened, so the effect below knows which row to scroll to once its panel
+  // has actually rendered - closing a row, or a re-render for any other reason, scrolls nothing.
+  const pendingScrollPath = useRef<string | null>(null);
+
+  const handleSelect = (project: Project) => {
+    if (!expandedPaths.has(project.path)) pendingScrollPath.current = project.path;
+    onToggle(project);
+  };
+
+  useEffect(() => {
+    const path = pendingScrollPath.current;
+    if (path === null || !expandedPaths.has(path)) return;
+    pendingScrollPath.current = null;
+    const row = Array.from(sectionRef.current?.querySelectorAll<HTMLElement>("[data-row-id]") ?? []).find(
+      (el) => el.dataset.rowId === path,
+    );
+    if (!row) return;
+
+    const scrollRowIntoView = () => row.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    scrollRowIntoView();
+
+    // The row's own position doesn't move once its panel (the very next sibling) starts rendering
+    // beneath it, but the panel's content (the overview query, then its charts) can still be
+    // loading at that first scroll - the page isn't tall enough yet for the browser to bring the
+    // row all the way to the top. Keep re-scrolling as the panel grows until it settles.
+    const panel = row.nextElementSibling;
+    if (!panel) return;
+    const observer = new ResizeObserver(scrollRowIntoView);
+    observer.observe(panel);
+    const stopWatching = window.setTimeout(() => observer.disconnect(), 2000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(stopWatching);
+    };
+  }, [expandedPaths]);
 
   return (
-    <section aria-label="Projects">
+    <section aria-label="Projects" ref={sectionRef}>
       <ResponsiveList
         columns={columns}
         rows={rows}
         rowId={(p) => p.path}
-        onSelect={onToggle}
+        onSelect={handleSelect}
         rowLabel={(p) => `${expandedPaths.has(p.path) ? "Hide" : "Show"} details for ${p.name}`}
         emptyMessage="No Claude projects found."
         ariaLabel="Projects"
