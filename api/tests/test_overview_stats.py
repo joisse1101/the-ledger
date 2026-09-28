@@ -149,6 +149,22 @@ def test_group_totals_with_ten_projects_shows_seven_plus_other():
     assert rows[-1]["messages"] == 6
 
 
+def test_group_totals_sums_context_tokens_per_group():
+    transcripts = [
+        _transcript(project="a", context=1000),
+        _transcript(project="a", context=500),
+        _transcript(project="b", context=2000),
+    ]
+    rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}
+    assert rows["a"]["tokens"] == 1500
+    assert rows["b"]["tokens"] == 2000
+
+
+def test_group_totals_treats_a_missing_context_as_zero_tokens():
+    rows = overview.group_totals([_transcript(project="a", context=None)], by_project)
+    assert rows[0]["tokens"] == 0
+
+
 def test_group_totals_share_sums_to_100():
     transcripts = [_transcript(project="a")] * 3 + [_transcript(project="b")]
     rows = {row["group"]: row for row in overview.group_totals(transcripts, by_project)}

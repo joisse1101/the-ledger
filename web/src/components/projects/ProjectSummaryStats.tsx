@@ -23,16 +23,19 @@ function tiles(summary: OverviewSummary): Tile[] {
       label: "Avg. messages / session",
       value: summary.avg_messages_per_session != null ? summary.avg_messages_per_session.toFixed(1) : "--",
     },
+
     { label: "Avg. session", value: summary.duration.average.label },
+    { label: "Total duration", value: summary.duration.total.label },
     { label: "Longest session", value: summary.duration.longest.label, ref: summary.duration.longest },
     { label: "Shortest session", value: summary.duration.shortest.label, ref: summary.duration.shortest },
-    { label: "Total duration", value: summary.duration.total.label },
+
     { label: "Avg. session cost", value: summary.cost.average.label },
+    { label: "Total cost", value: summary.cost.total.label },
     { label: "Most expensive session", value: summary.cost.most_expensive.label, ref: summary.cost.most_expensive },
     { label: "Cheapest session", value: summary.cost.cheapest.label, ref: summary.cost.cheapest },
-    { label: "Total cost", value: summary.cost.total.label },
-    { label: "Total tokens", value: formatContext(summary.tokens.total) },
+
     { label: "Avg. tokens / session", value: formatContext(summary.tokens.average) },
+    { label: "Total tokens", value: formatContext(summary.tokens.total) },
     { label: "Most tokens", value: formatContext(summary.tokens.most.amount), ref: summary.tokens.most },
     { label: "Least tokens", value: formatContext(summary.tokens.least.amount), ref: summary.tokens.least },
   ];

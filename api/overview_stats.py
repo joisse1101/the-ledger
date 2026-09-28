@@ -92,16 +92,18 @@ def group_totals(
     Every grouped chart shares this split, so a group's color/identity never shifts between
     charts. Each row also carries `share` (% of all sessions) and `messages_pct`/`cost_pct`: that
     measure as a % of the largest row's, so the two measures can share one 0-100 axis instead of a
-    dual-axis chart.
+    dual-axis chart. `tokens` sums each transcript's current context figure (a transcript with none
+    recorded, i.e. `context is None`, contributes 0 - same "skip, don't crash" rule `summary()` uses).
     """
     totals: dict[str, dict[str, Any]] = {}
     for transcript in transcripts:
         row = totals.setdefault(
-            key(transcript), {"sessions": 0, "messages": 0, "cost": 0.0}
+            key(transcript), {"sessions": 0, "messages": 0, "cost": 0.0, "tokens": 0}
         )
         row["sessions"] += 1
         row["messages"] += transcript.message_count
         row["cost"] += transcript.cost
+        row["tokens"] += transcript.context or 0
     if not totals:
         return []
 
@@ -115,6 +117,7 @@ def group_totals(
                 "sessions": sum(values["sessions"] for _, values in rest),
                 "messages": sum(values["messages"] for _, values in rest),
                 "cost": sum(values["cost"] for _, values in rest),
+                "tokens": sum(values["tokens"] for _, values in rest),
             }
         )
 

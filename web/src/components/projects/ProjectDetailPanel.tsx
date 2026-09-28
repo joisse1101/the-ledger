@@ -62,7 +62,12 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
       {data && !data.empty && (
         <>
           <div className="overview-top">
-            <GroupDonutChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
+            <GroupDonutChart
+              groups={data.groups}
+              groupOrder={data.group_order}
+              groupLabel="branch"
+              metric="tokens"
+            />
             <ProjectSummaryStats summary={data.summary} />
           </div>
           <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />

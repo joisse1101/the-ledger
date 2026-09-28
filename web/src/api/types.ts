@@ -267,6 +267,7 @@ export interface GroupTotals {
   sessions: number;
   messages: number;
   cost: number;
+  tokens: number;
   share: number;
   messages_pct: number;
   cost_pct: number;
