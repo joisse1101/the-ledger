@@ -67,6 +67,10 @@ export interface LiveResponse {
   sessions: LiveSession[];
 }
 
+/** Whether a session's cost is Claude Code's own reported figure, or this app's best-effort
+ *  estimate (computed only from recognized models and the session's own main-thread turns). */
+export type CostSource = "exact" | "estimated";
+
 export interface TranscriptItem {
   session_id: string;
   project: string;
@@ -75,6 +79,7 @@ export interface TranscriptItem {
   updated_at: string | null;
   message_count: number;
   cost: number;
+  cost_source: CostSource;
   context: number | null;
   version: string;
   git_branch: string;
@@ -126,6 +131,7 @@ export interface SessionRecap {
   updated_at: string | null;
   message_count: number | null;
   cost: number | null;
+  cost_source: CostSource | null;
   context: number | null;
   avg_tokens_per_message: number | null;
 }
@@ -231,8 +237,13 @@ export interface TokenFigure {
   amount: number;
 }
 
-/** Extremes also say which session they came from. */
-export type WithSession<T> = T & { project: string | null; session_id: string | null };
+/** Extremes also say which session they came from, and that session's cost source (present even
+ *  for a non-cost extreme, e.g. longest session, since the server attaches it uniformly). */
+export type WithSession<T> = T & {
+  project: string | null;
+  session_id: string | null;
+  cost_source: CostSource | null;
+};
 
 export interface OverviewSummary {
   projects: number;

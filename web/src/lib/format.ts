@@ -25,10 +25,18 @@ export function formatDateTime(iso: string | null | undefined): string {
   );
 }
 
-/** Dollars with two decimals, or `--` when there is no figure. Costs are estimates. */
+/** Dollars with two decimals, or `--` when there is no figure. A session's cost is either an
+ *  exact, Claude-Code-reported figure or a best-effort estimate - see `ESTIMATED_COST_TOOLTIP`
+ *  and `CostFigure`, which mark the latter. */
 export function formatCost(value: number | null | undefined): string {
   return value == null ? "--" : `$${value.toFixed(2)}`;
 }
+
+/** Explains what an estimated cost excludes, shown in `CostFigure`'s tooltip wherever a session's
+ *  cost is a best-effort estimate rather than Claude Code's own reported figure. */
+export const ESTIMATED_COST_TOOLTIP =
+  "Best-effort estimate: covers only models this app recognizes, and only this session's own " +
+  "main-thread turns - it excludes any subagent spend.";
 
 /** A token count, humanised, or `--` when there is none. */
 export function formatContext(value: number | null | undefined): string {

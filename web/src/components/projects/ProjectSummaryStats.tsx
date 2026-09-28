@@ -1,5 +1,6 @@
 import type { OverviewSummary } from "../../api/types";
 import { formatContext, formatCount } from "../../lib/format";
+import { CostFigure } from "../CostFigure";
 import { StatGrid, type StatTile } from "../StatGrid";
 
 function tiles(summary: OverviewSummary): StatTile[] {
@@ -19,8 +20,16 @@ function tiles(summary: OverviewSummary): StatTile[] {
 
     { label: "Avg. session cost", value: summary.cost.average.label },
     { label: "Total cost", value: summary.cost.total.label },
-    { label: "Most expensive session", value: summary.cost.most_expensive.label, ref: summary.cost.most_expensive },
-    { label: "Cheapest session", value: summary.cost.cheapest.label, ref: summary.cost.cheapest },
+    {
+      label: "Most expensive session",
+      value: <CostFigure label={summary.cost.most_expensive.label} source={summary.cost.most_expensive.cost_source} />,
+      ref: summary.cost.most_expensive,
+    },
+    {
+      label: "Cheapest session",
+      value: <CostFigure label={summary.cost.cheapest.label} source={summary.cost.cheapest.cost_source} />,
+      ref: summary.cost.cheapest,
+    },
 
     { label: "Avg. tokens / session", value: formatContext(summary.tokens.average) },
     { label: "Total tokens", value: formatContext(summary.tokens.total) },

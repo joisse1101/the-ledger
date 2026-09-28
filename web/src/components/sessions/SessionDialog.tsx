@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { LIVE_POLL_MS, useDeleteSession, useMeta, useSession } from "../../api/queries";
 import type { Compaction, SessionDetail, SessionRecap, Turn } from "../../api/types";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText, formatTime } from "../../lib/format";
 import { humanizeTokens } from "../../lib/tokens";
+import { CostFigure } from "../CostFigure";
 import { CloseIcon } from "../icons";
 import { TokensChart } from "./TokensChart";
 
@@ -50,12 +52,14 @@ function historyRows(turns: Turn[], compactions: Compaction[]): HistoryRow[] {
 
 function Recap({ recap }: { recap: SessionRecap }) {
   const hasSummary = recap.title || recap.last_message || recap.first_prompt;
-  const stats: [string, string][] = [];
+  const stats: [string, ReactNode][] = [];
   if (recap.started_at) stats.push(["Started", formatDateTime(recap.started_at)]);
   if (recap.updated_at) stats.push(["Last updated", formatDateTime(recap.updated_at)]);
   if (recap.message_count != null) stats.push(["Messages", formatCount(recap.message_count)]);
   if (recap.avg_tokens_per_message != null) stats.push(["Tokens per message", formatCount(recap.avg_tokens_per_message)]);
-  if (recap.cost != null) stats.push(["Cost", formatCost(recap.cost)]);
+  if (recap.cost != null) {
+    stats.push(["Cost", <CostFigure label={formatCost(recap.cost)} source={recap.cost_source} />]);
+  }
 
   return (
     <div className="session-recap">

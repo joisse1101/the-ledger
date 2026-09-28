@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Tooltip } from "./Tooltip";
 
 /** Names the session a tile's figure came from, for a tooltip. */
@@ -8,7 +9,8 @@ export interface SessionRef {
 
 export interface StatTile {
   label: string;
-  value: string;
+  /** A plain string, or a small node such as `CostFigure` for a mark like an estimate asterisk. */
+  value: ReactNode;
   /** Present only for a tile naming an extreme session (e.g. longest/most expensive). */
   ref?: SessionRef;
 }

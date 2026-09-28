@@ -29,8 +29,8 @@
 
 ## 3. Frontend
 
-- [ ] 3.1 Add `cost_source: "exact" | "estimated"` to the relevant shapes in `web/src/api/types.ts`.
-- [ ] 3.2 Add a small cost-display helper (asterisk + tooltip text) alongside `lib/format.ts`'s
+- [x] 3.1 Add `cost_source: "exact" | "estimated"` to the relevant shapes in `web/src/api/types.ts`.
+- [x] 3.2 Add a small cost-display helper (asterisk + tooltip text) alongside `lib/format.ts`'s
       `formatCost`, with the tooltip explaining the estimate covers only recognized models and only
       the session's own main-thread turns, excluding subagent spend; use it in the All list's cost
       column, `SessionDialog`'s recap cost, and Overview's most-expensive/cheapest disclosures; verify
