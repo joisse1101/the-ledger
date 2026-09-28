@@ -115,6 +115,7 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
             updated_at TEXT,
             message_count INTEGER NOT NULL,
             cost REAL NOT NULL,
+            cost_source TEXT NOT NULL DEFAULT 'estimated',
             context INTEGER,
             project TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
@@ -123,6 +124,16 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    # history.db is never recreated, so a pre-existing file's table predates this
+    # column - add it in place. ledger.db's CREATE TABLE above already includes
+    # it (that table is dropped and rebuilt every start), so this is a no-op
+    # there beyond the harmless "duplicate column" error being swallowed.
+    try:
+        conn.execute(
+            "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'"
+        )
+    except sqlite3.OperationalError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +381,8 @@ def _scan_transcript_file(
     updated_at: Optional[datetime] = None
     message_count = 0
     cost = 0.0
+    cost_state_total: Optional[float] = None
+    cost_state_has_unknown = False
     context: Optional[int] = None
     seen_message_ids: set[str] = set()
     ai_title: Optional[str] = None
@@ -404,6 +417,14 @@ def _scan_transcript_file(
 
                 if entry.get("type") == "ai-title":
                     ai_title = entry.get("aiTitle") or ai_title
+
+                if entry.get("type") == "cost-state":
+                    # No timestamp on these lines; the file is append-ordered, so the
+                    # last one encountered during this single pass is the most recent.
+                    total = entry.get("totalCostUSD")
+                    if isinstance(total, (int, float)):
+                        cost_state_total = float(total)
+                        cost_state_has_unknown = bool(entry.get("hasUnknownModelCost", False))
 
                 turn_context = _context_tokens(entry)
                 if turn_context is not None:
@@ -441,6 +462,15 @@ def _scan_transcript_file(
     except OSError:
         return None
 
+    # Prefer Claude Code's own cumulative, Anthropic-priced, subagent-inclusive
+    # tracker over this file's per-message recompute - the latter is kept only
+    # as a fallback estimate for a transcript with no clean cost-state line
+    # (still in progress, predates cost-state, or flags an unpriced model itself).
+    if cost_state_total is not None and not cost_state_has_unknown:
+        cost, cost_source = cost_state_total, "exact"
+    else:
+        cost_source = "estimated"
+
     # Claude Code's own auto-generated session title, the last thing the
     # assistant said (a recap, a wrap-up summary, a follow-up question -
     # whatever it naturally is), and the first thing the user actually
@@ -467,6 +497,7 @@ def _scan_transcript_file(
         "updated_at": updated_at,
         "message_count": message_count,
         "cost": cost,
+        "cost_source": cost_source,
         "context": context,
         "project": project,
         "title": title,
@@ -500,11 +531,11 @@ def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
 _TRANSCRIPT_UPSERT_SQL = """
     INSERT INTO transcripts (
         session_id, path, cwd, version, git_branch, started_at,
-        updated_at, message_count, cost, context, project, title,
+        updated_at, message_count, cost, cost_source, context, project, title,
         last_message, first_prompt
     ) VALUES (
         :session_id, :path, :cwd, :version, :git_branch, :started_at,
-        :updated_at, :message_count, :cost, :context, :project, :title,
+        :updated_at, :message_count, :cost, :cost_source, :context, :project, :title,
         :last_message, :first_prompt
     )
     ON CONFLICT(session_id) DO UPDATE SET
@@ -516,6 +547,7 @@ _TRANSCRIPT_UPSERT_SQL = """
         updated_at = excluded.updated_at,
         message_count = excluded.message_count,
         cost = excluded.cost,
+        cost_source = excluded.cost_source,
         context = excluded.context,
         project = excluded.project,
         title = excluded.title,
@@ -583,11 +615,11 @@ def refresh() -> datetime:
             """
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, context, project, title,
+                updated_at, message_count, cost, cost_source, context, project, title,
                 last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :context, :project, :title,
+                :updated_at, :message_count, :cost, :cost_source, :context, :project, :title,
                 :last_message, :first_prompt
             )
             """,

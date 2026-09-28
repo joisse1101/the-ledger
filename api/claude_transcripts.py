@@ -26,6 +26,7 @@ class ClaudeTranscript:
     updated_at: Optional[datetime]
     message_count: int
     cost: float
+    cost_source: str
     project: str
     title: str
     last_message: str
@@ -49,6 +50,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         ),
         message_count=row["message_count"],
         cost=row["cost"],
+        cost_source=row["cost_source"],
         project=row["project"],
         title=row["title"],
         last_message=row["last_message"],
