@@ -177,6 +177,7 @@ def _transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: 
         "updated_at": _iso(transcript.updated_at),
         "message_count": transcript.message_count,
         "cost": transcript.cost,
+        "cost_source": transcript.cost_source,
         "context": transcript.context,
         "version": transcript.version,
         "git_branch": transcript.git_branch,
@@ -242,6 +243,7 @@ def _recap(transcript: Optional[claude_transcripts.ClaudeTranscript], live_item:
             "updated_at": _iso(transcript.updated_at),
             "message_count": messages,
             "cost": transcript.cost,
+            "cost_source": transcript.cost_source,
         }
     elif live_item is not None:
         # Brand new: the registry knows it, the snapshot doesn't yet.
@@ -255,6 +257,7 @@ def _recap(transcript: Optional[claude_transcripts.ClaudeTranscript], live_item:
             "updated_at": live_item["updated_at"],
             "message_count": None,
             "cost": None,
+            "cost_source": None,
         }
     else:
         return None

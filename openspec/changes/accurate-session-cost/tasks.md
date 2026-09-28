@@ -20,10 +20,10 @@
 
 ## 2. API surface
 
-- [ ] 2.1 Add `cost_source` to the `/api/transcripts` item shape (`transcript_query.py`'s `Page`
+- [x] 2.1 Add `cost_source` to the `/api/transcripts` item shape (`transcript_query.py`'s `Page`
       items) and the `/api/sessions/{id}` recap payload; verify via `test_transcript_query.py` and
       `test_api_data.py` assertions on the new field.
-- [ ] 2.2 Extend `overview_stats.py`'s extreme-figure annotation (`_with_session`, used for the
+- [x] 2.2 Extend `overview_stats.py`'s extreme-figure annotation (`_with_session`, used for the
       most-expensive/cheapest KPIs) to also carry that session's `cost_source`; verify via
       `test_overview_stats.py`.
 
