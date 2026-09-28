@@ -15,7 +15,8 @@ backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml
 gitignored `.venv`/`.ledger`/`.history`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see "From another device on your network" below), and `hooks/` (Claude
-Code toast hooks, plus one optional relay hook coupled to the dashboard — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
+installer/uninstaller — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all
@@ -160,45 +161,33 @@ Nginx is told to target.
 
 **Keeping session history past Claude Code's own retention window**: `api/backup_history.py` (see
 "Data layer" below) needs to actually run on a schedule to be useful — the app itself never
-triggers it. Set up a daily Windows Task Scheduler entry for it, either scripted or by hand.
-
-**Scripted (recommended)** — `api\Install-HistoryBackupTask.ps1` registers or updates that same
-entry: `api\.venv\Scripts\python.exe backup_history.py`, "Start in" `api\`, run as the logged-in
-user with no elevation, daily. Re-running it updates the existing task in place rather than
-duplicating it:
+triggers it. Register a daily Windows Task Scheduler entry for it with
+`hooks\ledgerScripts\Install-HistoryBackupTask.ps1`, which registers or updates that same entry:
+`api\.venv\Scripts\python.exe backup_history.py`, "Start in" `api\`, run as the logged-in user with
+no elevation, daily. Re-running it updates the existing task in place rather than duplicating it;
+the paired `Uninstall-HistoryBackupTask.ps1` alongside it removes the task again:
 
 ```powershell
-cd api
-.\Install-HistoryBackupTask.ps1              # daily at 02:00 by default
+cd hooks\ledgerScripts
+.\Install-HistoryBackupTask.ps1              # daily at 14:00 by default
 .\Install-HistoryBackupTask.ps1 -Time 23:30  # or pick a different trigger time
-.\Install-HistoryBackupTask.ps1 -Uninstall   # remove it
+.\Uninstall-HistoryBackupTask.ps1            # remove it
 ```
 
-Or fold it into the normal startup with one flag on the root script:
-`.\Start-Ledger.ps1 -InstallBackupTask`.
+Or fold either into the root scripts as one flag: `.\Start-Ledger.ps1 -InstallBackupTask` /
+`.\Stop-Ledger.ps1 -UninstallBackupTask`. If you'd rather set the task up (or tear it down) by hand
+than run a script, the two scripts themselves are the reference — they're the definitive list of
+exactly which fields to set (program, arguments, working directory, trigger, logon type, run level),
+so reading them and replicating those same fields in Task Scheduler's UI produces the same task.
 
-**By hand**, if you'd rather not run a script, this is exactly what the one above does for you:
-
-1. Open Task Scheduler → Create Task... (not "Create Basic Task", so the options below are all
-   available).
-2. **General** tab: give it a name (e.g. "Ledger history backup"); leave "Run only when user is
-   logged on" selected — don't check "Run with highest privileges" (no elevation is needed; every
-   file involved is already owned by the logged-in user).
-3. **Triggers** tab → New...: "Daily", at any time convenient (e.g. once overnight); leave
-   "Enabled" checked.
-4. **Actions** tab → New...: "Start a program", with:
-   - Program/script: the full path to `api\.venv\Scripts\python.exe` in this checkout
-   - Add arguments: `backup_history.py`
-   - Start in: the full path to this checkout's `api\` folder (required — the script is run with
-     `api/` as its working directory, the same way `python server.py` is)
-5. Save (no password prompt needed if "Run only when user is logged on" stayed selected).
-
-Trigger it manually once after creating it (right-click the task → Run) to confirm it works:
-inspect `api/.history/history.db`'s row count/contents before and after via the `sqlite3` CLI (e.g.
-`sqlite3 api/.history/history.db "SELECT COUNT(*) FROM transcripts"`), or check the task's Last Run
-Result in Task Scheduler. Daily is deliberately decoupled from whether `server.py` is even running —
-this project isn't meant to run as an always-on daemon, so a trigger tied to the app's own uptime
-could miss the backup for weeks.
+Trigger it manually once after creating it (`Start-ScheduledTask -TaskName 'Ledger History
+Backup'`, or right-click the task in Task Scheduler → Run) to confirm it works: inspect
+`api/.history/history.db`'s row count/contents before and after (via the `sqlite3` CLI, e.g.
+`sqlite3 api/.history/history.db "SELECT COUNT(*) FROM transcripts"`, or Python's builtin `sqlite3`
+module if that CLI isn't installed), or check `Get-ScheduledTaskInfo -TaskName 'Ledger History
+Backup'`'s `LastTaskResult` (`0` = success). Daily is deliberately decoupled from whether
+`server.py` is even running — this project isn't meant to run as an always-on daemon, so a trigger
+tied to the app's own uptime could miss the backup for weeks.
 
 Dark/light theme is chosen per device, not shared server-side: each browser picks up
 `prefers-color-scheme` until it toggles the switch itself, then remembers that choice in its own
@@ -685,9 +674,10 @@ Claude Code's `Notification`/`Stop` hook events, with `Install-ClaudeHooks.ps1`/
 full install/uninstall/test steps. (The dashboard's one reach into it: `api/` runs
 `scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action — see `api/` above.)
 
-`hooks/ledgerScripts/` is the exception: an **optional, dashboard-coupled** hook script, kept apart
-from `scripts/` precisely because it only makes sense with this app. `Relay-PermissionRequest.ps1` is
-a `PermissionRequest` hook that forwards each prompt Claude Code is about to show (permission dialog
+`hooks/ledgerScripts/` is the exception: **optional, dashboard-coupled** scripts, kept apart from
+`scripts/` precisely because they only make sense with this app — one Claude Code hook plus two
+plain Task Scheduler scripts that are dashboard-coupled the same way but aren't hooks at all.
+`Relay-PermissionRequest.ps1` is a `PermissionRequest` hook that forwards each prompt Claude Code is about to show (permission dialog
 or `AskUserQuestion`) to `POST /api/sessions/{id}/decisions` on `127.0.0.1:<port>` (`-Port`, baked in
 by the installer, else `$env:LEDGER_PORT`, else 8501) and waits, so the dashboard can answer it. It
 must **print nothing at all** — empty stdout, exit 0 — whenever it has no answer (backend down, no
@@ -702,6 +692,14 @@ removes the legacy `PreToolUse` relay entry an earlier version of this feature i
 verified against Claude Code 2.1.281 (the hook runs alongside the dialog, a late hook result is
 discarded, `updatedInput.answers` answers an `AskUserQuestion`) — re-check after a Claude Code
 upgrade. See `hooks/README.md` section 6.
+
+`Install-HistoryBackupTask.ps1`/`Uninstall-HistoryBackupTask.ps1`, alongside the relay hook in the
+same folder, register/remove the Windows Scheduled Task that runs `api/backup_history.py` daily
+(see "Setup & Run" above) — unlike the relay hook, these aren't Claude Code hooks at all (nothing
+copies them anywhere or touches `settings.json`); they're run directly from this checkout, either by
+hand or via the root `Start-Ledger.ps1 -InstallBackupTask`/`Stop-Ledger.ps1 -UninstallBackupTask`.
+They live here rather than in `api/` because, like the relay hook, they're PowerShell tooling
+specific to this app rather than part of the Python backend itself.
 
 ### `openspec/`
 

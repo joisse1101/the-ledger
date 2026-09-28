@@ -55,8 +55,10 @@
       behavior for accuracy.
 - [x] 5.3 Document the Windows Task Scheduler setup (program `api\.venv\Scripts\python.exe`,
       argument `api\backup_history.py`, "Start in" `api\`, run as the logged-in user without
-      elevation, daily trigger) in `CLAUDE.md` or `README.md`; verify by following the written
-      steps once to create the task successfully.
+      elevation, daily trigger) in `CLAUDE.md` or `README.md`, via
+      `hooks\ledgerScripts\Install-HistoryBackupTask.ps1` (task 8.1) as the one documented way to
+      create it, pointing at the script itself as the reference for anyone replicating it by hand;
+      verify by running the script once to create the task successfully.
 
 ## 6. Tests
 
@@ -72,19 +74,28 @@
 
 ## 7. Manual verification
 
-- [ ] 7.1 Create the Task Scheduler entry, by hand per the documented steps (task 5.3), and manually trigger a run; verify
-      `history.db`'s row count/contents update as expected, inspected via the `sqlite3` CLI before
-      and after.
+- [x] 7.1 Create the Task Scheduler entry via `hooks\ledgerScripts\Install-HistoryBackupTask.ps1`
+      (task 8.1), and manually trigger a run (`Start-ScheduledTask -TaskName 'Ledger History
+      Backup'`); verify `history.db`'s row count/contents update as expected, inspected before and
+      after.
 
 ## 8. Scripted installer for the scheduled task
 
-- [x] 8.1 Add `api/Install-HistoryBackupTask.ps1`: registers/updates a Windows Scheduled Task
-      running `api\.venv\Scripts\python.exe backup_history.py` daily, "Start in" `api\`, as the
-      logged-in user with no elevation (`Interactive` logon, `Limited` run level); `-Uninstall`
-      removes it; idempotent re-runs update the existing task rather than duplicating it.
+- [x] 8.1 Add `hooks/ledgerScripts/Install-HistoryBackupTask.ps1`: registers/updates a Windows
+      Scheduled Task running `api\.venv\Scripts\python.exe backup_history.py` daily, "Start in"
+      `api\`, as the logged-in user with no elevation (`Interactive` logon, `Limited` run level);
+      idempotent re-runs update the existing task rather than duplicating it. Lives in
+      `hooks/ledgerScripts/` alongside the relay hook (dashboard-coupled PowerShell tooling, not
+      part of the Python backend) rather than in `api/`.
 - [x] 8.2 Add an `-InstallBackupTask` switch to the root `Start-Ledger.ps1` that invokes the
       installer script as part of normal startup, so installing the task and starting the app can
       be one command.
-- [x] 8.3 Document the script (as the recommended path, manual GUI steps kept as a fallback) in
-      `CLAUDE.md`'s "Setup & Run", and add a matching user-facing section to `README.md`, which
-      previously didn't mention `history.db`/`backup_history.py`/the scheduled task at all.
+- [x] 8.3 Document the script (as the one documented way to create the task, with the script itself
+      serving as the reference for anyone replicating it by hand) in `CLAUDE.md`'s "Setup & Run",
+      and add a matching user-facing section to `README.md`, which previously didn't mention
+      `history.db`/`backup_history.py`/the scheduled task at all.
+- [x] 8.4 Add `hooks/ledgerScripts/Uninstall-HistoryBackupTask.ps1` as 8.1's sibling (matching the
+      existing `Install-ClaudeHooks.ps1`/`Uninstall-ClaudeHooks.ps1` pattern already used elsewhere
+      in `hooks/`): removes the Scheduled Task 8.1 creates, doing nothing but printing a message if
+      it doesn't exist. Add a matching `-UninstallBackupTask` switch to the root `Stop-Ledger.ps1`;
+      document both in `CLAUDE.md`/`README.md` alongside the install path.

@@ -110,14 +110,22 @@ runs while the app is open; per CLAUDE.md this isn't meant to be an always-on da
 tied to the app's uptime could miss the backup entirely for weeks at a time. Daily cadence gives
 large margin under Claude Code's typical multi-week retention default.
 
-`api\Install-HistoryBackupTask.ps1` (and a `-InstallBackupTask` switch on the root
-`Start-Ledger.ps1` that calls it) registers exactly this same entry via
+`hooks\ledgerScripts\Install-HistoryBackupTask.ps1` (and a `-InstallBackupTask` switch on the root
+`Start-Ledger.ps1` that calls it) registers exactly this entry via
 `Register-ScheduledTask`/`Set-ScheduledTask` - same program, arguments, working directory, logon
-type (`Interactive`) and run level (`Limited`, i.e. no elevation) as the manual steps, just scripted
-and idempotent (re-running it updates the existing task rather than duplicating it). This is a
-convenience wrapper only: it doesn't change the trigger mechanism (still an OS-level Task Scheduler
-entry, not the app's own loop) or the manual GUI path, which stays documented as a fallback for
-anyone who'd rather not run a script.
+type (`Interactive`) and run level (`Limited`, i.e. no elevation) described above, scripted and
+idempotent (re-running it updates the existing task rather than duplicating it). This is the one
+documented way to create the task; it doesn't change the trigger mechanism itself (still an OS-level
+Task Scheduler entry, not the app's own loop). Anyone who'd rather set it up by hand than run the
+script reads the script itself as the reference for exactly which fields to set - CLAUDE.md/README
+no longer duplicate a separate manual GUI walkthrough. Its sibling,
+`hooks\ledgerScripts\Uninstall-HistoryBackupTask.ps1` (and `Stop-Ledger.ps1`'s
+`-UninstallBackupTask`), just unregisters the task by name - matching the
+`Install-ClaudeHooks.ps1`/`Uninstall-ClaudeHooks.ps1` split already used elsewhere in `hooks/`,
+rather than an `-Uninstall` switch on the install script itself. Both scripts live in
+`hooks/ledgerScripts/` alongside the relay hook rather than in `api/`: they're dashboard-coupled
+PowerShell tooling specific to this app, not part of the Python backend, the same reasoning that
+already put the relay hook there instead of in `api/`.
 
 ## Risks / Trade-offs
 

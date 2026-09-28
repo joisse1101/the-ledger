@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Registers (or removes) the Windows Scheduled Task that runs backup_history.py daily.
+Registers the Windows Scheduled Task that runs backup_history.py daily.
 
 .DESCRIPTION
 Creates the same Task Scheduler entry CLAUDE.md's "Setup & Run" section describes doing by hand:
@@ -10,31 +10,29 @@ no elevation ("Run only when user is logged on", RunLevel Limited), on a daily t
 app isn't running. Safe to re-run: an existing task with the same -TaskName is updated in place
 (action/trigger/settings only) rather than duplicated.
 
-Called directly from `api\`, or via the root Start-Ledger.ps1's -InstallBackupTask switch.
+Called directly from `hooks\ledgerScripts\`, or via the root Start-Ledger.ps1's -InstallBackupTask
+switch. .\Uninstall-HistoryBackupTask.ps1, alongside this script, removes what this one creates
+(also wired into the root Stop-Ledger.ps1 via -UninstallBackupTask).
 
 .PARAMETER TaskName
 Name of the Scheduled Task. Default 'Ledger History Backup'.
 
 .PARAMETER Time
-Daily trigger time, 24h `HH:mm`. Default '02:00'.
-
-.PARAMETER Uninstall
-Remove the task instead of creating/updating it.
+Daily trigger time, 24h `HH:mm`. Default '14:00'.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
 
 .EXAMPLE
 .\Install-HistoryBackupTask.ps1
-Create (or update) the daily backup task at 02:00.
+Create (or update) the daily backup task at 14:00.
 
 .EXAMPLE
 .\Install-HistoryBackupTask.ps1 -Time 23:30
 Create/update it with a different daily trigger time.
 
-.EXAMPLE
-.\Install-HistoryBackupTask.ps1 -Uninstall
-Remove the task.
+.LINK
+.\Uninstall-HistoryBackupTask.ps1 removes what this script creates.
 
 .LINK
 CLAUDE.md's "Setup & Run" section - "Keeping session history past Claude Code's own retention
@@ -43,8 +41,7 @@ window" - documents the equivalent manual steps and how to verify the task ran.
 
 param(
     [string]$TaskName = 'Ledger History Backup',
-    [string]$Time = '02:00',
-    [switch]$Uninstall,
+    [string]$Time = '14:00',
     [switch]$Help
 )
 
@@ -55,17 +52,8 @@ if ($Help) {
     return
 }
 
-if ($Uninstall) {
-    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-        Write-Host "Removed scheduled task '$TaskName'."
-    } else {
-        Write-Host "No scheduled task named '$TaskName' exists - nothing to remove."
-    }
-    return
-}
-
-$apiDir = $PSScriptRoot
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$apiDir = Join-Path $repoRoot 'api'
 $pythonExe = Join-Path $apiDir '.venv\Scripts\python.exe'
 if (-not (Test-Path $pythonExe)) {
     throw "No venv python found at $pythonExe - create it first (see CLAUDE.md's Setup & Run)."

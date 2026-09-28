@@ -32,9 +32,10 @@ machine only (see CLAUDE.md's "From another device on your network").
 
 -InstallBackupTask registers (or updates) the daily Task Scheduler entry that keeps
 `api/.history/history.db` accumulating between runs of this app - the same thing
-`api\Install-HistoryBackupTask.ps1` does on its own, wired in here as a one-flag convenience. It
-runs before anything else starts, and a failure there doesn't stop the backend/frontend/gateway from
-still starting normally.
+`hooks\ledgerScripts\Install-HistoryBackupTask.ps1` does on its own, wired in here as a one-flag
+convenience. It runs before anything else starts, and a failure there doesn't stop the
+backend/frontend/gateway from still starting normally. The paired Stop-Ledger.ps1's
+-UninstallBackupTask removes it again.
 
 .PARAMETER Mode
 'build' (default): build the frontend once and serve it with `vite preview`; backend without
@@ -45,7 +46,7 @@ Skip the gateway container (this machine only).
 
 .PARAMETER InstallBackupTask
 Also register (or update) the daily history-backup scheduled task - see
-api\Install-HistoryBackupTask.ps1.
+hooks\ledgerScripts\Install-HistoryBackupTask.ps1.
 
 .PARAMETER BackendPort
 Port for the backend API. Default 8501.
@@ -80,7 +81,8 @@ Override every port.
 Also register the daily history-backup scheduled task, then start as normal.
 
 .LINK
-.\Stop-Ledger.ps1 stops everything this script started.
+.\Stop-Ledger.ps1 stops everything this script started (and, with -UninstallBackupTask, removes the
+scheduled task this script's -InstallBackupTask installs).
 #>
 
 param(
@@ -130,7 +132,7 @@ $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
 if ($InstallBackupTask) {
     Write-Host "Installing the daily history-backup scheduled task..."
     try {
-        & (Join-Path $PSScriptRoot 'api\Install-HistoryBackupTask.ps1')
+        & (Join-Path $PSScriptRoot 'hooks\ledgerScripts\Install-HistoryBackupTask.ps1')
     } catch {
         Write-Warning "Failed to install the history-backup task: $_"
     }

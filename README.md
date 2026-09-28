@@ -167,17 +167,17 @@ copy (`api/.history/history.db`, gitignored, never wiped) that a session survive
 its `.jsonl` is gone — but only if it actually runs on a schedule, since the app itself never
 triggers it.
 
-Register the daily task for it with one command (from `api/`, with its venv set up):
+Register the daily task for it with one command (needs `api/`'s venv set up):
 
 ```powershell
-cd api
+cd hooks\ledgerScripts
 .\Install-HistoryBackupTask.ps1
 ```
 
 Or pass `-InstallBackupTask` to the root script to do it in the same step as starting the app:
-`.\Start-Ledger.ps1 -InstallBackupTask`. Both are safe to re-run. See `CLAUDE.md`'s "Setup & Run"
-for the manual Task Scheduler steps this script automates, and how to verify it's actually
-running.
+`.\Start-Ledger.ps1 -InstallBackupTask`. Both are safe to re-run. `.\Uninstall-HistoryBackupTask.ps1`
+(or `.\Stop-Ledger.ps1 -UninstallBackupTask`) removes it again. See `CLAUDE.md`'s "Setup & Run" for
+what the task runs and how to verify it's actually running.
 
 ## Testing
 
