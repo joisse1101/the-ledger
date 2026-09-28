@@ -47,31 +47,44 @@
 
 ## 5. Config and documentation
 
-- [ ] 5.1 Add `api/.history/` to `.gitignore`; verify `git status` shows no untracked files after
+- [x] 5.1 Add `api/.history/` to `.gitignore`; verify `git status` shows no untracked files after
       running the backup script locally.
-- [ ] 5.2 Update `CLAUDE.md`'s Data layer / Architecture sections to document `history.db`, the
+- [x] 5.2 Update `CLAUDE.md`'s Data layer / Architecture sections to document `history.db`, the
       merge behavior, delete propagation, and `backup_history.py`, at the same depth as the
       existing `claude_db.py` documentation; verify by re-reading the section against the shipped
       behavior for accuracy.
-- [ ] 5.3 Document the Windows Task Scheduler setup (program `api\.venv\Scripts\python.exe`,
+- [x] 5.3 Document the Windows Task Scheduler setup (program `api\.venv\Scripts\python.exe`,
       argument `api\backup_history.py`, "Start in" `api\`, run as the logged-in user without
       elevation, daily trigger) in `CLAUDE.md` or `README.md`; verify by following the written
       steps once to create the task successfully.
 
 ## 6. Tests
 
-- [ ] 6.1 In `api/tests/test_claude_db.py`, add coverage for history schema creation, upsert
+- [x] 6.1 In `api/tests/test_claude_db.py`, add coverage for history schema creation, upsert
       idempotency, live-wins merge precedence, and delete propagation (single session and whole
       project); verify `pytest` passes.
-- [ ] 6.2 Add `api/tests/test_backup_history.py` covering the backup script's logic run in
+- [x] 6.2 Add `api/tests/test_backup_history.py` covering the backup script's logic run in
       isolation (mirroring the `isolated_db` fixture pattern) without the server running; verify
       `pytest` passes.
-- [ ] 6.3 Extend `api/tests/test_api_data.py` with a case where a history-only (pruned) session is
+- [x] 6.3 Extend `api/tests/test_api_data.py` with a case where a history-only (pruned) session is
       present, confirming it's reflected in `/api/overview` and `/api/transcripts` responses;
       verify `pytest` passes.
 
 ## 7. Manual verification
 
-- [ ] 7.1 Create the Task Scheduler entry per the documented steps (task 5.3) and manually trigger
-      a run; verify `history.db`'s row count/contents update as expected, inspected via the
-      `sqlite3` CLI before and after.
+- [ ] 7.1 Create the Task Scheduler entry, by hand per the documented steps (task 5.3), and manually trigger a run; verify
+      `history.db`'s row count/contents update as expected, inspected via the `sqlite3` CLI before
+      and after.
+
+## 8. Scripted installer for the scheduled task
+
+- [x] 8.1 Add `api/Install-HistoryBackupTask.ps1`: registers/updates a Windows Scheduled Task
+      running `api\.venv\Scripts\python.exe backup_history.py` daily, "Start in" `api\`, as the
+      logged-in user with no elevation (`Interactive` logon, `Limited` run level); `-Uninstall`
+      removes it; idempotent re-runs update the existing task rather than duplicating it.
+- [x] 8.2 Add an `-InstallBackupTask` switch to the root `Start-Ledger.ps1` that invokes the
+      installer script as part of normal startup, so installing the task and starting the app can
+      be one command.
+- [x] 8.3 Document the script (as the recommended path, manual GUI steps kept as a fallback) in
+      `CLAUDE.md`'s "Setup & Run", and add a matching user-facing section to `README.md`, which
+      previously didn't mention `history.db`/`backup_history.py`/the scheduled task at all.

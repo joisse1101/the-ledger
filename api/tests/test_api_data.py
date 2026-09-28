@@ -3,6 +3,7 @@
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -671,6 +672,54 @@ def test_overview_scoped_call_still_applies_the_range(with_projects):
         "empty": True,
         "available_ranges": ["All time"],
     }
+
+
+# ---------------------------------------------------------------- history-only (pruned) sessions
+
+
+def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
+    """A session already pruned from disk - known only from history.db, never ledger.db.
+
+    Timestamps are UTC-aware, matching every real row: claude_db._parse_iso_timestamp()
+    always attaches an offset, so a real history.db row is never naive - unlike the seeded
+    live rows here (parsed from "...Z" timestamps), a naive one would crash sort_transcripts()
+    comparing it against them.
+    """
+    folder = claude_db.sanitize_project_path(cwd)
+    row = {
+        "session_id": session_id,
+        "path": Path(f"/whatever/{folder}/{session_id}.jsonl"),
+        "cwd": cwd,
+        "version": "1.0",
+        "git_branch": "main",
+        "started_at": datetime(2024, 1, 4, 10, 0, 0, tzinfo=timezone.utc),
+        "updated_at": datetime(2024, 1, 4, 10, 0, 0, tzinfo=timezone.utc),
+        "message_count": 2,
+        "cost": 0.1,
+        "context": 500,
+        "project": "alpha",
+        "title": "",
+        "last_message": "",
+        "first_prompt": "",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_transcripts_lists_a_history_only_pruned_session(api):
+    claude_db.upsert_history_transcripts([_history_only_row()])
+    response = api.get("/api/transcripts")
+    assert response.status_code == 200
+    assert "pruned-1" in _ids(response)
+    assert response.json()["total"] == 4
+
+
+def test_overview_counts_a_history_only_pruned_session(api):
+    claude_db.upsert_history_transcripts([_history_only_row()])
+    body = api.get("/api/overview").json()
+    assert body["summary"]["sessions"] == 4
+    by_group = {row["group"]: row["sessions"] for row in body["groups"]}
+    assert by_group == {"alpha": 3, "beta": 1}
 
 
 # ---------------------------------------------------------------- /api/sessions/{id}

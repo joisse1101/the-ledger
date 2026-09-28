@@ -30,12 +30,22 @@ BACKEND_PORT/FRONTEND_PORT/GATEWAY_PORT environment variable, then the hardcoded
 The gateway needs Docker Desktop; -NoGateway skips it entirely, leaving the app reachable from this
 machine only (see CLAUDE.md's "From another device on your network").
 
+-InstallBackupTask registers (or updates) the daily Task Scheduler entry that keeps
+`api/.history/history.db` accumulating between runs of this app - the same thing
+`api\Install-HistoryBackupTask.ps1` does on its own, wired in here as a one-flag convenience. It
+runs before anything else starts, and a failure there doesn't stop the backend/frontend/gateway from
+still starting normally.
+
 .PARAMETER Mode
 'build' (default): build the frontend once and serve it with `vite preview`; backend without
 --reload. 'dev': hot-reloading vite dev server; backend with --reload.
 
 .PARAMETER NoGateway
 Skip the gateway container (this machine only).
+
+.PARAMETER InstallBackupTask
+Also register (or update) the daily history-backup scheduled task - see
+api\Install-HistoryBackupTask.ps1.
 
 .PARAMETER BackendPort
 Port for the backend API. Default 8501.
@@ -65,6 +75,10 @@ Skip the gateway container.
 .\Start-Ledger.ps1 -BackendPort 9000 -FrontendPort 5000 -GatewayPort 9090
 Override every port.
 
+.EXAMPLE
+.\Start-Ledger.ps1 -InstallBackupTask
+Also register the daily history-backup scheduled task, then start as normal.
+
 .LINK
 .\Stop-Ledger.ps1 stops everything this script started.
 #>
@@ -73,6 +87,7 @@ param(
     [ValidateSet('dev', 'build')]
     [string]$Mode = 'build',
     [switch]$NoGateway,
+    [switch]$InstallBackupTask,
     [int]$BackendPort,
     [int]$FrontendPort,
     [int]$GatewayPort,
@@ -111,6 +126,15 @@ $GatewayPort = Resolve-Port -Explicit $GatewayPort -Name 'GATEWAY_PORT' -Default
 
 $venvPython = Join-Path $PSScriptRoot 'api\.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
+
+if ($InstallBackupTask) {
+    Write-Host "Installing the daily history-backup scheduled task..."
+    try {
+        & (Join-Path $PSScriptRoot 'api\Install-HistoryBackupTask.ps1')
+    } catch {
+        Write-Warning "Failed to install the history-backup task: $_"
+    }
+}
 
 Write-Host "Starting backend on port $BackendPort in $Mode mode (new window)..."
 $backendReloadFlag = if ($Mode -eq 'dev') { ' --reload' } else { '' }

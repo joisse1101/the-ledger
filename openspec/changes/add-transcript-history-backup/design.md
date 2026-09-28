@@ -110,6 +110,15 @@ runs while the app is open; per CLAUDE.md this isn't meant to be an always-on da
 tied to the app's uptime could miss the backup entirely for weeks at a time. Daily cadence gives
 large margin under Claude Code's typical multi-week retention default.
 
+`api\Install-HistoryBackupTask.ps1` (and a `-InstallBackupTask` switch on the root
+`Start-Ledger.ps1` that calls it) registers exactly this same entry via
+`Register-ScheduledTask`/`Set-ScheduledTask` - same program, arguments, working directory, logon
+type (`Interactive`) and run level (`Limited`, i.e. no elevation) as the manual steps, just scripted
+and idempotent (re-running it updates the existing task rather than duplicating it). This is a
+convenience wrapper only: it doesn't change the trigger mechanism (still an OS-level Task Scheduler
+entry, not the app's own loop) or the manual GUI path, which stays documented as a fallback for
+anyone who'd rather not run a script.
+
 ## Risks / Trade-offs
 
 - [`history.db` grows without bound, forever] → Acceptable at this data's scale (one row per
