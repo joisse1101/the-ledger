@@ -7,6 +7,7 @@ import { GroupBarChart } from "../overview/GroupBarChart";
 import { GroupDonutChart } from "../overview/GroupDonutChart";
 import { TimeRangeSelector } from "../overview/TimeRangeSelector";
 import styles from "./ProjectDetailPanel.module.css";
+import { ProjectSummaryStats } from "./ProjectSummaryStats";
 
 export interface ProjectDetailPanelProps {
   project: Project;
@@ -60,7 +61,10 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
 
       {data && !data.empty && (
         <>
-          <GroupDonutChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
+          <div className="overview-top">
+            <GroupDonutChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
+            <ProjectSummaryStats summary={data.summary} />
+          </div>
           <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
           <ActivityLineChart activity={data.activity} bucketMinutes={60} />
         </>

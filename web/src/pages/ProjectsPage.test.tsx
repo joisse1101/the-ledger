@@ -28,10 +28,36 @@ const make = (name: string): Project => ({
 const alpha = make("alpha");
 const beta = make("beta");
 
+const summary = {
+  projects: 1,
+  branches: 1,
+  sessions: 1,
+  messages: 1,
+  avg_messages_per_session: 1,
+  duration: {
+    average: { seconds: 10, label: "10s" },
+    longest: { seconds: 10, label: "10s", project: "alpha", session_id: "s1" },
+    shortest: { seconds: 10, label: "10s", project: "alpha", session_id: "s1" },
+    total: { seconds: 10, label: "10s" },
+  },
+  cost: {
+    average: { amount: 0, label: "$0.00" },
+    most_expensive: { amount: 0, label: "$0.00", project: "alpha", session_id: "s1" },
+    cheapest: { amount: 0, label: "$0.00", project: "alpha", session_id: "s1" },
+    total: { amount: 0, label: "$0.00" },
+  },
+  tokens: {
+    total: 0,
+    average: 0,
+    most: { amount: 0, project: "alpha", session_id: "s1" },
+    least: { amount: 0, project: "alpha", session_id: "s1" },
+  },
+};
+
 const populated = {
   range: "All time",
   empty: false,
-  summary: {},
+  summary,
   groups: [{ group: "main", sessions: 1, messages: 1, cost: 0, share: 100, messages_pct: 100, cost_pct: 100 }],
   group_order: ["main"],
   activity: [],

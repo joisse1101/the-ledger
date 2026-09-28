@@ -22,7 +22,7 @@ def frozen_now(monkeypatch):
 
 def _transcript(
     started_at=None, updated_at=None, message_count=0, cost=0.0, project="proj", session_id="s",
-    branch="main", path="x.jsonl",
+    branch="main", path="x.jsonl", context=None,
 ):
     return ClaudeTranscript(
         session_id=session_id,
@@ -38,6 +38,7 @@ def _transcript(
         title="",
         last_message="",
         first_prompt="",
+        context=context,
     )
 
 
@@ -284,16 +285,17 @@ def test_format_bucket(minute, expected):
 def test_summary_counts_and_names_the_extreme_sessions():
     transcripts = [
         _transcript(
-            project="a", session_id="quick", message_count=4, cost=0.5,
+            project="a", session_id="quick", message_count=4, cost=0.5, branch="main", context=1000,
             started_at=datetime(2024, 6, 15, 9, 0, 0), updated_at=datetime(2024, 6, 15, 9, 0, 30),
         ),
         _transcript(
-            project="b", session_id="slow", message_count=6, cost=2.0,
+            project="b", session_id="slow", message_count=6, cost=2.0, branch="dev", context=3000,
             started_at=datetime(2024, 6, 15, 10, 0, 0), updated_at=datetime(2024, 6, 15, 11, 1, 0),
         ),
     ]
     result = overview.summary(transcripts)
     assert result["projects"] == 2
+    assert result["branches"] == 2
     assert result["sessions"] == 2
     assert result["messages"] == 10
     assert result["avg_messages_per_session"] == pytest.approx(5.0)
@@ -305,15 +307,35 @@ def test_summary_counts_and_names_the_extreme_sessions():
     assert result["cost"]["cheapest"]["session_id"] == "quick"
     assert result["cost"]["total"]["label"] == "$2.50"
     assert result["cost"]["average"]["label"] == "$1.25"
+    assert result["tokens"]["total"] == 4000
+    assert result["tokens"]["average"] == pytest.approx(2000.0)
+    assert result["tokens"]["most"]["amount"] == 3000
+    assert result["tokens"]["most"]["session_id"] == "slow"
+    assert result["tokens"]["least"]["amount"] == 1000
+    assert result["tokens"]["least"]["session_id"] == "quick"
+
+
+def test_summary_tokens_ignores_transcripts_with_no_context_recorded():
+    transcripts = [_transcript(session_id="a", context=None), _transcript(session_id="b", context=500)]
+    result = overview.summary(transcripts)
+    assert result["tokens"]["total"] == 500
+    assert result["tokens"]["average"] == pytest.approx(500.0)
+    assert result["tokens"]["most"]["session_id"] == "b"
+    assert result["tokens"]["least"]["session_id"] == "b"
 
 
 def test_summary_of_nothing_is_placeholders_not_errors():
     result = overview.summary([])
     assert result["sessions"] == 0
+    assert result["branches"] == 0
     assert result["avg_messages_per_session"] is None
     assert result["duration"]["longest"]["label"] == "—"
     assert result["duration"]["longest"]["session_id"] is None
     assert result["cost"]["most_expensive"]["label"] == "$0.00"
+    assert result["tokens"]["total"] == 0
+    assert result["tokens"]["average"] == 0
+    assert result["tokens"]["most"]["amount"] == 0
+    assert result["tokens"]["most"]["session_id"] is None
 
 
 # ---------------------------------------------------------------------------

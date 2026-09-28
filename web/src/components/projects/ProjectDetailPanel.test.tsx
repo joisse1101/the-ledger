@@ -35,11 +35,37 @@ const project: Project = {
   mcp_servers: [],
 };
 
+const summary = {
+  projects: 1,
+  branches: 1,
+  sessions: 2,
+  messages: 4,
+  avg_messages_per_session: 2,
+  duration: {
+    average: { seconds: 30, label: "30s" },
+    longest: { seconds: 40, label: "40s", project: "demo", session_id: "s1" },
+    shortest: { seconds: 20, label: "20s", project: "demo", session_id: "s2" },
+    total: { seconds: 60, label: "1m 0s" },
+  },
+  cost: {
+    average: { amount: 0.5, label: "$0.50" },
+    most_expensive: { amount: 1, label: "$1.00", project: "demo", session_id: "s1" },
+    cheapest: { amount: 0, label: "$0.00", project: "demo", session_id: "s2" },
+    total: { amount: 1, label: "$1.00" },
+  },
+  tokens: {
+    total: 3000,
+    average: 1500,
+    most: { amount: 2000, project: "demo", session_id: "s1" },
+    least: { amount: 1000, project: "demo", session_id: "s2" },
+  },
+};
+
 const populated = {
   range: "All time",
   empty: false,
   available_ranges: ["All time", "Past week", "Past year"],
-  summary: {},
+  summary,
   groups: [{ group: "main", sessions: 2, messages: 4, cost: 1, share: 100, messages_pct: 100, cost_pct: 100 }],
   group_order: ["main"],
   activity: [],

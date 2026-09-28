@@ -17,7 +17,7 @@
 
 @media (--medium-up) {
   .stat-grid {
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   }
 }
 
@@ -54,7 +54,7 @@
 
 @media (--wide-up) {
   .overview-top {
-    grid-template-columns: minmax(13.75rem, 16.25rem) 1fr;
+    grid-template-columns: minmax(30rem, 36rem) 1fr;
   }
 }
 

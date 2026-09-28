@@ -204,7 +204,9 @@ def _with_session(
 
 
 def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
-    """The KPI figures: counts, session durations, session costs (extremes name their session)."""
+    """The KPI figures: counts, session durations, session costs, and context-token totals
+    (extremes name their session). `context` is None for a transcript with no real main-thread
+    turn recorded, so token figures are computed over whichever transcripts do have one."""
     num_sessions = len(transcripts)
     total_messages = sum(t.message_count for t in transcripts)
 
@@ -221,8 +223,14 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     most_expensive = max(transcripts, key=lambda t: t.cost) if transcripts else None
     cheapest = min(transcripts, key=lambda t: t.cost) if transcripts else None
 
+    token_entries = [(t.context, t) for t in transcripts if t.context is not None]
+    total_tokens = sum(tokens for tokens, _ in token_entries)
+    most_tokens = max(token_entries, key=lambda entry: entry[0]) if token_entries else None
+    least_tokens = min(token_entries, key=lambda entry: entry[0]) if token_entries else None
+
     return {
         "projects": len({t.project for t in transcripts}),
+        "branches": len({GROUP_KEYS["branch"](t) for t in transcripts}),
         "sessions": num_sessions,
         "messages": total_messages,
         "avg_messages_per_session": total_messages / num_sessions if num_sessions else None,
@@ -245,6 +253,18 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
                 _money(cheapest.cost if cheapest else 0), cheapest
             ),
             "total": _money(total_cost),
+        },
+        # Raw amounts (not pre-formatted) - the frontend humanises these the same way it already
+        # does the Context column/detail figures (`formatContext`/`humanizeTokens`).
+        "tokens": {
+            "total": total_tokens,
+            "average": total_tokens / len(token_entries) if token_entries else 0,
+            "most": _with_session(
+                {"amount": most_tokens[0] if most_tokens else 0}, most_tokens[1] if most_tokens else None
+            ),
+            "least": _with_session(
+                {"amount": least_tokens[0] if least_tokens else 0}, least_tokens[1] if least_tokens else None
+            ),
         },
     }
 

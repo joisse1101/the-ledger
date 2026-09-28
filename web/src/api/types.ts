@@ -225,11 +225,19 @@ export interface MoneyFigure {
   label: string;
 }
 
+/** A raw token count - unlike DurationFigure/MoneyFigure, not pre-formatted server-side; the
+ *  frontend humanises it the same way as the Context column/detail figures (`formatContext`). */
+export interface TokenFigure {
+  amount: number;
+}
+
 /** Extremes also say which session they came from. */
 export type WithSession<T> = T & { project: string | null; session_id: string | null };
 
 export interface OverviewSummary {
   projects: number;
+  /** Distinct git branches among these transcripts (the same key `group_by: "branch"` uses). */
+  branches: number;
   sessions: number;
   messages: number;
   avg_messages_per_session: number | null;
@@ -244,6 +252,12 @@ export interface OverviewSummary {
     most_expensive: WithSession<MoneyFigure>;
     cheapest: WithSession<MoneyFigure>;
     total: MoneyFigure;
+  };
+  tokens: {
+    total: number;
+    average: number;
+    most: WithSession<TokenFigure>;
+    least: WithSession<TokenFigure>;
   };
 }
 
