@@ -37,11 +37,11 @@
 
 ## 4. Standalone backup script
 
-- [ ] 4.1 Add `api/backup_history.py`: scans Claude Code's on-disk data (reusing `claude_db`'s
+- [x] 4.1 Add `api/backup_history.py`: scans Claude Code's on-disk data (reusing `claude_db`'s
       existing scan/`refresh()`) and upserts the results into `history.db`, with no dependency on
       `server.py` running; verify by running `python api/backup_history.py` directly while the
       server is stopped and confirming `history.db` is created/updated.
-- [ ] 4.2 Verify the script is safe to run repeatedly without growing row counts for unchanged
+- [x] 4.2 Verify the script is safe to run repeatedly without growing row counts for unchanged
       sessions; verify with a unit test invoking the backup logic twice in a row and asserting row
       counts are unchanged on the second run.
 
