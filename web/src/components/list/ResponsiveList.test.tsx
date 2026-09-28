@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ListCards } from "./ListCards";
 import { ListTable } from "./ListTable";
@@ -211,5 +212,168 @@ describe("ListTable and ListCards", () => {
       <ListTable columns={columns} rows={rows} rowId={(r) => r.id} onSelect={vi.fn()} emptyMessage="none" ariaLabel="Rows" showAllColumns />,
     );
     expect(screen.getByRole("button", { name: "Alpha" })).not.toHaveAttribute("aria-expanded");
+  });
+
+  describe("closing a row/card's expanded panel", () => {
+    function tableExpandedElement(expandedIds: string[]) {
+      return (
+        <ListTable
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          showAllColumns
+          expandedIds={new Set(expandedIds)}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />
+      );
+    }
+
+    function renderTableExpanded(expandedIds: string[]) {
+      return render(tableExpandedElement(expandedIds));
+    }
+
+    it("keeps a table row's panel mounted, marked collapsed, until its transition ends", () => {
+      const { rerender } = renderTableExpanded(["b"]);
+      rerender(
+        <ListTable
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          showAllColumns
+          expandedIds={new Set()}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />,
+      );
+
+      // Still there, right after the row itself stopped being expanded.
+      expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+      const panel = document.querySelector(".list-expand")!;
+      expect(panel).toHaveAttribute("data-collapsed", "true");
+
+      fireEvent.transitionEnd(panel);
+      expect(screen.queryByText("Expanded: Beta")).not.toBeInTheDocument();
+    });
+
+    it("cancels a still-closing row's removal if it's expanded again first", () => {
+      const { rerender } = renderTableExpanded(["b"]);
+      rerender(
+        <ListTable
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          showAllColumns
+          expandedIds={new Set()}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />,
+      );
+      rerender(
+        <ListTable
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          showAllColumns
+          expandedIds={new Set(["b"])}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />,
+      );
+
+      expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+      expect(document.querySelector(".list-expand")).toHaveAttribute("data-collapsed", "false");
+    });
+
+    it("removes a card's panel once its transition ends", () => {
+      const { rerender } = render(
+        <ListCards
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          expandedIds={new Set(["a"])}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />,
+      );
+      rerender(
+        <ListCards
+          columns={columns}
+          rows={rows}
+          rowId={(r) => r.id}
+          onSelect={vi.fn()}
+          emptyMessage="none"
+          ariaLabel="Rows"
+          expandedIds={new Set()}
+          renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+        />,
+      );
+
+      expect(screen.getByText("Expanded: Alpha")).toBeInTheDocument();
+      const panel = document.querySelector(".list-card-expanded")!;
+      expect(panel).toHaveAttribute("data-collapsed", "true");
+
+      fireEvent.transitionEnd(panel);
+      expect(screen.queryByText("Expanded: Alpha")).not.toBeInTheDocument();
+    });
+
+    it("removes the panel via a fallback timer, but not before the CSS transition (0.75s) could finish", () => {
+      // Regression test: the fallback timer used to fire at 300ms, well inside the 0.75s CSS
+      // transition, cutting the animation off partway - visually indistinguishable from no
+      // animation ever having played.
+      vi.useFakeTimers();
+      try {
+        const { rerender } = renderTableExpanded(["b"]);
+        rerender(
+          <ListTable
+            columns={columns}
+            rows={rows}
+            rowId={(r) => r.id}
+            onSelect={vi.fn()}
+            emptyMessage="none"
+            ariaLabel="Rows"
+            showAllColumns
+            expandedIds={new Set()}
+            renderExpanded={(r) => <div>Expanded: {r.name}</div>}
+          />,
+        );
+
+        expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+        act(() => {
+          vi.advanceTimersByTime(750);
+        });
+        expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+
+        act(() => {
+          vi.advanceTimersByTime(250);
+        });
+        expect(screen.queryByText("Expanded: Beta")).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still animates closed under StrictMode's double-invoked renders", () => {
+      // Regression test: an earlier version tracked "was this row just closed?" with a ref
+      // mutated inline during render. StrictMode calls the render function twice per commit with
+      // the same props/state; the ref's mutation from the first (discarded) call was already in
+      // place by the second (real) one, so the row's "closing" branch never ran and the panel was
+      // yanked out immediately instead of staying mounted to animate shut.
+      const { rerender } = render(<StrictMode>{tableExpandedElement(["b"])}</StrictMode>);
+      rerender(<StrictMode>{tableExpandedElement([])}</StrictMode>);
+
+      expect(screen.getByText("Expanded: Beta")).toBeInTheDocument();
+      expect(document.querySelector(".list-expand")).toHaveAttribute("data-collapsed", "true");
+    });
   });
 });

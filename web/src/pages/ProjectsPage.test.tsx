@@ -153,7 +153,11 @@ describe("ProjectsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Hide details for alpha" }));
 
-    expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument();
+    // The panel animates closed rather than vanishing the instant the row collapses, via
+    // useClosingIds' fallback timer - outliving waitFor's default 1000ms timeout.
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
     expect(screen.getByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
     expect(openProjects()).toEqual([beta.path]);
     client.clear();
@@ -170,7 +174,9 @@ describe("ProjectsPage", () => {
     fireEvent.click(within(alphaPanel).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(openProjects()).toEqual([beta.path]));
-    expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Charts for alpha" })).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
     expect(screen.getByRole("region", { name: "Charts for beta" })).toBeInTheDocument();
     client.clear();
   });

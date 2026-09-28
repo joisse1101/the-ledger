@@ -156,7 +156,9 @@ describe("ProjectsList", () => {
 
     scrollIntoView.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Hide details for demo" }));
-    await waitFor(() => expect(screen.queryByText("Details for demo")).not.toBeInTheDocument());
+    // The panel animates closed (see useClosingIds' fallback timer) rather than vanishing the
+    // instant the row collapses, so this outlives waitFor's default 1000ms timeout.
+    await waitFor(() => expect(screen.queryByText("Details for demo")).not.toBeInTheDocument(), { timeout: 2000 });
 
     expect(scrollIntoView).not.toHaveBeenCalled();
     client.clear();

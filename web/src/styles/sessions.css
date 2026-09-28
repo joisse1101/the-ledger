@@ -387,15 +387,54 @@
 }
 
 .list-table tbody tr.list-table-expanded-row td {
-  padding: 0.75rem;
+  padding: 0;
   max-width: none;
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
 }
 
+/* Animates a row/card's panel open and shut via grid-template-rows (interpolable between 0fr and
+   1fr, unlike height: auto): .list-expand/.list-card-expanded is the sizing wrapper, closed by
+   setting data-collapsed once the row is no longer expanded; .list-expand-inner clips the content
+   while that's shrinking and carries the padding, so it shrinks away too rather than leaving a gap. */
+.list-expand,
+.list-card-expanded {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.5s ease;
+}
+
 .list-card-expanded {
   margin-top: 0.5rem;
+  transition:
+    grid-template-rows 0.5s ease,
+    margin-top 0.5s ease;
+}
+
+.list-expand[data-collapsed="true"],
+.list-card-expanded[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+
+.list-card-expanded[data-collapsed="true"] {
+  margin-top: 0;
+}
+
+.list-expand-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.list-table .list-expand-inner {
+  padding: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-expand,
+  .list-card-expanded {
+    transition: none;
+  }
 }
 
 /* Shared by any list's "this is the selected row" state, e.g. the Projects list's

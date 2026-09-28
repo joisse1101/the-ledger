@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { ResponsiveListProps } from "./types";
+import { useClosingIds } from "./useClosingIds";
 
 export interface ListTableProps<T> extends ResponsiveListProps<T> {
   /** Wide shows every column; medium (false) hides "low" priority ones. */
@@ -24,6 +25,7 @@ export function ListTable<T>({
   showAllColumns,
 }: ListTableProps<T>) {
   const visible = columns.filter((column) => showAllColumns || column.priority === "high");
+  const { isClosing, onClosed } = useClosingIds(expandedIds);
 
   if (rows.length === 0) {
     return <p className="list-empty">{emptyMessage}</p>;
@@ -92,9 +94,19 @@ export function ListTable<T>({
                     </td>
                   ))}
                 </tr>
-                {expanded && renderExpanded && (
+                {(expanded || isClosing(id)) && renderExpanded && (
                   <tr className="list-table-expanded-row">
-                    <td colSpan={visible.length}>{renderExpanded(row)}</td>
+                    <td colSpan={visible.length}>
+                      <div
+                        className="list-expand"
+                        data-collapsed={!expanded}
+                        onTransitionEnd={(event) => {
+                          if (event.target === event.currentTarget && !expanded) onClosed(id);
+                        }}
+                      >
+                        <div className="list-expand-inner">{renderExpanded(row)}</div>
+                      </div>
+                    </td>
                   </tr>
                 )}
               </Fragment>

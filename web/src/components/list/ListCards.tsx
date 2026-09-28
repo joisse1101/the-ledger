@@ -1,4 +1,5 @@
 import { cardPriorityOf, type ResponsiveListProps } from "./types";
+import { useClosingIds } from "./useClosingIds";
 
 /** Card renderer for narrow screens: one button per item holding its primary fields plus small
  *  labelled chips for the secondary ones. Same rows, same order, same click handler as the table. */
@@ -14,6 +15,8 @@ export function ListCards<T>({
   expandedIds,
   renderExpanded,
 }: ResponsiveListProps<T>) {
+  const { isClosing, onClosed } = useClosingIds(expandedIds);
+
   if (rows.length === 0) {
     return <p className="list-empty">{emptyMessage}</p>;
   }
@@ -54,7 +57,17 @@ export function ListCards<T>({
                 </div>
               )}
             </button>
-            {expanded && renderExpanded && <div className="list-card-expanded">{renderExpanded(row)}</div>}
+            {(expanded || isClosing(id)) && renderExpanded && (
+              <div
+                className="list-card-expanded"
+                data-collapsed={!expanded}
+                onTransitionEnd={(event) => {
+                  if (event.target === event.currentTarget && !expanded) onClosed(id);
+                }}
+              >
+                <div className="list-expand-inner">{renderExpanded(row)}</div>
+              </div>
+            )}
           </li>
         );
       })}
