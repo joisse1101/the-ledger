@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import claude_db
 import claude_transcripts
 
@@ -112,3 +114,67 @@ def test_delete_transcript_returns_false_when_not_found(isolated_db, write_confi
     write_config(isolated_db / "claude.json", {})
     claude_db.refresh()
     assert claude_transcripts.delete_transcript("nonexistent") is False
+
+
+def test_delete_transcript_purges_history_only_session(isolated_db, write_config, tmp_path):
+    """A session already pruned from disk (known only from history.db) has no file left to
+    unlink - the delete still succeeds and purges the history.db row."""
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()
+    pruned_path = tmp_path / "gone" / "history-only.jsonl"  # never actually written to disk
+    claude_db.upsert_history_transcripts(
+        [
+            {
+                "session_id": "history-only",
+                "path": pruned_path,
+                "cwd": "/home/x/gone",
+                "version": "1.0.0",
+                "git_branch": "main",
+                "started_at": None,
+                "updated_at": None,
+                "message_count": 1,
+                "cost": 0.0,
+                "context": None,
+                "project": "gone",
+                "title": "",
+                "last_message": "",
+                "first_prompt": "",
+            }
+        ]
+    )
+
+    assert claude_transcripts.delete_transcript("history-only") is True
+    assert claude_transcripts.load_transcripts() == []
+    assert claude_db.fetch_history_transcripts() == []
+
+
+def test_delete_project_transcripts_purges_history_only_sessions(isolated_db, write_config):
+    """A project whose only remaining record is in history.db (already pruned from disk and
+    absent from ledger.db) still has its history.db rows removed by project delete."""
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()
+    folder = claude_db.sanitize_project_path("/home/x/proj")
+    claude_db.upsert_history_transcripts(
+        [
+            {
+                "session_id": "history-only",
+                "path": Path(f"/whatever/{folder}/history-only.jsonl"),
+                "cwd": "/home/x/proj",
+                "version": "1.0.0",
+                "git_branch": "main",
+                "started_at": None,
+                "updated_at": None,
+                "message_count": 1,
+                "cost": 0.0,
+                "context": None,
+                "project": "proj",
+                "title": "",
+                "last_message": "",
+                "first_prompt": "",
+            }
+        ]
+    )
+
+    removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
+    assert removed_dirs == 0  # nothing on disk to rmtree for a history-only session
+    assert claude_db.fetch_history_transcripts() == []

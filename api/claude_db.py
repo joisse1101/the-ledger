@@ -15,7 +15,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Callable, Generator, Optional
 
 
 _BUSY_TIMEOUT_MS = 10_000
@@ -23,6 +23,10 @@ _BUSY_TIMEOUT_MS = 10_000
 
 def db_path() -> Path:
     return Path(__file__).parent / ".ledger" / "ledger.db"
+
+
+def history_db_path() -> Path:
+    return Path(__file__).parent / ".history" / "history.db"
 
 
 def config_path() -> Path:
@@ -43,21 +47,34 @@ def sanitize_project_path(path: str) -> str:
 
 
 @contextmanager
-def _connect() -> Generator[sqlite3.Connection, None, None]:
-    path = db_path()
+def _connect_to(
+    path: Path, ensure_schema: Callable[[sqlite3.Connection], None]
+) -> Generator[sqlite3.Connection, None, None]:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=_BUSY_TIMEOUT_MS / 1000)
     conn.row_factory = sqlite3.Row
     try:
-        # WAL lets the API's readers keep reading while refresh() commits its
-        # table replacement; the timeout makes the rare remaining collision wait.
+        # WAL lets the API's readers keep reading while a writer commits its
+        # own table replacement; the timeout makes the rare remaining collision wait.
         conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
         conn.execute("PRAGMA journal_mode = WAL")
-        _ensure_schema(conn)
+        ensure_schema(conn)
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
+    with _connect_to(db_path(), _ensure_schema) as conn:
+        yield conn
+
+
+@contextmanager
+def _connect_history() -> Generator[sqlite3.Connection, None, None]:
+    with _connect_to(history_db_path(), _ensure_history_schema) as conn:
+        yield conn
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -79,6 +96,15 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             lines_removed INTEGER,
             mcp_servers TEXT NOT NULL
         );
+        """
+    )
+    _ensure_history_schema(conn)
+
+
+def _ensure_history_schema(conn: sqlite3.Connection) -> None:
+    """`transcripts` table shape shared by ledger.db (disposable) and history.db (durable)."""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS transcripts (
             session_id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
@@ -461,6 +487,62 @@ def _scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]
     return rows
 
 
+def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
+    """A `_scan_transcripts()`-shaped row (Path/datetime fields) -> one ready for SQLite binding."""
+    return {
+        **row,
+        "path": str(row["path"]),
+        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+    }
+
+
+_TRANSCRIPT_UPSERT_SQL = """
+    INSERT INTO transcripts (
+        session_id, path, cwd, version, git_branch, started_at,
+        updated_at, message_count, cost, context, project, title,
+        last_message, first_prompt
+    ) VALUES (
+        :session_id, :path, :cwd, :version, :git_branch, :started_at,
+        :updated_at, :message_count, :cost, :context, :project, :title,
+        :last_message, :first_prompt
+    )
+    ON CONFLICT(session_id) DO UPDATE SET
+        path = excluded.path,
+        cwd = excluded.cwd,
+        version = excluded.version,
+        git_branch = excluded.git_branch,
+        started_at = excluded.started_at,
+        updated_at = excluded.updated_at,
+        message_count = excluded.message_count,
+        cost = excluded.cost,
+        context = excluded.context,
+        project = excluded.project,
+        title = excluded.title,
+        last_message = excluded.last_message,
+        first_prompt = excluded.first_prompt
+"""
+
+
+def upsert_history_transcripts(rows: list[dict[str, Any]]) -> None:
+    """Insert or update `history.db` transcript rows, keyed by `session_id`.
+
+    `rows` is `_scan_transcripts()`-shaped (Path/datetime fields, one dict per transcript).
+    A row whose `session_id` already exists is overwritten in place rather than duplicated,
+    so re-running a backup against a still-growing session never creates a second row for it.
+    """
+    if not rows:
+        return
+    with _connect_history() as conn:
+        conn.executemany(_TRANSCRIPT_UPSERT_SQL, [_serialize_transcript_row(r) for r in rows])
+
+
+def fetch_history_transcripts() -> list[sqlite3.Row]:
+    """Every transcript row ever backed up to `history.db`, including ones since pruned from disk."""
+    with _connect_history() as conn:
+        return conn.execute("SELECT * FROM transcripts").fetchall()
+
+
 def refresh() -> datetime:
     """Rescan disk and replace the database's contents; returns the new refreshed-at timestamp."""
     project_rows = _scan_projects()
@@ -509,15 +591,7 @@ def refresh() -> datetime:
                 :last_message, :first_prompt
             )
             """,
-            [
-                {
-                    **t,
-                    "path": str(t["path"]),
-                    "started_at": t["started_at"].isoformat() if t["started_at"] else None,
-                    "updated_at": t["updated_at"].isoformat() if t["updated_at"] else None,
-                }
-                for t in transcript_rows
-            ],
+            [_serialize_transcript_row(t) for t in transcript_rows],
         )
 
         conn.execute(
@@ -576,11 +650,19 @@ def fetch_projects() -> list[sqlite3.Row]:
 
 
 def fetch_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row, newest-updated first (NULLs last)."""
+    """Every transcript row, live `ledger.db` rows merged with `history.db`'s durable rows by
+    `session_id` (the live row wins whenever a session exists in both - it's the fresher scan),
+    newest-updated first (NULLs last)."""
     with _connect() as conn:
-        return conn.execute(
-            "SELECT * FROM transcripts ORDER BY updated_at IS NULL, updated_at DESC"
-        ).fetchall()
+        live_rows = conn.execute("SELECT * FROM transcripts").fetchall()
+    history_rows = fetch_history_transcripts()
+
+    merged: dict[str, sqlite3.Row] = {row["session_id"]: row for row in history_rows}
+    merged.update({row["session_id"]: row for row in live_rows})
+
+    # Empty string sorts before any ISO timestamp, so `reverse=True` puts NULLs
+    # (mapped to "") last while still ordering real timestamps newest-first.
+    return sorted(merged.values(), key=lambda row: row["updated_at"] or "", reverse=True)
 
 
 def delete_project_row(project_path: str) -> None:
@@ -601,9 +683,10 @@ def transcript_paths_for_project(project_path: str) -> list[Path]:
     return [Path(row["path"]) for row in rows if Path(row["path"]).parent.name == folder]
 
 
-def delete_transcript_rows_by_project(project_path: str) -> None:
-    folder = sanitize_project_path(project_path)
-    with _connect() as conn:
+def _delete_transcript_rows_by_project_in(
+    connect: Callable[[], Any], folder: str
+) -> None:
+    with connect() as conn:
         rows = conn.execute("SELECT session_id, path FROM transcripts").fetchall()
         session_ids = [row["session_id"] for row in rows if Path(row["path"]).parent.name == folder]
         if session_ids:
@@ -613,8 +696,29 @@ def delete_transcript_rows_by_project(project_path: str) -> None:
             )
 
 
+def delete_transcript_rows_by_project(project_path: str) -> None:
+    """Remove a project's transcript rows from both `ledger.db` and `history.db`.
+
+    Matched by the same on-disk folder name `transcript_paths_for_project` uses, since a
+    `history.db` row (a session already pruned from disk) carries the same `path` shape.
+    """
+    folder = sanitize_project_path(project_path)
+    _delete_transcript_rows_by_project_in(_connect, folder)
+    _delete_transcript_rows_by_project_in(_connect_history, folder)
+
+
 def transcript_path_for_session(session_id: str) -> Optional[Path]:
+    """A session's transcript path from `ledger.db`, falling back to `history.db` when the
+    session is no longer live (e.g. already pruned from disk) - so callers checking whether a
+    session is known at all (the delete route's 404 check) recognize a history-only session too.
+    """
     with _connect() as conn:
+        row = conn.execute(
+            "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
+        ).fetchone()
+    if row is not None:
+        return Path(row["path"])
+    with _connect_history() as conn:
         row = conn.execute(
             "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -622,5 +726,8 @@ def transcript_path_for_session(session_id: str) -> Optional[Path]:
 
 
 def delete_transcript_row(session_id: str) -> None:
+    """Remove one session's row from whichever of `ledger.db`/`history.db` has it."""
     with _connect() as conn:
+        conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))
+    with _connect_history() as conn:
         conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))

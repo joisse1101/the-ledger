@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+import claude_db
+import claude_transcripts
 import transcript_query as tq
 from claude_transcripts import ClaudeTranscript
 
@@ -169,3 +171,44 @@ def test_query_defaults_to_newest_updated_first():
         _transcript(session_id="new", updated_at=datetime(2024, 1, 5)),
     ]
     assert _ids(tq.query(rows).items) == ["new", "old"]
+
+
+# ---------------------------------------------------------------- history-only sessions
+#
+# A history-only (pruned-from-disk) session flows through claude_transcripts.
+# load_transcripts() into query()/filter_transcripts() unchanged - no code here
+# is aware of history.db at all.
+
+
+def _history_only_row(session_id="pruned", **overrides):
+    row = {
+        "session_id": session_id,
+        "path": Path("/tmp/proj/pruned.jsonl"),
+        "cwd": "/tmp/proj",
+        "version": "1.0.0",
+        "git_branch": "main",
+        "started_at": datetime(2024, 1, 1, 9, 0, 0),
+        "updated_at": datetime(2024, 1, 1, 9, 5, 0),
+        "message_count": 4,
+        "cost": 0.5,
+        "context": 1000,
+        "project": "proj",
+        "title": "",
+        "last_message": "Fixed it.",
+        "first_prompt": "Can you look at this?",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_query_lists_a_history_only_session_with_unmodified_code(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {})
+    claude_db.refresh()  # nothing left on disk - the session only exists in history.db
+    claude_db.upsert_history_transcripts([_history_only_row()])
+
+    transcripts = claude_transcripts.load_transcripts()
+    page = tq.query(transcripts, projects=["proj"], search="fixed it")
+
+    assert _ids(page.items) == ["pruned"]
+    assert page.total == 1
+    assert page.options["projects"] == ["proj"]

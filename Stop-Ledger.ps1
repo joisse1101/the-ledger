@@ -12,8 +12,16 @@ backend/frontend you started by hand in your own terminal (there's no .ledger-ru
 Each window is stopped as a whole process tree (its `npm`/`vite`/`python` children included), not
 just the outer PowerShell window.
 
+-UninstallBackupTask removes the daily history-backup Scheduled Task Start-Ledger.ps1's
+-InstallBackupTask (or hooks\ledgerScripts\Install-HistoryBackupTask.ps1 directly) installs - opt-in
+only, since that task is meant to keep running independently of whether the app itself is up.
+
 .PARAMETER NoGateway
 Leave the gateway container running.
+
+.PARAMETER UninstallBackupTask
+Also remove the daily history-backup scheduled task - see
+hooks\ledgerScripts\Uninstall-HistoryBackupTask.ps1.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
@@ -25,16 +33,34 @@ Stop backend + frontend + gateway.
 .EXAMPLE
 .\Stop-Ledger.ps1 -NoGateway
 Stop backend + frontend, leave the gateway container running.
+
+.EXAMPLE
+.\Stop-Ledger.ps1 -UninstallBackupTask
+Also remove the daily history-backup scheduled task.
+
+.LINK
+.\Start-Ledger.ps1's -InstallBackupTask installs the scheduled task this script's
+-UninstallBackupTask removes.
 #>
 
 param(
     [switch]$NoGateway,
+    [switch]$UninstallBackupTask,
     [switch]$Help
 )
 
 if ($Help) {
     Get-Help $PSCommandPath -Detailed
     return
+}
+
+if ($UninstallBackupTask) {
+    Write-Host "Removing the daily history-backup scheduled task..."
+    try {
+        & (Join-Path $PSScriptRoot 'hooks\ledgerScripts\Uninstall-HistoryBackupTask.ps1')
+    } catch {
+        Write-Warning "Failed to remove the history-backup task: $_"
+    }
 }
 
 $stateFile = Join-Path $PSScriptRoot '.ledger-run.json'

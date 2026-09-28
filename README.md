@@ -44,8 +44,8 @@ the root (`Start-Ledger.ps1`/`Stop-Ledger.ps1`) that start/stop all three togeth
   data layer that actually knows how to read Claude Code's on-disk files
   (`claude_db.py`, `claude_projects.py`, `claude_transcripts.py`, `claude_sessions.py`,
   `claude_context.py`), its tests (`api/tests/`), `requirements*.txt`, `pyproject.toml`,
-  and its own `.venv`/`.ledger` (both gitignored). It only ever serves `/api/*` — no
-  pages, no static files.
+  and its own `.venv`/`.ledger`/`.history` (all gitignored). It only ever serves
+  `/api/*` — no pages, no static files.
 - `web/` — the React + Vite frontend. Built once with `npm run build`, then served by
   its own process (`vite preview`), entirely separate from the API.
 - `gateway/` — a small containerized Nginx reverse proxy (needs Docker Desktop). It's
@@ -158,6 +158,26 @@ every device using the old token will need the new link.
 One place to see/change every port (gateway, API, frontend) is the root `.env` — copy
 `.env.example` to `.env` and edit it; see `CLAUDE.md`'s "Setup & Run" for the full
 precedence rules and how to keep the API/frontend processes in sync with a custom port.
+
+## Keeping history past Claude Code's retention window
+
+Claude Code prunes its own session transcripts after a while, which would normally make old
+sessions disappear from the All list and Overview too. `api/backup_history.py` keeps a durable
+copy (`api/.history/history.db`, gitignored, never wiped) that a session survives in even after
+its `.jsonl` is gone — but only if it actually runs on a schedule, since the app itself never
+triggers it.
+
+Register the daily task for it with one command (needs `api/`'s venv set up):
+
+```powershell
+cd hooks\ledgerScripts
+.\Install-HistoryBackupTask.ps1
+```
+
+Or pass `-InstallBackupTask` to the root script to do it in the same step as starting the app:
+`.\Start-Ledger.ps1 -InstallBackupTask`. Both are safe to re-run. `.\Uninstall-HistoryBackupTask.ps1`
+(or `.\Stop-Ledger.ps1 -UninstallBackupTask`) removes it again. See `CLAUDE.md`'s "Setup & Run" for
+what the task runs and how to verify it's actually running.
 
 ## Testing
 

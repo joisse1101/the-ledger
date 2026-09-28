@@ -76,6 +76,19 @@ Both delete paths gain an equivalent history-side delete, using the same folder-
 `transcript_paths_for_project`/`delete_transcript_rows_by_project` already use (history rows carry
 the same `path`/`cwd` columns).
 
+A session known only from `history.db` (already pruned from disk and absent from `ledger.db`)
+still needs to be deletable, since the merge surfaces it in the All list exactly like a live one.
+Today, `DELETE /api/sessions/{id}` (`server.py:329-333`) 404s via
+`claude_db.transcript_path_for_session()`, which only queries `ledger.db`, and
+`claude_transcripts.delete_transcript()` unconditionally `unlink()`s the path it finds - neither
+recognizes a history-only session as real:
+- `claude_db.transcript_path_for_session()` (or a new sibling the route's existence check calls
+  instead) also consults `history.db` when the session isn't in `ledger.db`, so the 404 check
+  passes for a history-only session too.
+- `claude_transcripts.delete_transcript()` treats `FileNotFoundError` from `unlink()` as "already
+  gone, nothing to remove on disk" rather than a failure, then purges whichever of
+  `ledger.db`/`history.db` actually has a row for that `session_id`.
+
 ### Backup script is standalone, reuses `claude_db`'s existing scan
 
 `api/backup_history.py` calls `claude_db.refresh()` (or the lower-level `_scan_projects`/
@@ -96,6 +109,23 @@ user). This is deliberately decoupled from `server.py`'s own 10-minute `refresh_
 runs while the app is open; per CLAUDE.md this isn't meant to be an always-on daemon, so a trigger
 tied to the app's uptime could miss the backup entirely for weeks at a time. Daily cadence gives
 large margin under Claude Code's typical multi-week retention default.
+
+`hooks\ledgerScripts\Install-HistoryBackupTask.ps1` (and a `-InstallBackupTask` switch on the root
+`Start-Ledger.ps1` that calls it) registers exactly this entry via
+`Register-ScheduledTask`/`Set-ScheduledTask` - same program, arguments, working directory, logon
+type (`Interactive`) and run level (`Limited`, i.e. no elevation) described above, scripted and
+idempotent (re-running it updates the existing task rather than duplicating it). This is the one
+documented way to create the task; it doesn't change the trigger mechanism itself (still an OS-level
+Task Scheduler entry, not the app's own loop). Anyone who'd rather set it up by hand than run the
+script reads the script itself as the reference for exactly which fields to set - CLAUDE.md/README
+no longer duplicate a separate manual GUI walkthrough. Its sibling,
+`hooks\ledgerScripts\Uninstall-HistoryBackupTask.ps1` (and `Stop-Ledger.ps1`'s
+`-UninstallBackupTask`), just unregisters the task by name - matching the
+`Install-ClaudeHooks.ps1`/`Uninstall-ClaudeHooks.ps1` split already used elsewhere in `hooks/`,
+rather than an `-Uninstall` switch on the install script itself. Both scripts live in
+`hooks/ledgerScripts/` alongside the relay hook rather than in `api/`: they're dashboard-coupled
+PowerShell tooling specific to this app, not part of the Python backend, the same reasoning that
+already put the relay hook there instead of in `api/`.
 
 ## Risks / Trade-offs
 

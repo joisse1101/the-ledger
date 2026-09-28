@@ -5,6 +5,7 @@ __pycache__/
 run_log.txt
 .pytest_cache/
 .ledger/
+.history/
 .ledger-run.json
 web/node_modules/
 web/dist/

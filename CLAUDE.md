@@ -12,10 +12,11 @@ The backend and frontend run as two separate processes/ports; the API never serv
 
 The repo has exactly four top-level folders, one per service, each self-contained: `api/` (the
 backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
-gitignored `.venv`/`.ledger`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
+gitignored `.venv`/`.ledger`/`.history`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see "From another device on your network" below), and `hooks/` (Claude
-Code toast hooks, plus one optional relay hook coupled to the dashboard — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
+installer/uninstaller — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all
@@ -27,7 +28,10 @@ bearer-token auth and separate-origin rules) ahead of inferring it from the code
 
 The API and frontend both read the same on-disk Claude Code data (`~/.claude.json` and
 `~/.claude/projects/*/*.jsonl`) via a SQLite snapshot at `api/.ledger/ledger.db` (gitignored, rebuilt
-from disk on every server start and periodically thereafter — see "Data layer" below).
+from disk on every server start and periodically thereafter — see "Data layer" below). A second,
+never-wiped SQLite file, `api/.history/history.db`, retains a summary row per session transcript
+ever scanned, so a session survives in Overview/Projects/the All list after Claude Code prunes its
+`.jsonl` from disk — see "Data layer" below and `api/backup_history.py`.
 
 ## Setup & Run
 
@@ -155,6 +159,36 @@ frontend process's own environment (e.g. `BACKEND_PORT=<port> npm run preview --
 reads it from `process.env.BACKEND_PORT` (default `8501`), separately from the port the gateway's
 Nginx is told to target.
 
+**Keeping session history past Claude Code's own retention window**: `api/backup_history.py` (see
+"Data layer" below) needs to actually run on a schedule to be useful — the app itself never
+triggers it. Register a daily Windows Task Scheduler entry for it with
+`hooks\ledgerScripts\Install-HistoryBackupTask.ps1`, which registers or updates that same entry:
+`api\.venv\Scripts\python.exe backup_history.py`, "Start in" `api\`, run as the logged-in user with
+no elevation, daily. Re-running it updates the existing task in place rather than duplicating it;
+the paired `Uninstall-HistoryBackupTask.ps1` alongside it removes the task again:
+
+```powershell
+cd hooks\ledgerScripts
+.\Install-HistoryBackupTask.ps1              # daily at 14:00 by default
+.\Install-HistoryBackupTask.ps1 -Time 23:30  # or pick a different trigger time
+.\Uninstall-HistoryBackupTask.ps1            # remove it
+```
+
+Or fold either into the root scripts as one flag: `.\Start-Ledger.ps1 -InstallBackupTask` /
+`.\Stop-Ledger.ps1 -UninstallBackupTask`. If you'd rather set the task up (or tear it down) by hand
+than run a script, the two scripts themselves are the reference — they're the definitive list of
+exactly which fields to set (program, arguments, working directory, trigger, logon type, run level),
+so reading them and replicating those same fields in Task Scheduler's UI produces the same task.
+
+Trigger it manually once after creating it (`Start-ScheduledTask -TaskName 'Ledger History
+Backup'`, or right-click the task in Task Scheduler → Run) to confirm it works: inspect
+`api/.history/history.db`'s row count/contents before and after (via the `sqlite3` CLI, e.g.
+`sqlite3 api/.history/history.db "SELECT COUNT(*) FROM transcripts"`, or Python's builtin `sqlite3`
+module if that CLI isn't installed), or check `Get-ScheduledTaskInfo -TaskName 'Ledger History
+Backup'`'s `LastTaskResult` (`0` = success). Daily is deliberately decoupled from whether
+`server.py` is even running — this project isn't meant to run as an always-on daemon, so a trigger
+tied to the app's own uptime could miss the backup for weeks.
+
 Dark/light theme is chosen per device, not shared server-side: each browser picks up
 `prefers-color-scheme` until it toggles the switch itself, then remembers that choice in its own
 `localStorage` (see `web/src/theme/theme.ts`).
@@ -242,6 +276,30 @@ testable and readable independent of the web framework wrapping it.
   then delete just the matching row(s) from SQLite by key, rather than calling `refresh()` again — a
   full rescan isn't needed since the key just removed from disk is exactly the key to remove from the
   db.
+  `claude_db.py` also owns a second, durable store at `history_db_path()` (`api/.history/history.db`,
+  gitignored) holding the same `transcripts` table shape as `ledger.db`'s (shared via
+  `_ensure_history_schema()`) — unlike `ledger.db`, nothing ever wipes this file or its rows: no
+  `atexit` hook, no delete-and-reinsert in `refresh()`. `upsert_history_transcripts()` writes rows into
+  it with `INSERT ... ON CONFLICT(session_id) DO UPDATE SET ...`, so re-backing-up a still-growing
+  session overwrites its row in place rather than duplicating it; `fetch_history_transcripts()` reads
+  every row back, including ones for sessions since pruned from disk. `fetch_transcripts()` (the one
+  function `load_transcripts()` calls) merges `ledger.db`'s live rows with `history.db`'s rows by
+  `session_id`, preferring the live row whenever a session exists in both since it's the fresher scan
+  — this merge is the only thing that changed for callers; `claude_transcripts.py`, `overview_stats.py`
+  and `transcript_query.py` need no changes of their own, since they already just consume
+  `fetch_transcripts()`'s output. `delete_transcript_row()` and `delete_transcript_rows_by_project()`
+  purge from both stores, so an explicitly deleted session or project doesn't reappear on a later
+  merged read; `transcript_path_for_session()` falls back to `history.db` when a session isn't in
+  `ledger.db`, so a history-only session (already pruned from disk and absent from `ledger.db`) is
+  still recognized as known — and `claude_transcripts.delete_transcript()` treats its missing file
+  (`unlink()`'s `FileNotFoundError`) as "already gone" rather than a failure, purging whichever store
+  actually has the row.
+- `api/backup_history.py` is a standalone script, runnable independently of `server.py` (no server
+  process needed): it calls `claude_db._scan_projects()`/`_scan_transcripts()` directly — the same
+  scan `refresh()` itself calls — and upserts the results straight into `history.db`, skipping
+  `ledger.db` entirely. It's meant to be triggered daily by an OS-level scheduled task (see "Setup &
+  Run" below) so history keeps accumulating even when the app isn't running; safe to run repeatedly,
+  since the upsert overwrites an unchanged session's row rather than growing it.
 - `claude_projects.py` holds the `ClaudeProject` dataclass and query/delete functions for Claude
   Code's project data (originally `~/.claude.json`'s top-level `projects` map — one entry per
   directory Claude Code has been run/trusted in, reflecting only that project's *last* session:
@@ -259,7 +317,8 @@ testable and readable independent of the web framework wrapping it.
   silently skipped), and `project` (matching the on-disk parent folder against each project's
   `sanitize_project_path()`, falling back to a cwd/folder-derived guess). `delete_project_transcripts(cwd)`
   and `delete_transcript(session_id)` look up the affected path(s) via `claude_db`, remove the real
-  file(s), then delete just those rows from SQLite.
+  file(s) (tolerating one already gone — see `claude_db.py`'s `history.db` paragraph above), then
+  delete just those rows from both `ledger.db` and `history.db`.
 - `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`
   (one file per process) directly from disk on every call — unlike projects/transcripts this isn't
   routed through `claude_db.py`, since the Live views poll it every ~2s and a snapshot refreshed only
@@ -615,9 +674,10 @@ Claude Code's `Notification`/`Stop` hook events, with `Install-ClaudeHooks.ps1`/
 full install/uninstall/test steps. (The dashboard's one reach into it: `api/` runs
 `scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action — see `api/` above.)
 
-`hooks/ledgerScripts/` is the exception: an **optional, dashboard-coupled** hook script, kept apart
-from `scripts/` precisely because it only makes sense with this app. `Relay-PermissionRequest.ps1` is
-a `PermissionRequest` hook that forwards each prompt Claude Code is about to show (permission dialog
+`hooks/ledgerScripts/` is the exception: **optional, dashboard-coupled** scripts, kept apart from
+`scripts/` precisely because they only make sense with this app — one Claude Code hook plus two
+plain Task Scheduler scripts that are dashboard-coupled the same way but aren't hooks at all.
+`Relay-PermissionRequest.ps1` is a `PermissionRequest` hook that forwards each prompt Claude Code is about to show (permission dialog
 or `AskUserQuestion`) to `POST /api/sessions/{id}/decisions` on `127.0.0.1:<port>` (`-Port`, baked in
 by the installer, else `$env:LEDGER_PORT`, else 8501) and waits, so the dashboard can answer it. It
 must **print nothing at all** — empty stdout, exit 0 — whenever it has no answer (backend down, no
@@ -633,6 +693,14 @@ verified against Claude Code 2.1.281 (the hook runs alongside the dialog, a late
 discarded, `updatedInput.answers` answers an `AskUserQuestion`) — re-check after a Claude Code
 upgrade. See `hooks/README.md` section 6.
 
+`Install-HistoryBackupTask.ps1`/`Uninstall-HistoryBackupTask.ps1`, alongside the relay hook in the
+same folder, register/remove the Windows Scheduled Task that runs `api/backup_history.py` daily
+(see "Setup & Run" above) — unlike the relay hook, these aren't Claude Code hooks at all (nothing
+copies them anywhere or touches `settings.json`); they're run directly from this checkout, either by
+hand or via the root `Start-Ledger.ps1 -InstallBackupTask`/`Stop-Ledger.ps1 -UninstallBackupTask`.
+They live here rather than in `api/` because, like the relay hook, they're PowerShell tooling
+specific to this app rather than part of the Python backend itself.
+
 ### `openspec/`
 
 The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
@@ -646,7 +714,10 @@ of what a capability is required to do, ahead of inferring intent from the code 
 
 - `api/.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see "Data layer" above)
   and the LAN access token (`token`, see `api/security.py` above); both are recreated as needed and
-  never committed. `.gitignore` also excludes `web/node_modules/`, `web/dist/`, and root `.env`.
+  never committed. `api/.history/` (gitignored) holds the durable `history.db*` — see "Data layer"
+  above — which, unlike `.ledger/`, is never recreated or wiped; it's built up over time by
+  `api/backup_history.py`. `.gitignore` also excludes `web/node_modules/`, `web/dist/`, and root
+  `.env`.
 - Root `.env.example` (committed) documents `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` in one
   place — copy it to `.env` (gitignored) to override any of them; see "Setup & Run" above for how
   each one is actually consumed.
