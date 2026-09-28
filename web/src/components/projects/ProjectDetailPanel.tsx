@@ -15,6 +15,10 @@ export interface ProjectDetailPanelProps {
   onDeleted: () => void;
 }
 
+// Hourly, unlike Overview's own 30-minute default - a single project's activity is sparser, so
+// finer blocks would mostly be empty.
+const BUCKET_MINUTES = 60;
+
 /** One project's panel, shown inline beneath its row in the Projects list: the Overview time range
  *  plus that project's charts grouped by git branch, and (on the machine running the app only) a
  *  "Delete project" button that opens a confirmation modal. The page renders it with
@@ -23,7 +27,7 @@ export interface ProjectDetailPanelProps {
 export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelProps) {
   const [range, setRange] = useState<TimeRange>("All time");
   const [confirming, setConfirming] = useState(false);
-  const overview = useOverview(range, { project: project.path, groupBy: "branch", bucketMinutes: 60 });
+  const overview = useOverview(range, { project: project.path, groupBy: "branch", bucketMinutes: BUCKET_MINUTES });
   const deleteProject = useDeleteProject();
   // Deletes are local-only server-side, so no other device is even shown the button.
   const isLocal = useMeta().data?.is_local === true;
@@ -71,7 +75,7 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
             <ProjectSummaryStats summary={data.summary} />
           </div>
           <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
-          <ActivityLineChart activity={data.activity} bucketMinutes={60} />
+          <ActivityLineChart activity={data.activity} bucketMinutes={BUCKET_MINUTES} />
         </>
       )}
 

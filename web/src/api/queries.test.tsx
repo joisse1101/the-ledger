@@ -228,14 +228,14 @@ describe("the overview query", () => {
     const client = createQueryClient();
 
     const { result } = renderHook(
-      () => useOverview("Past week", { project: "C:\code\app", groupBy: "branch" }),
+      () => useOverview("Past week", { project: "C:\\code\\app", groupBy: "branch" }),
       { wrapper: wrapper(client) },
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     const params = new URL(fetchMock.mock.calls[0][0], "http://x").searchParams;
     expect(params.get("range")).toBe("Past week");
-    expect(params.get("project")).toBe("C:\code\app");
+    expect(params.get("project")).toBe("C:\\code\\app");
     expect(params.get("group_by")).toBe("branch");
     client.clear();
   });

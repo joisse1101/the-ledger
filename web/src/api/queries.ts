@@ -25,6 +25,9 @@ export const LIVE_POLL_MS = 2000;
 export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
 export const PAGE_SIZE = 50;
+// Matches the server's own default (overview_stats.BUCKET_MINUTES), so an unscoped cache key
+// collides with one that named it explicitly.
+const DEFAULT_BUCKET_MINUTES = 30;
 
 export const keys = {
   meta: ["meta"] as const,
@@ -34,7 +37,7 @@ export const keys = {
   pendingDecision: (id: string) => ["pending-decision", id] as const,
   // Always starts ["overview", ...] so invalidating ["overview"] covers every scope and grouping.
   overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy, bucketMinutes?: number) =>
-    ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? 30] as const,
+    ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? DEFAULT_BUCKET_MINUTES] as const,
   projects: ["projects"] as const,
 };
 

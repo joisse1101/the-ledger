@@ -206,6 +206,31 @@ def _with_session(
     return figure
 
 
+Extreme = Optional[tuple[float, ClaudeTranscript]]
+
+
+def _extremes(
+    transcripts: Sequence[ClaudeTranscript], value: Callable[[ClaudeTranscript], Optional[float]]
+) -> tuple[float, int, Extreme, Extreme]:
+    """Total, count, and the (value, transcript) pairs with the highest/lowest `value`, over
+    whichever transcripts `value` doesn't skip by returning None (e.g. no duration parsed, or no
+    context recorded) - so `count` may be less than `len(transcripts)` (durations, tokens), or
+    equal to it when `value` never skips (cost). `most`/`least` are None when nothing qualified.
+    """
+    entries = [(v, t) for t in transcripts for v in [value(t)] if v is not None]
+    total = sum(v for v, _ in entries)
+    most = max(entries, key=lambda entry: entry[0]) if entries else None
+    least = min(entries, key=lambda entry: entry[0]) if entries else None
+    return total, len(entries), most, least
+
+
+def _extreme_figure(build: Callable[[float], dict[str, Any]], extreme: Extreme) -> dict[str, Any]:
+    """`build(value)` (e.g. `_duration`/`_money`) plus which session that value belongs to, or
+    `build(0)`/no session when `extreme` is None (nothing qualified)."""
+    value, transcript = extreme if extreme else (0, None)
+    return _with_session(build(value), transcript)
+
+
 def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     """The KPI figures: counts, session durations, session costs, and context-token totals
     (extremes name their session). `context` is None for a transcript with no real main-thread
@@ -213,23 +238,12 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     num_sessions = len(transcripts)
     total_messages = sum(t.message_count for t in transcripts)
 
-    durations = [
-        ((t.updated_at - t.started_at).total_seconds(), t)
-        for t in transcripts
-        if t.started_at and t.updated_at
-    ]
-    total_duration = sum(seconds for seconds, _ in durations)
-    longest = max(durations, key=lambda entry: entry[0]) if durations else None
-    shortest = min(durations, key=lambda entry: entry[0]) if durations else None
-
-    total_cost = sum(t.cost for t in transcripts)
-    most_expensive = max(transcripts, key=lambda t: t.cost) if transcripts else None
-    cheapest = min(transcripts, key=lambda t: t.cost) if transcripts else None
-
-    token_entries = [(t.context, t) for t in transcripts if t.context is not None]
-    total_tokens = sum(tokens for tokens, _ in token_entries)
-    most_tokens = max(token_entries, key=lambda entry: entry[0]) if token_entries else None
-    least_tokens = min(token_entries, key=lambda entry: entry[0]) if token_entries else None
+    total_duration, duration_count, longest, shortest = _extremes(
+        transcripts,
+        lambda t: (t.updated_at - t.started_at).total_seconds() if t.started_at and t.updated_at else None,
+    )
+    total_cost, cost_count, most_expensive, cheapest = _extremes(transcripts, lambda t: t.cost)
+    total_tokens, token_count, most_tokens, least_tokens = _extremes(transcripts, lambda t: t.context)
 
     return {
         "projects": len({t.project for t in transcripts}),
@@ -238,36 +252,24 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
         "messages": total_messages,
         "avg_messages_per_session": total_messages / num_sessions if num_sessions else None,
         "duration": {
-            "average": _duration(total_duration / len(durations) if durations else 0),
-            "longest": _with_session(
-                _duration(longest[0] if longest else 0), longest[1] if longest else None
-            ),
-            "shortest": _with_session(
-                _duration(shortest[0] if shortest else 0), shortest[1] if shortest else None
-            ),
+            "average": _duration(total_duration / duration_count if duration_count else 0),
+            "longest": _extreme_figure(_duration, longest),
+            "shortest": _extreme_figure(_duration, shortest),
             "total": _duration(total_duration),
         },
         "cost": {
-            "average": _money(total_cost / num_sessions if num_sessions else 0),
-            "most_expensive": _with_session(
-                _money(most_expensive.cost if most_expensive else 0), most_expensive
-            ),
-            "cheapest": _with_session(
-                _money(cheapest.cost if cheapest else 0), cheapest
-            ),
+            "average": _money(total_cost / cost_count if cost_count else 0),
+            "most_expensive": _extreme_figure(_money, most_expensive),
+            "cheapest": _extreme_figure(_money, cheapest),
             "total": _money(total_cost),
         },
         # Raw amounts (not pre-formatted) - the frontend humanises these the same way it already
         # does the Context column/detail figures (`formatContext`/`humanizeTokens`).
         "tokens": {
             "total": total_tokens,
-            "average": total_tokens / len(token_entries) if token_entries else 0,
-            "most": _with_session(
-                {"amount": most_tokens[0] if most_tokens else 0}, most_tokens[1] if most_tokens else None
-            ),
-            "least": _with_session(
-                {"amount": least_tokens[0] if least_tokens else 0}, least_tokens[1] if least_tokens else None
-            ),
+            "average": total_tokens / token_count if token_count else 0,
+            "most": _extreme_figure(lambda amount: {"amount": amount}, most_tokens),
+            "least": _extreme_figure(lambda amount: {"amount": amount}, least_tokens),
         },
     }
 

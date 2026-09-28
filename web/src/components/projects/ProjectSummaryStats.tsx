@@ -1,20 +1,8 @@
 import type { OverviewSummary } from "../../api/types";
 import { formatContext, formatCount } from "../../lib/format";
-import { Tooltip } from "../Tooltip";
+import { StatGrid, type StatTile } from "../StatGrid";
 
-interface SessionRef {
-  project: string | null;
-  session_id: string | null;
-}
-
-interface Tile {
-  label: string;
-  value: string;
-  /** Present only for the tiles naming an extreme session. */
-  ref?: SessionRef;
-}
-
-function tiles(summary: OverviewSummary): Tile[] {
+function tiles(summary: OverviewSummary): StatTile[] {
   return [
     { label: "Branches", value: formatCount(summary.branches) },
     { label: "Sessions", value: formatCount(summary.sessions) },
@@ -41,10 +29,6 @@ function tiles(summary: OverviewSummary): Tile[] {
   ];
 }
 
-function refNote(ref: SessionRef): string | null {
-  return ref.project && ref.session_id ? `${ref.project} — ${ref.session_id}` : null;
-}
-
 export interface ProjectSummaryStatsProps {
   summary: OverviewSummary;
 }
@@ -55,20 +39,5 @@ export interface ProjectSummaryStatsProps {
  *  carry a tooltip naming the branch's session (project is fixed here, so it's mostly the session
  *  id, kept alongside project for consistency with `SummaryStats`). */
 export function ProjectSummaryStats({ summary }: ProjectSummaryStatsProps) {
-  return (
-    <div className="stat-grid">
-      {tiles(summary).map(({ label, value, ref }) => {
-        const note = ref && refNote(ref);
-        return (
-          <div key={label} className="stat-tile">
-            <span className="stat-label">
-              {label}
-              {note && <Tooltip tooltip={note} size="sm" />}
-            </span>
-            <span className="stat-value">{value}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <StatGrid tiles={tiles(summary)} />;
 }

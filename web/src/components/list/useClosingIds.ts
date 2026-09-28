@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const EMPTY = new Set<string>();
 // A safety net for onTransitionEnd never firing at all (prefers-reduced-motion sets
@@ -55,16 +55,38 @@ export function useClosingIds(expandedIds: Set<string> | undefined) {
     });
   };
 
+  // One timer per id, kept in a ref so an unrelated id joining or leaving `closing` doesn't reset
+  // everyone else's: a plain `useEffect(..., [closing])` that scheduled+cleared *all* timers on
+  // every change would restart an id's own 1000ms wait each time a different id started or
+  // finished closing, which can push its fallback removal out indefinitely under a steady trickle
+  // of closes. This effect only starts a timer for an id that doesn't have one yet, and only
+  // clears one for an id that left `closing` (closed for real, or reopened).
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
-    if (closing.size === 0) return;
-    const timers = [...closing].map((id) => setTimeout(() => onClosed(id), CLOSE_TIMEOUT_MS));
-    return () => {
-      for (const timer of timers) clearTimeout(timer);
-    };
+    const timers = timersRef.current;
+    for (const id of closing) {
+      if (!timers.has(id)) timers.set(id, setTimeout(() => onClosed(id), CLOSE_TIMEOUT_MS));
+    }
+    for (const [id, timer] of timers) {
+      if (!closing.has(id)) {
+        clearTimeout(timer);
+        timers.delete(id);
+      }
+    }
     // onClosed is a fresh function each render but stable in behavior; only closing membership
-    // should reschedule these timers.
+    // should start/stop timers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closing]);
+
+  // Unmount only: any renderer still "closing" when the whole component goes away leaves its
+  // timer with nothing to call `onClosed` on otherwise.
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
 
   return { isClosing: (id: string) => closing.has(id), onClosed };
 }
