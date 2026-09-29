@@ -12,16 +12,16 @@ before ticking the task.
 
 - [x] 2.1 Write `api/check_docs.py` (link/route-target resolution, orphan check against `_Sidebar.md`/`Home.md`, inline-code repo-path existence with an ignore marker, size budgets 8 KB root / 4 KB nested) and verify `python check_docs.py` exits non-zero with a clear message on each failure kind
 - [x] 2.2 Add `api/tests/test_check_docs.py` covering each spec scenario (renamed path, missing route target, orphan page, over-budget file, all-pass) against a temp tree, and verify `pytest` passes from `api/`
-- [ ] 2.3 Add `.github/workflows/docs-check.yml` running the script on pull requests and verify it fails on a deliberately broken link in a draft PR, then passes once fixed
+- [x] 2.3 Add `.github/workflows/docs-check.yml` running the script on pull requests and verify it fails on a deliberately broken link in a draft PR, then passes once fixed
   - Status: workflow added; failure path confirmed on draft PR #7 (run 36538881487). Pass path deferred to 6.2, since it needs the wiki skeleton (3.2) and slim CLAUDE.md (5.1).
-- [ ] 2.4 **(manual)** Add `.github/pull_request_template.md` with the docs checklist line; the user opens a new PR and confirms the checklist line appears
+- [x] 2.4 **(manual)** Add `.github/pull_request_template.md` with the docs checklist line; the user opens a new PR and confirms the checklist line appears
   - Status: template added. GitHub reads it from `main`, so verify after merge by opening any new PR.
 - [x] 2.5 Add `operations.archive.guidance` to `openspec/config.yaml` asking to update the affected wiki page, and verify the config still parses (`openspec list`)
 
 ## 3. Publish workflow
 
 - [x] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages, and stripping `.md` from internal link targets), push only when there is a diff, fail on push error
-- [ ] 3.2 Add a `wiki/` skeleton (`Home.md` with page list and an "edit in the repo, not the wiki" note, `_Sidebar.md`) and remove the empty `wiki/docs.md`; verify the publish run succeeds (`gh run view`), then **(manual)** the user confirms on the GitHub wiki that the placeholder is replaced
+- [x] 3.2 Add a `wiki/` skeleton (`Home.md` with page list and an "edit in the repo, not the wiki" note, `_Sidebar.md`) and remove the empty `wiki/docs.md`; verify the publish run succeeds (`gh run view`), then **(manual)** the user confirms on the GitHub wiki that the placeholder is replaced
   - Status: skeleton added and `wiki/docs.md` removed; waiting on a merge to `main` to run the publish and verify.
 - [ ] 3.3 **(manual)** Verify the web-edit path: the user makes an edit on the GitHub wiki, a further docs change is pushed, and the user confirms the run log warns and the wiki matches `wiki/` afterward
 - [ ] 3.4 Verify a push to `main` with no `wiki/` changes does not trigger a publish
@@ -44,6 +44,6 @@ before ticking the task.
 
 ## 6. Wrap up
 
-- [ ] 6.1 Update `README.md` to point at the wiki and remove content now duplicated there; verify links resolve with `check_docs.py`, and **(manual)** the user clicks through them on GitHub
-  - Status: README rewritten (quick start + links into `wiki/`, duplicated setup/gateway/testing/backup content removed); README links checked by script (`check_docs.py` does not scan README) and `check_docs.py` passes. Waiting on the user's click-through on GitHub.
+- [x] 6.1 Update `README.md` to point at the wiki and remove content now duplicated there; verify links resolve with `check_docs.py`, and **(manual)** the user clicks through them on GitHub
+  - Status: README rewritten (quick start + links into `wiki/`, duplicated setup/gateway/testing/backup content removed); README links checked by script (`check_docs.py` does not scan README) and `check_docs.py` passes. User clicked through the README links on GitHub: all work.
 - [ ] 6.2 Confirm the drift guards fire end to end on one real PR (broken path, orphan page, over-budget CLAUDE.md), then archive the change
