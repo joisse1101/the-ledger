@@ -530,6 +530,14 @@ def test_transcripts_default_order_is_newest_updated_first_with_iso_dates(api):
     assert response.json()["total"] == 3
 
 
+def test_transcripts_item_carries_cost_source_and_related_fields(api):
+    item = api.get("/api/transcripts").json()["items"][0]
+    # No assistant turns and no cost-state line in the seeded fixture -> the fallback estimate.
+    assert item["cost_source"] == "estimated"
+    assert item["unpriced_models"] == []
+    assert item["cost_state_flagged"] is False
+
+
 def test_transcripts_filters_combine(api):
     assert _ids(api.get("/api/transcripts", params={"project": "alpha", "branch": "main"})) == ["aaa-1"]
     both = api.get("/api/transcripts", params={"project": ["alpha", "beta"], "branch": "main"})
@@ -696,6 +704,9 @@ def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
         "updated_at": datetime(2024, 1, 4, 10, 0, 0, tzinfo=timezone.utc),
         "message_count": 2,
         "cost": 0.1,
+        "cost_source": "estimated",
+        "unpriced_models": [],
+        "cost_state_flagged": False,
         "context": 500,
         "project": "alpha",
         "title": "",
@@ -774,6 +785,9 @@ def test_session_detail_has_a_recap_and_turns_that_reconcile(with_turns, monkeyp
     assert body["recap"]["first_prompt"] == "start"
     assert body["recap"]["message_count"] == 5
     assert body["recap"]["context"] == 81_000
+    assert body["recap"]["cost_source"] == "estimated"
+    assert body["recap"]["unpriced_models"] == []
+    assert body["recap"]["cost_state_flagged"] is False
 
     turns = body["detail"]["turns"]
     assert [t["context"] for t in turns] == [50_000, 60_000, 65_000, 81_000]
@@ -798,6 +812,8 @@ def test_session_only_known_to_the_registry_gets_a_recap_from_it(isolated_db, mo
     assert body["readable"] is False
     assert body["detail"] is None
     assert body["recap"]["message_count"] is None
+    assert body["recap"]["cost_source"] is None
+    assert body["recap"]["cost_state_flagged"] is False
 
 
 def test_unreadable_transcript_is_readable_false_not_an_error(api, monkeypatch):

@@ -46,6 +46,9 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
     assert t.last_message == ""
     assert t.first_prompt == "What's causing the login bug?"
     assert t.context == 342
+    assert t.cost_source == "estimated"
+    assert t.unpriced_models == []
+    assert t.cost_state_flagged is False
 
 
 def test_delete_project_transcripts_removes_files_and_rows(
@@ -134,6 +137,9 @@ def test_delete_transcript_purges_history_only_session(isolated_db, write_config
                 "updated_at": None,
                 "message_count": 1,
                 "cost": 0.0,
+                "cost_source": "estimated",
+                "unpriced_models": [],
+                "cost_state_flagged": False,
                 "context": None,
                 "project": "gone",
                 "title": "",
@@ -166,6 +172,9 @@ def test_delete_project_transcripts_purges_history_only_sessions(isolated_db, wr
                 "updated_at": None,
                 "message_count": 1,
                 "cost": 0.0,
+                "cost_source": "estimated",
+                "unpriced_models": [],
+                "cost_state_flagged": False,
                 "context": None,
                 "project": "proj",
                 "title": "",

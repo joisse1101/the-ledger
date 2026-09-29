@@ -77,14 +77,14 @@
 
 ## 4. Tests and verification
 
-- [ ] 4.1 Update `test_claude_db.py`/`test_claude_transcripts.py` fixtures and assertions for the new
+- [x] 4.1 Update `test_claude_db.py`/`test_claude_transcripts.py` fixtures and assertions for the new
       `cost_source` field and the `cost-state`-preferred computation.
-- [ ] 4.2 Update `test_overview_stats.py` and `test_api_data.py` fixtures/assertions for the new field
+- [x] 4.2 Update `test_overview_stats.py` and `test_api_data.py` fixtures/assertions for the new field
       on extremes and on transcript/session responses.
-- [ ] 4.3 Update frontend tests touching cost display (the All list, `SessionDialog`, Overview
+- [x] 4.3 Update frontend tests touching cost display (the All list, `SessionDialog`, Overview
       `SummaryStats`/extreme disclosures) to cover both the marked-estimate and unmarked-exact cases.
-- [ ] 4.4 Run `pytest` in `api/` and `npm test` + `npm run build` in `web/`, and confirm they pass.
-- [ ] 4.5 Manually verify against real data: run a refresh against the local Claude Code history and
+- [x] 4.4 Run `pytest` in `api/` and `npm test` + `npm run build` in `web/`, and confirm they pass.
+- [x] 4.5 Manually verify against real data: run a refresh against the local Claude Code history and
       confirm the `the-ledger` session referenced in this change (`7819ee5e-675d-4a7f-a926-...`) now
       shows its `cost-state`-derived cost (~$3.34) with no asterisk, and that a session with no
       `cost-state` line shows its estimate with the asterisk and tooltip.

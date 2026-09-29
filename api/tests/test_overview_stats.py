@@ -24,7 +24,7 @@ def frozen_now(monkeypatch):
 
 def _transcript(
     started_at=None, updated_at=None, message_count=0, cost=0.0, project="proj", session_id="s",
-    branch="main", path="x.jsonl", context=None,
+    branch="main", path="x.jsonl", context=None, cost_source="estimated",
 ):
     return ClaudeTranscript(
         session_id=session_id,
@@ -36,6 +36,7 @@ def _transcript(
         updated_at=updated_at,
         message_count=message_count,
         cost=cost,
+        cost_source=cost_source,
         project=project,
         title="",
         last_message="",
@@ -305,10 +306,12 @@ def test_summary_counts_and_names_the_extreme_sessions():
         _transcript(
             project="a", session_id="quick", message_count=4, cost=0.5, branch="main", context=1000,
             started_at=datetime(2024, 6, 15, 9, 0, 0), updated_at=datetime(2024, 6, 15, 9, 0, 30),
+            cost_source="estimated",
         ),
         _transcript(
             project="b", session_id="slow", message_count=6, cost=2.0, branch="dev", context=3000,
             started_at=datetime(2024, 6, 15, 10, 0, 0), updated_at=datetime(2024, 6, 15, 11, 1, 0),
+            cost_source="exact",
         ),
     ]
     result = overview.summary(transcripts)
@@ -322,7 +325,11 @@ def test_summary_counts_and_names_the_extreme_sessions():
     assert result["duration"]["shortest"]["session_id"] == "quick"
     assert result["cost"]["most_expensive"]["label"] == "$2.00"
     assert result["cost"]["most_expensive"]["session_id"] == "slow"
+    assert result["cost"]["most_expensive"]["cost_source"] == "exact"
+    assert result["cost"]["most_expensive"]["unpriced_models"] == []
+    assert result["cost"]["most_expensive"]["cost_state_flagged"] is False
     assert result["cost"]["cheapest"]["session_id"] == "quick"
+    assert result["cost"]["cheapest"]["cost_source"] == "estimated"
     assert result["cost"]["total"]["label"] == "$2.50"
     assert result["cost"]["average"]["label"] == "$1.25"
     assert result["tokens"]["total"] == 4000
@@ -350,6 +357,9 @@ def test_summary_of_nothing_is_placeholders_not_errors():
     assert result["duration"]["longest"]["label"] == "—"
     assert result["duration"]["longest"]["session_id"] is None
     assert result["cost"]["most_expensive"]["label"] == "$0.00"
+    assert result["cost"]["most_expensive"]["cost_source"] is None
+    assert result["cost"]["most_expensive"]["unpriced_models"] == []
+    assert result["cost"]["most_expensive"]["cost_state_flagged"] is False
     assert result["tokens"]["total"] == 0
     assert result["tokens"]["average"] == 0
     assert result["tokens"]["most"]["amount"] == 0
@@ -440,6 +450,9 @@ def _history_only_row(session_id="pruned", **overrides):
         "updated_at": datetime(2024, 6, 15, 9, 5, 0),
         "message_count": 4,
         "cost": 0.5,
+        "cost_source": "estimated",
+        "unpriced_models": [],
+        "cost_state_flagged": False,
         "context": 1000,
         "project": "some",
         "title": "",

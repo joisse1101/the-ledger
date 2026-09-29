@@ -208,6 +208,165 @@ def test_scan_transcript_file_aggregates_fields(tmp_path, write_transcript):
     assert row["project"] == "repo"
 
 
+def _cost_state(total, *, has_unknown=False):
+    return {"type": "cost-state", "totalCostUSD": total, "hasUnknownModelCost": has_unknown}
+
+
+def test_scan_transcript_file_prefers_clean_cost_state_line(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 1_000_000, "output_tokens": 1_000_000},
+                },
+            },
+            _cost_state(3.34),
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    # cost-state's own total wins over the per-message sum (which would be $12.0 here).
+    assert row["cost"] == 3.34
+    assert row["cost_source"] == "exact"
+    assert row["cost_state_flagged"] is False
+
+
+def test_scan_transcript_file_last_cost_state_line_wins(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(path, [_cost_state(1.0), _cost_state(2.0), _cost_state(3.0)])
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["cost"] == 3.0
+    assert row["cost_source"] == "exact"
+
+
+def test_scan_transcript_file_cost_state_with_unknown_model_falls_back_to_estimate(
+    tmp_path, write_transcript
+):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 1_000_000, "output_tokens": 1_000_000},
+                },
+            },
+            _cost_state(3.34, has_unknown=True),
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    # Falls back to the per-message sum, not the flagged cost-state total.
+    assert row["cost"] == claude_db._message_cost(
+        "claude-sonnet-5", {"input_tokens": 1_000_000, "output_tokens": 1_000_000}
+    )
+    assert row["cost_source"] == "estimated"
+    assert row["cost_state_flagged"] is True
+
+
+def test_scan_transcript_file_no_cost_state_line_is_estimated_and_unflagged(
+    tmp_path, write_transcript
+):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["cost_source"] == "estimated"
+    assert row["cost_state_flagged"] is False
+
+
+def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
+    tmp_path, write_transcript
+):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:06:00Z",
+                "message": {
+                    "id": "m2",
+                    "model": "claude-opus-5-5",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:07:00Z",
+                "message": {
+                    "id": "m3",
+                    "model": "claude-haiku-4-5-20251001",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+            # Repeat an already-seen unrecognized model - de-duplicated, not repeated.
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:08:00Z",
+                "message": {
+                    "id": "m4",
+                    "model": "claude-opus-5-5",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["unpriced_models"] == ["claude-haiku-4-5-20251001", "claude-opus-5-5"]
+
+
+def test_scan_transcript_file_unpriced_models_empty_when_all_recognized(
+    tmp_path, write_transcript
+):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": "2024-01-01T10:05:00Z",
+                "message": {
+                    "id": "m1",
+                    "model": "claude-sonnet-5",
+                    "usage": {"input_tokens": 1000, "output_tokens": 1000},
+                },
+            },
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["unpriced_models"] == []
+
+
 def _assistant(message_id, *, new=0, read=0, written=0, model="claude-sonnet-5", **extra):
     return {
         "type": "assistant",
@@ -557,6 +716,9 @@ def _history_row(session_id="s1", **overrides):
         "updated_at": datetime(2024, 1, 1, 10, 5, 0),
         "message_count": 1,
         "cost": 0.01,
+        "cost_source": "estimated",
+        "unpriced_models": [],
+        "cost_state_flagged": False,
         "context": 100,
         "project": "some",
         "title": "",
