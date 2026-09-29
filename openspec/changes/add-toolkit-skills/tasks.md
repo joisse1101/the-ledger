@@ -5,7 +5,7 @@
 
 ## 2. Installer
 
-- [ ] 2.1 Write `toolkit/install/Install-Skills.ps1`: read `targets.json`, resolve global/project destination, copy one or all skills
+- [x] 2.1 Write `toolkit/install/Install-Skills.ps1`: read `targets.json`, resolve global/project destination, copy one or all skills
 - [ ] 2.2 Add content-hash drift detection: report up to date / differs / missing, skip differing unless `-Force`
 - [ ] 2.3 Add `-List` (status per skill) and `-Uninstall` (toolkit-owned skills only)
 - [ ] 2.4 Reject an unknown `-Skill` with the list of available names, copying nothing
