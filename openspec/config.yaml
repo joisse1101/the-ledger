@@ -30,3 +30,8 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+operations:
+  archive:
+    guidance:
+      - If the change alters documented behavior, update the affected page in wiki/ before archiving (the routing tables in CLAUDE.md name the page for each area)

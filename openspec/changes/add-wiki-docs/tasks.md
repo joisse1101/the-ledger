@@ -10,11 +10,11 @@ before ticking the task.
 
 ## 2. Drift guards
 
-- [ ] 2.1 Write `api/check_docs.py` (link/route-target resolution, orphan check against `_Sidebar.md`/`Home.md`, inline-code repo-path existence with an ignore marker, size budgets 8 KB root / 4 KB nested) and verify `python check_docs.py` exits non-zero with a clear message on each failure kind
-- [ ] 2.2 Add `api/tests/test_check_docs.py` covering each spec scenario (renamed path, missing route target, orphan page, over-budget file, all-pass) against a temp tree, and verify `pytest` passes from `api/`
+- [x] 2.1 Write `api/check_docs.py` (link/route-target resolution, orphan check against `_Sidebar.md`/`Home.md`, inline-code repo-path existence with an ignore marker, size budgets 8 KB root / 4 KB nested) and verify `python check_docs.py` exits non-zero with a clear message on each failure kind
+- [x] 2.2 Add `api/tests/test_check_docs.py` covering each spec scenario (renamed path, missing route target, orphan page, over-budget file, all-pass) against a temp tree, and verify `pytest` passes from `api/`
 - [ ] 2.3 Add `.github/workflows/docs-check.yml` running the script on pull requests and verify it fails on a deliberately broken link in a draft PR, then passes once fixed
 - [ ] 2.4 **(manual)** Add `.github/pull_request_template.md` with the docs checklist line; the user opens a new PR and confirms the checklist line appears
-- [ ] 2.5 Add `operations.archive.guidance` to `openspec/config.yaml` asking to update the affected wiki page, and verify the config still parses (`openspec list`)
+- [x] 2.5 Add `operations.archive.guidance` to `openspec/config.yaml` asking to update the affected wiki page, and verify the config still parses (`openspec list`)
 
 ## 3. Publish workflow
 
