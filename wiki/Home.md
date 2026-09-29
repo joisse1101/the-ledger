@@ -7,7 +7,7 @@ readable from another device on the same network through a gateway, behind a sha
 > **Edit these pages in the repo (`wiki/`), not on the GitHub wiki.** The wiki is a one-way mirror
 > published on every push to `main`; edits made in the browser are overwritten.
 
-Requirements live in `openspec/specs/`, not here.
+Requirements live in `openspec/specs/`, not here. Docs conventions are in [Coding standards](Coding-Standards.md).
 
 ## Pages
 
