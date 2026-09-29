@@ -20,8 +20,9 @@ before ticking the task.
 
 ## 3. Publish workflow
 
-- [ ] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages, and stripping `.md` from internal link targets), push only when there is a diff, fail on push error
+- [x] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages, and stripping `.md` from internal link targets), push only when there is a diff, fail on push error
 - [ ] 3.2 Add a `wiki/` skeleton (`Home.md` with page list and an "edit in the repo, not the wiki" note, `_Sidebar.md`) and remove the empty `wiki/docs.md`; verify the publish run succeeds (`gh run view`), then **(manual)** the user confirms on the GitHub wiki that the placeholder is replaced
+  - Status: skeleton added and `wiki/docs.md` removed; waiting on a merge to `main` to run the publish and verify.
 - [ ] 3.3 **(manual)** Verify the web-edit path: the user makes an edit on the GitHub wiki, a further docs change is pushed, and the user confirms the run log warns and the wiki matches `wiki/` afterward
 - [ ] 3.4 Verify a push to `main` with no `wiki/` changes does not trigger a publish
 
