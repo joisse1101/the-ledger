@@ -48,3 +48,5 @@ npm run build      # tsc --noEmit, then vite build -> web/dist
 
 There is no browser-automation/E2E harness for the React app; responsive layout across breakpoints
 is verified manually (resizing a real browser, and a real phone through the gateway — see [Gateway](Gateway.md)).
+
+Broken path check: see `api/does_not_exist.py`.
