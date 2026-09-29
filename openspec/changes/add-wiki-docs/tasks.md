@@ -37,8 +37,8 @@ before ticking the task.
 
 ## 5. Slim CLAUDE.md
 
-- [ ] 5.1 Rewrite root `CLAUDE.md` to commands, repo conventions and the area -> page routing table; verify it is under 8 KB and `check_docs.py` passes
-- [ ] 5.2 Add `api/CLAUDE.md`, `web/CLAUDE.md` and `hooks/CLAUDE.md` (pointers and local rules only, under 4 KB each; none for `gateway/`); verify `check_docs.py` passes
+- [x] 5.1 Rewrite root `CLAUDE.md` to commands, repo conventions and the area -> page routing table; verify it is under 8 KB and `check_docs.py` passes
+- [x] 5.2 Add `api/CLAUDE.md`, `web/CLAUDE.md` and `hooks/CLAUDE.md` (pointers and local rules only, under 4 KB each; none for `gateway/`); verify `check_docs.py` passes
 - [ ] 5.3 Verify the payoff: start a fresh session and confirm the guidance loaded at start is the slim root file only, and that a task in `web/` picks up `web/CLAUDE.md` and reads the relevant wiki page on demand
 
 ## 6. Wrap up
