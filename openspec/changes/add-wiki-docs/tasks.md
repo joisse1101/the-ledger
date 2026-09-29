@@ -28,11 +28,12 @@ before ticking the task.
 
 ## 4. Move the documentation
 
-- [ ] 4.1 Create wiki pages from `CLAUDE.md`'s Architecture > Data layer section (data layer, history store), moved verbatim then tidied; replace spec-restating text with pointers to `openspec/specs/`; verify `check_docs.py` passes
-- [ ] 4.2 Create wiki pages for the backend (routes table, security, live snapshot, pending decisions, overview/query modules) and verify `check_docs.py` passes
-- [ ] 4.3 Create wiki pages for the frontend (API layer, shell/theme, sessions, overview, projects, shared components) and verify `check_docs.py` passes
-- [ ] 4.4 Create wiki pages for setup and run (including gateway and the history backup task), testing, gateway, hooks, and a coding-standards page stating what "human-understandable" means for this repo; verify `check_docs.py` passes
-- [ ] 4.5 Cross-check that nothing from the old `CLAUDE.md` was dropped: compare its section list against the wiki page list and confirm each section landed somewhere or was intentionally removed
+- [x] 4.1 Create wiki pages from `CLAUDE.md`'s Architecture > Data layer section (data layer, history store), moved verbatim then tidied; replace spec-restating text with pointers to `openspec/specs/`; verify `check_docs.py` passes
+- [x] 4.2 Create wiki pages for the backend (routes table, security, live snapshot, pending decisions, overview/query modules) and verify `check_docs.py` passes
+- [x] 4.3 Create wiki pages for the frontend (API layer, shell/theme, sessions, overview, projects, shared components) and verify `check_docs.py` passes
+- [x] 4.4 Create wiki pages for setup and run (including gateway and the history backup task), testing, gateway, hooks, and a coding-standards page stating what "human-understandable" means for this repo; verify `check_docs.py` passes
+- [x] 4.5 Cross-check that nothing from the old `CLAUDE.md` was dropped: compare its section list against the wiki page list and confirm each section landed somewhere or was intentionally removed
+  - Mapping (every old section landed; only the section headings themselves were dropped): Project + OpenSpec + Other repo files -> Repository-Layout; Setup & Run -> Setup-And-Run (gateway usage -> Gateway, dark/light theme -> Frontend-Shell-And-Theme); Testing -> Testing; Data layer -> Backend-Data-Layer + Backend-History-Store; api/ backend -> Backend-API-Routes, Backend-Security, Backend-Live-Sessions-And-Prompts, Backend-Overview-And-Queries; web/ -> the six Frontend-* pages; gateway/ -> Gateway; hooks/ -> Hooks. Old cross-references ("above"/"below") were rewritten as links.
 
 ## 5. Slim CLAUDE.md
 

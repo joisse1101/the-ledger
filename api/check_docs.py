@@ -10,14 +10,15 @@ Checks:
   3. every repo path written in inline code in a wiki page or CLAUDE.md exists
   4. size budgets for the root and nested CLAUDE.md files
 
-A line containing IGNORE_MARKER is skipped by the inline-code path check (for paths that are
-deliberately absent from a checkout, e.g. gitignored files).
+Paths ignored by git (.venv, dist, .ledger...) are exempt from the inline-code check. A line
+containing IGNORE_MARKER is skipped by it too, for any other path deliberately absent from a checkout.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -77,7 +78,7 @@ def _link_target(raw: str) -> str | None:
 def _links(path: Path) -> list[tuple[int, str]]:
     found = []
     for number, line in _prose_lines(path):
-        for match in LINK_RE.finditer(line):
+        for match in LINK_RE.finditer(CODE_RE.sub("", line)):
             target = _link_target(match.group(1))
             if target:
                 found.append((number, target))
@@ -138,6 +139,24 @@ def _repo_path_candidate(root: Path, token: str) -> str | None:
     return None
 
 
+def _is_gitignored(root: Path, candidate: str) -> bool:
+    """Gitignored paths (.venv, dist, .ledger...) are legitimately absent from a fresh checkout."""
+    # A `dir/` pattern only matches when git is told the path is a directory, and a missing
+    # path can't say, so ask about both spellings.
+    for spelling in (candidate, candidate + "/"):
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "-q", "--", spelling],
+                capture_output=True,
+                check=False,
+            )
+        except OSError:  # git not installed
+            return False
+        if result.returncode == 0:
+            return True
+    return False
+
+
 def check_code_paths(root: Path, files: list[Path]) -> list[str]:
     problems = []
     for path in files:
@@ -146,7 +165,11 @@ def check_code_paths(root: Path, files: list[Path]) -> list[str]:
                 continue
             for match in CODE_RE.finditer(line):
                 candidate = _repo_path_candidate(root, match.group(1))
-                if candidate and not (root / candidate).exists():
+                if (
+                    candidate
+                    and not (root / candidate).exists()
+                    and not _is_gitignored(root, candidate)
+                ):
                     problems.append(
                         f"{_rel(root, path)}:{number}: path '{candidate}' does not exist"
                     )

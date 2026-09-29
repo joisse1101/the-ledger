@@ -131,3 +131,26 @@ def test_directory_paths_and_unknown_extension_paths(tmp_path):
         "wiki/Backend-Security.md:1: path 'web/src/gone.tsx' does not exist",
         "wiki/Backend-Security.md:1: path 'api/nope' does not exist",
     ]
+
+
+def test_link_syntax_inside_code_is_not_a_link(tmp_path):
+    _passing_tree(tmp_path)
+    _write(tmp_path, "wiki/Backend-Security.md", "Write links as `[text](Page-Name.md)`.\n")
+    assert _problems(tmp_path) == []
+
+
+def test_gitignored_paths_are_exempt(tmp_path):
+    import shutil
+    import subprocess
+
+    if shutil.which("git") is None:
+        import pytest
+
+        pytest.skip("git not installed")
+    _passing_tree(tmp_path)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    _write(tmp_path, ".gitignore", "api/.ledger/\n")
+    _write(tmp_path, "wiki/Backend-Security.md", "Token in `api/.ledger/token`, not `api/gone.py`.\n")
+    assert _problems(tmp_path) == [
+        "wiki/Backend-Security.md:1: path 'api/gone.py' does not exist"
+    ]
