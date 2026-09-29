@@ -37,7 +37,13 @@ lost. It still publishes; the repo wins.
 **Flat files, hyphenated names, group by prefix.** e.g. `Backend-Data-Layer.md`,
 `Frontend-Sessions.md`. `Home.md` (project summary and full page list) and `_Sidebar.md` (navigation)
 are required. Links between pages use one syntax verified to work both in the wiki and when browsing
-the repo (task 1.1 tests this before content is written).
+the repo (task 1.1 tested this before content is written).
+
+**Link syntax (decided from task 1.1):** links are written `[text](Page-Name.md)`. Tested on
+2026-09-29: `[text](Page-Name)` works on the wiki but 404s in the repo; `[[Page-Name]]` works only on
+the wiki; `.md` (with or without `./`) works in the repo and navigates on the wiki but only as a bare
+markdown render. So `wiki-publish` strips `.md` from internal link targets while mirroring, giving
+normal wiki pages there while `wiki/` keeps working links. `check_docs.py` resolves the `.md` form.
 
 **Routing, not imports.** Root `CLAUDE.md` = commands + conventions + a table `area -> wiki page`.
 `@wiki/...` imports were rejected because imports are expanded into every session, which recreates the

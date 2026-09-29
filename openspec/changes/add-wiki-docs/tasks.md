@@ -5,8 +5,8 @@ before ticking the task.
 
 ## 1. Verify the publishing assumptions
 
-- [ ] 1.1 **(manual)** In a scratch copy of the wiki repo, push test pages using each link syntax (`[x](Page-Name)`, `[[Page-Name]]`, `.md` suffix); the user checks which work both on the GitHub wiki and when browsing `wiki/` in the repo and reports back; record the chosen syntax in the docs-contributing page
-- [ ] 1.2 Confirm Actions can push to the wiki repo with `GITHUB_TOKEN` (repo Settings > Actions > workflow permissions: read and write) and verify with a throwaway commit that is then reverted
+- [x] 1.1 **(manual)** In a scratch copy of the wiki repo, push test pages using each link syntax (`[x](Page-Name)`, `[[Page-Name]]`, `.md` suffix); the user checks which work both on the GitHub wiki and when browsing `wiki/` in the repo and reports back; record the chosen syntax in the docs-contributing page (decision recorded in design.md: `.md` links, stripped on publish; add it to the docs-contributing page when that page is written in 4.4)
+- [x] 1.2 Confirm Actions can push to the wiki repo with `GITHUB_TOKEN` (repo Settings > Actions > workflow permissions: read and write) and verify with a throwaway commit that is then reverted
 
 ## 2. Drift guards
 
@@ -18,7 +18,7 @@ before ticking the task.
 
 ## 3. Publish workflow
 
-- [ ] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages), push only when there is a diff, fail on push error
+- [ ] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages, and stripping `.md` from internal link targets), push only when there is a diff, fail on push error
 - [ ] 3.2 Add a `wiki/` skeleton (`Home.md` with page list and an "edit in the repo, not the wiki" note, `_Sidebar.md`) and remove the empty `wiki/docs.md`; verify the publish run succeeds (`gh run view`), then **(manual)** the user confirms on the GitHub wiki that the placeholder is replaced
 - [ ] 3.3 **(manual)** Verify the web-edit path: the user makes an edit on the GitHub wiki, a further docs change is pushed, and the user confirms the run log warns and the wiki matches `wiki/` afterward
 - [ ] 3.4 Verify a push to `main` with no `wiki/` changes does not trigger a publish
