@@ -19,7 +19,7 @@ Code toast hooks, plus dashboard-coupled scripts — a relay hook and the histor
 installer/uninstaller — see "`hooks/`" below). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
-rather than inside any one service folder since they're the one piece of tooling that spans all
+rather than inside any one service folder since they're the one piece of tooling that spans add-
 three equally (see "Setup & Run" below) — otherwise nothing at root runs on its own.
 
 The agreed requirements for each shipped capability live in `openspec/specs/` (see "`openspec/`"
@@ -706,7 +706,7 @@ specific to this app rather than part of the Python backend itself.
 The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
 capabilities: `web-dashboard`, `responsive-layout`, `network-access`, `live-context-gauge`,
 `toast-context-line`, `remote-session-control`. `openspec/changes/` holds proposals in flight (each with
-`proposal.md`/`design.md`/`tasks.md` plus a spec delta) — currently `add-transcript-history-backup`; completed ones move to
+`proposal.md`/`design.md`/`tasks.md` plus a spec delta); completed ones move to
 `openspec/changes/archive/` and aren't tracked further. Treat the specs as the authoritative record
 of what a capability is required to do, ahead of inferring intent from the code alone.
 
