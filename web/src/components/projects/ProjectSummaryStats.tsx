@@ -22,12 +22,24 @@ function tiles(summary: OverviewSummary): StatTile[] {
     { label: "Total cost", value: summary.cost.total.label },
     {
       label: "Most expensive session",
-      value: <CostFigure label={summary.cost.most_expensive.label} source={summary.cost.most_expensive.cost_source} />,
+      value: (
+        <CostFigure
+          label={summary.cost.most_expensive.label}
+          source={summary.cost.most_expensive.cost_source}
+          unpricedModels={summary.cost.most_expensive.unpriced_models}
+        />
+      ),
       ref: summary.cost.most_expensive,
     },
     {
       label: "Cheapest session",
-      value: <CostFigure label={summary.cost.cheapest.label} source={summary.cost.cheapest.cost_source} />,
+      value: (
+        <CostFigure
+          label={summary.cost.cheapest.label}
+          source={summary.cost.cheapest.cost_source}
+          unpricedModels={summary.cost.cheapest.unpriced_models}
+        />
+      ),
       ref: summary.cost.cheapest,
     },
 

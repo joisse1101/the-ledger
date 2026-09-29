@@ -58,7 +58,10 @@ function Recap({ recap }: { recap: SessionRecap }) {
   if (recap.message_count != null) stats.push(["Messages", formatCount(recap.message_count)]);
   if (recap.avg_tokens_per_message != null) stats.push(["Tokens per message", formatCount(recap.avg_tokens_per_message)]);
   if (recap.cost != null) {
-    stats.push(["Cost", <CostFigure label={formatCost(recap.cost)} source={recap.cost_source} />]);
+    stats.push([
+      "Cost",
+      <CostFigure label={formatCost(recap.cost)} source={recap.cost_source} unpricedModels={recap.unpriced_models} />,
+    ]);
   }
 
   return (

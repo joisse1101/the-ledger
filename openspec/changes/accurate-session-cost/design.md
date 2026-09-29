@@ -84,6 +84,26 @@ limitation, but only for the shrinking set of transcripts with no `cost-state` l
 in-progress session, or one from a Claude Code build that predates `cost-state`). It stops being the
 primary source of truth for cost, which is the actual fix.
 
+**The estimate tooltip names the specific model id(s) `_MODEL_PRICING` didn't recognize, when any were
+found during the fallback per-message scan.** Added after initial implementation, at the user's
+request, to make "estimated" actionable rather than just a disclaimer - seeing `claude-opus-5-5` named
+tells you exactly what to add to `_MODEL_PRICING` to get an exact figure next scan. A new
+`unpriced_models: list[str]` field (sorted, de-duplicated model ids) travels alongside `cost_source`
+through the same places: `_scan_transcript_file` collects it whenever `_message_cost` returns `None`
+for a turn; `ClaudeTranscript`, both SQLite schemas (stored as a JSON-encoded string column, since
+SQLite has no native array type), `fetch_transcripts()`'s merge, the `/api/transcripts` and
+`/api/sessions/{id}` payloads, and `overview_stats.py`'s extreme-figure annotations all carry it the
+same way `cost_source` does. It's populated regardless of the session's final `cost_source` (a
+`cost-state` line can itself set `hasUnknownModelCost` without this app's own pricing table having
+found anything to name), but the frontend only reads it on an `estimated` session. When it's empty on
+an `estimated` session, the tooltip falls back to a generic message - this covers a `cost-state` line
+present with `hasUnknownModelCost: true` but no unrecognized model in the *local* per-message scan
+(e.g. a subagent's own model, invisible to this transcript's lines at all) and the case of no
+`cost-state` line and no unrecognized model either (a session still in progress). Alternative
+considered: only ever show the generic message - rejected, since naming the model is strictly more
+useful whenever this app's own table is the reason, and costs nothing extra to compute since the scan
+already calls `_message_cost` per turn.
+
 ## Risks / Trade-offs
 
 - [Subagent inclusion is confirmed from one traced session, not exhaustively] -> Mitigation: this

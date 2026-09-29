@@ -80,6 +80,9 @@ export interface TranscriptItem {
   message_count: number;
   cost: number;
   cost_source: CostSource;
+  /** Model ids this app's own pricing table didn't recognize while estimating; empty when every
+   *  turn's model was priced (always empty on an `exact` session). */
+  unpriced_models: string[];
   context: number | null;
   version: string;
   git_branch: string;
@@ -132,6 +135,7 @@ export interface SessionRecap {
   message_count: number | null;
   cost: number | null;
   cost_source: CostSource | null;
+  unpriced_models: string[];
   context: number | null;
   avg_tokens_per_message: number | null;
 }
@@ -243,6 +247,7 @@ export type WithSession<T> = T & {
   project: string | null;
   session_id: string | null;
   cost_source: CostSource | null;
+  unpriced_models: string[];
 };
 
 export interface OverviewSummary {

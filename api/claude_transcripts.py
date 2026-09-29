@@ -5,9 +5,10 @@ Covers every session that has ever run (unlike claude_sessions.py's live-only re
 
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -33,6 +34,9 @@ class ClaudeTranscript:
     first_prompt: str
     # Context size at the last real main-thread response (see claude_context); None if there wasn't one.
     context: Optional[int] = None
+    # Model ids this app's own pricing table didn't recognize during the per-message fallback scan -
+    # empty whenever every turn's model was priced (including every `exact` session).
+    unpriced_models: list[str] = field(default_factory=list)
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -56,6 +60,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         last_message=row["last_message"],
         first_prompt=row["first_prompt"],
         context=row["context"],
+        unpriced_models=json.loads(row["unpriced_models"]) if row["unpriced_models"] else [],
     )
 
 

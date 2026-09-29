@@ -17,6 +17,13 @@
 - [x] 1.4 Add `cost_source` to the `ClaudeTranscript` dataclass, its `INSERT`/`SELECT` column lists for
       both `ledger.db` and `history.db`, and `fetch_transcripts()`'s live/history merge (the live row's
       `cost_source` wins the same way its `cost` already does); verify via `test_claude_db.py`.
+- [x] 1.5 (Added scope - see design.md's "estimate tooltip names the specific model id(s)" decision.)
+      In `_scan_transcript_file`, collect every model id for which `_message_cost` returns `None`
+      during the per-message scan into a sorted, de-duplicated `unpriced_models: list[str]`; thread it
+      onto the returned row, `ClaudeTranscript`, both SQLite schemas (JSON-encoded text column,
+      `DEFAULT '[]'` on `history.db`'s `ALTER TABLE`), `INSERT`/`SELECT` column lists, and
+      `fetch_transcripts()`'s live/history merge (live row wins, same as `cost`/`cost_source`); verify
+      via `test_claude_db.py` fixtures covering a known model, an unrecognized one, and a mix.
 
 ## 2. API surface
 
@@ -26,6 +33,10 @@
 - [x] 2.2 Extend `overview_stats.py`'s extreme-figure annotation (`_with_session`, used for the
       most-expensive/cheapest KPIs) to also carry that session's `cost_source`; verify via
       `test_overview_stats.py`.
+- [x] 2.3 (Added scope.) Add `unpriced_models` to the `/api/transcripts` item shape, the
+      `/api/sessions/{id}` recap payload, and `overview_stats.py`'s extreme-figure annotation
+      (`_with_session`), alongside `cost_source` in each; verify via `test_transcript_query.py`,
+      `test_api_data.py` and `test_overview_stats.py` assertions on the new field.
 
 ## 3. Frontend
 
@@ -36,6 +47,14 @@
       column, `SessionDialog`'s recap cost, and Overview's most-expensive/cheapest disclosures; verify
       by rendering an estimated and an exact session in each location and confirming the mark only
       appears on the estimated one.
+- [x] 3.3 (Added scope.) Add `unpriced_models: string[]` to the relevant shapes in
+      `web/src/api/types.ts`; update the cost-display helper's tooltip to name the model(s) when
+      present ("Best-effort estimate: this app doesn't recognize <models>, so their turns aren't
+      priced.") and fall back to a generic message when the session is `estimated` but
+      `unpriced_models` is empty (Claude Code's own `cost-state` flagged the session without this
+      app's local scan finding a specific model - e.g. subagent spend on a model never seen in the
+      main transcript); verify by rendering sessions covering: one named model, several, and none
+      (generic fallback).
 
 ## 4. Tests and verification
 

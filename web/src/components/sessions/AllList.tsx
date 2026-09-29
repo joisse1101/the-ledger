@@ -43,7 +43,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     align: "end",
     cardPriority: "secondary",
     sortKey: "cost",
-    render: (t) => <CostFigure label={formatCost(t.cost)} source={t.cost_source} />,
+    render: (t) => <CostFigure label={formatCost(t.cost)} source={t.cost_source} unpricedModels={t.unpriced_models} />,
   },
   {
     key: "context",

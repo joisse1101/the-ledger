@@ -32,11 +32,31 @@ export function formatCost(value: number | null | undefined): string {
   return value == null ? "--" : `$${value.toFixed(2)}`;
 }
 
-/** Explains what an estimated cost excludes, shown in `CostFigure`'s tooltip wherever a session's
- *  cost is a best-effort estimate rather than Claude Code's own reported figure. */
-export const ESTIMATED_COST_TOOLTIP =
-  "Best-effort estimate: covers only models this app recognizes, and only this session's own " +
-  "main-thread turns - it excludes any subagent spend.";
+function joinWithAnd(items: string[]): string {
+  if (items.length === 1) return items[0];
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** Explains why a cost is a best-effort estimate rather than Claude Code's own reported figure,
+ *  shown in `CostFigure`'s tooltip. Names the specific model(s) this app's pricing table didn't
+ *  recognize when the per-message fallback scan found any (`unpricedModels`); otherwise falls back
+ *  to a generic message - this covers Claude Code's own `cost-state` flagging the session as
+ *  unpriced without this app's local scan finding a specific model (e.g. subagent spend on a model
+ *  never mentioned in the session's own transcript lines), and a session still in progress. */
+export function estimatedCostTooltip(unpricedModels: string[]): string {
+  if (unpricedModels.length === 0) {
+    return (
+      "Best-effort estimate: it excludes any subagent spend, and Claude Code flagged part of this " +
+      "session's cost as unpriced in a way this app can't attribute to a specific model."
+    );
+  }
+  const models = joinWithAnd(unpricedModels);
+  const plural = unpricedModels.length > 1;
+  return (
+    `Best-effort estimate: it excludes any subagent spend, and this app doesn't yet recognize ` +
+    `${plural ? "these models" : "this model"} (${models}), so ${plural ? "their" : "its"} turns aren't priced.`
+  );
+}
 
 /** A token count, humanised, or `--` when there is none. */
 export function formatContext(value: number | null | undefined): string {

@@ -116,6 +116,7 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
             message_count INTEGER NOT NULL,
             cost REAL NOT NULL,
             cost_source TEXT NOT NULL DEFAULT 'estimated',
+            unpriced_models TEXT NOT NULL DEFAULT '[]',
             context INTEGER,
             project TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
@@ -124,16 +125,18 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    # history.db is never recreated, so a pre-existing file's table predates this
-    # column - add it in place. ledger.db's CREATE TABLE above already includes
-    # it (that table is dropped and rebuilt every start), so this is a no-op
+    # history.db is never recreated, so a pre-existing file's table predates these
+    # columns - add them in place. ledger.db's CREATE TABLE above already includes
+    # them (that table is dropped and rebuilt every start), so this is a no-op
     # there beyond the harmless "duplicate column" error being swallowed.
-    try:
-        conn.execute(
-            "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'"
-        )
-    except sqlite3.OperationalError:
-        pass
+    for ddl in (
+        "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'",
+        "ALTER TABLE transcripts ADD COLUMN unpriced_models TEXT NOT NULL DEFAULT '[]'",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +386,7 @@ def _scan_transcript_file(
     cost = 0.0
     cost_state_total: Optional[float] = None
     cost_state_has_unknown = False
+    unpriced_models: set[str] = set()
     context: Optional[int] = None
     seen_message_ids: set[str] = set()
     ai_title: Optional[str] = None
@@ -443,6 +447,8 @@ def _scan_transcript_file(
                             turn_cost = _message_cost(model, usage)
                             if turn_cost is not None:
                                 cost += turn_cost
+                            else:
+                                unpriced_models.add(model)
 
                     text = _extract_text(message.get("content"))
                     if text:
@@ -498,6 +504,7 @@ def _scan_transcript_file(
         "message_count": message_count,
         "cost": cost,
         "cost_source": cost_source,
+        "unpriced_models": sorted(unpriced_models),
         "context": context,
         "project": project,
         "title": title,
@@ -525,17 +532,18 @@ def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
         "path": str(row["path"]),
         "started_at": row["started_at"].isoformat() if row["started_at"] else None,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+        "unpriced_models": json.dumps(row["unpriced_models"]),
     }
 
 
 _TRANSCRIPT_UPSERT_SQL = """
     INSERT INTO transcripts (
         session_id, path, cwd, version, git_branch, started_at,
-        updated_at, message_count, cost, cost_source, context, project, title,
+        updated_at, message_count, cost, cost_source, unpriced_models, context, project, title,
         last_message, first_prompt
     ) VALUES (
         :session_id, :path, :cwd, :version, :git_branch, :started_at,
-        :updated_at, :message_count, :cost, :cost_source, :context, :project, :title,
+        :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :context, :project, :title,
         :last_message, :first_prompt
     )
     ON CONFLICT(session_id) DO UPDATE SET
@@ -548,6 +556,7 @@ _TRANSCRIPT_UPSERT_SQL = """
         message_count = excluded.message_count,
         cost = excluded.cost,
         cost_source = excluded.cost_source,
+        unpriced_models = excluded.unpriced_models,
         context = excluded.context,
         project = excluded.project,
         title = excluded.title,
@@ -615,11 +624,11 @@ def refresh() -> datetime:
             """
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, cost_source, context, project, title,
+                updated_at, message_count, cost, cost_source, unpriced_models, context, project, title,
                 last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :cost_source, :context, :project, :title,
+                :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :context, :project, :title,
                 :last_message, :first_prompt
             )
             """,
