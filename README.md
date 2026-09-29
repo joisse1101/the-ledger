@@ -59,7 +59,7 @@ The docs live in [`wiki/`](wiki/Home.md) and are mirrored to the GitHub wiki on 
 - [Gateway](wiki/Gateway.md): reading the dashboard from a phone or another device, the token,
   HTTPS
 - [Testing](wiki/Testing.md): the Python and frontend suites
-- [Repository layout](wiki/Repository-Layout.md): the four folders and what each holds
+- [Repository layout](wiki/Repository-Layout.md): the five folders and what each holds
 - [Hooks](wiki/Hooks.md): toast notification hooks
 - [All pages](wiki/Home.md)
 

@@ -11,13 +11,16 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 
 ## Layout
 
-Exactly four top-level folders, one per service, each self-contained:
+Exactly five top-level folders, each self-contained (four services plus `toolkit/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
   its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
 - `web/` — the frontend.
 - `gateway/` — the Nginx reverse proxy, the only thing that grants LAN access.
 - `hooks/` — Claude Code toast hooks plus dashboard-coupled scripts.
+- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`) and an
+  installer (`toolkit/install/Install-Skills.ps1`). Independent of the dashboard; see
+  `toolkit/README.md`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
 `.env.example`) and `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
