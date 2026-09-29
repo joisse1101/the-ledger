@@ -23,7 +23,7 @@ before ticking the task.
 - [x] 3.1 Add `.github/workflows/wiki-publish.yml`: on push to `main` touching `wiki/**`, clone the wiki repo, warn about any commits not authored by the workflow, mirror `wiki/` (deleting removed pages, and stripping `.md` from internal link targets), push only when there is a diff, fail on push error
 - [x] 3.2 Add a `wiki/` skeleton (`Home.md` with page list and an "edit in the repo, not the wiki" note, `_Sidebar.md`) and remove the empty `wiki/docs.md`; verify the publish run succeeds (`gh run view`), then **(manual)** the user confirms on the GitHub wiki that the placeholder is replaced
   - Status: skeleton added and `wiki/docs.md` removed; waiting on a merge to `main` to run the publish and verify.
-- [ ] 3.3 **(manual)** Verify the web-edit path: the user makes an edit on the GitHub wiki, a further docs change is pushed, and the user confirms the run log warns and the wiki matches `wiki/` afterward
+- [x] 3.3 **(manual)** Verify the web-edit path: the user makes an edit on the GitHub wiki, a further docs change is pushed, and the user confirms the run log warns and the wiki matches `wiki/` afterward
 - [x] 3.4 Verify a push to `main` with no `wiki/` changes does not trigger a publish
 
 ## 4. Move the documentation
@@ -46,4 +46,4 @@ before ticking the task.
 
 - [x] 6.1 Update `README.md` to point at the wiki and remove content now duplicated there; verify links resolve with `check_docs.py`, and **(manual)** the user clicks through them on GitHub
   - Status: README rewritten (quick start + links into `wiki/`, duplicated setup/gateway/testing/backup content removed); README links checked by script (`check_docs.py` does not scan README) and `check_docs.py` passes. User clicked through the README links on GitHub: all work.
-- [ ] 6.2 Confirm the drift guards fire end to end on one real PR (broken path, orphan page, over-budget CLAUDE.md), then archive the change
+- [x] 6.2 Confirm the drift guards fire end to end on one real PR (broken path, orphan page, over-budget CLAUDE.md), then archive the change
