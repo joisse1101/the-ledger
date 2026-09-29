@@ -45,4 +45,5 @@ before ticking the task.
 ## 6. Wrap up
 
 - [ ] 6.1 Update `README.md` to point at the wiki and remove content now duplicated there; verify links resolve with `check_docs.py`, and **(manual)** the user clicks through them on GitHub
+  - Status: README rewritten (quick start + links into `wiki/`, duplicated setup/gateway/testing/backup content removed); README links checked by script (`check_docs.py` does not scan README) and `check_docs.py` passes. Waiting on the user's click-through on GitHub.
 - [ ] 6.2 Confirm the drift guards fire end to end on one real PR (broken path, orphan page, over-budget CLAUDE.md), then archive the change
