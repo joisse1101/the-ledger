@@ -77,7 +77,9 @@ $toolkitRoot = Split-Path $PSScriptRoot -Parent
 $sourceRoot = Join-Path $toolkitRoot 'skills'
 
 function Get-SkillHash([string]$Dir) {
-    $root = (Resolve-Path -LiteralPath $Dir).Path.TrimEnd('\')
+    # Get-Item's FullName is the same form Get-ChildItem reports below (Resolve-Path can keep 8.3
+    # short names, which would throw off the relative-path substring).
+    $root = (Get-Item -LiteralPath $Dir).FullName.TrimEnd('\')
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
         $files = Get-ChildItem -LiteralPath $root -Recurse -File |

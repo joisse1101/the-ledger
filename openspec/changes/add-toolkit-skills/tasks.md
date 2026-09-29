@@ -17,6 +17,6 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Install the sample skill to a throwaway project path, then run `-List`, edit it to confirm "differs" and no overwrite, then `-Force`, then `-Uninstall`
+- [x] 4.1 Install the sample skill to a throwaway project path, then run `-List`, edit it to confirm "differs" and no overwrite, then `-Force`, then `-Uninstall`
 - [ ] 4.2 Confirm a foreign skill in the destination survives uninstall and no `settings.json` changed
 - [ ] 4.3 Run `openspec validate add-toolkit-skills`
