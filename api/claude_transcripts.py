@@ -5,9 +5,10 @@ Covers every session that has ever run (unlike claude_sessions.py's live-only re
 
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -26,12 +27,20 @@ class ClaudeTranscript:
     updated_at: Optional[datetime]
     message_count: int
     cost: float
+    cost_source: str
     project: str
     title: str
     last_message: str
     first_prompt: str
     # Context size at the last real main-thread response (see claude_context); None if there wasn't one.
     context: Optional[int] = None
+    # Model ids this app's own pricing table didn't recognize during the per-message fallback scan -
+    # empty whenever every turn's model was priced (including every `exact` session).
+    unpriced_models: list[str] = field(default_factory=list)
+    # True only when a `cost-state` line was found and it flagged `hasUnknownModelCost` itself -
+    # distinguishes that case from `estimated` meaning "no cost-state line at all yet" (always False
+    # on an `exact` session, where a clean cost-state line was found instead).
+    cost_state_flagged: bool = False
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -49,11 +58,14 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         ),
         message_count=row["message_count"],
         cost=row["cost"],
+        cost_source=row["cost_source"],
         project=row["project"],
         title=row["title"],
         last_message=row["last_message"],
         first_prompt=row["first_prompt"],
         context=row["context"],
+        unpriced_models=json.loads(row["unpriced_models"]) if row["unpriced_models"] else [],
+        cost_state_flagged=bool(row["cost_state_flagged"]),
     )
 
 

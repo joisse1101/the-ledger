@@ -41,14 +41,13 @@
   border-radius: 50%;
 }
 
-/* Just below the icon. Tooltip.tsx overrides `left` (clamped to the viewport) and sets
+/* Rendered through a portal (see Tooltip.tsx) so an ancestor's `overflow: hidden/auto` (a
+   scrollable table cell, a dialog body) can't clip it, and so it can stay above a native <dialog>'s
+   top-layer stacking. Tooltip.tsx writes `left`/`top` in viewport coordinates and sets
    data-side="top" to flip it above the icon when there's no room below. */
 .bubble {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 10;
-  margin-top: 0.25rem;
+  position: fixed;
+  z-index: 100;
   width: max-content;
   max-width: min(18rem, 80vw);
   padding: 0.375rem 0.625rem;
@@ -59,27 +58,14 @@
   box-shadow: var(--shadow-sm);
   font-size: var(--font-xs);
   white-space: pre-line;
-  /* Not just `visibility: hidden`: a hidden bubble still takes up layout space, and sitting at
-     `left: 0` it can stick out past the screen edge and make the page scroll sideways. */
-  display: none;
+  /* Visibility, not display: none - a display: none bubble can't be measured for placement. */
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.bubble[data-side="top"] {
-  top: auto;
-  bottom: 100%;
-  margin: 0 0 0.25rem;
-}
-
-.tipButton:focus-visible + .bubble,
 .bubbleOpen {
-  display: block;
-}
-
-/* Only where hovering is real. A touch screen fakes :hover on tap and leaves it stuck on until
-   another element is tapped, which would keep the bubble showing after the JS state closed it
-   (scroll, second tap, Escape). There, .bubbleOpen alone decides. */
-@media (hover: hover) {
-  .tip:hover .bubble {
-    display: block;
-  }
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }

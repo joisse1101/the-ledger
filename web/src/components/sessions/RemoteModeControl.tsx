@@ -35,7 +35,7 @@ export function RemoteModeControl() {
         disabled={setRemoteMode.isPending}
         onChange={(checked) => setRemoteMode.mutate(checked)}
         label="Remote mode"
-        tooltip={`${timeLeft ? `${timeLeft}\n` : ""}Toggle whether the Ledger can be remotely accessed`}
+        tooltip={`${timeLeft ? `${timeLeft}\n` : ""}Toggle whether sessions can be remotely controlled`}
       />
       {setRemoteMode.isError && <span className="detail-caption">{setRemoteMode.error.message}</span>}
     </>

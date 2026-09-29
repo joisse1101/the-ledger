@@ -90,6 +90,13 @@ a:hover {
   color: var(--text-muted);
 }
 
+/* An estimated (vs. exact) cost figure: the value, an asterisk, and a tooltip icon inline. */
+.cost-figure {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
 /* iOS Safari zooms the page when a field under 1rem is focused. */
 input,
 select,

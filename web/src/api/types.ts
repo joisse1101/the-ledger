@@ -67,6 +67,10 @@ export interface LiveResponse {
   sessions: LiveSession[];
 }
 
+/** Whether a session's cost is Claude Code's own reported figure, or this app's best-effort
+ *  estimate (computed only from recognized models and the session's own main-thread turns). */
+export type CostSource = "exact" | "estimated";
+
 export interface TranscriptItem {
   session_id: string;
   project: string;
@@ -75,6 +79,14 @@ export interface TranscriptItem {
   updated_at: string | null;
   message_count: number;
   cost: number;
+  cost_source: CostSource;
+  /** Model ids this app's own pricing table didn't recognize while estimating; empty when every
+   *  turn's model was priced (always empty on an `exact` session). */
+  unpriced_models: string[];
+  /** True only when Claude Code's own `cost-state` line flagged this session as unpriced; false on
+   *  an `estimated` session that instead simply has no `cost-state` line yet (still in progress, or
+   *  from a build too old to write one) - always false on an `exact` session. */
+  cost_state_flagged: boolean;
   context: number | null;
   version: string;
   git_branch: string;
@@ -126,6 +138,9 @@ export interface SessionRecap {
   updated_at: string | null;
   message_count: number | null;
   cost: number | null;
+  cost_source: CostSource | null;
+  unpriced_models: string[];
+  cost_state_flagged: boolean;
   context: number | null;
   avg_tokens_per_message: number | null;
 }
@@ -231,8 +246,15 @@ export interface TokenFigure {
   amount: number;
 }
 
-/** Extremes also say which session they came from. */
-export type WithSession<T> = T & { project: string | null; session_id: string | null };
+/** Extremes also say which session they came from, and that session's cost source (present even
+ *  for a non-cost extreme, e.g. longest session, since the server attaches it uniformly). */
+export type WithSession<T> = T & {
+  project: string | null;
+  session_id: string | null;
+  cost_source: CostSource | null;
+  unpriced_models: string[];
+  cost_state_flagged: boolean;
+};
 
 export interface OverviewSummary {
   projects: number;

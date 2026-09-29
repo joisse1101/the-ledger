@@ -4,6 +4,7 @@ import type { SortDirection, SortField, TranscriptItem } from "../../api/types";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useViewportClass } from "../../hooks/useViewportClass";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
+import { CostFigure } from "../CostFigure";
 import { ResponsiveList } from "../list/ResponsiveList";
 import type { ListColumn } from "../list/types";
 import { FilterMultiselect } from "./FilterMultiselect";
@@ -42,7 +43,14 @@ const columns: ListColumn<TranscriptItem>[] = [
     align: "end",
     cardPriority: "secondary",
     sortKey: "cost",
-    render: (t) => formatCost(t.cost),
+    render: (t) => (
+      <CostFigure
+        label={formatCost(t.cost)}
+        source={t.cost_source}
+        unpricedModels={t.unpriced_models}
+        costStateFlagged={t.cost_state_flagged}
+      />
+    ),
   },
   {
     key: "context",
