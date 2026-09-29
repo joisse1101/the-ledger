@@ -12,7 +12,7 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Write `toolkit/README.md`: quick start (get the toolkit, install everything) and a separate Skills section with the manual copy path
+- [x] 3.1 Write `toolkit/README.md`: quick start (get the toolkit, install everything) and a separate Skills section with the manual copy path
 - [ ] 3.2 Update `CLAUDE.md`: five top-level folders, describe `toolkit/`
 
 ## 4. Verification
