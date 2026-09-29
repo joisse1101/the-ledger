@@ -1,0 +1,59 @@
+name: wiki-publish
+
+# One-way mirror: wiki/ in this repo -> the GitHub wiki. Never edit the wiki in the browser.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki-publish
+  cancel-in-progress: false
+
+env:
+  BOT_NAME: github-actions[bot]
+  BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone the wiki repo
+        run: |
+          git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" wiki-repo
+
+      - name: Warn about edits made outside this workflow
+        working-directory: wiki-repo
+        run: |
+          last_bot=$(git log --author="$BOT_EMAIL" -1 --format=%H || true)
+          range=${last_bot:+$last_bot..}HEAD
+          foreign=$(git log "$range" --format='%h %an: %s' --author="$BOT_EMAIL" --invert-grep)
+          if [ -n "$foreign" ]; then
+            echo "::warning title=Wiki edited outside the repo::These wiki commits will be overwritten (edit wiki/ in the repo instead):"
+            echo "$foreign"
+          fi
+
+      - name: Mirror wiki/ into the wiki repo
+        run: |
+          rsync -a --delete --exclude '.git' wiki/ wiki-repo/
+          # Links are written [text](Page-Name.md) so they work when browsing wiki/ in the repo;
+          # the wiki wants them without the suffix.
+          find wiki-repo -name '*.md' -not -path 'wiki-repo/.git/*' -print0 |
+            xargs -0 sed -i -E 's/\]\(([A-Za-z0-9_.-]+)\.md(#[^)]*)?\)/](\1\2)/g'
+
+      - name: Push if anything changed
+        working-directory: wiki-repo
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki already matches wiki/; nothing to publish."
+            exit 0
+          fi
+          git -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" commit -m "Publish wiki from ${GITHUB_SHA::7}"
+          git push

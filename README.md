@@ -33,186 +33,35 @@ CLI version, lines changed, and any MCP servers configured for it.
 It also works from your phone or another device on the same network — see "Run from
 another device" below — and each device remembers its own light/dark theme preference.
 
-## Layout
+## Quick start
 
-Four top-level folders, one per service, each self-contained, plus a pair of scripts at
-the root (`Start-Ledger.ps1`/`Stop-Ledger.ps1`) that start/stop all three together — see
-"Run" and "Run from another device" below:
-
-- `api/` — the FastAPI backend: `server.py` and its supporting modules (`banner.py`,
-  `security.py`, `live_snapshot.py`, `overview_stats.py`, `transcript_query.py`), the
-  data layer that actually knows how to read Claude Code's on-disk files
-  (`claude_db.py`, `claude_projects.py`, `claude_transcripts.py`, `claude_sessions.py`,
-  `claude_context.py`), its tests (`api/tests/`), `requirements*.txt`, `pyproject.toml`,
-  and its own `.venv`/`.ledger`/`.history` (all gitignored). It only ever serves
-  `/api/*` — no pages, no static files.
-- `web/` — the React + Vite frontend. Built once with `npm run build`, then served by
-  its own process (`vite preview`), entirely separate from the API.
-- `gateway/` — a small containerized Nginx reverse proxy (needs Docker Desktop). It's
-  the only thing that ever exposes the dashboard to another device on your network; the
-  API and frontend themselves always stay bound to this machine only. See "Run from
-  another device" below.
-- `hooks/` — Windows toast notifications for Claude Code's hook events, unrelated to
-  the dashboard (see `hooks/README.md`).
-
-## Setup
-
-Create and activate a virtual environment inside `api/` (Windows PowerShell):
+Create the venv and install dependencies (Windows PowerShell), then start everything from the
+repo root. You'll also need [Node.js](https://nodejs.org/).
 
 ```powershell
 cd api
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-Install Python dependencies (still in `api/`):
-
-```powershell
 pip install -r requirements.txt
+cd ..
+.\Start-Ledger.ps1      # API + frontend (+ gateway); .\Stop-Ledger.ps1 stops them
 ```
 
-You'll also need [Node.js](https://nodejs.org/) installed for the frontend.
+Open the URL the frontend prints (http://localhost:4173 by default), not the API's address.
 
-## Run
+## Documentation
 
-The API and the frontend are two separate processes on two separate ports.
+The docs live in [`wiki/`](wiki/Home.md) and are mirrored to the GitHub wiki on every push to
+`main`. Edit them in the repo, not on the wiki. Requirements live in `openspec/specs/`.
 
-**Terminal 1 — the API** (from `api/`, with its venv active):
-
-```powershell
-cd api
-python server.py
-```
-
-**Terminal 2 — build and serve the frontend** (from `web/`; `npm run build` only needs
-re-running after you pull frontend changes, not on every start):
-
-```powershell
-cd web
-npm ci
-npm run build
-npm run preview
-```
-
-Open the URL `npm run preview` prints (http://localhost:4173 by default) — not the
-API's address, which has no page to show you.
-
-While actively working on either side, run them in "dev" mode instead: `npm run dev` (in
-place of `npm run build` + `npm run preview`) hot-reloads the frontend on save and
-proxies `/api` to the backend on http://localhost:8501; `python server.py --reload`
-does the same for the backend, restarting itself whenever a file under `api/` changes.
-
-**Or start both at once** from the repo root:
-
-```powershell
-.\Start-Ledger.ps1              # build mode — matches the two terminals above
-.\Start-Ledger.ps1 -Mode dev    # both as hot-reloading dev servers instead
-```
-
-It opens the backend and frontend each in their own window (so their logs and Ctrl+C
-stay independent), and `.\Stop-Ledger.ps1` stops exactly those two windows again without
-touching anything else you have open.
-
-## Run from another device
-
-The API and frontend themselves never bind beyond this machine, no matter what — the
-only thing that ever grants access from a phone, tablet, or another computer is a small
-containerized Nginx gateway (`gateway/`, requires Docker Desktop; Windows/Mac only). With
-the API and frontend already running (see "Run" above), start it:
-
-```powershell
-cd gateway
-.\Start-Gateway.ps1
-```
-
-Or skip straight to all three with `.\Start-Ledger.ps1` from the repo root — it starts
-the gateway too unless you pass `-NoGateway`.
-
-Either way, once it's up you'll see a sign-in link and QR code printed for every address
-this machine is reachable at, e.g. `https://<address>:8080/?token=<token>`. Opening that
-link (or scanning the QR) on another device signs it in — the token is stored in that
-browser and stripped from the address bar, then sent as a header on every request from
-then on. A device that hasn't opened that link sees an empty, signed-out shell instead of
-your data.
-
-Windows will prompt to allow Docker/the gateway through the firewall the first time —
-allow it on **Private networks**.
-
-The gateway serves HTTPS only, using a self-signed certificate it generates when its image
-is built, so the token and your session data are encrypted in transit. Because that
-certificate isn't from a public authority, each new device's browser warns that the
-connection isn't trusted the first time — that's expected; accept it once per device
-(rebuilding the gateway image from scratch generates a new certificate, and the warning
-returns). The token is still what keeps out devices that don't have it, so only do this on
-a network you trust. An old `http://` link no longer works — use the freshly printed
-`https://` one.
-
-Stop the gateway on its own with `cd gateway && .\Stop-Gateway.ps1` (or `.\Stop-Ledger.ps1`
-from the root, which also stops the API/frontend windows `Start-Ledger.ps1` opened) — it
-doesn't touch the API/frontend processes either way.
-
-**Rotating the token.** If you've shared the link and want to revoke access, delete
-`api/.ledger/token` and restart the API; it generates a fresh one on next start, and
-every device using the old token will need the new link.
-
-One place to see/change every port (gateway, API, frontend) is the root `.env` — copy
-`.env.example` to `.env` and edit it; see `CLAUDE.md`'s "Setup & Run" for the full
-precedence rules and how to keep the API/frontend processes in sync with a custom port.
-
-## Keeping history past Claude Code's retention window
-
-Claude Code prunes its own session transcripts after a while, which would normally make old
-sessions disappear from the All list and Overview too. `api/backup_history.py` keeps a durable
-copy (`api/.history/history.db`, gitignored, never wiped) that a session survives in even after
-its `.jsonl` is gone — but only if it actually runs on a schedule, since the app itself never
-triggers it.
-
-Register the daily task for it with one command (needs `api/`'s venv set up):
-
-```powershell
-cd hooks\ledgerScripts
-.\Install-HistoryBackupTask.ps1
-```
-
-Or pass `-InstallBackupTask` to the root script to do it in the same step as starting the app:
-`.\Start-Ledger.ps1 -InstallBackupTask`. Both are safe to re-run. `.\Uninstall-HistoryBackupTask.ps1`
-(or `.\Stop-Ledger.ps1 -UninstallBackupTask`) removes it again. See `CLAUDE.md`'s "Setup & Run" for
-what the task runs and how to verify it's actually running.
-
-## Testing
-
-Install dev dependencies (from `api/`; this includes `requirements.txt` plus `pytest`):
-
-```powershell
-cd api
-pip install -r requirements-dev.txt
-```
-
-Run the Python test suite (from `api/`, where its `pyproject.toml` lives):
-
-```powershell
-pytest
-```
-
-Tests live in `api/tests/`, one file per module under test. They cover the pure
-parsing/aggregation logic (cost math, time-range filtering, chart data prep), the
-SQLite-backed read/write/delete paths in `claude_db.py`, `claude_projects.py`, and
-`claude_transcripts.py` (via an `isolated_db` fixture — see `api/tests/conftest.py` — that
-points `claude_db` at a throwaway `tmp_path` instead of your real `~/.claude.json` /
-`~/.claude/projects/`, so running the suite never touches your actual Claude Code data),
-and the FastAPI app end to end (auth, routes) via `TestClient`.
-
-Run the frontend tests (from `web/`):
-
-```powershell
-npm test
-```
-
-And check the frontend still builds cleanly (also fails on a TypeScript type error):
-
-```powershell
-npm run build
-```
+- [Setup and run](wiki/Setup-And-Run.md): install, dev vs. build mode, ports and `.env`, the
+  history backup task
+- [Gateway](wiki/Gateway.md): reading the dashboard from a phone or another device, the token,
+  HTTPS
+- [Testing](wiki/Testing.md): the Python and frontend suites
+- [Repository layout](wiki/Repository-Layout.md): the five folders and what each holds
+- [Hooks](wiki/Hooks.md): toast notification hooks
+- [All pages](wiki/Home.md)
 
 ## A couple of things worth knowing
 
