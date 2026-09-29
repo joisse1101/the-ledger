@@ -83,6 +83,10 @@ export interface TranscriptItem {
   /** Model ids this app's own pricing table didn't recognize while estimating; empty when every
    *  turn's model was priced (always empty on an `exact` session). */
   unpriced_models: string[];
+  /** True only when Claude Code's own `cost-state` line flagged this session as unpriced; false on
+   *  an `estimated` session that instead simply has no `cost-state` line yet (still in progress, or
+   *  from a build too old to write one) - always false on an `exact` session. */
+  cost_state_flagged: boolean;
   context: number | null;
   version: string;
   git_branch: string;
@@ -136,6 +140,7 @@ export interface SessionRecap {
   cost: number | null;
   cost_source: CostSource | null;
   unpriced_models: string[];
+  cost_state_flagged: boolean;
   context: number | null;
   avg_tokens_per_message: number | null;
 }
@@ -248,6 +253,7 @@ export type WithSession<T> = T & {
   session_id: string | null;
   cost_source: CostSource | null;
   unpriced_models: string[];
+  cost_state_flagged: boolean;
 };
 
 export interface OverviewSummary {

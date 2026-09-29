@@ -104,6 +104,24 @@ considered: only ever show the generic message - rejected, since naming the mode
 useful whenever this app's own table is the reason, and costs nothing extra to compute since the scan
 already calls `_message_cost` per turn.
 
+**The generic (no named model) fallback tooltip distinguishes "no cost report yet" from "Claude Code
+flagged this as unpriced."** Added after the above, when a first draft of the generic message ("Claude
+Code flagged part of this session's cost as unpriced") turned out to be simply false for one of the two
+cases that reach it: `cost_source` becomes `"estimated"` for two distinct reasons - (a) no `cost-state`
+line was found at all (the session is still in progress, or predates `cost-state` support in that
+Claude Code build - design.md's Context section traced real examples of both), where nothing has been
+"flagged," there's just no authoritative total yet; or (b) a `cost-state` line was found but its
+`hasUnknownModelCost` was `true` - Claude Code itself saying it couldn't fully price the session. A new
+`cost_state_flagged: bool` field (`True` only in case (b)) travels alongside `cost_source`/
+`unpriced_models` through the same places (`_scan_transcript_file`, both SQLite schemas as
+`INTEGER NOT NULL DEFAULT 0`, `ClaudeTranscript`, the two API payloads, `overview_stats.py`'s extreme
+annotations, `types.ts`), so the frontend's fallback tooltip can say which case applies instead of
+guessing. When a named model is present, the tooltip still leads with that (naming the model is
+strictly more useful regardless of which case produced the estimate). Alternative considered: keep the
+message generic but reword it to be true in both cases (e.g. "the true total isn't known yet") -
+rejected as strictly less informative once distinguishing the two cases costs only one more boolean
+column, no new scan logic (both `cost_state_total`/`cost_state_has_unknown` are already computed).
+
 ## Risks / Trade-offs
 
 - [Subagent inclusion is confirmed from one traced session, not exhaustively] -> Mitigation: this

@@ -24,6 +24,14 @@
       `DEFAULT '[]'` on `history.db`'s `ALTER TABLE`), `INSERT`/`SELECT` column lists, and
       `fetch_transcripts()`'s live/history merge (live row wins, same as `cost`/`cost_source`); verify
       via `test_claude_db.py` fixtures covering a known model, an unrecognized one, and a mix.
+- [x] 1.6 (Added scope - see design.md's "generic fallback tooltip distinguishes..." decision.) In
+      `_scan_transcript_file`, record `cost_state_flagged: bool` - `True` only when a `cost-state`
+      line was found and its `hasUnknownModelCost` was `True` (i.e. exactly the case that falls back
+      to `estimated` despite having a `cost-state` line, as opposed to no `cost-state` line at all);
+      thread it onto the returned row, both SQLite schemas (`INTEGER NOT NULL DEFAULT 0`),
+      `ClaudeTranscript`, and `fetch_transcripts()`'s live/history merge; verify via
+      `test_claude_db.py` fixtures covering: no `cost-state` line, one with `hasUnknownModelCost:
+      false`, and one with `hasUnknownModelCost: true`.
 
 ## 2. API surface
 
@@ -37,6 +45,11 @@
       `/api/sessions/{id}` recap payload, and `overview_stats.py`'s extreme-figure annotation
       (`_with_session`), alongside `cost_source` in each; verify via `test_transcript_query.py`,
       `test_api_data.py` and `test_overview_stats.py` assertions on the new field.
+- [x] 2.4 (Added scope.) Add `cost_state_flagged` to the `/api/transcripts` item shape, the
+      `/api/sessions/{id}` recap payload (`False` on the live-only branch), and
+      `overview_stats.py`'s extreme-figure annotation (`_with_session`); verify via
+      `test_transcript_query.py`, `test_api_data.py` and `test_overview_stats.py` assertions on the
+      new field.
 
 ## 3. Frontend
 
@@ -55,6 +68,12 @@
       app's local scan finding a specific model - e.g. subagent spend on a model never seen in the
       main transcript); verify by rendering sessions covering: one named model, several, and none
       (generic fallback).
+- [x] 3.4 (Added scope.) Add `cost_state_flagged: boolean` to the relevant shapes in
+      `web/src/api/types.ts`; split the cost-display helper's generic (no named model) fallback into
+      two messages - one for `cost_state_flagged: true` ("Claude Code flagged part of this session's
+      cost as unpriced...") and one for `false` ("Claude Code hasn't reported a final cost for this
+      session yet - still running, or from a build too old to report one"); verify by rendering
+      sessions covering both.
 
 ## 4. Tests and verification
 

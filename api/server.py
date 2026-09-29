@@ -179,6 +179,7 @@ def _transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: 
         "cost": transcript.cost,
         "cost_source": transcript.cost_source,
         "unpriced_models": transcript.unpriced_models,
+        "cost_state_flagged": transcript.cost_state_flagged,
         "context": transcript.context,
         "version": transcript.version,
         "git_branch": transcript.git_branch,
@@ -246,6 +247,7 @@ def _recap(transcript: Optional[claude_transcripts.ClaudeTranscript], live_item:
             "cost": transcript.cost,
             "cost_source": transcript.cost_source,
             "unpriced_models": transcript.unpriced_models,
+            "cost_state_flagged": transcript.cost_state_flagged,
         }
     elif live_item is not None:
         # Brand new: the registry knows it, the snapshot doesn't yet.
@@ -261,6 +263,7 @@ def _recap(transcript: Optional[claude_transcripts.ClaudeTranscript], live_item:
             "cost": None,
             "cost_source": None,
             "unpriced_models": [],
+            "cost_state_flagged": False,
         }
     else:
         return None

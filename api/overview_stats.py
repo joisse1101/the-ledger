@@ -205,6 +205,7 @@ def _with_session(
     figure["session_id"] = transcript.session_id if transcript else None
     figure["cost_source"] = transcript.cost_source if transcript else None
     figure["unpriced_models"] = transcript.unpriced_models if transcript else []
+    figure["cost_state_flagged"] = transcript.cost_state_flagged if transcript else False
     return figure
 
 

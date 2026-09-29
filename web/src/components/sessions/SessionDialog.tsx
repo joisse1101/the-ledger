@@ -60,7 +60,12 @@ function Recap({ recap }: { recap: SessionRecap }) {
   if (recap.cost != null) {
     stats.push([
       "Cost",
-      <CostFigure label={formatCost(recap.cost)} source={recap.cost_source} unpricedModels={recap.unpriced_models} />,
+      <CostFigure
+        label={formatCost(recap.cost)}
+        source={recap.cost_source}
+        unpricedModels={recap.unpriced_models}
+        costStateFlagged={recap.cost_state_flagged}
+      />,
     ]);
   }
 

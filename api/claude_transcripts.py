@@ -37,6 +37,10 @@ class ClaudeTranscript:
     # Model ids this app's own pricing table didn't recognize during the per-message fallback scan -
     # empty whenever every turn's model was priced (including every `exact` session).
     unpriced_models: list[str] = field(default_factory=list)
+    # True only when a `cost-state` line was found and it flagged `hasUnknownModelCost` itself -
+    # distinguishes that case from `estimated` meaning "no cost-state line at all yet" (always False
+    # on an `exact` session, where a clean cost-state line was found instead).
+    cost_state_flagged: bool = False
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -61,6 +65,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         first_prompt=row["first_prompt"],
         context=row["context"],
         unpriced_models=json.loads(row["unpriced_models"]) if row["unpriced_models"] else [],
+        cost_state_flagged=bool(row["cost_state_flagged"]),
     )
 
 

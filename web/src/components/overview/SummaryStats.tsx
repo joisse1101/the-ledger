@@ -27,6 +27,7 @@ function tiles(summary: OverviewSummary): StatTile[] {
           label={summary.cost.most_expensive.label}
           source={summary.cost.most_expensive.cost_source}
           unpricedModels={summary.cost.most_expensive.unpriced_models}
+          costStateFlagged={summary.cost.most_expensive.cost_state_flagged}
         />
       ),
       ref: summary.cost.most_expensive,
@@ -38,6 +39,7 @@ function tiles(summary: OverviewSummary): StatTile[] {
           label={summary.cost.cheapest.label}
           source={summary.cost.cheapest.cost_source}
           unpricedModels={summary.cost.cheapest.unpriced_models}
+          costStateFlagged={summary.cost.cheapest.cost_state_flagged}
         />
       ),
       ref: summary.cost.cheapest,

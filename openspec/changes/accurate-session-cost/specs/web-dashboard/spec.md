@@ -40,7 +40,11 @@ A session's cost SHALL be either an exact figure Claude Code itself reported for
 when no such figure is available, a best-effort estimate computed from the session's own
 recognized-model usage. An estimated cost SHALL be marked with an asterisk and a tooltip explaining
 that it is a best-effort figure covering only models this app recognizes and only the session's own
-main-thread turns, excluding any subagent spend. An exact cost SHALL be shown with no such mark.
+main-thread turns, excluding any subagent spend. When this app's own scan found a specific model it
+doesn't recognize, the tooltip SHALL name it (or them, when more than one); otherwise it SHALL explain
+whether Claude Code itself flagged the session's own cost as unpriced, or has not yet reported a final
+cost for the session at all (still running, or from a build too old to report one). An exact cost
+SHALL be shown with no such mark.
 
 #### Scenario: Search matches literally
 - **WHEN** the user searches for `a.b`
@@ -71,6 +75,16 @@ main-thread turns, excluding any subagent spend. An exact cost SHALL be shown wi
 - **WHEN** a session's cost column shows a best-effort estimate rather than an exact,
   Claude-Code-reported figure
 - **THEN** the amount is marked with an asterisk and a tooltip explains what the estimate excludes
+
+#### Scenario: Estimated cost names an unrecognized model
+- **WHEN** a session's cost is estimated because this app's own scan found a model its pricing table
+  doesn't recognize
+- **THEN** the tooltip names that model
+
+#### Scenario: Estimated cost with no named model explains why
+- **WHEN** a session's cost is estimated and this app's own scan found no unrecognized model
+- **THEN** the tooltip explains whether Claude Code itself flagged the session's cost as unpriced, or
+  has not yet reported a final cost for it
 
 #### Scenario: Exact cost is unmarked
 - **WHEN** a session's cost column shows Claude Code's own reported cost
