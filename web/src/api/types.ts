@@ -88,6 +88,8 @@ export interface TranscriptItem {
    *  from a build too old to write one) - always false on an `exact` session. */
   cost_state_flagged: boolean;
   context: number | null;
+  /** The model with the most main-thread responses in the session; empty if it had none. */
+  model: string;
   version: string;
   git_branch: string;
   live: boolean;
@@ -115,6 +117,7 @@ export type SortField =
   | "message_count"
   | "cost"
   | "context"
+  | "model"
   | "version"
   | "git_branch";
 

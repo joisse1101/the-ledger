@@ -295,6 +295,39 @@ def test_scan_transcript_file_no_cost_state_line_is_estimated_and_unflagged(
     assert row["cost_state_flagged"] is False
 
 
+def _assistant_turn(message_id, model, *, sidechain=False):
+    return {
+        "type": "assistant",
+        "isSidechain": sidechain,
+        "timestamp": "2024-01-01T10:05:00Z",
+        "message": {"id": message_id, "model": model, "usage": {"input_tokens": 1, "output_tokens": 1}},
+    }
+
+
+def test_scan_transcript_file_model_is_the_most_used_main_thread_model(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            _assistant_turn("m1", "model-a"),
+            _assistant_turn("m2", "model-b"),
+            _assistant_turn("m3", "model-b"),
+            _assistant_turn("m3", "model-b"),  # repeated line of the same response: counted once
+            _assistant_turn("m4", "model-a", sidechain=True),
+            _assistant_turn("m5", "model-a", sidechain=True),
+            _assistant_turn("m6", "<synthetic>"),
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["model"] == "model-b"
+
+
+def test_scan_transcript_file_model_is_blank_without_assistant_turns(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(path, [_cost_state(1.0)])
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["model"] == ""
+
+
 def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
     tmp_path, write_transcript
 ):

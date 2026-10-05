@@ -12,6 +12,7 @@ import atexit
 import json
 import re
 import sqlite3
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -118,6 +119,7 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
             cost_source TEXT NOT NULL DEFAULT 'estimated',
             unpriced_models TEXT NOT NULL DEFAULT '[]',
             cost_state_flagged INTEGER NOT NULL DEFAULT 0,
+            model TEXT NOT NULL DEFAULT '',
             context INTEGER,
             project TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
@@ -134,6 +136,7 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
         "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'",
         "ALTER TABLE transcripts ADD COLUMN unpriced_models TEXT NOT NULL DEFAULT '[]'",
         "ALTER TABLE transcripts ADD COLUMN cost_state_flagged INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE transcripts ADD COLUMN model TEXT NOT NULL DEFAULT ''",
     ):
         try:
             conn.execute(ddl)
@@ -389,6 +392,7 @@ def _scan_transcript_file(
     cost_state_total: Optional[float] = None
     cost_state_has_unknown = False
     unpriced_models: set[str] = set()
+    model_turns: Counter[str] = Counter()
     context: Optional[int] = None
     seen_message_ids: set[str] = set()
     ai_title: Optional[str] = None
@@ -445,6 +449,8 @@ def _scan_transcript_file(
                         seen_message_ids.add(message_id)
                         usage = message.get("usage")
                         model = message.get("model")
+                        if model and model != "<synthetic>" and not entry.get("isSidechain"):
+                            model_turns[model] += 1
                         if isinstance(usage, dict) and model:
                             turn_cost = _message_cost(model, usage)
                             if turn_cost is not None:
@@ -513,6 +519,8 @@ def _scan_transcript_file(
         "cost_source": cost_source,
         "unpriced_models": sorted(unpriced_models),
         "cost_state_flagged": cost_state_flagged,
+        # The model with the most main-thread responses; ties go to the one seen first.
+        "model": model_turns.most_common(1)[0][0] if model_turns else "",
         "context": context,
         "project": project,
         "title": title,
@@ -541,18 +549,19 @@ def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
         "started_at": row["started_at"].isoformat() if row["started_at"] else None,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         "unpriced_models": json.dumps(row["unpriced_models"]),
+        "model": row.get("model", ""),
     }
 
 
 _TRANSCRIPT_UPSERT_SQL = """
     INSERT INTO transcripts (
         session_id, path, cwd, version, git_branch, started_at,
-        updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, context,
-        project, title, last_message, first_prompt
+        updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, model,
+        context, project, title, last_message, first_prompt
     ) VALUES (
         :session_id, :path, :cwd, :version, :git_branch, :started_at,
         :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-        :context, :project, :title, :last_message, :first_prompt
+        :model, :context, :project, :title, :last_message, :first_prompt
     )
     ON CONFLICT(session_id) DO UPDATE SET
         path = excluded.path,
@@ -566,6 +575,7 @@ _TRANSCRIPT_UPSERT_SQL = """
         cost_source = excluded.cost_source,
         unpriced_models = excluded.unpriced_models,
         cost_state_flagged = excluded.cost_state_flagged,
+        model = excluded.model,
         context = excluded.context,
         project = excluded.project,
         title = excluded.title,
@@ -634,11 +644,11 @@ def refresh() -> datetime:
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
                 updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged,
-                context, project, title, last_message, first_prompt
+                model, context, project, title, last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
                 :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-                :context, :project, :title, :last_message, :first_prompt
+                :model, :context, :project, :title, :last_message, :first_prompt
             )
             """,
             [_serialize_transcript_row(t) for t in transcript_rows],

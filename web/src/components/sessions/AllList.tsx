@@ -61,6 +61,14 @@ const columns: ListColumn<TranscriptItem>[] = [
     render: (t) => formatContext(t.context),
   },
   {
+    key: "model",
+    header: "Model",
+    priority: "high",
+    cardPriority: "secondary",
+    sortKey: "model",
+    render: (t) => formatText(t.model),
+  },
+  {
     key: "version",
     header: "Version",
     priority: "low",

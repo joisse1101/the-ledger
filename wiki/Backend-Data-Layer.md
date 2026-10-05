@@ -44,7 +44,8 @@ testable and readable independent of the web framework wrapping it.
   `assistant` lines), `context` (the same latest-real-main-thread-turn figure `claude_context.py`
   shows live, via `claude_db._context_tokens`), `cost` (per-turn `message.usage` priced via
   `_MODEL_PRICING`, counted once per unique `message.id`; an *estimate* — unrecognized models are
-  silently skipped), and `project` (matching the on-disk parent folder against each project's
+  silently skipped), `model` (the model with the most main-thread responses, once per
+  `message.id`, ignoring `<synthetic>`; ties go to the first seen), and `project` (matching the on-disk parent folder against each project's
   `sanitize_project_path()`, falling back to a cwd/folder-derived guess). `delete_project_transcripts(cwd)`
   and `delete_transcript(session_id)` look up the affected path(s) via `claude_db`, remove the real
   file(s) (tolerating one already gone — see [History store](Backend-History-Store.md)), then
