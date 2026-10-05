@@ -349,7 +349,7 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:06:00Z",
                 "message": {
                     "id": "m2",
-                    "model": "claude-opus-5-5",
+                    "model": "claude-fake-model-b",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
@@ -358,7 +358,7 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:07:00Z",
                 "message": {
                     "id": "m3",
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": "claude-fake-model-a",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
@@ -368,14 +368,14 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:08:00Z",
                 "message": {
                     "id": "m4",
-                    "model": "claude-opus-5-5",
+                    "model": "claude-fake-model-b",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
         ],
     )
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["unpriced_models"] == ["claude-haiku-4-5-20251001", "claude-opus-5-5"]
+    assert row["unpriced_models"] == ["claude-fake-model-a", "claude-fake-model-b"]
 
 
 def test_scan_transcript_file_unpriced_models_empty_when_all_recognized(

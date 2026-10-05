@@ -29,10 +29,10 @@ describe("CostFigure", () => {
 
   it("threads named unpriced models into the tooltip", () => {
     render(
-      <CostFigure label="$0.23" source="estimated" unpricedModels={["claude-opus-5-5"]} />,
+      <CostFigure label="$0.23" source="estimated" unpricedModels={["claude-fake-model-b"]} />,
     );
 
-    expect(screen.getByRole("tooltip")).toHaveTextContent("claude-opus-5-5");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("claude-fake-model-b");
   });
 
   it("threads cost_state_flagged into the tooltip when no model was named", () => {

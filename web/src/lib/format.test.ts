@@ -54,22 +54,22 @@ describe("formatCount", () => {
 
 describe("estimatedCostTooltip", () => {
   it("names a single unpriced model", () => {
-    const tooltip = estimatedCostTooltip(["claude-opus-5-5"], false);
-    expect(tooltip).toContain("this app doesn't yet recognize this model (claude-opus-5-5)");
+    const tooltip = estimatedCostTooltip(["claude-fake-model-b"], false);
+    expect(tooltip).toContain("this app doesn't yet recognize this model (claude-fake-model-b)");
     expect(tooltip).toContain("its turns aren't priced");
   });
 
   it("names several unpriced models, joined with 'and'", () => {
-    const tooltip = estimatedCostTooltip(["claude-opus-5-5", "claude-haiku-4-5-20251001"], false);
+    const tooltip = estimatedCostTooltip(["claude-fake-model-b", "claude-fake-model-a"], false);
     expect(tooltip).toContain(
-      "these models (claude-opus-5-5 and claude-haiku-4-5-20251001)",
+      "these models (claude-fake-model-b and claude-fake-model-a)",
     );
     expect(tooltip).toContain("their turns aren't priced");
   });
 
   it("takes the named-model reason even when cost-state also flagged the session", () => {
-    const tooltip = estimatedCostTooltip(["claude-opus-5-5"], true);
-    expect(tooltip).toContain("claude-opus-5-5");
+    const tooltip = estimatedCostTooltip(["claude-fake-model-b"], true);
+    expect(tooltip).toContain("claude-fake-model-b");
     expect(tooltip).not.toContain("Claude Code flagged");
   });
 
