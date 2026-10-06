@@ -22,6 +22,7 @@ SORT_FIELDS = (
     "cost",
     "context",
     "model",
+    "used_openspec",
     "version",
     "git_branch",
 )

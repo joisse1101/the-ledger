@@ -182,6 +182,7 @@ def _transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: 
         "cost_state_flagged": transcript.cost_state_flagged,
         "context": transcript.context,
         "model": transcript.model,
+        "used_openspec": transcript.used_openspec,
         "version": transcript.version,
         "git_branch": transcript.git_branch,
         "live": transcript.session_id in live_ids,
@@ -190,7 +191,7 @@ def _transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: 
 
 SortField = Literal[
     "project", "title", "session_id", "started_at", "updated_at",
-    "message_count", "cost", "context", "model", "version", "git_branch",
+    "message_count", "cost", "context", "model", "used_openspec", "version", "git_branch",
 ]
 
 

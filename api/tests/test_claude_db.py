@@ -965,3 +965,47 @@ def test_read_succeeds_while_another_connection_holds_a_write_transaction(isolat
     finally:
         writer.rollback()
         writer.close()
+
+
+def test_scan_transcript_file_detects_openspec_slash_command(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "user",
+                "sessionId": "s",
+                "message": {"content": "<command-name>/opsx:propose</command-name>"},
+            }
+        ],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is True
+
+
+def test_scan_transcript_file_detects_openspec_skill_call(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "sessionId": "s",
+                "message": {
+                    "id": "m1",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "openspec-apply-change"}}
+                    ],
+                },
+            }
+        ],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is True
+
+
+def test_scan_transcript_file_without_openspec_is_false(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [{"type": "user", "sessionId": "s", "message": {"content": "talk about /opsx:propose"}}],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is False

@@ -43,6 +43,8 @@ class ClaudeTranscript:
     cost_state_flagged: bool = False
     # The model with the most main-thread responses in the session; "" if it had none.
     model: str = ""
+    # True if the session ran an OpenSpec (`/opsx:*` or `openspec-*`) command or skill.
+    used_openspec: bool = False
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -69,6 +71,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         unpriced_models=json.loads(row["unpriced_models"]) if row["unpriced_models"] else [],
         cost_state_flagged=bool(row["cost_state_flagged"]),
         model=row["model"],
+        used_openspec=bool(row["used_openspec"]),
     )
 
 
