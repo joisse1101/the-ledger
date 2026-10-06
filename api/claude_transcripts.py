@@ -41,6 +41,10 @@ class ClaudeTranscript:
     # distinguishes that case from `estimated` meaning "no cost-state line at all yet" (always False
     # on an `exact` session, where a clean cost-state line was found instead).
     cost_state_flagged: bool = False
+    # The model with the most main-thread responses in the session; "" if it had none.
+    model: str = ""
+    # True if the session ran an OpenSpec (`/opsx:*` or `openspec-*`) command or skill.
+    used_openspec: bool = False
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -66,6 +70,8 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         context=row["context"],
         unpriced_models=json.loads(row["unpriced_models"]) if row["unpriced_models"] else [],
         cost_state_flagged=bool(row["cost_state_flagged"]),
+        model=row["model"],
+        used_openspec=bool(row["used_openspec"]),
     )
 
 

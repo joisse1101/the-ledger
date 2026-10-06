@@ -12,6 +12,7 @@ import atexit
 import json
 import re
 import sqlite3
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -118,6 +119,8 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
             cost_source TEXT NOT NULL DEFAULT 'estimated',
             unpriced_models TEXT NOT NULL DEFAULT '[]',
             cost_state_flagged INTEGER NOT NULL DEFAULT 0,
+            model TEXT NOT NULL DEFAULT '',
+            used_openspec INTEGER NOT NULL DEFAULT 0,
             context INTEGER,
             project TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
@@ -134,6 +137,8 @@ def _ensure_history_schema(conn: sqlite3.Connection) -> None:
         "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'",
         "ALTER TABLE transcripts ADD COLUMN unpriced_models TEXT NOT NULL DEFAULT '[]'",
         "ALTER TABLE transcripts ADD COLUMN cost_state_flagged INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE transcripts ADD COLUMN model TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE transcripts ADD COLUMN used_openspec INTEGER NOT NULL DEFAULT 0",
     ):
         try:
             conn.execute(ddl)
@@ -186,10 +191,12 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "claude-fable-5-1": (10.00, 50.00),
     "claude-mythos-5-1": (10.00, 50.00),
     "claude-fable-5": (10.00, 50.00),
+    "claude-opus-5-5": (4.00, 20.00),
     "claude-opus-5": (5.00, 25.00),
     "claude-opus-4-8": (5.00, 25.00),
     "claude-opus-4-7": (5.00, 25.00),
     "claude-opus-4-6": (5.00, 25.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
     "claude-sonnet-5": (2.00, 10.00),
     "claude-sonnet-4-6": (3.00, 15.00),
     "claude-haiku-4-5": (1.00, 5.00),
@@ -260,6 +267,22 @@ def _extract_text(content: Any) -> Optional[str]:
         joined = "\n\n".join(part for part in parts if part)
         return joined.strip() or None
     return None
+
+
+# OpenSpec is driven by `/opsx:*` slash commands, or by the `openspec-*` / `opsx:*` skills (which the
+# model can also call itself through the Skill tool).
+_OPENSPEC_COMMAND_RE = re.compile(r"<command-name>\s*/(?:opsx:|openspec-)")
+
+
+def _calls_openspec_skill(content: Any) -> bool:
+    if not isinstance(content, list):
+        return False
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Skill":
+            skill = (block.get("input") or {}).get("skill")
+            if isinstance(skill, str) and skill.startswith(("openspec-", "opsx:")):
+                return True
+    return False
 
 
 def _clean_wrapper_tags(text: str) -> Optional[str]:
@@ -389,6 +412,8 @@ def _scan_transcript_file(
     cost_state_total: Optional[float] = None
     cost_state_has_unknown = False
     unpriced_models: set[str] = set()
+    model_turns: Counter[str] = Counter()
+    used_openspec = False
     context: Optional[int] = None
     seen_message_ids: set[str] = set()
     ai_title: Optional[str] = None
@@ -445,6 +470,8 @@ def _scan_transcript_file(
                         seen_message_ids.add(message_id)
                         usage = message.get("usage")
                         model = message.get("model")
+                        if model and model != "<synthetic>" and not entry.get("isSidechain"):
+                            model_turns[model] += 1
                         if isinstance(usage, dict) and model:
                             turn_cost = _message_cost(model, usage)
                             if turn_cost is not None:
@@ -455,6 +482,19 @@ def _scan_transcript_file(
                     text = _extract_text(message.get("content"))
                     if text:
                         last_assistant_text = text
+                    if not used_openspec and _calls_openspec_skill(message.get("content")):
+                        used_openspec = True
+
+                if (
+                    entry.get("type") == "user"
+                    and not used_openspec
+                    and isinstance(message, dict)
+                ):
+                    # A slash command is recorded as a user line wrapping `<command-name>`
+                    # (isMeta is false on it).
+                    command_text = _extract_text(message.get("content"))
+                    if command_text and _OPENSPEC_COMMAND_RE.search(command_text):
+                        used_openspec = True
 
                 if (
                     entry.get("type") == "user"
@@ -513,6 +553,9 @@ def _scan_transcript_file(
         "cost_source": cost_source,
         "unpriced_models": sorted(unpriced_models),
         "cost_state_flagged": cost_state_flagged,
+        # The model with the most main-thread responses; ties go to the one seen first.
+        "model": model_turns.most_common(1)[0][0] if model_turns else "",
+        "used_openspec": used_openspec,
         "context": context,
         "project": project,
         "title": title,
@@ -541,18 +584,20 @@ def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
         "started_at": row["started_at"].isoformat() if row["started_at"] else None,
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         "unpriced_models": json.dumps(row["unpriced_models"]),
+        "model": row.get("model", ""),
+        "used_openspec": int(row.get("used_openspec", False)),
     }
 
 
 _TRANSCRIPT_UPSERT_SQL = """
     INSERT INTO transcripts (
         session_id, path, cwd, version, git_branch, started_at,
-        updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, context,
-        project, title, last_message, first_prompt
+        updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, model,
+        used_openspec, context, project, title, last_message, first_prompt
     ) VALUES (
         :session_id, :path, :cwd, :version, :git_branch, :started_at,
         :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-        :context, :project, :title, :last_message, :first_prompt
+        :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
     )
     ON CONFLICT(session_id) DO UPDATE SET
         path = excluded.path,
@@ -566,6 +611,8 @@ _TRANSCRIPT_UPSERT_SQL = """
         cost_source = excluded.cost_source,
         unpriced_models = excluded.unpriced_models,
         cost_state_flagged = excluded.cost_state_flagged,
+        model = excluded.model,
+        used_openspec = excluded.used_openspec,
         context = excluded.context,
         project = excluded.project,
         title = excluded.title,
@@ -634,11 +681,11 @@ def refresh() -> datetime:
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
                 updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged,
-                context, project, title, last_message, first_prompt
+                model, used_openspec, context, project, title, last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
                 :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-                :context, :project, :title, :last_message, :first_prompt
+                :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
             )
             """,
             [_serialize_transcript_row(t) for t in transcript_rows],

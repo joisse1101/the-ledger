@@ -295,6 +295,39 @@ def test_scan_transcript_file_no_cost_state_line_is_estimated_and_unflagged(
     assert row["cost_state_flagged"] is False
 
 
+def _assistant_turn(message_id, model, *, sidechain=False):
+    return {
+        "type": "assistant",
+        "isSidechain": sidechain,
+        "timestamp": "2024-01-01T10:05:00Z",
+        "message": {"id": message_id, "model": model, "usage": {"input_tokens": 1, "output_tokens": 1}},
+    }
+
+
+def test_scan_transcript_file_model_is_the_most_used_main_thread_model(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            _assistant_turn("m1", "model-a"),
+            _assistant_turn("m2", "model-b"),
+            _assistant_turn("m3", "model-b"),
+            _assistant_turn("m3", "model-b"),  # repeated line of the same response: counted once
+            _assistant_turn("m4", "model-a", sidechain=True),
+            _assistant_turn("m5", "model-a", sidechain=True),
+            _assistant_turn("m6", "<synthetic>"),
+        ],
+    )
+    row = claude_db._scan_transcript_file(path, project_by_folder={})
+    assert row["model"] == "model-b"
+
+
+def test_scan_transcript_file_model_is_blank_without_assistant_turns(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(path, [_cost_state(1.0)])
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["model"] == ""
+
+
 def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
     tmp_path, write_transcript
 ):
@@ -316,7 +349,7 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:06:00Z",
                 "message": {
                     "id": "m2",
-                    "model": "claude-opus-5-5",
+                    "model": "claude-fake-model-b",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
@@ -325,7 +358,7 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:07:00Z",
                 "message": {
                     "id": "m3",
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": "claude-fake-model-a",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
@@ -335,14 +368,14 @@ def test_scan_transcript_file_unpriced_models_collects_unrecognized_model_ids(
                 "timestamp": "2024-01-01T10:08:00Z",
                 "message": {
                     "id": "m4",
-                    "model": "claude-opus-5-5",
+                    "model": "claude-fake-model-b",
                     "usage": {"input_tokens": 1000, "output_tokens": 1000},
                 },
             },
         ],
     )
     row = claude_db._scan_transcript_file(path, project_by_folder={})
-    assert row["unpriced_models"] == ["claude-haiku-4-5-20251001", "claude-opus-5-5"]
+    assert row["unpriced_models"] == ["claude-fake-model-a", "claude-fake-model-b"]
 
 
 def test_scan_transcript_file_unpriced_models_empty_when_all_recognized(
@@ -932,3 +965,47 @@ def test_read_succeeds_while_another_connection_holds_a_write_transaction(isolat
     finally:
         writer.rollback()
         writer.close()
+
+
+def test_scan_transcript_file_detects_openspec_slash_command(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "user",
+                "sessionId": "s",
+                "message": {"content": "<command-name>/opsx:propose</command-name>"},
+            }
+        ],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is True
+
+
+def test_scan_transcript_file_detects_openspec_skill_call(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [
+            {
+                "type": "assistant",
+                "sessionId": "s",
+                "message": {
+                    "id": "m1",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "openspec-apply-change"}}
+                    ],
+                },
+            }
+        ],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is True
+
+
+def test_scan_transcript_file_without_openspec_is_false(tmp_path, write_transcript):
+    path = tmp_path / "projects" / "f" / "abc.jsonl"
+    write_transcript(
+        path,
+        [{"type": "user", "sessionId": "s", "message": {"content": "talk about /opsx:propose"}}],
+    )
+    assert claude_db._scan_transcript_file(path, project_by_folder={})["used_openspec"] is False

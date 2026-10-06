@@ -21,6 +21,8 @@ SORT_FIELDS = (
     "message_count",
     "cost",
     "context",
+    "model",
+    "used_openspec",
     "version",
     "git_branch",
 )
