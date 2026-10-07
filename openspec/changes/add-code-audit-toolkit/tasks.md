@@ -17,12 +17,12 @@
 
 ## 3. Skill, agents and command
 
-- [ ] 3.1 Write `toolkit/skills/code-audit/SKILL.md` and reference files for the evidence schema, severity mapping and report format, and verify the skill folder is self-contained
-- [ ] 3.2 Write `toolkit/agents/sec-checker.md` with frontmatter `tools: Read, Grep, Glob` and a scoped blocking `PreToolUse` hook (scanner correlation, OWASP data-flow, false-positive dismissal with reasons, citation required) and verify its output format matches the report spec
-- [ ] 3.3 Write `toolkit/agents/arch-checker.md` with the same read-only `tools` allowlist and blocking hook (KISS, YAGNI, DRY from `jscpd.json` and flagged complex files, concrete refactor per finding) and verify its output format matches the report spec
-- [ ] 3.4 Write `toolkit/commands/code-audit.md` (phase sequencing, `--full`, gate stop, spawn both agents, merge severities with recorded adjustments, drop uncited findings, triage table with skipped tools and scope) and verify by reading it against every scenario in the `code-audit` spec
+- [x] 3.1 Write `toolkit/skills/code-audit/SKILL.md` and reference files for the evidence schema, severity mapping and report format, and verify the skill folder is self-contained
+- [x] 3.2 Write `toolkit/agents/sec-checker.md` with frontmatter `tools: Read, Grep, Glob` and a scoped blocking `PreToolUse` hook (scanner correlation, OWASP data-flow, false-positive dismissal with reasons, citation required) and verify its output format matches the report spec
+- [x] 3.3 Write `toolkit/agents/arch-checker.md` with the same read-only `tools` allowlist and blocking hook (KISS, YAGNI, DRY from `jscpd.json` and flagged complex files, concrete refactor per finding) and verify its output format matches the report spec
+- [x] 3.4 Write `toolkit/commands/code-audit.md` (phase sequencing, `--full`, gate stop, spawn both agents, merge severities with recorded adjustments, drop uncited findings, triage table with skipped tools and scope) and verify by reading it against every scenario in the `code-audit` spec
 - [ ] 3.5 Make the command call the snapshot before Phase 0 and `audit.py --verify` after the agents, headed "AUDIT INVALID" on any difference, and verify with a seeded tamper that the report is not shown as clean
-- [ ] 3.6 Spike: on the installed Claude Code version, check whether a command or skill can deny Edit and Write for its own run, and how a scoped agent `PreToolUse` hook is declared. Record the result in design.md and adopt it in the command if it works
+- [x] 3.6 Spike: on the installed Claude Code version, check whether a command or skill can deny Edit and Write for its own run, and how a scoped agent `PreToolUse` hook is declared. Record the result in design.md and adopt it in the command if it works
 - [ ] 3.7 Red-team test: run each agent with a prompt that tells it to edit a file and run `git checkout`, and verify both attempts are blocked and `git status` is unchanged
 - [ ] 3.8 Install into a temp project with the installer, run `/code-audit` there on a small seeded repo (one syntax-free vulnerability, one duplicate block), and verify the report shows Critical, Medium and Low groups and the skipped-tools list
 
