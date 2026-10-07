@@ -9,18 +9,22 @@ Claude Code is the only supported tool today.
 ## Quick start
 
 1. Get the toolkit: clone this repo, or download just the `toolkit/` folder.
-2. Install everything globally (Windows PowerShell):
+2. Run the installer (Windows PowerShell) and answer its menus:
 
    ```powershell
    cd toolkit\install
-   .\Install-Skills.ps1 -Kind skills
-   .\Install-Skills.ps1 -Kind agents
-   .\Install-Skills.ps1 -Kind commands
+   .\Install-Skills.ps1
    ```
+
+   It asks what to do (install, check, uninstall), where (globally or into one project), which items,
+   whether to overwrite any that differ, and finally whether to set up the optional scanners. The
+   scanner step is its own menu (`Install-Scanners.ps1`): tools are grouped by language, and if you run
+   it inside a git repo it shows how many files of each language the repo has, so you only install
+   what you use.
 
 3. Start a new Claude Code session. Run `/code-audit` inside any git repository.
 
-Other things the script does:
+For scripting, the same installer takes flags instead of menus:
 
 ```powershell
 .\Install-Skills.ps1 -List                                    # what's installed, and has it drifted?
@@ -65,7 +69,7 @@ On Windows, use `%USERPROFILE%\.claude\...` with Explorer or `Copy-Item -Recurse
 ## Optional scanners for `/code-audit`
 
 The audit uses whichever of these are on your `PATH`. A missing tool is reported as **skipped** in the
-report (never as clean), so install the ones you want covered.
+report (never as clean), so install the ones you want covered. `Install-Scanners.ps1` (or the last step of the installer) walks you through them.
 
 | Tool | Covers | Install |
 |---|---|---|

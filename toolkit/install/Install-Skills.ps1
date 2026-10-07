@@ -189,6 +189,58 @@ function Get-DestRoot([string]$ItemKind) {
     return Join-Path $projectRoot ([string]$kindEntry.project)
 }
 
+# Wizard: run with no flags and every choice is a numbered menu. Flags still work for scripting.
+$wizard = $PSBoundParameters.Count -eq 0 -and [Environment]::UserInteractive
+
+function Read-Menu([string]$Title, [string[]]$Options) {
+    Write-Host "`n$Title" -ForegroundColor Cyan
+    for ($i = 0; $i -lt $Options.Count; $i++) { Write-Host ("  {0}. {1}" -f ($i + 1), $Options[$i]) }
+    while ($true) {
+        $a = (Read-Host 'Choose a number').Trim()
+        if ($a -match '^\d+$' -and [int]$a -ge 1 -and [int]$a -le $Options.Count) { return [int]$a - 1 }
+    }
+}
+
+function Read-YesNo([string]$Question) { (Read-Host "$Question [y/N]").Trim() -like 'y*' }
+
+if ($wizard) {
+    $mode = Read-Menu 'What do you want to do?' @('Install', 'Check what is installed', 'Uninstall')
+    $List = $mode -eq 1
+    $Uninstall = $mode -eq 2
+
+    if ((Read-Menu 'Where?' @('Globally, for every project (~/.claude)', 'In one project (<project>/.claude)')) -eq 1) {
+        $Scope = 'project'
+        do { $p = (Read-Host 'Project folder').Trim('" ') } until ($p -and (Test-Path -LiteralPath $p -PathType Container))
+        $projectRoot = (Resolve-Path -LiteralPath $p).Path
+    }
+
+    $labels = @()
+    foreach ($it in $available) {
+        $labels += ("{0,-9} {1,-16} {2}" -f $it.Kind, $it.Name, (Get-ItemState $it (Get-DestRoot $it.Kind)))
+    }
+    Write-Host "`nToolkit items:" -ForegroundColor Cyan
+    for ($i = 0; $i -lt $labels.Count; $i++) { Write-Host ("  {0}. {1}" -f ($i + 1), $labels[$i]) }
+    Write-Host '  (/code-audit needs the skill, both agents and the command.)'
+    $ans = (Read-Host 'Which? Numbers like 1,3  |  all  |  Enter for all').Trim().ToLowerInvariant()
+    if ($ans -and $ans -ne 'all') {
+        $nums = $ans -split '[,\s]+' | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ }
+        $items = @($nums | Sort-Object -Unique | Where-Object { $_ -ge 1 -and $_ -le $available.Count } | ForEach-Object { $available[$_ - 1] })
+        if (-not $items) { Write-Host 'No valid choice; nothing to do.'; return }
+    }
+
+    if (-not $List -and -not $Uninstall) {
+        $differing = @($items | Where-Object { (Get-ItemState $_ (Get-DestRoot $_.Kind)) -eq 'differs' })
+        if ($differing) {
+            Write-Host "`nThese differ from the toolkit's copy: $(($differing | ForEach-Object { $_.Name }) -join ', ')"
+            $Force = Read-YesNo 'Overwrite them with the toolkit version?'
+        }
+    }
+    elseif ($Uninstall -and -not (Read-YesNo "`nRemove $($items.Count) toolkit item(s) from the destination?")) {
+        Write-Host 'Cancelled.'; return
+    }
+    Write-Host ''
+}
+
 Write-Host "Target: $Target ($Scope)"
 
 foreach ($group in ($items | Group-Object Kind)) {
@@ -237,4 +289,15 @@ foreach ($group in ($items | Group-Object Kind)) {
             }
         }
     }
+}
+
+if ($wizard -and -not $List -and -not $Uninstall -and (Read-YesNo "`nSet up the optional scanners /code-audit can use (gitleaks, ruff, eslint, ...)?")) {
+    & (Join-Path $PSScriptRoot 'Install-Scanners.ps1')
+}
+
+if ($wizard) {
+    Write-Host "`nTo verify:" -ForegroundColor Cyan
+    Write-Host '  .\Install-Skills.ps1 -List      each item should say "up to date"'
+    Write-Host '  .\Install-Scanners.ps1          each scanner shows "ok: <version>" if it really runs'
+    Write-Host 'Then start a NEW Claude Code session and run /code-audit; tools that cannot run are listed as skipped.'
 }
