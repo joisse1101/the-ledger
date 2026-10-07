@@ -1,20 +1,25 @@
 <#
 .SYNOPSIS
-Copies the toolkit's skills into an AI tool's skills folder (Claude Code by default).
+Copies the toolkit's skills, agents and commands into an AI tool's folders (Claude Code by default).
 
 .DESCRIPTION
-Each folder under toolkit\skills\ is one skill. This script copies them - one named skill, or all of
-them - into the tool's global skills folder (e.g. ~/.claude/skills) or into a project's
-(<project>\.claude\skills). Where each tool reads skills from lives in targets.json next to this
-script, so supporting another tool is a new entry there, not new code.
+The toolkit holds three kinds of item:
+  skills    toolkit\skills\<name>\      a folder containing SKILL.md
+  agents    toolkit\agents\<name>.md    one file per subagent
+  commands  toolkit\commands\<name>.md  one file per slash command
+This script copies them - one named item, or all of them - into the tool's global folders (e.g.
+~/.claude/skills, ~/.claude/agents, ~/.claude/commands) or into a project's (<project>\.claude\...).
+Where each tool reads each kind from lives in targets.json next to this script, so supporting another
+tool or kind is a new entry there, not new code.
 
-A destination skill that already exists and differs from the toolkit's copy is never overwritten
+A destination item that already exists and differs from the toolkit's copy is never overwritten
 silently: it is reported as "differs" and skipped unless -Force is given. "Differs" is decided by a
-hash over every file's relative path and content. -List shows that state per skill without changing
-anything. -Uninstall removes only skills that exist in the toolkit; any other skill in the destination
-is left alone. Nothing outside the skills folder is touched (settings.json and hooks included).
+SHA-256 over every file's relative path and content. -List shows that state per item without changing
+anything. -Uninstall removes only items that exist in the toolkit; any other skill, agent or command
+in the destination is left alone. Nothing outside those three folders is touched (settings.json and
+hooks included).
 
-Copy the folders by hand instead if you prefer - see toolkit\README.md.
+Copy the files by hand instead if you prefer - see toolkit\README.md.
 
 .PARAMETER Scope
 'global' (default) or 'project'.
@@ -22,35 +27,42 @@ Copy the folders by hand instead if you prefer - see toolkit\README.md.
 .PARAMETER Path
 The project folder. Required with -Scope project.
 
+.PARAMETER Kind
+Restrict the action to 'skills', 'agents' or 'commands'. Omit to act on every kind.
+
+.PARAMETER Name
+Name of one item to act on (for a kind, the folder or file name without .md). Omit to act on all.
+If the name exists under several kinds, every match is acted on unless -Kind narrows it.
+
 .PARAMETER Skill
-Name of one skill to act on. Omit to act on every toolkit skill.
+Same as -Name with -Kind skills. Kept for compatibility.
 
 .PARAMETER Target
 Which tool's entry in targets.json to use. Default 'claude-code'.
 
 .PARAMETER List
-Show each toolkit skill's state at the destination (missing / up to date / differs) and exit.
+Show each toolkit item's state at the destination (missing / up to date / differs) and exit.
 
 .PARAMETER Uninstall
-Remove the toolkit's skills (or just -Skill) from the destination.
+Remove the toolkit's items (or just the named one) from the destination.
 
 .PARAMETER Force
-Overwrite a destination skill that differs from the toolkit's copy.
+Overwrite a destination item that differs from the toolkit's copy.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
 
 .EXAMPLE
 .\Install-Skills.ps1
-Install every toolkit skill globally.
+Install every toolkit skill, agent and command globally.
 
 .EXAMPLE
-.\Install-Skills.ps1 -Scope project -Path C:\code\my-app -Skill toolkit-hello
-Install one skill into a project.
+.\Install-Skills.ps1 -Scope project -Path C:\code\my-app -Kind agents
+Install only the agents into a project.
 
 .EXAMPLE
-.\Install-Skills.ps1 -List
-Show what is installed globally and whether it has drifted.
+.\Install-Skills.ps1 -Name code-audit -List
+Show whether the code-audit skill and command are installed globally and whether they have drifted.
 #>
 
 [CmdletBinding()]
@@ -58,6 +70,9 @@ param(
     [ValidateSet('global', 'project')]
     [string]$Scope = 'global',
     [string]$Path,
+    [ValidateSet('skills', 'agents', 'commands')]
+    [string]$Kind,
+    [string]$Name,
     [string]$Skill,
     [string]$Target = 'claude-code',
     [switch]$List,
@@ -73,22 +88,36 @@ if ($Help) {
     return
 }
 
-$toolkitRoot = Split-Path $PSScriptRoot -Parent
-$sourceRoot = Join-Path $toolkitRoot 'skills'
+if ($Skill) {
+    if ($Name -and $Name -ne $Skill) { throw "-Skill and -Name disagree; use -Name." }
+    if ($Kind -and $Kind -ne 'skills') { throw "-Skill means a skill; it conflicts with -Kind $Kind." }
+    $Name = $Skill
+    $Kind = 'skills'
+}
 
-function Get-SkillHash([string]$Dir) {
+$toolkitRoot = Split-Path $PSScriptRoot -Parent
+$allKinds = @('skills', 'agents', 'commands')
+
+function Get-ItemHash([string]$Item) {
+    # Hashes a folder (every file's relative path + content) or a single file (its name + content).
     # Get-Item's FullName is the same form Get-ChildItem reports below (Resolve-Path can keep 8.3
     # short names, which would throw off the relative-path substring).
-    $root = (Get-Item -LiteralPath $Dir).FullName.TrimEnd('\')
+    $info = Get-Item -LiteralPath $Item
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $files = Get-ChildItem -LiteralPath $root -Recurse -File |
-            Sort-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
+        if ($info.PSIsContainer) {
+            $root = $info.FullName.TrimEnd('\')
+            $files = Get-ChildItem -LiteralPath $root -Recurse -File |
+                Sort-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') } |
+                ForEach-Object { [pscustomobject]@{ Rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/'); Full = $_.FullName } }
+        }
+        else {
+            $files = @([pscustomobject]@{ Rel = $info.Name; Full = $info.FullName })
+        }
         foreach ($f in $files) {
-            $rel = $f.FullName.Substring($root.Length + 1).Replace('\', '/')
-            $relBytes = [System.Text.Encoding]::UTF8.GetBytes($rel + "`n")
+            $relBytes = [System.Text.Encoding]::UTF8.GetBytes($f.Rel + "`n")
             [void]$sha.TransformBlock($relBytes, 0, $relBytes.Length, $null, 0)
-            $content = [System.IO.File]::ReadAllBytes($f.FullName)
+            $content = [System.IO.File]::ReadAllBytes($f.Full)
             [void]$sha.TransformBlock($content, 0, $content.Length, $null, 0)
         }
         [void]$sha.TransformFinalBlock([byte[]]::new(0), 0, 0)
@@ -97,29 +126,45 @@ function Get-SkillHash([string]$Dir) {
     finally { $sha.Dispose() }
 }
 
-function Get-SkillState([string]$Name, [string]$DestRoot) {
-    $dest = Join-Path $DestRoot $Name
+function Get-AvailableItems([string]$ItemKind) {
+    # skills: every folder under toolkit\skills holding a SKILL.md.
+    # agents / commands: every .md file directly under toolkit\agents / toolkit\commands.
+    $dir = Join-Path $toolkitRoot $ItemKind
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+    if ($ItemKind -eq 'skills') {
+        Get-ChildItem -LiteralPath $dir -Directory |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
+            ForEach-Object { [pscustomobject]@{ Kind = $ItemKind; Name = $_.Name; Source = $_.FullName; Leaf = $_.Name } }
+    }
+    else {
+        Get-ChildItem -LiteralPath $dir -File -Filter '*.md' |
+            ForEach-Object { [pscustomobject]@{ Kind = $ItemKind; Name = $_.BaseName; Source = $_.FullName; Leaf = $_.Name } }
+    }
+}
+
+function Get-ItemState($Item, [string]$DestRoot) {
+    $dest = Join-Path $DestRoot $Item.Leaf
     if (-not (Test-Path -LiteralPath $dest)) { return 'missing' }
-    if ((Get-SkillHash (Join-Path $sourceRoot $Name)) -eq (Get-SkillHash $dest)) { return 'up to date' }
+    if ((Get-ItemHash $Item.Source) -eq (Get-ItemHash $dest)) { return 'up to date' }
     return 'differs'
 }
 
-# Available skills: every folder under toolkit\skills that holds a SKILL.md.
-$available = @(Get-ChildItem -LiteralPath $sourceRoot -Directory |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
-    ForEach-Object Name)
+# Items to act on, narrowed by -Kind and -Name.
+$kinds = if ($Kind) { @($Kind) } else { $allKinds }
+$available = @(foreach ($k in $kinds) { Get-AvailableItems $k })
 
-if ($Skill) {
-    if ($available -notcontains $Skill) {
-        throw "Unknown skill '$Skill'. Available skills: $($available -join ', ')"
+if ($Name) {
+    $items = @($available | Where-Object { $_.Name -eq $Name })
+    if ($items.Count -eq 0) {
+        $names = ($available | ForEach-Object { "$($_.Kind)/$($_.Name)" }) -join ', '
+        throw "Unknown item '$Name'. Available items: $names"
     }
-    $names = @($Skill)
 }
 else {
-    $names = $available
+    $items = $available
 }
 
-# Destination, from targets.json.
+# Destination roots, from targets.json.
 $targets = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'targets.json') -Raw | ConvertFrom-Json
 $entry = $targets.$Target
 if (-not $entry) {
@@ -127,58 +172,69 @@ if (-not $entry) {
     throw "Unknown target '$Target'. Known targets: $known"
 }
 
-if ($Scope -eq 'global') {
-    $rel = [string]$entry.global
-    if ($rel.StartsWith('~')) { $rel = Join-Path $HOME $rel.Substring(1).TrimStart('/', '\') }
-    $destRoot = $rel
-}
-else {
+if ($Scope -eq 'project') {
     if (-not $Path) { throw "-Scope project needs -Path <project folder>." }
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { throw "Project folder not found: $Path" }
-    $destRoot = Join-Path (Resolve-Path -LiteralPath $Path).Path ([string]$entry.project)
+    $projectRoot = (Resolve-Path -LiteralPath $Path).Path
 }
 
-Write-Host "Target: $Target ($Scope) -> $destRoot"
-
-if ($List) {
-    foreach ($name in $names) {
-        Write-Host ("  {0,-30} {1}" -f $name, (Get-SkillState $name $destRoot))
+function Get-DestRoot([string]$ItemKind) {
+    $kindEntry = $entry.$ItemKind
+    if (-not $kindEntry) { throw "Target '$Target' has no '$ItemKind' destination in targets.json." }
+    if ($Scope -eq 'global') {
+        $rel = [string]$kindEntry.global
+        if ($rel.StartsWith('~')) { $rel = Join-Path $HOME $rel.Substring(1).TrimStart('/', '\') }
+        return $rel
     }
-    return
+    return Join-Path $projectRoot ([string]$kindEntry.project)
 }
 
-if ($Uninstall) {
-    foreach ($name in $names) {
-        $dest = Join-Path $destRoot $name
-        if (Test-Path -LiteralPath $dest) {
-            Remove-Item -LiteralPath $dest -Recurse -Force
-            Write-Host "  removed     $name"
+Write-Host "Target: $Target ($Scope)"
+
+foreach ($group in ($items | Group-Object Kind)) {
+    $destRoot = Get-DestRoot $group.Name
+    Write-Host "[$($group.Name)] -> $destRoot"
+
+    if ($List) {
+        foreach ($item in $group.Group) {
+            Write-Host ("  {0,-30} {1}" -f $item.Name, (Get-ItemState $item $destRoot))
         }
-        else {
-            Write-Host "  not present $name"
-        }
+        continue
     }
-    return
-}
 
-New-Item -ItemType Directory -Force -Path $destRoot | Out-Null
-foreach ($name in $names) {
-    $dest = Join-Path $destRoot $name
-    switch (Get-SkillState $name $destRoot) {
-        'up to date' { Write-Host "  up to date  $name" }
-        'differs' {
-            if ($Force) {
+    if ($Uninstall) {
+        foreach ($item in $group.Group) {
+            $dest = Join-Path $destRoot $item.Leaf
+            if (Test-Path -LiteralPath $dest) {
                 Remove-Item -LiteralPath $dest -Recurse -Force
-                Copy-Item -LiteralPath (Join-Path $sourceRoot $name) -Destination $dest -Recurse
-                Write-Host "  overwritten $name"
+                Write-Host "  removed     $($item.Name)"
             }
             else {
-                Write-Host "  differs     $name (left unchanged; re-run with -Force to overwrite)"
+                Write-Host "  not present $($item.Name)"
             }
         }
-        'missing' {
-            Copy-Item -LiteralPath (Join-Path $sourceRoot $name) -Destination $dest -Recurse
-            Write-Host "  installed   $name"
+        continue
+    }
+
+    New-Item -ItemType Directory -Force -Path $destRoot | Out-Null
+    foreach ($item in $group.Group) {
+        $dest = Join-Path $destRoot $item.Leaf
+        switch (Get-ItemState $item $destRoot) {
+            'up to date' { Write-Host "  up to date  $($item.Name)" }
+            'differs' {
+                if ($Force) {
+                    Remove-Item -LiteralPath $dest -Recurse -Force
+                    Copy-Item -LiteralPath $item.Source -Destination $dest -Recurse
+                    Write-Host "  overwritten $($item.Name)"
+                }
+                else {
+                    Write-Host "  differs     $($item.Name) (left unchanged; re-run with -Force to overwrite)"
+                }
+            }
+            'missing' {
+                Copy-Item -LiteralPath $item.Source -Destination $dest -Recurse
+                Write-Host "  installed   $($item.Name)"
+            }
         }
     }
 }
