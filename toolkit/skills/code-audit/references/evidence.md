@@ -1,7 +1,8 @@
 # Evidence folder
 
-`audit.py --init` creates `<OS temp>/code-audit/<repo-name>-<timestamp>/`. It is never inside the
-audited repository. Agents read these files by absolute path.
+`audit.py --init` creates `<repo>/code-audit/<timestamp>/` in the repository it was launched in, plus
+`<repo>/code-audit/.gitignore` (`*`) so git ignores the whole folder. It is excluded from the audit's
+scope and from the tamper check. Agents read these files by absolute path.
 
 | File | Written by | Contents |
 |---|---|---|
@@ -12,6 +13,7 @@ audited repository. Agents read these files by absolute path.
 | `*.raw.json`, `jscpd-raw/` | `--phase 1` | the tool's own output, for detail |
 | `summary.json` | `--phase 1` | `phase0_gate`, `phase0_tools`, `phase1_tools`, severity `counts` |
 | `verify.json` | `--verify` | `ok` and the list of `changes` |
+| `report.md` | `--save-report` | the final triage report |
 
 ## Tool status
 

@@ -5,10 +5,13 @@
     audit.py --phase 0 --evidence DIR            linters and type checkers; exit 2 on a syntax/type error
     audit.py --phase 1 --evidence DIR            gitleaks, semgrep, jscpd, trivy
     audit.py --verify --evidence DIR             compare the repo with the --init snapshot; exit 4 on any change
+    audit.py --save-report --evidence DIR        save the final report (stdin) as DIR/report.md
 
 Read-only by construction: every tool command comes from the builders below, none of which carries an
-auto-fix flag (run() refuses any command that does), tool caches are pointed at the evidence folder,
-and all output goes to the evidence folder under the OS temp directory, never into the audited repo.
+auto-fix flag (run() refuses any command that does), and tool caches are pointed at the evidence folder.
+The audit covers only the repository it is launched in and writes only to <repo>/code-audit/<run>/
+(self-ignored by git, excluded from scope and from the tamper check). It never touches a path outside
+the working directory.
 
 Exit codes: 0 ok, 1 usage or internal error, 2 Phase 0 gate failed, 3 nothing to audit, 4 repo changed.
 """
@@ -22,7 +25,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -34,6 +36,7 @@ FIX_FLAGS = frozenset({
     "--write", "--fix-dry-run-off", "--allow-dirty", "--allow-staged", "--fix-type",
 })
 
+WORKSPACE = "code-audit"  # <repo>/code-audit/<run>/ holds all evidence, temp files and reports
 DEFAULT_TIMEOUT = 300
 MAX_ARG_FILES = 100  # above this, tools scan the repo root and findings are filtered to scope afterwards
 
@@ -92,6 +95,10 @@ def find_tool(name: str, extra_dirs: list[Path] | None = None) -> str | None:
 # Scope
 # --------------------------------------------------------------------------------------------------
 
+def in_workspace(rel: str) -> bool:
+    return rel == WORKSPACE or rel.startswith(WORKSPACE + "/")
+
+
 def repo_root(path: Path) -> Path:
     return Path(git(path, "rev-parse", "--show-toplevel").strip()).resolve()
 
@@ -120,7 +127,7 @@ def resolve_scope(repo: Path, full: bool) -> dict:
         files |= set(_split_z(git(repo, "ls-files", "-z", "--others", "--exclude-standard")))
     else:
         files = set(_split_z(git(repo, "ls-files", "-z")))
-    files = {f for f in files if (repo / f).is_file()}
+    files = {f for f in files if (repo / f).is_file() and not in_workspace(f)}
     return {
         "mode": mode, "base_branch": base[0] if base else None, "base_ref": base[1] if base else None,
         "repo": str(repo), "notice": notice, "files": sorted(files),
@@ -155,9 +162,13 @@ def _status_paths(out: str) -> list[str]:
 
 
 def take_snapshot(repo: Path, scope_files: list[str]) -> dict:
-    status = git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-    untracked = _split_z(git(repo, "ls-files", "-z", "--others", "--exclude-standard"))
-    paths = sorted(set(scope_files) | set(untracked) | set(_status_paths(status)))
+    entries = [e for e in _split_z(git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all"))
+               if not in_workspace(e[3:])]
+    status = chr(0).join(entries)
+    untracked = [u for u in _split_z(git(repo, "ls-files", "-z", "--others", "--exclude-standard"))
+                 if not in_workspace(u)]
+    paths = sorted(p for p in set(scope_files) | set(untracked) | set(_status_paths(status))
+                   if not in_workspace(p))
     config = repo / ".git" / "config"
     return {
         "head": git(repo, "rev-parse", "HEAD", check=False).strip(),
@@ -165,6 +176,7 @@ def take_snapshot(repo: Path, scope_files: list[str]) -> dict:
         "refs": hashlib.sha256(git(repo, "for-each-ref", "--format=%(refname) %(objectname)").encode()).hexdigest(),
         "stash": git(repo, "stash", "list", check=False),
         "git_config": _hash_file(config) if config.is_file() else "ABSENT",
+        "untracked": sorted(untracked),
         "files": {p: _hash_file(repo / p) for p in paths},
     }
 
@@ -180,7 +192,8 @@ def diff_snapshots(before: dict, after: dict) -> list[str]:
         if a == b:
             continue
         if a is None:
-            changes.append(f"added: {p}")
+            # Absent from the snapshot: a new untracked file, or a tracked file that was clean and out of scope.
+            changes.append(f"{'added' if p in after.get('untracked', []) else 'modified'}: {p}")
         elif b is None or b == "MISSING":
             changes.append(f"deleted: {p}")
         else:
@@ -222,15 +235,17 @@ def cmd_gitleaks(exe: str, repo: Path, report: Path) -> list[str]:
 
 def cmd_semgrep(exe: str, targets: list[str], config: str) -> list[str]:
     return [exe, "scan", "--config", config, "--json", "--metrics", "off", "--quiet",
-            "--disable-version-check", *targets]
+            "--disable-version-check", "--exclude", WORKSPACE, *targets]
 
 
 def cmd_jscpd(exe: str, out_dir: Path, targets: list[str]) -> list[str]:
-    return [exe, "--reporters", "json", "--output", str(out_dir), "--silent", "--gitignore", *targets]
+    return [exe, "--reporters", "json", "--output", str(out_dir), "--silent", "--gitignore",
+            "--ignore", f"**/{WORKSPACE}/**", *targets]
 
 
 def cmd_trivy(exe: str, report: Path) -> list[str]:
-    return [exe, "fs", "--format", "json", "--output", str(report), "--scanners", "vuln", "--quiet", "."]
+    return [exe, "fs", "--format", "json", "--output", str(report), "--scanners", "vuln", "--quiet",
+            "--skip-dirs", WORKSPACE, "."]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -614,19 +629,33 @@ def _inside(child: Path, parent: Path) -> bool:
         return False
 
 
+def _cwd() -> Path:
+    return Path.cwd().resolve()
+
+
+def require_launch_repo(repo: Path) -> None:
+    """The audit covers only the repository it was launched in. Refuse any other path."""
+    if not _inside(_cwd(), repo):
+        raise RuntimeError(
+            f"refusing to audit {repo}: it does not contain the current working directory ({_cwd()}). "
+            "The audit only covers the repository it is launched in.")
+
+
 def cmd_init(args) -> int:
     repo = repo_root(Path(args.repo))
+    require_launch_repo(repo)
     scope = resolve_scope(repo, args.full)
     if not scope["files"]:
         print(json.dumps({"nothing_to_audit": True, "mode": scope["mode"],
                           "message": "No changed files to audit. Re-run with --full to audit the whole repository."}))
         return EXIT_NOTHING
-    base = Path(args.out) if args.out else Path(tempfile.gettempdir()) / "code-audit"
-    evidence = base / f"{repo.name}-{time.strftime('%Y%m%d-%H%M%S')}"
-    if _inside(evidence, repo):
-        print(f"error: evidence folder {evidence} is inside the repository; choose another --out", file=sys.stderr)
-        return EXIT_ERROR
-    evidence.mkdir(parents=True, exist_ok=False)
+    workspace = repo / WORKSPACE
+    workspace.mkdir(exist_ok=True)
+    ignore = workspace / ".gitignore"
+    if not ignore.exists():  # self-ignoring folder: git never lists anything inside it
+        ignore.write_text("*" + chr(10), encoding="utf-8")
+    evidence = workspace / time.strftime("%Y%m%d-%H%M%S")
+    evidence.mkdir(exist_ok=False)
     (evidence / "scope.json").write_text(json.dumps(scope, indent=2), encoding="utf-8")
     (evidence / "snapshot.json").write_text(json.dumps(take_snapshot(repo, scope["files"]), indent=2), encoding="utf-8")
     print(json.dumps({"evidence": str(evidence), "mode": scope["mode"], "base": scope["base_branch"],
@@ -639,7 +668,11 @@ def _context(args):
     scope = _load(evidence / "scope.json")
     if not scope:
         raise RuntimeError(f"{evidence} has no scope.json; run --init first")
-    return evidence, scope, Path(scope["repo"])
+    repo = Path(scope["repo"])
+    require_launch_repo(repo)
+    if not _inside(evidence, repo / WORKSPACE):
+        raise RuntimeError(f"refusing {evidence}: evidence must be inside {repo / WORKSPACE}")
+    return evidence, scope, repo
 
 
 def cmd_phase(args) -> int:
@@ -651,6 +684,17 @@ def cmd_phase(args) -> int:
         return EXIT_GATE if res["gate"] == "fail" else EXIT_OK
     summary = run_phase1(repo, evidence, scope["files"], args.timeout, scope["mode"] == "full")
     print(json.dumps(summary, indent=2))
+    return EXIT_OK
+
+
+def cmd_save_report(args) -> int:
+    """Write the final report (read from stdin) to <evidence>/report.md. The only write this mode makes."""
+    evidence, _scope, _repo = _context(args)
+    text = sys.stdin.buffer.read().decode("utf-8", "replace")
+    if not text.strip():
+        raise RuntimeError("no report text on stdin")
+    (evidence / "report.md").write_text(text, encoding="utf-8")
+    print(str(evidence / "report.md"))
     return EXIT_OK
 
 
@@ -676,9 +720,9 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--init", action="store_true")
     mode.add_argument("--phase", type=int, choices=(0, 1))
     mode.add_argument("--verify", action="store_true")
-    ap.add_argument("--repo", default=".")
+    mode.add_argument("--save-report", action="store_true", help="save the report on stdin as <evidence>/report.md")
+    ap.add_argument("--repo", default=".", help="the repository to audit; must contain the current directory")
     ap.add_argument("--full", action="store_true")
-    ap.add_argument("--out", help="parent folder for evidence (default: <tmp>/code-audit); must be outside the repo")
     ap.add_argument("--evidence", help="evidence folder printed by --init")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="per-tool timeout in seconds")
     args = ap.parse_args(argv)
@@ -687,6 +731,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_init(args)
         if not args.evidence:
             ap.error("--evidence is required with --phase and --verify")
+        if args.save_report:
+            return cmd_save_report(args)
         return cmd_verify(args) if args.verify else cmd_phase(args)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)

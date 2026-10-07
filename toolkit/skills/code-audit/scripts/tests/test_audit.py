@@ -18,6 +18,10 @@ def sh(repo: Path, *args: str) -> None:
                    check=True, capture_output=True)
 
 
+NL = chr(10)
+LAUNCH = [None]  # the repo the "shell" is in; tests stand in for the working directory
+
+
 def make_repo(tmp: Path, branch: str = "main") -> Path:
     repo = tmp / "repo"
     repo.mkdir()
@@ -26,6 +30,7 @@ def make_repo(tmp: Path, branch: str = "main") -> Path:
     (repo / "b.ts").write_text("export const b = 1;\n")
     sh(repo, "add", ".")
     sh(repo, "commit", "-m", "init")
+    LAUNCH[0] = repo.resolve()
     return repo.resolve()
 
 
@@ -34,6 +39,9 @@ class TempCase(unittest.TestCase):
         self._td = tempfile.TemporaryDirectory()
         self.tmp = Path(self._td.name).resolve()
         self.addCleanup(self._td.cleanup)
+        patcher = mock.patch.object(audit, "_cwd", lambda: LAUNCH[0] or Path.cwd())
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
 
 class ScopeTests(TempCase):
@@ -76,27 +84,95 @@ class ScopeTests(TempCase):
         repo = make_repo(self.tmp)
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = audit.main(["--init", "--repo", str(repo), "--out", str(self.tmp / "ev")])
+            rc = audit.main(["--init", "--repo", str(repo)])
         self.assertEqual(rc, audit.EXIT_NOTHING)
         self.assertIn("--full", buf.getvalue())
 
-    def test_evidence_inside_repo_is_refused(self):
-        repo = make_repo(self.tmp)
-        (repo / "a.py").write_text("x = 9\n")
-        rc = audit.main(["--init", "--repo", str(repo), "--out", str(repo / "ev")])
-        self.assertEqual(rc, audit.EXIT_ERROR)
-        self.assertFalse((repo / "ev").exists())
+    def init(self, repo, *extra):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = audit.main(["--init", "--repo", str(repo), *extra])
+        return rc, buf.getvalue()
 
-    def test_init_writes_scope_and_snapshot_outside_repo(self):
+    def test_evidence_lives_in_the_repos_code_audit_folder_and_is_self_ignored(self):
+        repo = make_repo(self.tmp)
+        (repo / "a.py").write_text("x = 9" + NL)
+        rc, out = self.init(repo)
+        self.assertEqual(rc, audit.EXIT_OK)
+        ev = Path(json.loads(out)["evidence"])
+        self.assertTrue((ev / "scope.json").is_file() and (ev / "snapshot.json").is_file())
+        self.assertEqual(ev.parent, repo / audit.WORKSPACE)
+        self.assertEqual((repo / audit.WORKSPACE / ".gitignore").read_text().strip(), "*")
+        status = subprocess.run(["git", "-C", str(repo), "status", "--porcelain", "-uall"],
+                                capture_output=True, text=True).stdout
+        self.assertNotIn(audit.WORKSPACE, status)  # git never lists the workspace
+
+    def test_workspace_files_are_never_in_scope_or_snapshot(self):
+        repo = make_repo(self.tmp)
+        (repo / "a.py").write_text("x = 9" + NL)
+        _, out = self.init(repo)
+        ev = Path(json.loads(out)["evidence"])
+        self.assertTrue(all(not f.startswith("code-audit/") for f in json.loads((ev / "scope.json").read_text())["files"]))
+        (ev / "extra.json").write_text("{}")  # the audit writing its own evidence is not tampering
+        self.assertEqual(audit.diff_snapshots(json.loads((ev / "snapshot.json").read_text()),
+                                              audit.take_snapshot(repo, ["a.py"])), [])
+
+    def test_evidence_outside_the_workspace_is_refused(self):
+        repo = make_repo(self.tmp)
+        (repo / "a.py").write_text("x = 9" + NL)
+        _, out = self.init(repo)
+        real = Path(json.loads(out)["evidence"])
+        elsewhere = self.tmp / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "scope.json").write_text((real / "scope.json").read_text())
+        with mock.patch("sys.stderr", io.StringIO()) as err:
+            self.assertEqual(audit.main(["--verify", "--evidence", str(elsewhere)]), audit.EXIT_ERROR)
+        self.assertIn("evidence must be inside", err.getvalue())
+
+    def test_save_report_writes_only_report_md_in_the_run_folder(self):
+        repo = make_repo(self.tmp)
+        (repo / "a.py").write_text("x = 9" + NL)
+        _, out = self.init(repo)
+        ev = Path(json.loads(out)["evidence"])
+        with mock.patch("sys.stdin", mock.Mock(buffer=io.BytesIO(b"# report"))), redirect_stdout(io.StringIO()):
+            self.assertEqual(audit.main(["--save-report", "--evidence", str(ev)]), audit.EXIT_OK)
+        self.assertEqual((ev / "report.md").read_text(), "# report")
+
+    def test_scanners_are_told_to_skip_the_workspace(self):
+        p = Path("/x")
+        self.assertIn("code-audit", audit.cmd_semgrep("semgrep", ["."], "c"))
+        self.assertIn("**/code-audit/**", audit.cmd_jscpd("jscpd", p, ["."]))
+        self.assertIn("code-audit", audit.cmd_trivy("trivy", p))
+
+
+class LaunchRepoOnlyTests(TempCase):
+    def test_init_refuses_a_repo_the_cwd_is_not_in(self):
+        other = make_repo(self.tmp)
+        (other / "a.py").write_text("x = 9\n")
+        LAUNCH[0] = self.tmp  # launched somewhere else
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            rc = audit.main(["--init", "--repo", str(other)])
+        self.assertEqual(rc, audit.EXIT_ERROR)
+        self.assertIn("only covers the repository it is launched in", err.getvalue())
+        self.assertFalse((self.tmp / "ev").exists())
+
+    def test_phase_and_verify_refuse_evidence_for_another_repo(self):
         repo = make_repo(self.tmp)
         (repo / "a.py").write_text("x = 9\n")
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = audit.main(["--init", "--repo", str(repo), "--out", str(self.tmp / "ev")])
-        self.assertEqual(rc, audit.EXIT_OK)
-        ev = Path(json.loads(buf.getvalue())["evidence"])
-        self.assertTrue((ev / "scope.json").is_file() and (ev / "snapshot.json").is_file())
-        self.assertFalse(audit._inside(ev, repo))
+            audit.main(["--init", "--repo", str(repo)])
+        ev = json.loads(buf.getvalue())["evidence"]
+        LAUNCH[0] = self.tmp  # now launched elsewhere, pointing at that evidence
+        with mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(audit.main(["--phase", "0", "--evidence", ev]), audit.EXIT_ERROR)
+            self.assertEqual(audit.main(["--verify", "--evidence", ev]), audit.EXIT_ERROR)
+
+    def test_subfolder_of_the_repo_is_fine(self):
+        repo = make_repo(self.tmp)
+        LAUNCH[0] = repo / "api"
+        audit.require_launch_repo(repo)  # no exception
 
 
 class Phase0Tests(TempCase):
@@ -190,7 +266,7 @@ class Phase1Tests(TempCase):
         (self.repo / "a.py").write_text("x = 5\n")
         buf = io.StringIO()
         with redirect_stdout(buf):
-            audit.main(["--init", "--repo", str(self.repo), "--out", str(self.tmp / "o")])
+            audit.main(["--init", "--repo", str(self.repo)])
         ev = json.loads(buf.getvalue())["evidence"]
         with mock.patch.object(audit, "find_tool", return_value=None), redirect_stdout(io.StringIO()):
             rc = audit.main(["--phase", "1", "--evidence", ev])
@@ -287,6 +363,10 @@ class TamperTests(TempCase):
         (self.repo / "evil.py").write_text("boom\n")
         self.assertIn("added: evil.py", self.changes())
 
+    def test_modified_tracked_file_outside_scope_is_named_modified(self):
+        (self.repo / "b.ts").write_text("export const b = 2;\n")  # clean and not in scope at snapshot time
+        self.assertIn("modified: b.ts", self.changes())
+
     def test_deleted_file_is_named(self):
         (self.repo / "a.py").unlink()
         self.assertIn("deleted: a.py", self.changes())
@@ -308,7 +388,7 @@ class TamperTests(TempCase):
     def test_verify_command_fails_with_changed_path(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            audit.main(["--init", "--repo", str(self.repo), "--out", str(self.tmp / "o")])
+            audit.main(["--init", "--repo", str(self.repo)])
         ev = json.loads(buf.getvalue())["evidence"]
         with redirect_stdout(io.StringIO()):
             self.assertEqual(audit.main(["--verify", "--evidence", ev]), audit.EXIT_OK)

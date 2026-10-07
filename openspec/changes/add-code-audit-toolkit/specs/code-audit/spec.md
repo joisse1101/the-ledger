@@ -42,18 +42,18 @@ By default the audit SHALL examine only files changed relative to the `main` bra
 - **THEN** the audit SHALL say there is nothing to audit and suggest `--full`
 
 ### Requirement: Deterministic evidence before any LLM review
-Phase 1 SHALL run the available scanners (secrets, static security, duplicate code, dependency vulnerabilities) and write each one's output as a structured JSON file in a per-run evidence folder outside the audited repository before any subagent starts. Subagents SHALL be given those files as their evidence.
+Phase 1 SHALL run the available scanners (secrets, static security, duplicate code, dependency vulnerabilities) and write each one's output as a structured JSON file in a per-run evidence folder, `code-audit/<run>/` at the root of the audited repository, before any subagent starts. That `code-audit/` folder SHALL be the only place the audit writes: it holds every temporary file, scanner output and the saved report, and a `.gitignore` inside it SHALL make git ignore the folder. Subagents SHALL be given those files as their evidence.
 
 #### Scenario: Evidence files exist before agents run
 - **WHEN** a subagent is started
-- **THEN** the JSON evidence files for every scanner that ran SHALL already exist in the evidence folder, and that folder SHALL NOT be inside the audited repository
+- **THEN** the JSON evidence files for every scanner that ran SHALL already exist in the run's folder under `code-audit/` in the audited repository
 
 #### Scenario: Findings trace to a scanner or a file
 - **WHEN** a finding appears in the report
 - **THEN** it SHALL cite either the scanner and rule that produced it, or the file and line a subagent reviewed
 
 ### Requirement: Audit never modifies the audited repository
-The audit SHALL NOT create, change or delete any file in the audited repository, nor change git state (index, branches, stash, config). This SHALL be enforced by mechanisms that do not depend on the model following instructions: subagents SHALL be restricted to read-only tools and SHALL be blocked from any write or command execution; scanners and linters SHALL run in report-only mode with every auto-fix option off; and the audit SHALL compare the repository's state before and after the run.
+The audit SHALL NOT create, change or delete any file in the audited repository outside its own `code-audit/` folder, nor change git state (index, branches, stash, config). The `code-audit/` folder is excluded from the audit's scope and from the before and after comparison. This SHALL be enforced by mechanisms that do not depend on the model following instructions: subagents SHALL be restricted to read-only tools and SHALL be blocked from any write or command execution; scanners and linters SHALL run in report-only mode with every auto-fix option off; and the audit SHALL compare the repository's state before and after the run.
 
 #### Scenario: Subagent cannot write
 - **WHEN** a subagent attempts to edit or write a file, or run a shell command
@@ -70,6 +70,21 @@ The audit SHALL NOT create, change or delete any file in the audited repository,
 #### Scenario: Clean repo stays clean
 - **WHEN** an audit completes normally
 - **THEN** the repository's working tree and git state SHALL be identical to before the audit
+
+### Requirement: Audit is confined to the repository it is launched in
+The audit SHALL examine only the git repository that contains the directory it was launched from. It SHALL NOT accept a path to another repository, SHALL NOT read or write any path outside that repository (other than its own installed skill, agent and command files), and SHALL NOT ask the user to grant access to additional directories.
+
+#### Scenario: Another repository is refused
+- **WHEN** the engine is pointed at a repository that does not contain the launch directory
+- **THEN** it SHALL refuse with an error and create nothing
+
+#### Scenario: Evidence elsewhere is refused
+- **WHEN** a later step is given an evidence folder that is not inside the launch repository's `code-audit/` folder
+- **THEN** it SHALL refuse
+
+#### Scenario: Access is not widened
+- **WHEN** a step is refused because a path is outside the working directory
+- **THEN** the audit SHALL report the refusal and SHALL NOT suggest or use any directory-granting option
 
 ### Requirement: Missing tools are skipped, not fatal
 When a scanner, linter or type checker is not installed, the audit SHALL record it as skipped with the tool's name, SHALL continue with the remaining tools, and SHALL list every skipped tool in the report. The audit SHALL NOT install tools.
