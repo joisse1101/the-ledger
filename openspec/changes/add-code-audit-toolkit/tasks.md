@@ -34,7 +34,7 @@
 
 ## 4. Cleanup and docs
 
-- [ ] 4.1 Delete `toolkit/skills/toolkit-hello/` and verify the installer lists only real toolkit items
-- [ ] 4.2 Update `toolkit/README.md` (quick start, `-Kind`/`-Name`, per-kind manual install table, optional scanner list with install hints) and verify a manual-only reader can follow it
-- [ ] 4.3 Update `CLAUDE.md` and `wiki/Repository-Layout.md` for skills, agents and commands, and verify `cd api; python check_docs.py` passes
-- [ ] 4.4 Run `openspec validate add-code-audit-toolkit --strict` and verify it reports the change valid
+- [x] 4.1 Delete `toolkit/skills/toolkit-hello/` and verify the installer lists only real toolkit items
+- [x] 4.2 Update `toolkit/README.md` (quick start, `-Kind`/`-Name`, per-kind manual install table, optional scanner list with install hints) and verify a manual-only reader can follow it
+- [x] 4.3 Update `CLAUDE.md` and `wiki/Repository-Layout.md` for skills, agents and commands, and verify `cd api; python check_docs.py` passes
+- [x] 4.4 Run `openspec validate add-code-audit-toolkit --strict` and verify it reports the change valid

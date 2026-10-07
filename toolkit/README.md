@@ -1,51 +1,81 @@
 # Toolkit
 
-Reusable AI-agent skills, kept in one place so they have version history and can be put on any
-machine or project. Nothing here depends on a vendor's plugin marketplace: a skill is just a folder,
-and the script below only automates copying it.
+Reusable AI-agent skills, agents and slash commands, kept in one place so they have version history
+and can be put on any machine or project. Nothing here depends on a vendor's plugin marketplace: each
+item is a file or folder, and the script below only automates copying it.
 
-Today the toolkit holds skills only, and Claude Code is the only supported tool.
+Claude Code is the only supported tool today.
 
 ## Quick start
 
 1. Get the toolkit: clone this repo, or download just the `toolkit/` folder.
-2. Install every skill globally (Windows PowerShell):
+2. Install everything globally (Windows PowerShell):
 
    ```powershell
    cd toolkit\install
-   .\Install-Skills.ps1
+   .\Install-Skills.ps1 -Kind skills
+   .\Install-Skills.ps1 -Kind agents
+   .\Install-Skills.ps1 -Kind commands
    ```
 
-3. Start a new Claude Code session; the skills are now available.
+3. Start a new Claude Code session. Run `/code-audit` inside any git repository.
 
 Other things the script does:
 
 ```powershell
-.\Install-Skills.ps1 -List                                   # what's installed, and has it drifted?
-.\Install-Skills.ps1 -Skill toolkit-hello                    # just one skill
-.\Install-Skills.ps1 -Scope project -Path C:\code\my-app     # into a project instead of globally
-.\Install-Skills.ps1 -Force                                  # overwrite a copy that differs
-.\Install-Skills.ps1 -Uninstall                              # remove toolkit skills (only those)
+.\Install-Skills.ps1 -List                                    # what's installed, and has it drifted?
+.\Install-Skills.ps1 -Kind commands -Name code-audit          # just one item
+.\Install-Skills.ps1 -Scope project -Path C:\code\my-app      # into a project instead of globally
+.\Install-Skills.ps1 -Force                                   # overwrite a copy that differs
+.\Install-Skills.ps1 -Uninstall                               # remove toolkit items (only those)
 ```
 
-A skill already installed that differs from the toolkit's copy is never overwritten unless you pass
-`-Force`; `-List` shows it as `differs`. The script writes only inside the skills folder — it never
-touches `settings.json` or hooks.
+`-Kind` is `skills`, `agents` or `commands`; `-Name` picks one item of that kind. An installed copy that
+differs from the toolkit's is never overwritten unless you pass `-Force`; `-List` shows it as `differs`.
+The script writes only inside `skills/`, `agents/` and `commands/` — it never touches `settings.json`
+or permissions.
 
-## Skills
+## What is in it
 
-Each skill is a folder `toolkit/skills/<name>/` with a `SKILL.md` (`name` and `description`
-frontmatter, then instructions) and any support files it needs. A folder is self-contained, so you
-can install by hand without the script: copy it into the folder your tool reads skills from.
-
-| Tool | Global (all projects) | Per project |
+| Kind | Source | Contents |
 |---|---|---|
-| Claude Code | `~/.claude/skills/<name>/` | `<project>/.claude/skills/<name>/` |
+| skills | `toolkit/skills/<name>/` (a folder with `SKILL.md`) | `code-audit`: the audit engine and its reference docs |
+| agents | `toolkit/agents/<name>.md` | `sec-checker`, `arch-checker`: read-only reviewers |
+| commands | `toolkit/commands/<name>.md` | `code-audit`: the `/code-audit` slash command |
 
-For example, on Windows: copy `toolkit\skills\toolkit-hello` to
-`%USERPROFILE%\.claude\skills\toolkit-hello`. On macOS/Linux: `cp -r toolkit/skills/toolkit-hello
-~/.claude/skills/`.
+`/code-audit` needs all three. It installs fine globally: it still reads and writes **only the
+repository it is launched in** (evidence goes to that repo's `code-audit/` folder, which is
+self-ignored by git). It never accepts a path to another repo and never asks for extra directory
+access. To audit a branch in isolation, start Claude in a worktree yourself: `claude -w <name>`.
 
-`toolkit-hello` is a sample that confirms the install worked; delete it once real skills exist.
-Where each tool reads skills from is data in `install/targets.json`, so supporting another tool is a
+## Manual install
+
+Copy the item into the folder Claude Code reads. Per kind:
+
+| Kind | Global (all projects) | Per project |
+|---|---|---|
+| skills | `~/.claude/skills/<name>/` | `<project>/.claude/skills/<name>/` |
+| agents | `~/.claude/agents/<name>.md` | `<project>/.claude/agents/<name>.md` |
+| commands | `~/.claude/commands/<name>.md` | `<project>/.claude/commands/<name>.md` |
+
+On macOS/Linux, for example: `cp -r toolkit/skills/code-audit ~/.claude/skills/`,
+`cp toolkit/agents/*.md ~/.claude/agents/`, `cp toolkit/commands/code-audit.md ~/.claude/commands/`.
+On Windows, use `%USERPROFILE%\.claude\...` with Explorer or `Copy-Item -Recurse`.
+
+## Optional scanners for `/code-audit`
+
+The audit uses whichever of these are on your `PATH`. A missing tool is reported as **skipped** in the
+report (never as clean), so install the ones you want covered.
+
+| Tool | Covers | Install |
+|---|---|---|
+| gitleaks | committed secrets | `winget install gitleaks.gitleaks` / `brew install gitleaks` |
+| semgrep | SAST rules | `pipx install semgrep` |
+| jscpd | duplicate code | `npm i -g jscpd` |
+| trivy | dependency and config vulnerabilities | `winget install AquaSecurity.Trivy` / `brew install trivy` |
+| ruff, eslint, tsc, mypy | Phase 0 lint and type gate, per language found in the repo | `pipx install ruff`, `npm i -g eslint typescript`, `pipx install mypy` |
+
+Python 3 is required for the engine. Everything else is optional.
+
+Where each tool reads items from is data in `install/targets.json`, so supporting another tool is a
 new entry there.

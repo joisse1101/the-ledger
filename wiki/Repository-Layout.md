@@ -13,9 +13,10 @@ proxy that's the only thing granting other devices access — its own Dockerfile
 template, and compose file; see [Gateway](Gateway.md)), and `hooks/` (Claude
 Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
 installer/uninstaller — see [Hooks](Hooks.md)), and `toolkit/` (not a service: tool-neutral reusable
-AI-agent skills under `toolkit/skills/<name>/SKILL.md`, plus `toolkit/install/Install-Skills.ps1` and
-its `targets.json` that copy them into Claude Code's global or a project's `.claude/skills/` without
-silently overwriting a differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+AI-agent skills under `toolkit/skills/<name>/SKILL.md`, agents under `toolkit/agents/` and slash commands
+under `toolkit/commands/` (the read-only `/code-audit` is one skill, two agents and one command), plus
+`toolkit/install/Install-Skills.ps1` and its `targets.json` that copy them into Claude Code's global or a
+project's `.claude/skills|agents|commands/` without silently overwriting a differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all

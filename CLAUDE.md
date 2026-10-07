@@ -18,7 +18,8 @@ Exactly five top-level folders, each self-contained (four services plus `toolkit
 - `web/` — the frontend.
 - `gateway/` — the Nginx reverse proxy, the only thing that grants LAN access.
 - `hooks/` — Claude Code toast hooks plus dashboard-coupled scripts.
-- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`) and an
+- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`), agents
+  (`toolkit/agents/`), slash commands (`toolkit/commands/`, e.g. the read-only `/code-audit`) and an
   installer (`toolkit/install/Install-Skills.ps1`). Independent of the dashboard; see
   `toolkit/README.md`.
 
