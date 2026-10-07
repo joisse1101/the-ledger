@@ -2,10 +2,11 @@
 
 ## What a reviewer agent returns
 
-One fenced `json` block and nothing else of substance. Prose outside the block is ignored.
+One fenced `json` block and nothing else of substance. Prose outside the block is ignored. It starts with `"evidence"`, the folder path the agent was given; a `Stop` hook in the agent saves the reply into that folder, and `audit.py --report` merges everything.
 
 ```json
 {
+  "evidence": "<absolute evidence folder path, repeated unchanged>",
   "findings": [
     {
       "severity": "Critical",
@@ -30,7 +31,7 @@ Rules:
 
 - `source` is either `<tool>:<rule>` (a scanner finding the agent confirmed or raised) or
   `review:<file>:<line>` (the agent's own finding from reading the file). **A finding with no usable
-  `source`, file or line is dropped by the command.**
+  `source`, file or line is dropped by the engine.**
 - `principle` is set by the architecture agent: `KISS`, `YAGNI` or `DRY`. `fix` is a concrete
   refactor, not "consider simplifying".
 - `adjusted_from` and `reason` are set only when the agent changes a baseline severity.
@@ -56,6 +57,9 @@ Rules:
 
 ## Severity adjustments
 - <file>:<line> <source>: <from> -> <to>: <reason>
+
+## Reviewers
+- <agent>: ok | output missing or unparseable
 
 ## Skipped or failed tools
 - <tool>: <reason and install hint>

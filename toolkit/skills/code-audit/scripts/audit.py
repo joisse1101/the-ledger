@@ -5,7 +5,8 @@
     audit.py --phase 0 --evidence DIR            linters and type checkers; exit 2 on a syntax/type error
     audit.py --phase 1 --evidence DIR            gitleaks, semgrep, jscpd, trivy
     audit.py --verify --evidence DIR             compare the repo with the --init snapshot; exit 4 on any change
-    audit.py --save-report --evidence DIR        save the final report (stdin) as DIR/report.md
+    audit.py --report --evidence DIR             merge all evidence into DIR/report.md and print it
+    audit.py --save-agent                        SubagentStop hook: save a reviewer's JSON reply (payload on stdin)
 
 Read-only by construction: every tool command comes from the builders below, none of which carries an
 auto-fix flag (run() refuses any command that does), and tool caches are pointed at the evidence folder.
@@ -687,15 +688,184 @@ def cmd_phase(args) -> int:
     return EXIT_OK
 
 
-def cmd_save_report(args) -> int:
-    """Write the final report (read from stdin) to <evidence>/report.md. The only write this mode makes."""
-    evidence, _scope, _repo = _context(args)
-    text = sys.stdin.buffer.read().decode("utf-8", "replace")
-    if not text.strip():
-        raise RuntimeError("no report text on stdin")
-    (evidence / "report.md").write_text(text, encoding="utf-8")
-    print(str(evidence / "report.md"))
+AGENTS = ("sec-checker", "arch-checker")
+SEVERITIES = ("Critical", "Medium", "Low")
+SCANNER_FILES = ("gitleaks", "semgrep", "jscpd", "trivy")
+_JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.S)
+_RUN_DIR = re.compile(r"code-audit[\\/](\d{8}-\d{6})")
+
+
+def extract_agent_json(text: str):
+    """The agent's last fenced json block, else the whole text, parsed; None if neither parses."""
+    blocks = _JSON_BLOCK.findall(text or "")
+    for candidate in ([blocks[-1]] if blocks else []) + [text or ""]:
+        try:
+            data = json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+def cmd_save_agent(args) -> int:
+    """SubagentStop hook target: save the reviewer's reply (hook payload on stdin) into its evidence folder.
+
+    Never fails the agent: every problem is reported on stderr and the exit code is 0. A missing file
+    shows up in the report as missing reviewer output.
+    """
+    try:
+        payload = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace") or "{}")
+        name = str(payload.get("agent_type") or "").split(":")[-1]
+        if name not in AGENTS:
+            return EXIT_OK  # not one of ours
+        text = payload.get("last_assistant_message") or ""
+        data = extract_agent_json(text)
+        folder = (data or {}).get("evidence")
+        if not folder:
+            m = _RUN_DIR.search(text)
+            folder = str(_cwd() / WORKSPACE / m.group(1)) if m else None
+        if not folder:
+            raise RuntimeError("the reply names no evidence folder")
+        evidence, _scope, _repo = _context(argparse.Namespace(evidence=folder))
+        if data is None:
+            (evidence / f"agent-{name}.raw.txt").write_text(text, encoding="utf-8")
+            raise RuntimeError("the reply holds no parseable JSON block (raw text saved)")
+        (evidence / f"agent-{name}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"code-audit save-agent: {e}", file=sys.stderr)
     return EXIT_OK
+
+
+def _cell(value) -> str:
+    return str(value if value not in (None, "") else "-").replace("|", "\\|").replace(chr(10), " ")
+
+
+def _key(f: dict) -> tuple:
+    return (f.get("file"), f.get("line"), f.get("source"))
+
+
+def merge_findings(baseline: list[dict], agents: dict[str, dict]):
+    """Apply the triage rules. Returns (findings, dismissed, adjustments, dropped)."""
+    base = {}
+    for f in baseline:
+        source = f"{f['tool']}:{f['rule']}"
+        base[(f["file"], f["line"], source)] = {
+            "severity": f["severity"], "file": f["file"], "line": f["line"],
+            "source": source, "message": f["message"], "fix": None, "principle": None}
+    dismissed, adjustments, dropped = [], [], 0
+    for name, data in agents.items():
+        for d in data.get("dismissed") or []:
+            if isinstance(d, dict) and d.get("reason"):
+                dismissed.append({**d, "agent": name})
+                base.pop(_key(d), None)
+    added: dict[tuple, dict] = {}
+    for name, data in agents.items():
+        for f in data.get("findings") or []:
+            ok = (isinstance(f, dict) and f.get("source") and f.get("file")
+                  and isinstance(f.get("line"), int) and f["line"] > 0 and f.get("severity") in SEVERITIES)
+            if not ok:
+                dropped += 1
+                continue
+            row = {k: f.get(k) for k in ("severity", "file", "line", "source", "message", "fix", "principle")}
+            row["agent"] = name
+            prior = base.get(_key(f))
+            if prior:
+                if f["severity"] != prior["severity"]:
+                    if f.get("reason"):
+                        adjustments.append({**row, "from": prior["severity"], "reason": f["reason"]})
+                    else:
+                        row["severity"] = prior["severity"]  # a change needs a reason
+                base[_key(f)] = {**prior, **{k: v for k, v in row.items() if v}, "severity": row["severity"]}
+            else:
+                added.setdefault(_key(f), row)
+    return list(base.values()) + list(added.values()), dismissed, adjustments, dropped
+
+
+def build_report(evidence: Path, scope: dict, repo: Path) -> tuple[str, bool]:
+    """Assemble report.md from the evidence files. Returns (text, repo_unchanged)."""
+    p0 = _load(evidence / "phase0.json") or {}
+    summary = _load(evidence / "summary.json")
+    verify = _load(evidence / "verify.json")
+    gate_failed = p0.get("gate") == "fail"
+    baseline = list(p0.get("findings", []))
+    for tool in SCANNER_FILES:
+        baseline += _load(evidence / f"{tool}.json") or []
+    agents, agent_status = {}, {}
+    for name in AGENTS:
+        data = _load(evidence / f"agent-{name}.json")
+        if gate_failed:
+            agent_status[name] = "not run (Phase 0 gate failed)"
+        elif isinstance(data, dict):
+            agents[name] = data
+            agent_status[name] = "ok"
+        else:
+            agent_status[name] = "output missing or unparseable"
+    findings, dismissed, adjustments, dropped = merge_findings(baseline, agents)
+    mode = "full" if scope["mode"] == "full" else f"diff vs {scope.get('base_branch') or 'base'}"
+    changes = [] if verify is None else verify.get("changes", [])
+    tampered = bool(verify) and not verify.get("ok", True)
+    incomplete = [] if gate_failed else [n for n, s in agent_status.items() if s != "ok"]
+    out = [f"# Code audit: {repo.name} ({mode}, {len(scope['files'])} files)", ""]
+    if tampered:
+        out += ["> **AUDIT INVALID: the repository changed during the audit. No result below can be trusted.**", ""]
+        out += [f"- {c}" for c in changes] + [""]
+    elif verify is None:
+        out += ["> Tamper check was not run (`--verify`); the repository state is unconfirmed.", ""]
+    if incomplete:
+        out += [f"> **INCOMPLETE: reviewer output missing for {', '.join(incomplete)}.** The audit is not complete.", ""]
+    if gate_failed:
+        out += ["## Phase 0 gate failed", "",
+                "The code has syntax or type errors. The audit stopped before Phase 1: no scanner or reviewer ran.", "",
+                "| Location | Tool | Rule | Message |", "|---|---|---|---|"]
+        out += [f"| {_cell(e['file'])}:{e['line']} | {_cell(e['tool'])} | {_cell(e['rule'])} | {_cell(e['message'])} |"
+                for e in p0.get("gate_errors", [])]
+        out += [""]
+    else:
+        titles = {"Critical": "Critical (blockers)", "Medium": "Medium (refactor)", "Low": "Low (tech debt)"}
+        for sev in SEVERITIES:
+            rows = sorted((f for f in findings if f["severity"] == sev), key=lambda f: (f["file"], f["line"]))
+            out += [f"## {titles[sev]}", ""]
+            if not rows:
+                out += ["none", ""]
+                continue
+            out += ["| Location | Source | Finding | Suggested fix |", "|---|---|---|---|"]
+            for f in rows:
+                msg = f["message"] if not f.get("principle") else f"[{f['principle']}] {f['message']}"
+                out += [f"| {_cell(f['file'])}:{f['line']} | {_cell(f['source'])} | {_cell(msg)} | {_cell(f.get('fix'))} |"]
+            out += [""]
+        out += ["## Dismissed as false positives", ""]
+        out += [f"- {d.get('source')} {d.get('file')}:{d.get('line')}: {d['reason']} ({d['agent']})" for d in dismissed] or ["none"]
+        out += ["", "## Severity adjustments", ""]
+        out += [f"- {a['file']}:{a['line']} {a['source']}: {a['from']} -> {a['severity']}: {a['reason']} ({a['agent']})"
+                for a in adjustments] or ["none"]
+        out += [""]
+        if dropped:
+            out += [f"{dropped} reviewer finding(s) were dropped for lacking a source, file, positive line or valid severity.", ""]
+        if not findings and not incomplete and not tampered and verify is not None:
+            out += ["**Clean: no findings remain after triage.**", ""]
+    out += ["## Reviewers", ""] + [f"- {n}: {s}" for n, s in agent_status.items()] + [""]
+    tools = {**p0.get("tools", {}), **(summary or {}).get("phase1_tools", {})}
+    notes = [f"- {t}: {v.get('status')}: {v.get('reason')}" for t, v in tools.items() if v.get("status") != "ran"]
+    out += ["## Skipped or failed tools", ""] + (notes or ["none"]) + [""]
+    out += ["## Scope", "", f"{mode}, base {scope.get('base_ref') or 'n/a'}, {len(scope['files'])} files; evidence at {evidence}"]
+    if scope.get("notice"):
+        out += ["", scope["notice"]]
+    return chr(10).join(out) + chr(10), not tampered
+
+
+def cmd_report(args) -> int:
+    """Build <evidence>/report.md from the evidence files and print it. The only write this mode makes."""
+    evidence, scope, repo = _context(args)
+    text, unchanged = build_report(evidence, scope, repo)
+    (evidence / "report.md").write_text(text, encoding="utf-8")
+    raw = getattr(sys.stdout, "buffer", None)  # bytes keep UTF-8 intact on a Windows console
+    if raw:
+        raw.write(text.encode("utf-8"))
+        raw.flush()
+    else:
+        sys.stdout.write(text)
+    return EXIT_OK if unchanged else EXIT_TAMPER
 
 
 def cmd_verify(args) -> int:
@@ -720,7 +890,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--init", action="store_true")
     mode.add_argument("--phase", type=int, choices=(0, 1))
     mode.add_argument("--verify", action="store_true")
-    mode.add_argument("--save-report", action="store_true", help="save the report on stdin as <evidence>/report.md")
+    mode.add_argument("--report", action="store_true", help="build <evidence>/report.md from the evidence files")
+    mode.add_argument("--save-agent", action="store_true", help="hook: save a reviewer reply from stdin")
     ap.add_argument("--repo", default=".", help="the repository to audit; must contain the current directory")
     ap.add_argument("--full", action="store_true")
     ap.add_argument("--evidence", help="evidence folder printed by --init")
@@ -729,10 +900,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.init:
             return cmd_init(args)
+        if args.save_agent:
+            return cmd_save_agent(args)
         if not args.evidence:
-            ap.error("--evidence is required with --phase and --verify")
-        if args.save_report:
-            return cmd_save_report(args)
+            ap.error("--evidence is required with --phase, --verify and --report")
+        if args.report:
+            return cmd_report(args)
         return cmd_verify(args) if args.verify else cmd_phase(args)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)

@@ -13,7 +13,8 @@ scope and from the tamper check. Agents read these files by absolute path.
 | `*.raw.json`, `jscpd-raw/` | `--phase 1` | the tool's own output, for detail |
 | `summary.json` | `--phase 1` | `phase0_gate`, `phase0_tools`, `phase1_tools`, severity `counts` |
 | `verify.json` | `--verify` | `ok` and the list of `changes` |
-| `report.md` | `--save-report` | the final triage report |
+| `agent-sec-checker.json`, `agent-arch-checker.json` | the agents' `Stop` hook (`--save-agent`) | each reviewer's JSON reply |
+| `report.md` | `--report` | the final triage report, built from all the files above |
 
 ## Tool status
 

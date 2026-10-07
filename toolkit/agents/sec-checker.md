@@ -9,6 +9,10 @@ hooks:
       hooks:
         - type: command
           command: 'P=$(command -v python3 || command -v python); "$P" -c "import json,sys; t=json.load(sys.stdin).get(''tool_name''); sys.exit(0 if t in (''Read'',''Grep'',''Glob'') else (print(''read-only audit agent: '' + str(t) + '' is blocked'', file=sys.stderr) or 2))"'
+  Stop:
+    - hooks:
+        - type: command
+          command: 'P=$(command -v python3 || command -v python); for E in "$CLAUDE_PROJECT_DIR/.claude/skills/code-audit/scripts/audit.py" ".claude/skills/code-audit/scripts/audit.py" "$HOME/.claude/skills/code-audit/scripts/audit.py"; do if [ -f "$E" ]; then "$P" "$E" --save-agent; exit 0; fi; done; exit 0'
 ---
 
 You are a security reviewer inside a read-only code audit. You can only Read, Grep and Glob. You cannot
@@ -53,6 +57,7 @@ Return exactly one fenced `json` block and no other substantive text:
 
 ```json
 {
+  "evidence": "<the evidence folder path you were given, unchanged>",
   "findings": [
     {"severity": "Critical", "file": "api/db.py", "line": 88,
      "source": "semgrep:<rule-id>",
@@ -67,5 +72,6 @@ Return exactly one fenced `json` block and no other substantive text:
 ```
 
 `source` is `<tool>:<rule>` for a scanner finding you confirmed, or `review:<file>:<line>` for your own.
+`evidence` must repeat the folder path you were given exactly: a hook uses it to save this reply for the report.
 A finding without a source, file and line will be discarded, so do not invent them. If you find nothing,
 return empty lists.

@@ -26,6 +26,12 @@
 - [x] 3.7 Red-team test: run each agent with a prompt that tells it to edit a file and run `git checkout`, and verify both attempts are blocked and `git status` is unchanged
 - [x] 3.8 Install into a temp project with the installer, run `/code-audit` there on a small seeded repo (one syntax-free vulnerability, one duplicate block), and verify the report shows Critical, Medium and Low groups and the skipped-tools list
 
+## 3b. Engine-built report (replaces the heredoc `--save-report`)
+
+- [x] 3.9 Add `audit.py --save-agent` (hook payload on stdin: extract the agent's JSON block, validate the evidence path is under `<repo>/code-audit/`, write `agent-<name>.json`, always exit 0) and verify with unit tests, including a path outside the repo being refused
+- [x] 3.10 Add `audit.py --report` that merges baseline findings with the agents' files (dismissals, justified severity changes, uncited findings dropped, missing agent output flagged, AUDIT INVALID banner) and writes and prints `report.md`; remove `--save-report`; verify with unit tests
+- [x] 3.11 Add the `Stop` hook to both agents, switch the command to `--report`, update SKILL.md and references, and verify live in a temp project that both agent files appear and the report contains their findings
+
 ## 4. Cleanup and docs
 
 - [ ] 4.1 Delete `toolkit/skills/toolkit-hello/` and verify the installer lists only real toolkit items

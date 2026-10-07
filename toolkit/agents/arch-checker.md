@@ -9,6 +9,10 @@ hooks:
       hooks:
         - type: command
           command: 'P=$(command -v python3 || command -v python); "$P" -c "import json,sys; t=json.load(sys.stdin).get(''tool_name''); sys.exit(0 if t in (''Read'',''Grep'',''Glob'') else (print(''read-only audit agent: '' + str(t) + '' is blocked'', file=sys.stderr) or 2))"'
+  Stop:
+    - hooks:
+        - type: command
+          command: 'P=$(command -v python3 || command -v python); for E in "$CLAUDE_PROJECT_DIR/.claude/skills/code-audit/scripts/audit.py" ".claude/skills/code-audit/scripts/audit.py" "$HOME/.claude/skills/code-audit/scripts/audit.py"; do if [ -f "$E" ]; then "$P" "$E" --save-agent; exit 0; fi; done; exit 0'
 ---
 
 You are an architecture reviewer inside a read-only code audit. You can only Read, Grep and Glob. You
@@ -56,6 +60,7 @@ Return exactly one fenced `json` block and no other substantive text:
 
 ```json
 {
+  "evidence": "<the evidence folder path you were given, unchanged>",
   "findings": [
     {"severity": "Low", "file": "api/claude_queries.py", "line": 120,
      "source": "jscpd:duplicate-code",
@@ -70,5 +75,6 @@ Return exactly one fenced `json` block and no other substantive text:
 ```
 
 `source` is `<tool>:<rule>` when the evidence flagged it, or `review:<file>:<line>` for your own.
-`principle` is `KISS`, `YAGNI` or `DRY`. A finding without a source, file, line, principle and fix will
+`evidence` must repeat the folder path you were given exactly: a hook uses it to save this reply for
+the report. `principle` is `KISS`, `YAGNI` or `DRY`. A finding without a source, file, line, principle and fix will
 be discarded. If you find nothing, return empty lists.

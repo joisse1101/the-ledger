@@ -129,20 +129,169 @@ class ScopeTests(TempCase):
             self.assertEqual(audit.main(["--verify", "--evidence", str(elsewhere)]), audit.EXIT_ERROR)
         self.assertIn("evidence must be inside", err.getvalue())
 
-    def test_save_report_writes_only_report_md_in_the_run_folder(self):
-        repo = make_repo(self.tmp)
-        (repo / "a.py").write_text("x = 9" + NL)
-        _, out = self.init(repo)
-        ev = Path(json.loads(out)["evidence"])
-        with mock.patch("sys.stdin", mock.Mock(buffer=io.BytesIO(b"# report"))), redirect_stdout(io.StringIO()):
-            self.assertEqual(audit.main(["--save-report", "--evidence", str(ev)]), audit.EXIT_OK)
-        self.assertEqual((ev / "report.md").read_text(), "# report")
-
     def test_scanners_are_told_to_skip_the_workspace(self):
         p = Path("/x")
         self.assertIn("code-audit", audit.cmd_semgrep("semgrep", ["."], "c"))
         self.assertIn("**/code-audit/**", audit.cmd_jscpd("jscpd", p, ["."]))
         self.assertIn("code-audit", audit.cmd_trivy("trivy", p))
+
+
+def hook_payload(agent: str, reply: str) -> mock.Mock:
+    body = json.dumps({"agent_type": agent, "last_assistant_message": reply}).encode()
+    return mock.Mock(buffer=io.BytesIO(body))
+
+
+class ReportTests(TempCase):
+    def setUp(self):
+        super().setUp()
+        self.repo = make_repo(self.tmp)
+        (self.repo / "a.py").write_text("x = 9" + NL)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            audit.main(["--init", "--repo", str(self.repo)])
+        self.ev = Path(json.loads(buf.getvalue())["evidence"])
+        self.base = {"tool": "semgrep", "rule": "r1", "severity": "Critical", "file": "a.py", "line": 3, "message": "sqli"}
+        (self.ev / "phase0.json").write_text(json.dumps({"gate": "pass", "gate_errors": [], "findings": [], "tools": {
+            "ruff": {"status": "skipped", "reason": "not installed (pip install ruff)"}}}))
+        (self.ev / "semgrep.json").write_text(json.dumps([self.base]))
+        (self.ev / "summary.json").write_text(json.dumps({"phase1_tools": {"trivy": {"status": "failed", "reason": "boom"}}}))
+        (self.ev / "verify.json").write_text(json.dumps({"ok": True, "changes": []}))
+
+    def agent(self, name, findings=(), dismissed=()):
+        (self.ev / f"agent-{name}.json").write_text(json.dumps({"findings": list(findings), "dismissed": list(dismissed)}))
+
+    def both(self, **kw):
+        self.agent("sec-checker", **kw)
+        self.agent("arch-checker")
+
+    def report(self):
+        with redirect_stdout(io.StringIO()):
+            rc = audit.main(["--report", "--evidence", str(self.ev)])
+        return rc, (self.ev / "report.md").read_text(encoding="utf-8")
+
+    def test_baseline_finding_is_reported_with_its_source_and_skipped_tools_are_listed(self):
+        self.both()
+        rc, text = self.report()
+        self.assertEqual(rc, audit.EXIT_OK)
+        self.assertIn("| a.py:3 | semgrep:r1 | sqli |", text)
+        self.assertIn("ruff: skipped", text)
+        self.assertIn("trivy: failed: boom", text)
+
+    def test_dismissed_finding_leaves_the_triage_with_its_reason(self):
+        self.both(dismissed=[{"source": "semgrep:r1", "file": "a.py", "line": 3, "reason": "constant"}])
+        _, text = self.report()
+        self.assertNotIn("| a.py:3 | semgrep:r1", text)
+        self.assertIn("semgrep:r1 a.py:3: constant", text)
+        self.assertIn("Clean", text)
+
+    def test_justified_severity_change_is_applied_and_recorded(self):
+        self.both(findings=[{"severity": "Low", "file": "a.py", "line": 3, "source": "semgrep:r1",
+                             "message": "sqli", "reason": "test file", "adjusted_from": "Critical"}])
+        _, text = self.report()
+        self.assertIn("a.py:3 semgrep:r1: Critical -> Low: test file", text)
+        low = text.split("## Low")[1].split("##")[0]
+        self.assertIn("semgrep:r1", low)
+
+    def test_unjustified_severity_change_is_ignored(self):
+        self.both(findings=[{"severity": "Low", "file": "a.py", "line": 3, "source": "semgrep:r1", "message": "sqli"}])
+        _, text = self.report()
+        self.assertIn("a.py:3", text.split("## Critical")[1].split("##")[0])
+
+    def test_uncited_agent_findings_are_dropped_and_counted(self):
+        self.both(findings=[{"severity": "Medium", "file": "a.py", "line": 0, "source": "review:a.py:0", "message": "m"},
+                            {"severity": "Medium", "file": "a.py", "line": 2, "message": "no source"}])
+        _, text = self.report()
+        self.assertIn("2 reviewer finding(s) were dropped", text)
+
+    def test_agent_only_finding_is_added_with_principle(self):
+        self.both(findings=[{"severity": "Medium", "file": "a.py", "line": 1, "source": "review:a.py:1",
+                             "message": "dup", "fix": "extract", "principle": "DRY"}])
+        _, text = self.report()
+        self.assertIn("| a.py:1 | review:a.py:1 | [DRY] dup | extract |", text)
+
+    def test_missing_reviewer_output_is_flagged_not_clean(self):
+        self.agent("sec-checker")
+        (self.ev / "semgrep.json").write_text("[]")
+        _, text = self.report()
+        self.assertIn("INCOMPLETE", text)
+        self.assertIn("arch-checker: output missing", text)
+        self.assertNotIn("Clean", text)
+
+    def test_tamper_puts_a_banner_and_returns_the_tamper_code(self):
+        self.both()
+        (self.ev / "verify.json").write_text(json.dumps({"ok": False, "changes": ["modified: a.py"]}))
+        rc, text = self.report()
+        self.assertEqual(rc, audit.EXIT_TAMPER)
+        self.assertIn("AUDIT INVALID", text)
+        self.assertIn("modified: a.py", text)
+
+    def test_failed_gate_report_lists_errors_and_no_reviewers_ran(self):
+        (self.ev / "phase0.json").write_text(json.dumps({"gate": "fail", "findings": [], "tools": {}, "gate_errors": [
+            {"tool": "ruff", "rule": "E999", "file": "a.py", "line": 1, "message": "syntax | error"}]}))
+        _, text = self.report()
+        self.assertIn("Phase 0 gate failed", text)
+        self.assertIn("syntax \\| error", text)
+        self.assertNotIn("INCOMPLETE", text)
+
+    def test_report_writes_only_report_md(self):
+        self.both()
+        before = {p.name for p in self.ev.iterdir()}
+        self.report()
+        self.assertEqual({p.name for p in self.ev.iterdir()} - before, {"report.md"})
+
+
+class SaveAgentTests(TempCase):
+    def setUp(self):
+        super().setUp()
+        self.repo = make_repo(self.tmp)
+        (self.repo / "a.py").write_text("x = 9" + NL)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            audit.main(["--init", "--repo", str(self.repo)])
+        self.ev = Path(json.loads(buf.getvalue())["evidence"])
+
+    def save(self, agent, reply):
+        err = io.StringIO()
+        with mock.patch("sys.stdin", hook_payload(agent, reply)), mock.patch("sys.stderr", err):
+            rc = audit.main(["--save-agent"])
+        return rc, err.getvalue()
+
+    def reply(self, evidence, extra=""):
+        return "Done.\n```json\n" + json.dumps({"evidence": str(evidence), "findings": [], "dismissed": [], **({} if not extra else {"x": extra})}) + "\n```"
+
+    def test_reply_is_saved_in_the_named_run_folder(self):
+        rc, _ = self.save("sec-checker", self.reply(self.ev))
+        self.assertEqual(rc, audit.EXIT_OK)
+        self.assertEqual(json.loads((self.ev / "agent-sec-checker.json").read_text())["findings"], [])
+
+    def test_plugin_prefixed_agent_name_is_accepted(self):
+        self.save("toolkit:arch-checker", self.reply(self.ev))
+        self.assertTrue((self.ev / "agent-arch-checker.json").is_file())
+
+    def test_other_agents_are_ignored(self):
+        rc, err = self.save("Explore", self.reply(self.ev))
+        self.assertEqual((rc, err), (audit.EXIT_OK, ""))
+        self.assertEqual([p.name for p in self.ev.glob("agent-*")], [])
+
+    def test_evidence_outside_the_repo_is_refused_but_never_fails_the_agent(self):
+        elsewhere = self.tmp / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "scope.json").write_text((self.ev / "scope.json").read_text())
+        rc, err = self.save("sec-checker", self.reply(elsewhere))
+        self.assertEqual(rc, audit.EXIT_OK)
+        self.assertIn("evidence must be inside", err)
+        self.assertEqual(list(elsewhere.glob("agent-*")), [])
+
+    def test_unparseable_reply_saves_raw_text_and_reports_it(self):
+        rc, err = self.save("sec-checker", "no json here, but it is in code-audit/" + self.ev.name)
+        self.assertEqual(rc, audit.EXIT_OK)
+        self.assertIn("no parseable JSON", err)
+        self.assertTrue((self.ev / "agent-sec-checker.raw.txt").is_file())
+        self.assertFalse((self.ev / "agent-sec-checker.json").exists())
+
+    def test_garbage_payload_never_raises(self):
+        with mock.patch("sys.stdin", mock.Mock(buffer=io.BytesIO(b"not json"))), mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(audit.main(["--save-agent"]), audit.EXIT_OK)
 
 
 class LaunchRepoOnlyTests(TempCase):

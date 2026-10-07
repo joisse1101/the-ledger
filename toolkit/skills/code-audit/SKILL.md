@@ -25,7 +25,8 @@ repository that contains the current directory and refuses any other.
 | Phase 0: linters and type checkers | `audit.py --phase 0 --evidence <dir>` | 0 pass, 2 syntax or type error |
 | Phase 1: security and health scanners | `audit.py --phase 1 --evidence <dir>` | 0 |
 | Tamper check | `audit.py --verify --evidence <dir>` | 0 clean, 4 repository changed |
-| Save the final report | `audit.py --save-report --evidence <dir>` (report on stdin) | 0 |
+| Build and save the report | `audit.py --report --evidence <dir>` | 0 clean, 4 repository changed |
+| Save a reviewer reply (agent `Stop` hook, not run by hand) | `audit.py --save-agent` (hook payload on stdin) | 0 always |
 
 `--init` prints one JSON line containing the `evidence` folder path. Pass that path to every later step
 and to the agents.

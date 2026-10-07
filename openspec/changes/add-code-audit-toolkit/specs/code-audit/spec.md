@@ -112,7 +112,19 @@ Each finding SHALL start with the severity its scanner assigned, mapped to Criti
 - **THEN** the report SHALL show the original severity, the new severity and the reason
 
 ### Requirement: Consolidated triage report
-The audit SHALL end with a single report that groups findings as Critical (blockers), Medium (refactor) and Low (tech debt), each with location, source and suggested fix, followed by the list of skipped tools and the audit's scope.
+The audit SHALL end with a single report that groups findings as Critical (blockers), Medium (refactor) and Low (tech debt), each with location, source and suggested fix, followed by the list of skipped tools and the audit's scope. The engine SHALL build the report from the evidence files, applying the merge rules (dismissals, justified severity changes, dropping uncited agent findings) in code, and SHALL save it as `report.md` in the run's folder without any report text being passed through a shell command.
+
+#### Scenario: Agent findings are saved by the harness
+- **WHEN** a reviewer subagent finishes
+- **THEN** a hook declared by that agent SHALL save the agent's JSON reply into the run's folder under `code-audit/`, and the subagent itself SHALL remain unable to write any file
+
+#### Scenario: Agent output missing
+- **WHEN** a reviewer's saved output is absent or unparseable
+- **THEN** the report SHALL say that reviewer's output is missing and SHALL NOT present the audit as complete
+
+#### Scenario: Uncited agent finding
+- **WHEN** an agent finding lacks a source, a file or a positive line
+- **THEN** the engine SHALL drop it and the report SHALL state how many were dropped
 
 #### Scenario: Clean audit
 - **WHEN** no findings remain after triage
