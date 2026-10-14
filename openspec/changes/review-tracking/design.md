@@ -23,18 +23,21 @@ committing without a confirmation word and wants one concern per commit.
 
 ## Decisions
 
-**1. Version = date in frontmatter, plus content hash recorded in the review.** The date is
-readable ("2026-10-14") and hand-bumped; the hash catches edits where nobody bumped it. Staleness
-= either differs. *Alternatives:* date only (misses forgotten bumps); hash only (no readable
-label, no sense of how old). The check_docs only validates the format, since it cannot know
-whether an edit warranted a bump.
+**1. Version = `metadata.version` (semver) + `metadata.last_updated`, plus a content hash recorded
+in the review.** The Agent Skills format keeps a skill's version inside a flat string map,
+`metadata:`, not as a top-level key, so we follow it for every item kind. Semver says how big a
+change was, `last_updated` says when, both are hand-bumped, and the hash catches edits where
+nobody bumped them. Staleness = version, date or hash differs. *Alternatives:* a date only (no
+sense of size); semver only (no date); a top-level `version:` (not the spec's place for it; an
+earlier draft used it and was reworked). The docs check validates the formats, since it cannot
+know whether an edit warranted a bump.
 
 **2. One hash helper, owned by the skill.** The review must run in any project, where the
 installer may not exist, and the skill folder must stay self-contained. So the algorithm moves to
 `toolkit/skills/coding-standards/scripts/Get-ItemHash.ps1` and `Install-Toolkit.ps1` dot-sources
 it from the toolkit tree. Algorithm unchanged, so existing installs do not read as drifted.
 *Alternative:* duplicate the code in both places and test they agree; rejected as two copies to
-keep in step. The helper also prints an item's `version:` so reviews and `-List` share it.
+keep in step. The helper also prints an item's `metadata.version` and `last_updated` so reviews and `-List` share them.
 
 **3. Review-time lookup of "what was used".** The skill hashes `~/.claude/skills/coding-standards`
 and every rule actually relevant to the reviewed files (the rules whose `paths:` match, plus the
@@ -120,11 +123,11 @@ must be self-contained).
 - [Baseline can be slow or need a service] -> It is the project's own documented command; if it
   cannot run, the review says `not run` and why rather than silently skipping.
 
-- [Claude Code may reject or warn on an unknown `version:` key in rule frontmatter] -> First task
+- [Claude Code may reject or warn on an unknown key in rule frontmatter] -> First task
   verifies on a throwaway rule; fallback is a `<!-- version: ... -->` comment on the first line
   and the helper/check read that instead. Decide before touching every rule.
 - [Adding frontmatter to `commit-hygiene.md` could be mistaken for scoping] -> The docs check
-  already fails on a `paths:` key there; add a test that a `version:`-only block passes.
+  already fails on a `paths:` key there; add a test that a `metadata:`-only block passes.
 - [Skill grows past 4 KB] -> Budget raised to 6 KB in the spec; the format template lives in the
   skill, the procedure details in the commands.
 - [Hand-bumped versions get forgotten] -> The hash still flags the change; the version is a

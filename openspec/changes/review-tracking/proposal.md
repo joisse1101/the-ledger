@@ -17,8 +17,9 @@ trackable checklist they get forgotten or re-reviewed from scratch.
   finding, ticking each box.
 - New command `/jois-review:archive`: checks every finding is resolved (or skipped with a reason),
   stamps the review archived and moves it to `reviews/archive/`.
-- Every skill, rule and `jois-review` command gets a `version:` in its frontmatter (a date such as
-  `2026-10-14`). A review records each used item's version and content hash; `apply` and `archive`
+- Every skill, rule and `jois-review` command gets a `metadata:` block in its frontmatter with a
+  semver `version` and a `last_updated` date, as the Agent Skills format keeps them. A review
+  records each used item's version, date and content hash; `apply` and `archive`
   warn when the installed item no longer matches (stale review).
 - The review is read-only: a new `code-reviewer` agent (tools: Read, Grep, Glob only) does the
   reading, and the main thread only writes the `reviews/` file. A before/after `git status`
@@ -43,17 +44,17 @@ trackable checklist they get forgotten or re-reviewed from scratch.
 
 ### Modified Capabilities
 - `toolkit-coding-standards`: the review skill gains a save-to-file output and its size budget
-  rises; every rule and skill carries a `version:` frontmatter key, which the docs check validates.
+  rises; every rule, skill, agent and `jois-review` command carries `metadata.version` and `metadata.last_updated`, which the docs check validates.
 - `toolkit-skills`: the installer shares one hashing helper, lists item versions, gains an
   `agents` item kind, and `toolkit/commands/` gains the `jois-review` namespace.
 
 ## Impact
 
 - `toolkit/skills/coding-standards/SKILL.md` (+ new `scripts/` helper), all of `toolkit/rules/*.md`
-  (one frontmatter line each), new `toolkit/commands/jois-review/{apply,archive}.md`,
+  (a `metadata:` block each), new `toolkit/commands/jois-review/{apply,archive}.md`,
   new `toolkit/agents/code-reviewer.md`, `toolkit/install/Install-Toolkit.ps1` and `targets.json`,
   `toolkit/README.md`.
 - `api/check_docs.py` and `api/tests/test_check_docs.py`; `CLAUDE.md`, `wiki/Repository-Layout.md`,
   `wiki/Testing.md` if it lists checks.
-- Unverified: that Claude Code tolerates an extra `version:` key in rule frontmatter (first task).
+- Verified in the first task: Claude Code loads rules with extra frontmatter keys (re-verified for the nested `metadata:` map).
 - Not affected: the dashboard (`api/`, `web/`, `widget/`, `gateway/`) behaviour.

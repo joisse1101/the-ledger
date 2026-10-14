@@ -34,20 +34,25 @@ The `coding-standards` skill SHALL be a review checklist (code smells, a blockin
 ## ADDED Requirements
 
 ### Requirement: Skills, rules and review commands carry a version
-Every skill (`SKILL.md`), every rule file, every agent file, and every command in the `jois-review` namespace SHALL
-declare a `version:` key in its frontmatter whose value is a date `YYYY-MM-DD`, optionally followed
-by `.N` for a further revision the same day. The key SHALL be bumped by hand whenever the file's
-guidance changes. A rule without other frontmatter SHALL still carry a frontmatter block holding
-only `version:`, and SHALL NOT thereby gain a `paths:` key.
+Every skill (`SKILL.md`), every rule file, every agent file, and every command in the `jois-review`
+namespace SHALL declare its version inside a `metadata:` map in its frontmatter, as the Agent Skills
+format keeps it, with two string keys: `version`, a semantic version `MAJOR.MINOR.PATCH`, and
+`last_updated`, the date of the last change as `YYYY-MM-DD`. Both SHALL be bumped by hand whenever
+the file's guidance changes. A rule without other frontmatter SHALL still carry a frontmatter block
+holding only `metadata:`, and SHALL NOT thereby gain a `paths:` key.
 
 #### Scenario: Version present
-- **WHEN** the docs check runs and a skill, rule or `jois-review` command has no `version:` key or a value that is not a date
+- **WHEN** the docs check runs and a skill, rule, agent or `jois-review` command has no `metadata.version`, a `version` that is not `MAJOR.MINOR.PATCH`, or no valid `metadata.last_updated` date
 - **THEN** it SHALL fail and name the file
 
+#### Scenario: Top-level version is not accepted
+- **WHEN** a file declares `version:` at the top level of its frontmatter instead of under `metadata:`
+- **THEN** the docs check SHALL fail and name the file
+
 #### Scenario: Unscoped rule keeps loading everywhere
-- **WHEN** `commit-hygiene.md` gains a `version:` key
+- **WHEN** `commit-hygiene.md` gains a `metadata:` block
 - **THEN** it SHALL still have no `paths:` key and SHALL still load in every session
 
 #### Scenario: Version bumped on change
 - **WHEN** a rule's guidance is edited
-- **THEN** its `version:` SHALL be set to the date of the edit, so that reviews recorded against the old version are reported stale
+- **THEN** its `metadata.version` SHALL be raised and `last_updated` set to the date of the edit, so that reviews recorded against the old version are reported stale

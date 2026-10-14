@@ -25,11 +25,11 @@ A saved review SHALL begin with YAML frontmatter holding: `reviewed_at` (local d
 line numbers refer to, or `none` outside a git repository), `status` (`open` or `archived`),
 `baseline`, `tree_unchanged` and `redactions` (defined by the requirements below), and
 `uses`, a list with one entry for every skill and rule applied, each recording its kind, name,
-`version` and content `hash`.
+`version`, `last_updated` and content `hash`, the first two taken from its `metadata:` map.
 
 #### Scenario: Metadata records what was used
 - **WHEN** a review applied the `coding-standards` skill and the `python.md` and `core-principles.md` rules
-- **THEN** `uses` SHALL hold an entry for each of the three, with the version and hash each had at review time
+- **THEN** `uses` SHALL hold an entry for each of the three, with the version, last-updated date and hash each had at review time
 
 #### Scenario: New review is open
 - **WHEN** a review is first saved

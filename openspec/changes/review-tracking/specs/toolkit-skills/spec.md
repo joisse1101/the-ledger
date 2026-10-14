@@ -37,11 +37,11 @@ stable order), so existing installs are not reported as drifted by this change.
 
 ### Requirement: Listing shows versions
 The installer's status listing SHALL show, for each skill, rule, agent and command item that
-declares one, its `version:` from the toolkit and from the destination, alongside the existing
+declares one, its `metadata.version` from the toolkit and from the destination, alongside the existing
 state (missing, up to date, differing).
 
 #### Scenario: Differing item shows both versions
-- **WHEN** the installed `python.md` is version 2026-09-01 and the toolkit's is 2026-10-14
+- **WHEN** the installed `python.md` is version 1.0.0 and the toolkit's is 1.1.0
 - **THEN** the listing SHALL show the item as differing with both versions
 
 #### Scenario: Item without a version
