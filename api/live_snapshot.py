@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 import claude_context
+import claude_db
 import claude_sessions
 
 LIVE_TTL_SECONDS = 1.0
@@ -29,6 +30,7 @@ class LiveSnapshot:
         load_sessions: Optional[Callable[[], list]] = None,
         live_context: Optional[Callable[[str, str], Any]] = None,
         latest_activity: Optional[Callable[[str, str], Optional[datetime]]] = None,
+        git_branches: Optional[Callable[[list[str]], dict[str, str]]] = None,
         ttl: float = LIVE_TTL_SECONDS,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -40,6 +42,7 @@ class LiveSnapshot:
         self._latest_activity = latest_activity or (
             lambda session_id, cwd: claude_context.latest_activity(session_id, cwd)
         )
+        self._git_branches = git_branches or (lambda ids: claude_db.git_branches(ids))
         self._ttl = ttl
         self._clock = clock
         self._lock = threading.Lock()
@@ -52,7 +55,8 @@ class LiveSnapshot:
         now = self._clock()
         if self._computed_at is None or now - self._computed_at >= self._ttl:
             sessions = self._load_sessions()
-            self._items = [self._item(s) for s in sessions]
+            branches = self._branches([s.session_id for s in sessions])
+            self._items = [self._item(s, branches.get(s.session_id, "")) for s in sessions]
             self._cwds = {s.session_id: s.cwd for s in sessions}
             self._computed_at = now
 
@@ -102,12 +106,20 @@ class LiveSnapshot:
             "label": claude_context.format_context(context),
         }
 
-    def _item(self, s) -> dict[str, Any]:
+    def _branches(self, session_ids: list[str]) -> dict[str, str]:
+        # A missing or unreadable snapshot just means no branch shown, never a failed list.
+        try:
+            return self._git_branches(session_ids)
+        except Exception:
+            return {}
+
+    def _item(self, s, git_branch: str) -> dict[str, Any]:
         return {
             "session_id": s.session_id,
             "pid": s.pid,
             "name": s.name,
             "project": s.project,
+            "git_branch": git_branch,
             "title": s.title,
             "status": s.status,
             "kind": s.kind,

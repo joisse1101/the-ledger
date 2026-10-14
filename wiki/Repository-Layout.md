@@ -6,13 +6,14 @@ built so a phone or other device on the same network can read it too, behind a s
 The backend and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 [Setup and run](Setup-And-Run.md)).
 
-The repo has exactly five top-level folders, each self-contained: `api/` (the
+The repo has exactly six top-level folders, each self-contained: `api/` (the
 backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
 gitignored `.venv`/`.ledger`/`.history`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see [Gateway](Gateway.md)), and `hooks/` (Claude
 Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
-installer/uninstaller — see [Hooks](Hooks.md)), and `toolkit/` (not a service: tool-neutral reusable
+installer/uninstaller — see [Hooks](Hooks.md)), `widget/` (the Electron desktop widget: a floating, read-only
+live-sessions window with its own `package.json`, tests and startup scripts; see [Widget](Widget.md)), and `toolkit/` (not a service: tool-neutral reusable
 AI-agent skills under `toolkit/skills/<name>/SKILL.md`, plus `toolkit/install/Install-Skills.ps1` and
 its `targets.json` that copy them into Claude Code's global or a project's `.claude/skills/` without
 silently overwriting a differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,

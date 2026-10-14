@@ -117,3 +117,22 @@ def test_latest_activity_is_none_for_a_session_that_is_not_live():
         latest_activity=lambda sid, cwd: datetime(2026, 1, 1),
     )
     assert snapshot.latest_activity("gone") is None
+
+
+def test_items_carry_git_branch_and_default_to_empty():
+    snapshot = LiveSnapshot(
+        load_sessions=lambda: [_session("a", pid=1), _session("b", pid=2)],
+        live_context=lambda sid, cwd: None,
+        git_branches=lambda ids: {"a": "main"},
+    )
+    assert [i["git_branch"] for i in snapshot.get()] == ["main", ""]
+
+
+def test_failing_branch_lookup_leaves_the_list_intact():
+    def boom(ids):
+        raise RuntimeError("snapshot missing")
+
+    snapshot = LiveSnapshot(load_sessions=lambda: [_session()], live_context=lambda sid, cwd: None, git_branches=boom)
+    items = snapshot.get()
+    assert [i["session_id"] for i in items] == ["s1"]
+    assert items[0]["git_branch"] == ""

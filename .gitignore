@@ -9,3 +9,5 @@ run_log.txt
 .ledger-run.json
 web/node_modules/
 web/dist/
+widget/node_modules/
+widget/dist/

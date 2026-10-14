@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ledger widget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <span id="summary" class="summary"></span>
+    <span class="actions">
+      <button id="ledger" type="button" title="Open the Ledger dashboard">Ledger</button>
+      <button id="collapse" type="button" title="Collapse or expand">&#8211;</button>
+    </span>
+  </header>
+  <main id="body" class="list"></main>
+  <footer id="note" class="note" role="status"></footer>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfa;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --line: #deded8;
+  --hover: #efefe9;
+  --accent: #b54708;
+  --accent-bg: #fef0c7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1a;
+    --fg: #ecece6;
+    --muted: #9a9a92;
+    --line: #34342f;
+    --hover: #2a2a27;
+    --accent: #fdb022;
+    --accent-bg: #4a3200;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px/1.35 "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+}
+
+.summary { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.actions { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+button:hover { background: var(--hover); }
+
+.list { flex: 1; overflow-y: auto; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  text-align: left;
+}
+
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.branch { margin-left: 6px; font-weight: 400; color: var(--muted); }
+
+/* The label carries Unicode block glyphs (the sparkline); Segoe UI Symbol has them. */
+.ctx {
+  font-family: "Cascadia Mono", Consolas, "Segoe UI Symbol", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+}
+
+.badge {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.empty { margin: 0; padding: 14px 10px; color: var(--muted); }
+
+.note { min-height: 0; padding: 0 10px; color: var(--muted); }
+.note:not(:empty) { padding: 3px 10px; border-top: 1px solid var(--line); }
+
+body.collapsed .list,
+body.collapsed .note,
+body.collapsed #ledger { display: none; }
+body.collapsed .bar { border-bottom: 0; }
