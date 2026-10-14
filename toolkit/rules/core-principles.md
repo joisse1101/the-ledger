@@ -1,3 +1,15 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.java"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.ps1"
+  - "**/*.sh"
+  - "**/*.bat"
+---
 # Core principles
 
 Language-agnostic. These apply to all code; technology rules add mechanics, not new principles.

@@ -52,13 +52,14 @@ Each `.md` file directly under `toolkit/rules/` is one rule: a short instruction
 loads on its own, with no one needing to invoke it. A rule with no `paths:` frontmatter loads at
 session start, in every project. A rule with `paths:` frontmatter (a list of globs such as
 `"**/*.java"`) loads once a matching file is read or created. Tested on Claude Code 2.1.299: a
-scoped rule is not present before any matching file is touched, so the always-on rules
-(`core-principles`, `architecture-boundaries`) are the floor for that case.
+scoped rule is not present before any matching file is touched, so a change planned before any
+file is opened has no rules yet. Every rule here is scoped, so sessions that never touch code
+(tickets, workflows) load none of them.
 
-The standards are split this way: two small always-on rules (principles and architecture
-boundaries), one path-scoped rule per technology (TypeScript/React, Java, Python, config files,
-scripts), and the `coding-standards` skill as an on-demand review checklist. Use `-Scope project`
-to keep the always-on rules out of unrelated projects. A project's own `CLAUDE.md` takes precedence.
+The standards are split this way: two small core rules (principles and architecture
+boundaries, scoped to source-code file types), one path-scoped rule per technology (TypeScript/React,
+Java, Python, config files, scripts), and the `coding-standards` skill as an on-demand review
+checklist. Use `-Scope project` to keep the rules out of unrelated projects. A project's own `CLAUDE.md` takes precedence.
 
 ## Installing by hand
 

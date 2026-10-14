@@ -1,6 +1,18 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.java"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.ps1"
+  - "**/*.sh"
+  - "**/*.bat"
+---
 # Architecture boundaries
 
-Structure across frontend, backend and shared code. Applies to every project.
+Structure across frontend, backend and shared code. Applies to code in every project.
 
 - A backend module never imports frontend code, and a frontend module never imports backend code.
   Share through a shared package or generated definitions.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how the toolkit's coding standards are layered so that Claude loads only the guidance that matches the work: a small always-on floor, structural boundaries, per-technology rules scoped to file types, and an on-demand review checklist.
+Defines how the toolkit's coding standards are layered so that Claude loads only the guidance that matches the work: a small core floor scoped to source code, structural boundaries, per-technology rules scoped to file types, and an on-demand review checklist.
 
 ## Requirements
 
@@ -17,12 +17,16 @@ The toolkit SHALL provide its coding standards as separate files, not one docume
 - **WHEN** a principle such as fail-fast error handling is covered by the core rule
 - **THEN** language rules SHALL add only language-specific mechanics for it and SHALL NOT restate the principle
 
-### Requirement: Always-on floor is small
-The core-principles and architecture-boundaries rules SHALL have no `paths:` frontmatter, so they apply to all work, and SHALL together stay within 4 KB, with core-principles within 2 KB.
+### Requirement: Core floor is small and code-scoped
+The core-principles and architecture-boundaries rules SHALL declare `paths:` frontmatter limited to source-code file types (`py`, `java`, `ts`, `tsx`, `js`, `jsx`, `ps1`, `sh`, `bat`), so they load when code is touched and not in sessions that never touch code, such as ticket or workflow work. They SHALL together stay within 4 KB, with core-principles within 2 KB.
 
-#### Scenario: Always-on rules within budget
+#### Scenario: Core rules within budget
 - **WHEN** the docs check runs
-- **THEN** it SHALL fail if either unscoped rule is missing, if their combined size exceeds 4 KB, or if core-principles exceeds 2 KB
+- **THEN** it SHALL fail if either core rule is missing, if their combined size exceeds 4 KB, or if core-principles exceeds 2 KB
+
+#### Scenario: Core rules are code-scoped
+- **WHEN** the docs check runs
+- **THEN** it SHALL fail if either core rule has no `paths:` frontmatter or a glob for a non-source-code file type such as `json`, `yaml` or `md`
 
 ### Requirement: Technology rules are path-scoped
 Each technology rule SHALL declare `paths:` frontmatter matching only its own file types, so it loads when files of that type are in play and not otherwise: TypeScript/React for `ts`, `tsx`, `js`, `jsx`, `css` and `html`; Java for `java`; Python for `py`; configuration for `yml`, `yaml`, `json` and `toml`; scripts for `ps1`, `sh` and `bat`. Each such rule SHALL stay within 3 KB.
@@ -40,9 +44,9 @@ Each technology rule SHALL declare `paths:` frontmatter matching only its own fi
 - **THEN** the docs check SHALL fail and name the file
 
 ### Requirement: Rules are separated from style
-A guideline SHALL be written as a rule ("must" or "never") only if breaking it causes a defect, a security hole or structural damage. A guideline that only affects consistency or readability is style and SHALL be written as a preference ("prefer"). Always-on rules SHALL contain rules only. A technology rule MAY carry style, but only in a final "Prefer" section kept separate from its rules. Style that a linter or formatter enforces SHALL NOT appear in any file.
+A guideline SHALL be written as a rule ("must" or "never") only if breaking it causes a defect, a security hole or structural damage. A guideline that only affects consistency or readability is style and SHALL be written as a preference ("prefer"). The core rules SHALL contain rules only. A technology rule MAY carry style, but only in a final "Prefer" section kept separate from its rules. Style that a linter or formatter enforces SHALL NOT appear in any file.
 
-#### Scenario: Always-on files hold no style
+#### Scenario: Core files hold no style
 - **WHEN** core-principles or architecture-boundaries is read
 - **THEN** every line SHALL be a rule, and no line SHALL be a naming, formatting or layout preference
 

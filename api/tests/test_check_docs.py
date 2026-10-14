@@ -158,8 +158,8 @@ def test_gitignored_paths_are_exempt(tmp_path):
 
 def _toolkit_tree(root):
     _passing_tree(root)
-    _write(root, "toolkit/rules/core-principles.md", "- core\n")
-    _write(root, "toolkit/rules/architecture-boundaries.md", "- arch\n")
+    _write(root, "toolkit/rules/core-principles.md", _scoped("py"))
+    _write(root, "toolkit/rules/architecture-boundaries.md", _scoped("py"))
     _write(root, "toolkit/rules/java.md", '---\npaths:\n  - "**/*.java"\n---\nJava\n')
     _write(
         root,
@@ -179,12 +179,20 @@ def test_toolkit_tree_passes(tmp_path):
 
 def test_always_on_rule_budgets_and_paths(tmp_path):
     _toolkit_tree(tmp_path)
-    _write(tmp_path, "toolkit/rules/core-principles.md", "x" * 2100)
-    _write(tmp_path, "toolkit/rules/architecture-boundaries.md", _scoped("ts", 2100))
+    _write(tmp_path, "toolkit/rules/core-principles.md", _scoped("py", 2100))
+    _write(tmp_path, "toolkit/rules/architecture-boundaries.md", "x" * 2100)
     problems = _problems(tmp_path)
     assert any("core-principles.md" in p and "2048-byte" in p for p in problems)
-    assert any("architecture-boundaries.md" in p and "must not have `paths:`" in p for p in problems)
+    assert any("architecture-boundaries.md" in p and "needs `paths:`" in p for p in problems)
     assert any("always-on rules total" in p for p in problems)
+
+
+def test_core_rule_paths_must_be_source_code(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/core-principles.md", _scoped("json"))
+    assert "toolkit/rules/core-principles.md: glob '**/*.json' is not a source-code file type" in _problems(
+        tmp_path
+    )
 
 
 def test_missing_always_on_rule(tmp_path):

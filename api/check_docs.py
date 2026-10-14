@@ -31,6 +31,8 @@ ALWAYS_ON_BUDGET_BYTES = 4 * 1024
 SCOPED_RULE_BUDGET_BYTES = 3 * 1024
 SKILL_BUDGET_BYTES = 4 * 1024
 ALWAYS_ON_RULES = ("core-principles.md", "architecture-boundaries.md")
+# The core rules load only when source code is touched, so config and markup extensions are out.
+CODE_EXTENSIONS = {"py", "java", "ts", "tsx", "js", "jsx", "ps1", "sh", "bat"}
 
 # A token with a "/" is only treated as a repo path when its first segment is a top-level entry of
 # the repo or its last segment has one of these extensions; this keeps "and/or" and the like out.
@@ -216,8 +218,12 @@ def _check_always_on_rules(rules: Path) -> list[str]:
             problems.append(f"toolkit/rules/{name}: required always-on rule is missing")
             continue
         total += path.stat().st_size
-        if _rule_paths(path.read_text(encoding="utf-8")) is not None:
-            problems.append(f"toolkit/rules/{name}: always-on rule must not have `paths:`")
+        globs = _rule_paths(path.read_text(encoding="utf-8"))
+        if not globs:
+            problems.append(f"toolkit/rules/{name}: core rule needs `paths:` frontmatter")
+        for glob in globs or []:
+            if glob.rsplit(".", 1)[-1] not in CODE_EXTENSIONS:
+                problems.append(f"toolkit/rules/{name}: glob '{glob}' is not a source-code file type")
     core = rules / ALWAYS_ON_RULES[0]
     if core.is_file() and core.stat().st_size > CORE_RULE_BUDGET_BYTES:
         problems.append(
