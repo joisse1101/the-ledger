@@ -1,5 +1,7 @@
 ---
-version: 2026-10-14
+metadata:
+  version: "1.0.0"
+  last_updated: "2026-10-14"
 paths:
   - "**/*.java"
 ---
