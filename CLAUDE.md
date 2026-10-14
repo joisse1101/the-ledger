@@ -11,13 +11,16 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 
 ## Layout
 
-Exactly five top-level folders, each self-contained (four services plus `toolkit/`):
+Exactly six top-level folders, each self-contained (four services, `toolkit/` and `widget/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
   its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
 - `web/` — the frontend.
 - `gateway/` — the Nginx reverse proxy, the only thing that grants LAN access.
 - `hooks/` — Claude Code toast hooks plus dashboard-coupled scripts.
+- `widget/` — the Electron desktop widget: an always-on-top, read-only live-sessions window with its own
+  `package.json`, startup scripts and tests. Talks to the backend on loopback only; imports nothing
+  from `web/`.
 - `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`) and an
   installer (`toolkit/install/Install-Skills.ps1`). Independent of the dashboard; see
   `toolkit/README.md`.
@@ -37,6 +40,8 @@ The API and the frontend are two processes on two ports (8501 and 4173).
 cd api; pytest                  # Python tests, run from api/ (that's where pyproject.toml is)
 cd web; npm test                # Vitest
 cd web; npm run build           # tsc --noEmit, then vite build; a type error fails it
+cd widget; npm test; npm run build   # widget: Vitest, then tsc
+.\widget\Start-Widget.ps1       # widget + the backend it needs (no frontend, no Docker)
 cd api; python check_docs.py    # docs check: links, code paths, size budgets
 ```
 
@@ -70,6 +75,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 | `ButtonSelector`, `ConfirmDialog`, formatting | [Frontend-Shared-Components](wiki/Frontend-Shared-Components.md) |
 | Nginx gateway, HTTPS, LAN access | [Gateway](wiki/Gateway.md) |
 | Toast hooks, relay hook | [Hooks](wiki/Hooks.md) |
+| Desktop widget, its startup scripts | [Widget](wiki/Widget.md) |
 | Folder layout, OpenSpec, other repo files | [Repository-Layout](wiki/Repository-Layout.md) |
 | Code style and standards | [Coding-Standards](wiki/Coding-Standards.md) |
 

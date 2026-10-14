@@ -762,6 +762,18 @@ def fetch_transcripts() -> list[sqlite3.Row]:
     return sorted(merged.values(), key=lambda row: row["updated_at"] or "", reverse=True)
 
 
+def git_branches(session_ids: list[str]) -> dict[str, str]:
+    """`git_branch` per session id from `ledger.db`; ids it has no row for are left out."""
+    if not session_ids:
+        return {}
+    marks = ",".join("?" * len(session_ids))
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT session_id, git_branch FROM transcripts WHERE session_id IN ({marks})", session_ids
+        ).fetchall()
+    return {row["session_id"]: row["git_branch"] for row in rows}
+
+
 def delete_project_row(project_path: str) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM projects WHERE path = ?", (project_path,))

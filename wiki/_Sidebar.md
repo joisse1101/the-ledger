@@ -25,3 +25,4 @@
 **Services**
 - [Gateway](Gateway.md)
 - [Hooks](Hooks.md)
+- [Widget](Widget.md)

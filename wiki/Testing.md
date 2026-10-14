@@ -46,5 +46,17 @@ npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/q
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
+Widget (`cd widget`):
+
+```powershell
+npm test          # Vitest: the loopback API client (against a stub HTTP server), the poller,
+                   # the process Supervisor (fake spawner: never kills what it didn't start, never
+                   # touches Docker), window-state clamping/persistence, the renderer (jsdom), IPC names
+npm run build     # tsc for the main process and for the renderer, then copies the static files
+powershell -File tests\Test-StartWidget.ps1   # Start-Widget.ps1 against a stub backend (needs a build)
+```
+
+The always-on-top window, the tray menu and the toast-equivalent repo window are checked by hand.
+
 There is no browser-automation/E2E harness for the React app; responsive layout across breakpoints
 is verified manually (resizing a real browser, and a real phone through the gateway — see [Gateway](Gateway.md)).

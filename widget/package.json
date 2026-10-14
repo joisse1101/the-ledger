@@ -1,0 +1,19 @@
+{
+  "name": "the-ledger-widget",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Always-on-top desktop widget for the Ledger's live sessions",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.mjs",
+    "start": "electron .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "electron": "^44.7.2",
+    "jsdom": "^30.1.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
