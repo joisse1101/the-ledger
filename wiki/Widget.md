@@ -1,6 +1,6 @@
 # Widget
 
-> Requirements live in `openspec/specs/desktop-widget/spec.md`. This page describes how the code meets them, not what it must do. <!-- docs-check: ignore -->
+> Requirements live in `openspec/specs/desktop-widget/spec.md`. This page describes how the code meets them, not what it must do.
 
 `widget/` is a small Electron app: a frameless, always-on-top window that lists the live Claude Code
 sessions with each one's context size, so the Ledger is useful without opening it. It is read-only
