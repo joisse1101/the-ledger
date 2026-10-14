@@ -31,6 +31,9 @@ ALWAYS_ON_BUDGET_BYTES = 4 * 1024
 SCOPED_RULE_BUDGET_BYTES = 3 * 1024
 SKILL_BUDGET_BYTES = 4 * 1024
 ALWAYS_ON_RULES = ("core-principles.md", "architecture-boundaries.md")
+# Loads in every session on purpose: a commit can contain no code (images, deletions, docs).
+UNSCOPED_RULES = ("commit-hygiene.md",)
+UNSCOPED_RULE_BUDGET_BYTES = 2 * 1024
 # The core rules load only when source code is touched, so config and markup extensions are out.
 CODE_EXTENSIONS = {"py", "java", "ts", "tsx", "js", "jsx", "ps1", "sh", "bat"}
 
@@ -238,11 +241,28 @@ def _check_always_on_rules(rules: Path) -> list[str]:
     return problems
 
 
+def _check_unscoped_rules(rules: Path) -> list[str]:
+    problems = []
+    for name in UNSCOPED_RULES:
+        path = rules / name
+        if not path.is_file():
+            continue
+        rel = f"toolkit/rules/{name}"
+        if _rule_paths(path.read_text(encoding="utf-8")):
+            problems.append(f"{rel}: unscoped rule must not have `paths:` frontmatter")
+        if path.stat().st_size > UNSCOPED_RULE_BUDGET_BYTES:
+            problems.append(
+                f"{rel}: {path.stat().st_size} bytes exceeds the "
+                f"{UNSCOPED_RULE_BUDGET_BYTES}-byte budget"
+            )
+    return problems
+
+
 def _check_scoped_rules(rules: Path) -> list[str]:
     problems = []
     seen: dict[str, str] = {}
     for path in sorted(rules.glob("*.md")):
-        if path.name in ALWAYS_ON_RULES:
+        if path.name in ALWAYS_ON_RULES or path.name in UNSCOPED_RULES:
             continue
         rel = f"toolkit/rules/{path.name}"
         globs = _rule_paths(path.read_text(encoding="utf-8"))
@@ -288,7 +308,12 @@ def check_toolkit(root: Path) -> list[str]:
     rules = root / "toolkit" / "rules"
     if not rules.is_dir():
         return []
-    return _check_always_on_rules(rules) + _check_scoped_rules(rules) + _check_review_skill(root)
+    return (
+        _check_always_on_rules(rules)
+        + _check_unscoped_rules(rules)
+        + _check_scoped_rules(rules)
+        + _check_review_skill(root)
+    )
 
 
 def _rel(root: Path, path: Path) -> str:

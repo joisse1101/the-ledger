@@ -214,6 +214,20 @@ def test_scoped_rule_needs_paths_budget_and_unique_extensions(tmp_path):
     assert "toolkit/rules/other.md: extension 'java' is also scoped by java.md" in problems
 
 
+def test_unscoped_commit_rule_is_accepted_without_paths(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/commit-hygiene.md", "# Commit hygiene\n")
+    assert _problems(tmp_path) == []
+
+
+def test_unscoped_commit_rule_budget_and_paths(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/commit-hygiene.md", _scoped("py", 2100))
+    problems = _problems(tmp_path)
+    assert "toolkit/rules/commit-hygiene.md: unscoped rule must not have `paths:` frontmatter" in problems
+    assert any("commit-hygiene.md" in p and "2048-byte" in p for p in problems)
+
+
 def test_skill_size_and_references(tmp_path):
     _toolkit_tree(tmp_path)
     _write(
