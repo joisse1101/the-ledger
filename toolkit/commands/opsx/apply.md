@@ -99,13 +99,13 @@ Implement tasks from an OpenSpec change.
 
    **Pause conditions:**
    - **Visual Verification:** If the task produces visually verifiable changes (e.g., UI components, styling, layouts), pause and instruct the user on *what* to verify and *how* to test or view it.
-   - **Pending Commits (HARD STOP — never commit in the same turn you stage):** When changes are ready to be committed:
-     1. Stage the modified files (`git add`) and run `git diff --staged --stat`.
+   - **Pending Commits (HARD STOP — never commit in the same turn you stage):** Follow the commit-hygiene rule. Changes are ready to be committed when one concern is complete, not when the task list is done. Stage and present a commit after each concern, before starting a task that belongs to another concern. If the stage spans several concerns, unstage and present only the first, and offer the rest as following commits.
+     1. Stage the files of that concern by explicit path (`git add <path>`) and run `git diff --staged --stat`.
      2. Print, as plain text in your reply (not inside a question/prompt tool): the staged file summary and the proposed commit message.
-     3. **End your turn there.** Do NOT call AskUserQuestion or any other tool, and do NOT run `git commit`. Say: "Staged. Review the diff, then reply 'yes' to commit or tell me what to change."
-     4. A message approving the *feature* (e.g. "looks good", "works well") is NOT approval to commit. Only a reply to the staged-changes prompt above counts.
-     - **If User Says Yes:** Run `git commit -m ""` and continue with implementation/remaining tasks.
-     - **If User Says No / requests changes:** Take user feedback to edit the code, apply the code changes, stage the updated files (`git add`), re-print the summary and revised commit message, and end your turn again. Repeat until the user explicitly approves.
+     3. **End your turn there.** Do NOT call AskUserQuestion or any other tool, and do NOT run `git commit`. Say: "Staged. Reply with <word> to commit, or tell me what to change." Use a common word that differs from the word in your previous prompt.
+     4. A message approving the *feature* (e.g. "looks good", "works well") or a plain "yes" is NOT approval to commit. Only the word from your most recent staged-changes prompt counts.
+     - **If User Types the Word:** Run `git commit -m ""` and continue with implementation/remaining tasks.
+     - **If User Says No / requests changes:** Take user feedback to edit the code, apply the code changes, stage the updated files (`git add <path>`), re-print the summary and revised commit message with a new word, and end your turn again. Repeat until the user types the current word.
    - **Scope & Clarity:** 
      - If a task is ambiguous or missing requirements, ask for clarification.
      - If completing a task requires work beyond the spec, or tempts you to drop, narrow, or defer specified behavior, surface the added scope explicitly instead of absorbing it silently.
@@ -141,9 +141,7 @@ Working on task 4/7: <task description>
 ## Ready to Commit
 <suggested commit message>
 
-Would you like to proceed with this commit?
-1. Yes (Commit and continue)
-2. No (Suggest what needs to change)
+Reply with <word> to commit, or tell me what to change.
 ```
 
 **Output On Completion**
