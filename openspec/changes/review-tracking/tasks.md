@@ -8,7 +8,7 @@
 ## 2. Shared hash helper
 
 - [x] 2.1 Create `toolkit/skills/coding-standards/scripts/Get-ItemHash.ps1` holding the installer's hash algorithm plus a `metadata.version`/`last_updated` reader, runnable standalone, and verify it prints the same hash as the current installer for an unchanged rule
-- [ ] 2.2 Make `Install-Toolkit.ps1` dot-source the helper instead of its private copy, add versions (toolkit and destination) to `-List`, and verify `-List` reports no new drift on an unchanged install and shows both versions for a differing item
+- [x] 2.2 Make `Install-Toolkit.ps1` dot-source the helper instead of its private copy, add versions (toolkit and destination) to `-List`, and verify `-List` reports no new drift on an unchanged install and shows both versions for a differing item
 - [ ] 2.3 Update `toolkit/README.md` for versions, the helper and `-List` output
 
 ## 3. Review skill saves its output
