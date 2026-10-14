@@ -45,5 +45,5 @@ state (missing, up to date, differing).
 - **THEN** the listing SHALL show the item as differing with both versions
 
 #### Scenario: Item without a version
-- **WHEN** an item declares no version, such as an OpenSpec-generated command
+- **WHEN** an item declares no version, such as a command file with no `metadata:` block
 - **THEN** the listing SHALL show its state without a version and SHALL NOT fail
