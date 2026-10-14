@@ -53,13 +53,17 @@ loads on its own, with no one needing to invoke it. A rule with no `paths:` fron
 session start, in every project. A rule with `paths:` frontmatter (a list of globs such as
 `"**/*.java"`) loads once a matching file is read or created. Tested on Claude Code 2.1.299: a
 scoped rule is not present before any matching file is touched, so a change planned before any
-file is opened has no rules yet. Every rule here is scoped, so sessions that never touch code
-(tickets, workflows) load none of them.
+file is opened has no rules yet. Every coding rule here is scoped, so sessions that never touch
+code (tickets, workflows) load none of them. The one exception is `commit-hygiene`, which is
+unscoped on purpose: commits of images, deletions, renames and docs touch no code file, so a
+scoped rule would be missing exactly when those commits grow. It is capped at 2 KB and asks
+nothing unless Claude is about to commit.
 
 The standards are split this way: two small core rules (principles and architecture
 boundaries, scoped to source-code file types), one path-scoped rule per technology (TypeScript/React,
 Java, Python, config files, scripts), and the `coding-standards` skill as an on-demand review
-checklist. Use `-Scope project` to keep the rules out of unrelated projects. A project's own `CLAUDE.md` takes precedence.
+checklist. The unscoped `commit-hygiene` rule keeps commits to one concern and requires the user's
+confirmation word before Claude commits. Use `-Scope project` to keep the rules out of unrelated projects. A project's own `CLAUDE.md` takes precedence.
 
 ## Installing by hand
 
