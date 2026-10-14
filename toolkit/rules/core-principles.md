@@ -29,6 +29,6 @@ Language-agnostic. These apply to all code; technology rules add mechanics, not 
 - Configuration is data. Never hardcode environment values (hosts, paths, ports, keys).
 - Evolve schemas and APIs additively and backward-compatibly. Never remove or repurpose a field
   without a migration path.
-- Log at boundaries and on failure, with enough context to diagnose. Never log secrets or
-  personal data.
+- Log at boundaries and on failure, as structured key/value or JSON, not free-form strings, with
+  enough context to diagnose. Never log secrets or personal data.
 - Run the project's build and type-check before calling a change done.
