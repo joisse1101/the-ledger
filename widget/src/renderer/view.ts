@@ -11,7 +11,7 @@ export function summaryText(state: LiveState | null): string {
 }
 
 /** Sparkline segments kept in a row; the label's trailing glyphs are the newest responses. */
-export const SPARK_SEGMENTS = 8
+export const SPARK_SEGMENTS = 15
 
 /** The server's context label with its trailing sparkline cut to the latest segments. */
 export function trimSparkline(label: string, max = SPARK_SEGMENTS): string {
