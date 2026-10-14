@@ -16,6 +16,8 @@ Language-agnostic. These apply to all code; technology rules add mechanics, not 
 
 - KISS, DRY, YAGNI: build the simplest thing that works; do not add features, options or
   abstractions before a second real use needs them; extract repeated logic once it is real.
+- Write code to be read by a person first: descriptive names, one job per function, no clever
+  construct that needs decoding.
 - Single responsibility and layer isolation: one responsibility per unit. Business logic never knows about HTTP, database drivers or UI.
 - Keep pure logic apart from I/O so it can be tested directly.
 - Fail fast at boundaries: validate input where it enters and reject bad data with a clear error.

@@ -22,6 +22,17 @@ rules); check against those rather than restating them here.
 - **Hidden coupling**: a function that reads or writes globals, or does I/O, behind a pure-looking name.
 - **Swallowed error**: an empty catch or a default that hides a failure.
 
+## Readability
+
+Code a person cannot read at a glance is a rule-breaking finding, listed with the smells above.
+
+- **Cryptic name**: a single letter, an abbreviation or a vague word (`data`, `tmp`, `x`) where a
+  descriptive name fits.
+- **Nested ternary**: a conditional expression inside another. Use `if` or a named helper.
+- **Dense one-liner**: a chain or expression the reader must decode. Split it into named steps.
+- **Many jobs in one function**: it needs "and" to describe it. Split by responsibility.
+- **Comment restating the code**: it says what the line does, not why. Delete it.
+
 ## Testing
 
 - Each test covers one behavior and follows arrange, act, assert.
@@ -37,7 +48,5 @@ These improve consistency and readability. Raise them as suggestions.
 - Match the surrounding code's naming, layout and idiom over personal taste.
 - Name things for what they are: nouns for values, verb-noun for functions, `is`/`has` for booleans.
 - Keep functions short and focused on one job.
-- Comment why, not what: the reason for a non-obvious choice, a constraint, a workaround. Delete a
-  comment that restates the code.
+- Comment why, not what: the reason for a non-obvious choice, a constraint, a workaround.
 - Document public APIs with their contract (inputs, outputs, errors) and no more.
-- Prefer clear code over clever code.
