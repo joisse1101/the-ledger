@@ -9,7 +9,8 @@ Checks:
   2. every wiki page is linked from _Sidebar.md, and from Home.md
   3. every repo path written in inline code in a wiki page or CLAUDE.md exists
   4. size budgets for the root and nested CLAUDE.md files
-  5. toolkit standards: always-on rules and budgets, scoped rules, review skill size and references
+  5. toolkit standards: always-on rules and budgets, scoped rules, review skill size and references,
+     and `metadata.version` and `metadata.last_updated` on every skill, rule, agent and jois-review command
 
 Paths ignored by git (.venv, dist, .ledger...) are exempt from the inline-code check. A line
 containing IGNORE_MARKER is skipped by it too, for any other path deliberately absent from a checkout.
@@ -18,6 +19,7 @@ containing IGNORE_MARKER is skipped by it too, for any other path deliberately a
 from __future__ import annotations
 
 import argparse
+import datetime
 import re
 import subprocess
 import sys
@@ -36,6 +38,9 @@ UNSCOPED_RULES = ("commit-hygiene.md",)
 UNSCOPED_RULE_BUDGET_BYTES = 2 * 1024
 # The core rules load only when source code is touched, so config and markup extensions are out.
 CODE_EXTENSIONS = {"py", "java", "ts", "tsx", "js", "jsx", "ps1", "sh", "bat"}
+
+# `metadata.version` in toolkit frontmatter: a semantic version, bumped by hand with `last_updated`.
+SEMVER_RE = re.compile(r"\d+\.\d+\.\d+")
 
 # A token with a "/" is only treated as a repo path when its first segment is a top-level entry of
 # the repo or its last segment has one of these extensions; this keeps "and/or" and the like out.
@@ -304,6 +309,67 @@ def _check_review_skill(root: Path) -> list[str]:
     return problems
 
 
+def _frontmatter(text: str) -> str | None:
+    match = re.match(r"---\r?\n(.*?)\r?\n---", text, re.DOTALL)
+    return match.group(1) if match else None
+
+
+def _metadata(frontmatter: str) -> dict[str, str]:
+    """The string keys of a frontmatter `metadata:` map (flat, as the Agent Skills format keeps it)."""
+    block = re.search(r"^metadata:[ \t]*\r?\n((?:[ \t]+\S.*\r?\n?)+)", frontmatter + "\n", re.MULTILINE)
+    if not block:
+        return {}
+    pairs = re.findall(r"^[ \t]+([\w-]+):[ \t]*(.*?)[ \t]*$", block.group(1), re.MULTILINE)
+    return {key: value.strip("\"'") for key, value in pairs}
+
+
+def _is_date(value: str) -> bool:
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return False
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _versioned_items(toolkit: Path) -> list[Path]:
+    return sorted(
+        [
+            *toolkit.glob("rules/*.md"),
+            *toolkit.glob("skills/*/SKILL.md"),
+            *toolkit.glob("agents/*.md"),
+            *toolkit.glob("commands/jois-review/*.md"),
+        ]
+    )
+
+
+def _version_problems(rel: str, text: str) -> list[str]:
+    frontmatter = _frontmatter(text) or ""
+    if re.search(r"^version:", frontmatter, re.MULTILINE):
+        return [f"{rel}: `version:` belongs under `metadata:`, not at the top level of the frontmatter"]
+    metadata = _metadata(frontmatter)
+    problems = []
+    version = metadata.get("version")
+    if version is None:
+        problems.append(f"{rel}: missing `metadata.version` (semver such as \"1.0.0\")")
+    elif not SEMVER_RE.fullmatch(version):
+        problems.append(f"{rel}: metadata.version '{version}' is not MAJOR.MINOR.PATCH")
+    updated = metadata.get("last_updated")
+    if updated is None:
+        problems.append(f"{rel}: missing `metadata.last_updated` (a date such as 2026-10-14)")
+    elif not _is_date(updated):
+        problems.append(f"{rel}: metadata.last_updated '{updated}' is not a date like 2026-10-14")
+    return problems
+
+
+def _check_versions(root: Path) -> list[str]:
+    problems = []
+    for path in _versioned_items(root / "toolkit"):
+        problems += _version_problems(_rel(root, path), path.read_text(encoding="utf-8"))
+    return problems
+
+
 def check_toolkit(root: Path) -> list[str]:
     rules = root / "toolkit" / "rules"
     if not rules.is_dir():
@@ -313,6 +379,7 @@ def check_toolkit(root: Path) -> list[str]:
         + _check_unscoped_rules(rules)
         + _check_scoped_rules(rules)
         + _check_review_skill(root)
+        + _check_versions(root)
     )
 
 
