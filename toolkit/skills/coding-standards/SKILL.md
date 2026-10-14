@@ -2,6 +2,7 @@
 name: coding-standards
 description: Review checklist for code quality - code smells, naming, comments and test structure. Use when asked to review code, check a change for quality, or clean up a diff. Not needed while writing code; the always-on and per-language rules cover that.
 license: MIT
+version: 2026-10-14
 ---
 
 # Code quality review

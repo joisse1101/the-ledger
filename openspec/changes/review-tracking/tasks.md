@@ -2,7 +2,7 @@
 
 - [x] 1.1 Verify on a throwaway rule that Claude Code loads a rule whose frontmatter has `version:` (and, scoped, `paths:` plus `version:`); record the result and, if rejected, switch design decision 1 to a first-line comment before continuing (result on 2.1.299: accepted; unscoped and `paths:`-scoped rules both loaded)
 - [x] 1.1b Verify whether a subagent's frontmatter can carry a `PreToolUse` hook that denies a Read/Grep call; record the answer and, if unsupported, drop design layer 12(b) and plan the README `permissions.deny` snippet instead (result on 2.1.299: the agent hook never ran, the same hook in `settings.json` blocked; layer dropped, README snippet planned)
-- [ ] 1.2 Add `version: <today>` frontmatter to every file in `toolkit/rules/` (`commit-hygiene.md` gets a `version:`-only block, no `paths:`) and verify scoped rules keep their `paths:`
+- [x] 1.2 Add `version: <today>` frontmatter to every file in `toolkit/rules/` (`commit-hygiene.md` gets a `version:`-only block, no `paths:`) and verify scoped rules keep their `paths:`
 - [ ] 1.3 Extend `api/check_docs.py` to require a date-format `version:` on every skill, rule and `jois-review` command (naming the file on failure), with tests in `api/tests/test_check_docs.py` for missing, malformed and valid values and for the `commit-hygiene` version-only block; run `cd api; pytest` and `python check_docs.py`
 
 ## 2. Shared hash helper
