@@ -151,8 +151,8 @@ Archive a completed change in the experimental workflow.
 
 7. **Stage and propose a commit (HARD STOP — never commit in the same turn you stage)**
 
-   The archive (and any spec sync) leaves uncommitted changes. After the summary:
-   1. Stage them (`git add` the archive directory, moved change files, and any synced main specs) and run `git diff --staged --stat`.
+   The archive (and any spec sync) leaves uncommitted changes. They are one concern: archiving this change. Follow the commit-hygiene rule and keep unrelated edits out of the commit. After the summary:
+   1. Stage them by explicit path (`git add <path>` for the archive directory, moved change files, and any synced main specs) and run `git diff --staged --stat`.
    2. Print, as plain text in your reply: the staged file summary and a concise proposed commit message (e.g. `chore(openspec): archive <change-name>`).
    3. **Ask with AskUserQuestion as the last action of your turn** — a single-select question such as "Commit these staged changes?" with options "Yes, commit" and "No, let me change something". Do NOT run `git commit` in this turn.
    4. Commit only after the user picks "Yes, commit". If they pick "No" or answer via "Other" with changes, apply them, re-stage, reprint the summary and revised message, and ask again.
