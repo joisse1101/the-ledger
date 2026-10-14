@@ -56,15 +56,15 @@ Each row SHALL show the session's context size, using the same value and the sam
 - **THEN** no value is presented as a percentage of a limit and no limit is shown
 
 ### Requirement: Rows flag a waiting prompt
-A row for a session that has a pending permission prompt or question SHALL show a `pending` badge. The widget SHALL NOT display the prompt's content and SHALL NOT offer to approve, deny or answer it.
+A row for a session that has a pending permission prompt or question SHALL be shown in a distinct highlight colour instead of a status icon or badge. The widget SHALL NOT display the prompt's content and SHALL NOT offer to approve, deny or answer it.
 
 #### Scenario: Prompt is waiting
 - **WHEN** a live session has a pending prompt
-- **THEN** its row shows the badge and no prompt text or answer controls
+- **THEN** its row is highlighted and shows no prompt text or answer controls
 
 #### Scenario: Prompt answered elsewhere
 - **WHEN** the prompt is answered in the terminal or the dashboard
-- **THEN** the badge is gone at the next refresh
+- **THEN** the highlight is gone at the next refresh
 
 ### Requirement: Clicking a row opens the session's repo window
 Clicking a session's row SHALL open or focus the editor window for that session's repository, the same action a toast click performs. If it fails because the session is no longer live, the widget SHALL show a brief message and otherwise keep working.

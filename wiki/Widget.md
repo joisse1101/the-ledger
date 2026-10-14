@@ -12,7 +12,7 @@ the only part of the repo that is not a service, a hook or a skill.
 ```text
 Electron main process                      renderer (sandboxed)
   poller --GET /api/live--> backend          plain TS + HTML + CSS
-  supervisor (hidden backend/frontend)       rows, pending badge, offline state
+  supervisor (hidden backend/frontend)       rows, pending tint, offline state
   tray, window, saved bounds   --IPC-->      window.widget (narrow preload API)
 ```
 
@@ -27,8 +27,8 @@ Electron main process                      renderer (sandboxed)
 - **Context text is the server's.** A row shows `context.label` verbatim (for example
   `394k ▲ +2.1k ▁▂▃▅`), the string `claude_context.format_context` builds for the Live table and the
   toast, or `--` when `context` is null. The widget has no token formatter of its own.
-- **Pending badge.** A row shows `pending` when `pending_decision` is set. The prompt itself is never
-  read or shown, and nothing can be approved here; answer in the terminal or the Ledger.
+- **Pending tint.** A row gets the `pending` class (warm background) when `pending_decision` is set,
+  with no badge text. The prompt itself is never read or shown, and nothing can be approved here; answer in the terminal or the Ledger.
 - **Row click** calls `POST /api/sessions/{id}/open-repo` (the toast-click action). A 404 shows a
   brief "Session ended" note and refreshes the list.
 - **Branch.** `/api/live` items carry `git_branch`, looked up from `ledger.db` in `LiveSnapshot`
