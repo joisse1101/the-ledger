@@ -13,8 +13,8 @@
 
 ## 3. Review skill saves its output
 
-- [ ] 3.1 Add the save step to `toolkit/skills/coding-standards/SKILL.md`: `reviews/YYYY-MM-DD_HHMM.md` naming with collision suffix, frontmatter fields, `uses[]` populated through the helper, coverage section, finding-block template with the five categories and symbol anchors, "what's good" section; keep it within 6 KB and bump its `metadata.version`
-- [ ] 3.2 Update `check_docs.py` for the 6 KB skill budget and confirm the skill's references still resolve; verify `python check_docs.py` passes
+- [x] 3.1 Add the save step to `toolkit/skills/coding-standards/SKILL.md`: `reviews/YYYY-MM-DD_HHMM.md` naming with collision suffix, frontmatter fields, `uses[]` populated through the helper, coverage section, finding-block template with the five categories and symbol anchors, "what's good" section; keep it within 6 KB and bump its `metadata.version`
+- [x] 3.2 Update `check_docs.py` for the 6 KB skill budget and confirm the skill's references still resolve; verify `python check_docs.py` passes
 - [ ] 3.3 Dry-run the skill on a small diff and verify the produced file matches the spec (metadata, one complete block per finding, unchecked boxes)
 
 ## 4. Read-only reviewer and baseline

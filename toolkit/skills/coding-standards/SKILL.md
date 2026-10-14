@@ -3,7 +3,7 @@ name: coding-standards
 description: Review checklist for code quality - code smells, naming, comments and test structure. Use when asked to review code, check a change for quality, or clean up a diff. Not needed while writing code; the always-on and per-language rules cover that.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   last_updated: "2026-10-14"
 ---
 
@@ -53,3 +53,46 @@ These improve consistency and readability. Raise them as suggestions.
 - Keep functions short and focused on one job.
 - Comment why, not what: the reason for a non-obvious choice, a constraint, a workaround.
 - Document public APIs with their contract (inputs, outputs, errors) and no more.
+
+## Save the review
+
+Always save the review as a checklist, so it can be worked through and archived later. Write it to
+`reviews/YYYY-MM-DD_HHMM.md` at the repository root (local time; create the folder). If that name
+exists, add a suffix (`_HHMM-2`) and never overwrite. Tell the user the path.
+
+Start with this frontmatter:
+
+```yaml
+---
+reviewed_at: 2026-10-14 17:07
+scope: whole codebase | branch name | the diff
+commit: <git rev-parse --short HEAD, or none>
+status: open
+uses:
+  - {kind: skill, name: coding-standards, version: "1.1.0", last_updated: "2026-10-14", hash: <hash>}
+  - {kind: rule, name: python.md, version: "1.0.0", last_updated: "2026-10-14", hash: <hash>}
+---
+```
+
+`uses` has one entry for the skill and for every rule you applied. Take each entry's `hash`,
+`version` and `last_updated` by running `scripts/Get-ItemHash.ps1 -ItemPath <installed skill folder
+or rule file>` (in this skill's folder); never type them from memory.
+
+Then the body, in this order:
+
+1. **Coverage**: what was read and what was not (name skipped areas, such as CSS or generated code).
+2. **Findings**, one block each, numbered, ordered rule-breaking first and smells last:
+
+   ```markdown
+   ### 3. open-repo reports success when it fails
+   - **Category**: Defect
+   - **Files**: `api/routes.py:120-134` (`open_repo`)
+   - **Problem**: what is wrong and why it matters.
+   - **Fix**: the concrete change to make.
+   - [ ] Done
+   ```
+
+   Category is exactly one of **Rule-breaking**, **Defect**, **Structure**, **Script**, **Smell**.
+   Give each location a symbol anchor (function, class or component) beside its line numbers; later
+   fixes move lines, the anchor still finds the code.
+3. **What's good**: what is already sound, briefly.

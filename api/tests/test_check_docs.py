@@ -235,10 +235,10 @@ def test_skill_size_and_references(tmp_path):
     _write(
         tmp_path,
         "toolkit/skills/coding-standards/SKILL.md",
-        f"---\n{VERSION}\n---\nUse `frontend-patterns` and `rules/common/coding-style.md`.\n" + "x" * 4100,
+        f"---\n{VERSION}\n---\nUse `frontend-patterns` and `rules/common/coding-style.md`.\n" + "x" * 6200,
     )
     problems = _problems(tmp_path)
-    assert any("4096-byte" in p for p in problems)
+    assert any("6144-byte" in p for p in problems)
     assert any("'frontend-patterns' is not in the toolkit" in p for p in problems)
     assert any("'rules/common/coding-style.md' is not in the toolkit" in p for p in problems)
 
@@ -300,3 +300,13 @@ def test_version_is_required_on_skills_agents_and_review_commands(tmp_path):
     ):
         assert any(p.startswith(f"{rel}: missing `metadata.version`") for p in problems)
     assert not any("opsx" in p for p in problems)
+
+
+def test_skill_may_name_the_review_output_folder(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(
+        tmp_path,
+        "toolkit/skills/coding-standards/SKILL.md",
+        f"---\n{VERSION}\n---\nSave to `reviews/2026-10-14_1707.md`.\n",
+    )
+    assert _problems(tmp_path) == []
