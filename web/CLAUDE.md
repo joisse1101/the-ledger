@@ -13,9 +13,10 @@
 ## Local rules
 
 - `npm run build` type-checks (`tsc --noEmit`); run it before calling a change done.
-- New components use a colocated CSS module. Colours come only from the `tokens.css` variables.
-  Migrate an old component when touching it; don't rewrite `src/styles/` wholesale.
-- Breakpoints live only in `web/src/lib/breakpoints.ts`; stylesheets use `@media (--narrow)` and friends.
-- `web/src/api/types.ts` mirrors the server JSON. Change both sides together.
-- Call the API only through `apiFetch`, with relative `/api` paths.
+- General standards: toolkit rules (`toolkit/install/Install-Toolkit.ps1`, `-Scope project` works).
+- Colours come from `tokens.css` variables. Migrate an old component when touching it; don't
+  rewrite `src/styles/` wholesale.
+- Breakpoints live in `web/src/lib/breakpoints.ts`; stylesheets use `@media (--narrow)` and friends.
+- `web/src/api/types.ts` mirrors the server JSON.
+- The API client is `apiFetch`, with relative `/api` paths.
 - No E2E harness: verify responsive layout by resizing a real browser.

@@ -10,6 +10,16 @@ export function summaryText(state: LiveState | null): string {
   return pending > 0 ? `${count} live · ${pending} pending` : `${count} live`
 }
 
+/** Sparkline segments kept in a row; the label's trailing glyphs are the newest responses. */
+export const SPARK_SEGMENTS = 15
+
+/** The server's context label with its trailing sparkline cut to the latest segments. */
+export function trimSparkline(label: string, max = SPARK_SEGMENTS): string {
+  const match = label.match(/[▁-█]+$/u)
+  if (!match || match[0].length <= max) return label
+  return label.slice(0, match.index) + match[0].slice(-max)
+}
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   doc: Document,
   tag: K,
@@ -30,11 +40,11 @@ function renderRow(doc: Document, session: LiveSession, onOpen: (sessionId: stri
   const name = el(doc, 'span', 'name', session.project)
   if (session.git_branch) name.append(el(doc, 'span', 'branch', session.git_branch))
 
-  // The server's own label (size, growth marker, sparkline), shown verbatim; `--` when unknown.
-  const context = el(doc, 'span', 'ctx', session.context?.label || '--')
+  // The server's own label (size, growth marker, sparkline); only the sparkline is shortened. `--` when unknown.
+  const context = el(doc, 'span', 'ctx', trimSparkline(session.context?.label || '--'))
 
   row.append(name, context)
-  if (session.pending_decision) row.append(el(doc, 'span', 'badge', 'pending'))
+  if (session.pending_decision) row.classList.add('pending')
   row.addEventListener('click', () => onOpen(session.session_id))
   return row
 }

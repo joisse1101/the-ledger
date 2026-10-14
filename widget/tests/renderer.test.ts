@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../src/renderer/app'
-import { summaryText } from '../src/renderer/view'
+import { summaryText, trimSparkline } from '../src/renderer/view'
 import type { LiveSession, LiveState, OpenRepoResult, WidgetBridge } from '../src/shared/types'
 
 const session = (over: Partial<LiveSession> = {}): LiveSession => ({
@@ -47,6 +47,12 @@ describe('rows', () => {
     expect(text('.ctx')).toBe('394k ▲ +2.1k ▁▂▃▅')
   })
 
+  it('keeps only the latest sparkline segments and leaves the rest of the label alone', () => {
+    expect(trimSparkline('394k ▲ +2.1k ▁▂▃▄▅▆▇█▁▂▃▄')).toBe('394k ▲ +2.1k ▅▆▇█▁▂▃▄')
+    expect(trimSparkline('394k ▲ +2.1k ▁▂▃')).toBe('394k ▲ +2.1k ▁▂▃')
+    expect(trimSparkline('42k')).toBe('42k')
+  })
+
   it('shows -- when the context is unavailable and leaves other rows alone', () => {
     const { push } = setup()
     push({ state: 'online', sessions: [session({ context: null }), session({ session_id: 's2', context: { label: '42k' } })] })
@@ -61,21 +67,22 @@ describe('rows', () => {
   })
 })
 
-describe('pending badge', () => {
-  it('shows the badge but never the prompt content or controls', () => {
+describe('pending row', () => {
+  it('tints the row but never shows the prompt content or controls', () => {
     const { push } = setup()
     const decision = { id: 'p1', tool_name: 'Bash', tool_input: { command: 'rm -rf secret' } }
     push({ state: 'online', sessions: [session({ pending_decision: decision })] })
-    expect(text('.badge')).toBe('pending')
-    expect(document.body.textContent).not.toMatch(/Bash|rm -rf|secret/)
+    expect(document.querySelector('.row.pending')).not.toBeNull()
+    expect(document.querySelector('.badge')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/Bash|rm -rf|secret|pending decision/)
     expect(document.querySelectorAll('button.row button, .row input, .row textarea')).toHaveLength(0)
     expect(text('#summary')).toBe('1 live · 1 pending')
   })
 
-  it('has no badge when nothing is pending', () => {
+  it('leaves the row untinted when nothing is pending', () => {
     const { push } = setup()
     push({ state: 'online', sessions: [session()] })
-    expect(document.querySelector('.badge')).toBeNull()
+    expect(document.querySelector('.row.pending')).toBeNull()
   })
 })
 

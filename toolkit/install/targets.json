@@ -1,6 +1,16 @@
 {
   "claude-code": {
-    "global": "~/.claude/skills",
-    "project": ".claude/skills"
+    "skills": {
+      "global": "~/.claude/skills",
+      "project": ".claude/skills"
+    },
+    "commands": {
+      "global": "~/.claude/commands",
+      "project": ".claude/commands"
+    },
+    "rules": {
+      "global": "~/.claude/rules",
+      "project": ".claude/rules"
+    }
   }
 }

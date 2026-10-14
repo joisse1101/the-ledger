@@ -154,3 +154,88 @@ def test_gitignored_paths_are_exempt(tmp_path):
     assert _problems(tmp_path) == [
         "wiki/Backend-Security.md:1: path 'api/gone.py' does not exist"
     ]
+
+
+def _toolkit_tree(root):
+    _passing_tree(root)
+    _write(root, "toolkit/rules/core-principles.md", _scoped("py"))
+    _write(root, "toolkit/rules/architecture-boundaries.md", _scoped("py"))
+    _write(root, "toolkit/rules/java.md", '---\npaths:\n  - "**/*.java"\n---\nJava\n')
+    _write(
+        root,
+        "toolkit/skills/coding-standards/SKILL.md",
+        "Check against `core-principles` and `java`.\n",
+    )
+
+
+def _scoped(extension, padding=0):
+    return f'---\npaths:\n  - "**/*.{extension}"\n---\n' + "x" * padding
+
+
+def test_toolkit_tree_passes(tmp_path):
+    _toolkit_tree(tmp_path)
+    assert _problems(tmp_path) == []
+
+
+def test_always_on_rule_budgets_and_paths(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/core-principles.md", _scoped("py", 2100))
+    _write(tmp_path, "toolkit/rules/architecture-boundaries.md", "x" * 2100)
+    problems = _problems(tmp_path)
+    assert any("core-principles.md" in p and "2048-byte" in p for p in problems)
+    assert any("architecture-boundaries.md" in p and "needs `paths:`" in p for p in problems)
+    assert any("always-on rules total" in p for p in problems)
+
+
+def test_core_rule_paths_must_be_source_code(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/core-principles.md", _scoped("json"))
+    assert "toolkit/rules/core-principles.md: glob '**/*.json' is not a source-code file type" in _problems(
+        tmp_path
+    )
+
+
+def test_missing_always_on_rule(tmp_path):
+    _toolkit_tree(tmp_path)
+    (tmp_path / "toolkit/rules/core-principles.md").unlink()
+    assert "toolkit/rules/core-principles.md: required always-on rule is missing" in _problems(
+        tmp_path
+    )
+
+
+def test_scoped_rule_needs_paths_budget_and_unique_extensions(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/noscope.md", "no frontmatter\n")
+    _write(tmp_path, "toolkit/rules/big.md", _scoped("py", 3100))
+    _write(tmp_path, "toolkit/rules/other.md", _scoped("java"))
+    problems = _problems(tmp_path)
+    assert "toolkit/rules/noscope.md: technology rule needs `paths:` frontmatter" in problems
+    assert any("big.md" in p and "3072-byte" in p for p in problems)
+    assert "toolkit/rules/other.md: extension 'java' is also scoped by java.md" in problems
+
+
+def test_unscoped_commit_rule_is_accepted_without_paths(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/commit-hygiene.md", "# Commit hygiene\n")
+    assert _problems(tmp_path) == []
+
+
+def test_unscoped_commit_rule_budget_and_paths(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/commit-hygiene.md", _scoped("py", 2100))
+    problems = _problems(tmp_path)
+    assert "toolkit/rules/commit-hygiene.md: unscoped rule must not have `paths:` frontmatter" in problems
+    assert any("commit-hygiene.md" in p and "2048-byte" in p for p in problems)
+
+
+def test_skill_size_and_references(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(
+        tmp_path,
+        "toolkit/skills/coding-standards/SKILL.md",
+        "Use `frontend-patterns` and `rules/common/coding-style.md`.\n" + "x" * 4100,
+    )
+    problems = _problems(tmp_path)
+    assert any("4096-byte" in p for p in problems)
+    assert any("'frontend-patterns' is not in the toolkit" in p for p in problems)
+    assert any("'rules/common/coding-style.md' is not in the toolkit" in p for p in problems)

@@ -1,7 +1,7 @@
 ---
 name: "OPSX: Archive"
 description: "Archive a completed change in the experimental workflow"
-allowed-tools: Bash(openspec:*)
+allowed-tools: Bash(openspec:*), Bash(git add:*), Bash(git diff:*), Bash(git status:*), Bash(git commit:*)
 category: "Workflow"
 tags: ["workflow", "archive", "experimental"]
 ---
@@ -148,6 +148,15 @@ Archive a completed change in the experimental workflow.
    - Archive location
    - Spec sync status (synced / sync skipped / no delta specs)
    - Note about any warnings (incomplete artifacts/tasks)
+
+7. **Stage and propose a commit (HARD STOP — never commit in the same turn you stage)**
+
+   The archive (and any spec sync) leaves uncommitted changes. They are one concern: archiving this change. Follow the commit-hygiene rule and keep unrelated edits out of the commit. After the summary:
+   1. Stage them by explicit path (`git add <path>` for the archive directory, moved change files, and any synced main specs) and run `git diff --staged --stat`.
+   2. Print, as plain text in your reply: the staged file summary and a concise proposed commit message (e.g. `chore(openspec): archive <change-name>`).
+   3. **Ask with AskUserQuestion as the last action of your turn** — a single-select question such as "Commit these staged changes?" with options "Yes, commit" and "No, let me change something". Do NOT run `git commit` in this turn.
+   4. Commit only after the user picks "Yes, commit". If they pick "No" or answer via "Other" with changes, apply them, re-stage, reprint the summary and revised message, and ask again.
+   5. If nothing is staged (e.g., `openspec/` is gitignored), say so and skip this step.
 
 **Output On Success**
 
