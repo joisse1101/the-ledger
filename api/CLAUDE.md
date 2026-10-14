@@ -14,11 +14,10 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 
 ## Local rules
 
-- Tests: one file per module under `tests/`. Use the `isolated_db` fixture so a test never touches
-  the real `~/.claude.json` or `~/.claude/projects/`.
-- The `claude_*.py` data layer stays framework-free: no FastAPI or Starlette imports.
-- Delete routes and Remote-mode switching are local-only, enforced in the route with `is_local`.
-  Hiding a button in `web/` is UX, not security.
+- General standards: toolkit rules (`toolkit/install/Install-Toolkit.ps1`, `-Scope project` works).
+- Tests use the `isolated_db` fixture (`~/.claude.json`, `~/.claude/projects/`).
+- The `claude_*.py` modules are the data layer.
+- Delete routes and Remote-mode switching check `is_local` in the route.
 - No `CORSMiddleware`; the frontend only calls relative `/api` paths.
 - `api/` runs `hooks/scripts/Open-ClaudeRepoWindow.ps1` for open-repo, so keep that path stable.
 - Docs: `python check_docs.py` checks `wiki/` and every `CLAUDE.md`. Update the wiki page when a

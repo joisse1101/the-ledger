@@ -7,6 +7,10 @@
     "commands": {
       "global": "~/.claude/commands",
       "project": ".claude/commands"
+    },
+    "rules": {
+      "global": "~/.claude/rules",
+      "project": ".claude/rules"
     }
   }
 }

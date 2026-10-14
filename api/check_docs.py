@@ -9,6 +9,7 @@ Checks:
   2. every wiki page is linked from _Sidebar.md, and from Home.md
   3. every repo path written in inline code in a wiki page or CLAUDE.md exists
   4. size budgets for the root and nested CLAUDE.md files
+  5. toolkit standards: always-on rules and budgets, scoped rules, review skill size and references
 
 Paths ignored by git (.venv, dist, .ledger...) are exempt from the inline-code check. A line
 containing IGNORE_MARKER is skipped by it too, for any other path deliberately absent from a checkout.
@@ -25,6 +26,11 @@ from pathlib import Path
 ROOT_BUDGET_BYTES = 8 * 1024
 NESTED_BUDGET_BYTES = 4 * 1024
 IGNORE_MARKER = "<!-- docs-check: ignore -->"
+CORE_RULE_BUDGET_BYTES = 2 * 1024
+ALWAYS_ON_BUDGET_BYTES = 4 * 1024
+SCOPED_RULE_BUDGET_BYTES = 3 * 1024
+SKILL_BUDGET_BYTES = 4 * 1024
+ALWAYS_ON_RULES = ("core-principles.md", "architecture-boundaries.md")
 
 # A token with a "/" is only treated as a repo path when its first segment is a top-level entry of
 # the repo or its last segment has one of these extensions; this keeps "and/or" and the like out.
@@ -190,6 +196,95 @@ def check_sizes(root: Path) -> list[str]:
     return problems
 
 
+def _rule_paths(text: str) -> list[str] | None:
+    """The globs in a rule's `paths:` frontmatter, or None if it has none."""
+    match = re.match(r"---\r?\n(.*?)\r?\n---", text, re.DOTALL)
+    if not match:
+        return None
+    block = re.search(r"^paths:[ \t]*\r?\n((?:[ \t]+-[ \t]*.+\r?\n?)+)", match.group(1) + "\n", re.MULTILINE)
+    if not block:
+        return None
+    return [g.strip().strip("\"'") for g in re.findall(r"-[ \t]*(.+)", block.group(1))]
+
+
+def _check_always_on_rules(rules: Path) -> list[str]:
+    problems = []
+    total = 0
+    for name in ALWAYS_ON_RULES:
+        path = rules / name
+        if not path.is_file():
+            problems.append(f"toolkit/rules/{name}: required always-on rule is missing")
+            continue
+        total += path.stat().st_size
+        if _rule_paths(path.read_text(encoding="utf-8")) is not None:
+            problems.append(f"toolkit/rules/{name}: always-on rule must not have `paths:`")
+    core = rules / ALWAYS_ON_RULES[0]
+    if core.is_file() and core.stat().st_size > CORE_RULE_BUDGET_BYTES:
+        problems.append(
+            f"toolkit/rules/{core.name}: {core.stat().st_size} bytes exceeds the "
+            f"{CORE_RULE_BUDGET_BYTES}-byte budget"
+        )
+    if total > ALWAYS_ON_BUDGET_BYTES:
+        problems.append(
+            f"toolkit/rules: always-on rules total {total} bytes, over the "
+            f"{ALWAYS_ON_BUDGET_BYTES}-byte budget"
+        )
+    return problems
+
+
+def _check_scoped_rules(rules: Path) -> list[str]:
+    problems = []
+    seen: dict[str, str] = {}
+    for path in sorted(rules.glob("*.md")):
+        if path.name in ALWAYS_ON_RULES:
+            continue
+        rel = f"toolkit/rules/{path.name}"
+        globs = _rule_paths(path.read_text(encoding="utf-8"))
+        if not globs:
+            problems.append(f"{rel}: technology rule needs `paths:` frontmatter")
+        if path.stat().st_size > SCOPED_RULE_BUDGET_BYTES:
+            problems.append(
+                f"{rel}: {path.stat().st_size} bytes exceeds the "
+                f"{SCOPED_RULE_BUDGET_BYTES}-byte budget"
+            )
+        for glob in globs or []:
+            ext = glob.rsplit(".", 1)[-1]
+            if ext in seen and seen[ext] != path.name:
+                problems.append(f"{rel}: extension '{ext}' is also scoped by {seen[ext]}")
+            seen.setdefault(ext, path.name)
+    return problems
+
+
+def _check_review_skill(root: Path) -> list[str]:
+    skill = root / "toolkit" / "skills" / "coding-standards" / "SKILL.md"
+    if not skill.is_file():
+        return []
+    rel = "toolkit/skills/coding-standards/SKILL.md"
+    problems = []
+    if skill.stat().st_size > SKILL_BUDGET_BYTES:
+        problems.append(
+            f"{rel}: {skill.stat().st_size} bytes exceeds the {SKILL_BUDGET_BYTES}-byte budget"
+        )
+    toolkit = root / "toolkit"
+    for number, line in _prose_lines(skill):
+        for token in CODE_RE.findall(line):
+            if re.fullmatch(r"[a-z]+(-[a-z]+)+", token):
+                if not (toolkit / "rules" / f"{token}.md").is_file() and not (
+                    toolkit / "skills" / token
+                ).is_dir():
+                    problems.append(f"{rel}:{number}: reference '{token}' is not in the toolkit")
+            elif "/" in token and not (toolkit / token).exists():
+                problems.append(f"{rel}:{number}: path '{token}' is not in the toolkit")
+    return problems
+
+
+def check_toolkit(root: Path) -> list[str]:
+    rules = root / "toolkit" / "rules"
+    if not rules.is_dir():
+        return []
+    return _check_always_on_rules(rules) + _check_scoped_rules(rules) + _check_review_skill(root)
+
+
 def _rel(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
@@ -202,6 +297,7 @@ def run_checks(root: Path) -> list[str]:
         + check_orphans(root)
         + check_code_paths(root, docs)
         + check_sizes(root)
+        + check_toolkit(root)
     )
 
 
