@@ -21,8 +21,8 @@ Exactly six top-level folders, each self-contained (four services, `toolkit/` an
 - `widget/` — the Electron desktop widget: an always-on-top, read-only live-sessions window with its own
   `package.json`, startup scripts and tests. Talks to the backend on loopback only; imports nothing
   from `web/`.
-- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`) and an
-  installer (`toolkit/install/Install-Skills.ps1`). Independent of the dashboard; see
+- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`), slash
+  commands (`toolkit/commands/`) and an installer (`toolkit/install/Install-Toolkit.ps1`). Independent of the dashboard; see
   `toolkit/README.md`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
