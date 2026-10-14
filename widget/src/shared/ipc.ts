@@ -6,4 +6,6 @@ export const CHANNELS = {
   openSession: 'widget:open-session',
   openLedger: 'widget:open-ledger',
   toggleCollapse: 'widget:toggle-collapse',
+  opacity: 'widget:opacity',
+  setOpacity: 'widget:set-opacity',
 } as const

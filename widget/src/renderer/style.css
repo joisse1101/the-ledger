@@ -1,23 +1,38 @@
 :root {
   color-scheme: light dark;
-  --bg: #fbfbfa;
-  --fg: #1d1d1b;
-  --muted: #6b6b66;
-  --line: #deded8;
-  --hover: #efefe9;
-  --accent: #b54708;
-  --accent-bg: #fef0c7;
+  --bg-alpha: 1;
+}
+
+/* Values copied by hand from web/src/theme/tokens.css (the widget imports nothing from web/),
+   under the same names. Refresh them there first if the palette changes. */
+:root {
+  --bg-main: #f3eef0;
+  --bg-surface-hover: #f7eef1;
+  --text-main: #241820;
+  --text-muted: #6b5a61;
+  --text-on-accent: #fff;
+  --border-subtle: #e7dfe2;
+  --brand-accent: #8a4a5e;
+  --brand-text: #8a4a5e;
+  --brand-border-muted: #f0d8de;
+  --brand-border-strong: #c98da0;
+  --warn-bg: #fff4d6;
+  --warn-text: #5c3d00;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1c1a;
-    --fg: #ecece6;
-    --muted: #9a9a92;
-    --line: #34342f;
-    --hover: #2a2a27;
-    --accent: #fdb022;
-    --accent-bg: #4a3200;
+    --bg-main: #121214;
+    --bg-surface-hover: #26262b;
+    --text-main: #fff;
+    --text-muted: #a1a1aa;
+    --border-subtle: #27272a;
+    --brand-accent: #96556c;
+    --brand-text: #d17f9b;
+    --brand-border-muted: #4d2c36;
+    --brand-border-strong: #b8738a;
+    --warn-bg: #3d2f00;
+    --warn-text: #ffe29a;
   }
 }
 
@@ -26,8 +41,8 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--fg);
+  background: color-mix(in srgb, var(--bg-main) calc(var(--bg-alpha) * 100%), transparent);
+  color: var(--text-main);
   font: 12px/1.35 "Segoe UI", system-ui, sans-serif;
   user-select: none;
   overflow: hidden;
@@ -36,7 +51,7 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-subtle);
 }
 
 .bar {
@@ -45,7 +60,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 6px 4px 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-subtle);
   -webkit-app-region: drag;
 }
 
@@ -57,12 +72,17 @@ button {
   font: inherit;
   color: inherit;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: 1px 7px;
   cursor: pointer;
 }
-button:hover { background: var(--hover); }
+.actions button { color: var(--brand-text); background: var(--brand-border-muted); border-color: var(--brand-border-strong); line-height: 1.2; }
+.actions button:hover { background: var(--brand-accent); color: var(--text-on-accent); }
+.sun.small { font-size: 10px; }
+.sun.big { font-size: 16px; line-height: 1; }
+
+button:hover { background: var(--bg-surface-hover); }
 
 .list { flex: 1; overflow-y: auto; }
 
@@ -74,13 +94,13 @@ button:hover { background: var(--hover); }
   width: 100%;
   padding: 6px 10px;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-subtle);
   border-radius: 0;
   text-align: left;
 }
 
 .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.branch { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.branch { margin-left: 6px; font-weight: 400; color: var(--text-muted); }
 
 /* The label carries Unicode block glyphs (the sparkline); Segoe UI Symbol has them. */
 .ctx {
@@ -94,18 +114,19 @@ button:hover { background: var(--hover); }
 .badge {
   padding: 0 6px;
   border-radius: 8px;
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: var(--warn-bg);
+  color: var(--warn-text);
   font-size: 11px;
   font-weight: 600;
 }
 
-.empty { margin: 0; padding: 14px 10px; color: var(--muted); }
+.empty { margin: 0; padding: 14px 10px; color: var(--text-muted); }
 
-.note { min-height: 0; padding: 0 10px; color: var(--muted); }
-.note:not(:empty) { padding: 3px 10px; border-top: 1px solid var(--line); }
+.note { min-height: 0; padding: 0 10px; color: var(--text-muted); }
+.note:not(:empty) { padding: 3px 10px; border-top: 1px solid var(--border-subtle); }
 
 body.collapsed .list,
 body.collapsed .note,
+body.collapsed .sun,
 body.collapsed #ledger { display: none; }
 body.collapsed .bar { border-bottom: 0; }

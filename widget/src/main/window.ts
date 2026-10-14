@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
 import { CHANNELS } from '../shared/ipc'
 import type { LiveState } from '../shared/types'
-import { clampToDisplays, saveState, type Rect, type WidgetState } from './state'
+import { clampOpacity, clampToDisplays, saveState, type Rect, type WidgetState } from './state'
 
 const PILL_HEIGHT = 34
 const PILL_MAX_WIDTH = 240
@@ -13,6 +13,7 @@ export interface WidgetWindow {
   sendState(state: LiveState): void
   toggleCollapse(): void
   toggleVisible(): void
+  setOpacity(value: number): void
   show(): void
   isVisible(): boolean
 }
@@ -22,6 +23,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
   const workAreas = screen.getAllDisplays().map((d) => d.workArea)
   let bounds: Rect = clampToDisplays(saved.bounds, workAreas)
   let collapsed = saved.collapsed
+  let opacity = clampOpacity(saved.opacity)
   let lastState: LiveState | null = null
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -43,6 +45,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
     fullscreenable: false,
     maximizable: false,
     show: false,
+    transparent: true,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -61,6 +64,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
 
   const push = () => {
     window.webContents.send(CHANNELS.collapsed, collapsed)
+    window.webContents.send(CHANNELS.opacity, opacity)
     if (lastState) window.webContents.send(CHANNELS.state, lastState)
   }
   window.webContents.on('did-finish-load', () => {
@@ -74,7 +78,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       const current = window.getBounds()
       // While collapsed only the position is meaningful; the expanded size is kept as it was.
       bounds = collapsed ? { ...bounds, x: current.x, y: current.y } : current
-      saveState(stateFile, { bounds, collapsed })
+      saveState(stateFile, { bounds, collapsed, opacity })
     }, SAVE_DELAY_MS)
   }
   window.on('moved', persist)
@@ -93,8 +97,13 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       window.setResizable(!collapsed)
       window.setBounds(collapsed ? { ...collapsedRect(), x: current.x, y: current.y } : { ...bounds, x: current.x, y: current.y })
       bounds = { ...bounds, x: current.x, y: current.y }
-      saveState(stateFile, { bounds, collapsed })
+      saveState(stateFile, { bounds, collapsed, opacity })
       window.webContents.send(CHANNELS.collapsed, collapsed)
+    },
+    setOpacity(value) {
+      opacity = clampOpacity(value)
+      window.webContents.send(CHANNELS.opacity, opacity)
+      saveState(stateFile, { bounds, collapsed, opacity })
     },
     toggleVisible() {
       if (window.isVisible()) window.hide()

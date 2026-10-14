@@ -12,8 +12,11 @@ export interface Rect {
 export interface WidgetState {
   bounds: Rect | null
   collapsed: boolean
+  /** Background opacity (text stays solid), MIN_OPACITY..1. */
+  opacity: number
 }
 
+export const MIN_OPACITY = 0.1
 export const DEFAULT_SIZE = { width: 300, height: 240 }
 /** How much of the window must stay on a display for it to count as reachable. */
 const MIN_VISIBLE = 48
@@ -49,15 +52,18 @@ export function clampToDisplays(saved: Rect | null, workAreas: Rect[]): Rect {
   }
 }
 
+export const clampOpacity = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(MIN_OPACITY, value)) : 1
+
 export function loadState(file: string): WidgetState {
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<WidgetState>
     const b = raw.bounds
     const valid =
       b && [b.x, b.y, b.width, b.height].every((n) => typeof n === 'number' && Number.isFinite(n))
-    return { bounds: valid ? { x: b.x, y: b.y, width: b.width, height: b.height } : null, collapsed: raw.collapsed === true }
+    return { bounds: valid ? { x: b.x, y: b.y, width: b.width, height: b.height } : null, collapsed: raw.collapsed === true, opacity: clampOpacity(raw.opacity) }
   } catch {
-    return { bounds: null, collapsed: false }
+    return { bounds: null, collapsed: false, opacity: 1 }
   }
 }
 
