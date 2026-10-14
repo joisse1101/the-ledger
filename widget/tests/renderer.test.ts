@@ -16,19 +16,22 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
 function setup(openResult: OpenRepoResult = 'opened') {
   document.body.className = ''
   document.body.innerHTML = `
-    <span id="summary"></span><button id="ledger"></button><button id="collapse"></button>
+    <span id="summary"></span><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
     <main id="body"></main><footer id="note"></footer>`
   let push!: (s: LiveState) => void
   let setCollapsed!: (c: boolean) => void
+  let setOpacity!: (o: number) => void
   const bridge: WidgetBridge = {
     onState: (cb) => (push = cb),
     onCollapsed: (cb) => (setCollapsed = cb),
     openSession: vi.fn(async () => openResult),
     openLedger: vi.fn(),
     toggleCollapse: vi.fn(),
+    onOpacity: (cb) => (setOpacity = cb),
+    setOpacity: vi.fn(),
   }
   mount(document, bridge)
-  return { bridge, push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c) }
+  return { bridge, push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
 }
 
 const text = (selector: string) => document.querySelector(selector)?.textContent
@@ -148,5 +151,37 @@ describe('toolbar', () => {
     expect(document.body.classList.contains('collapsed')).toBe(true)
     setCollapsed(false)
     expect(document.body.classList.contains('collapsed')).toBe(false)
+  })
+})
+
+describe('opacity', () => {
+  const alpha = () => document.documentElement.style.getPropertyValue('--bg-alpha')
+  const click = (id: string) => document.getElementById(id)!.click()
+
+  it('applies the saved opacity to the background', () => {
+    const { setOpacity } = setup()
+    setOpacity(0.4)
+    expect(alpha()).toBe('0.4')
+  })
+
+  it('steps down and up with the small and big sun, telling the main process', () => {
+    const { bridge, setOpacity } = setup()
+    setOpacity(0.5)
+    click('fade')
+    expect(alpha()).toBe('0.4')
+    expect(bridge.setOpacity).toHaveBeenLastCalledWith(0.4)
+    click('solid')
+    click('solid')
+    expect(bridge.setOpacity).toHaveBeenLastCalledWith(0.6)
+  })
+
+  it('stays between 10% and 100%', () => {
+    const { setOpacity } = setup()
+    setOpacity(0.1)
+    click('fade')
+    expect(alpha()).toBe('0.1')
+    setOpacity(1)
+    click('solid')
+    expect(alpha()).toBe('1')
   })
 })

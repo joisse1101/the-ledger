@@ -21,6 +21,8 @@ export type OpenRepoResult = 'opened' | 'ended' | 'failed'
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void
   onCollapsed(callback: (collapsed: boolean) => void): void
+  onOpacity(callback: (opacity: number) => void): void
+  setOpacity(opacity: number): void
   openSession(sessionId: string): Promise<OpenRepoResult>
   openLedger(): void
   toggleCollapse(): void

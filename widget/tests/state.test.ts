@@ -46,16 +46,16 @@ describe('persistence', () => {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'widget-')), 'nested', 'state.json')
 
   it('round-trips the bounds and collapsed flag', () => {
-    const state = { bounds: { x: 10, y: 20, width: 300, height: 240 }, collapsed: true }
+    const state = { bounds: { x: 10, y: 20, width: 300, height: 240 }, collapsed: true, opacity: 0.7 }
     saveState(file, state)
     expect(loadState(file)).toEqual(state)
   })
 
   it('falls back to defaults for a missing or corrupt file', () => {
-    expect(loadState(path.join(os.tmpdir(), 'does-not-exist.json'))).toEqual({ bounds: null, collapsed: false })
+    expect(loadState(path.join(os.tmpdir(), 'does-not-exist.json'))).toEqual({ bounds: null, collapsed: false, opacity: 1 })
     fs.writeFileSync(file, '{not json')
-    expect(loadState(file)).toEqual({ bounds: null, collapsed: false })
+    expect(loadState(file)).toEqual({ bounds: null, collapsed: false, opacity: 1 })
     fs.writeFileSync(file, JSON.stringify({ bounds: { x: 'a' }, collapsed: 1 }))
-    expect(loadState(file)).toEqual({ bounds: null, collapsed: false })
+    expect(loadState(file)).toEqual({ bounds: null, collapsed: false, opacity: 1 })
   })
 })

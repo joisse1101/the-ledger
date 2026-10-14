@@ -71,5 +71,6 @@ script, so a cold start and the tray's "Start backend" share one code path.
   to a one-line pill (count and pending count) and expands it again.
 - A second launch focuses the running widget (`requestSingleInstanceLock`).
 - The tray menu: Open Ledger, Start backend, Show/Hide widget, Quit. The window has no taskbar entry.
+- The header has a small-sun and a big-sun button that step the background transparency (10–100%, 10% a click; big sun = more opaque) without fading the text; the value is remembered with the window position. A transparent frameless window may not be resizable by dragging on Windows.
 
 See [Testing](Testing.md) for the suites and [Hooks](Hooks.md) for the toast the click action mirrors.

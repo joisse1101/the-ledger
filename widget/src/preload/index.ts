@@ -10,6 +10,10 @@ const bridge: WidgetBridge = {
   onCollapsed: (callback) => {
     ipcRenderer.on('widget:collapsed', (_event, collapsed: boolean) => callback(collapsed))
   },
+  onOpacity: (callback) => {
+    ipcRenderer.on('widget:opacity', (_event, opacity: number) => callback(opacity))
+  },
+  setOpacity: (opacity) => ipcRenderer.send('widget:set-opacity', opacity),
   openSession: (sessionId): Promise<OpenRepoResult> => ipcRenderer.invoke('widget:open-session', sessionId),
   openLedger: () => ipcRenderer.send('widget:open-ledger'),
   toggleCollapse: () => ipcRenderer.send('widget:toggle-collapse'),

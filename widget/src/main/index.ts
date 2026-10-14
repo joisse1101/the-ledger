@@ -37,6 +37,9 @@ if (!app.requestSingleInstanceLock()) {
       return result
     })
     ipcMain.on(CHANNELS.openLedger, () => void supervisor.openLedger())
+    ipcMain.on(CHANNELS.setOpacity, (_event, value: unknown) => {
+      if (typeof value === 'number') win.setOpacity(value)
+    })
     ipcMain.on(CHANNELS.toggleCollapse, () => win.toggleCollapse())
 
     const tray = new Tray(nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'tray.png')))
