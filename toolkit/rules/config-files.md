@@ -19,7 +19,10 @@ Adds config hygiene to [core-principles](core-principles.md) and
   variables, not in the shared base file.
 - Quote YAML values that could be misparsed (`"no"`, `"1.10"`, `"0755"`, strings with `:` or `#`).
 - Never duplicate a key or copy a block between files; use anchors, includes or one shared file.
-- Never hand-edit generated files (lockfiles); regenerate them with the tool.
+- Commit lockfiles, and never hand-edit them; regenerate them with the tool.
+- Shared packages use no wildcard or floating dependency versions (`*`, `latest`).
+- Declare a dependency on another package in the same workspace through the workspace mechanism,
+  not by copying code or a relative path.
 
 ## Prefer
 
