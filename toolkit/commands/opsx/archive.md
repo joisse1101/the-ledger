@@ -4,6 +4,7 @@ description: "Archive a completed change in the experimental workflow"
 allowed-tools: Bash(openspec:*), Bash(git add:*), Bash(git diff:*), Bash(git status:*), Bash(git commit:*)
 category: "Workflow"
 tags: ["workflow", "archive", "experimental"]
+disable-model-invocation: true
 ---
 
 Archive a completed change in the experimental workflow.

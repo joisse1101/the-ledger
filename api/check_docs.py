@@ -365,6 +365,16 @@ def _version_problems(rel: str, text: str) -> list[str]:
     return problems
 
 
+def _check_commands_hidden(root: Path) -> list[str]:
+    """Every slash command must stay out of the session listing (user-only invocation)."""
+    problems = []
+    for path in sorted((root / "toolkit" / "commands").glob("**/*.md")):
+        frontmatter = _frontmatter(path.read_text(encoding="utf-8")) or ""
+        if not re.search(r"^disable-model-invocation:[ 	]*true[ 	]*$", frontmatter, re.MULTILINE):
+            problems.append(f"{_rel(root, path)}: missing `disable-model-invocation: true` in the frontmatter")
+    return problems
+
+
 def _check_versions(root: Path) -> list[str]:
     problems = []
     for path in _versioned_items(root / "toolkit"):
@@ -382,6 +392,7 @@ def check_toolkit(root: Path) -> list[str]:
         + _check_scoped_rules(rules)
         + _check_review_skill(root)
         + _check_versions(root)
+        + _check_commands_hidden(root)
     )
 
 
