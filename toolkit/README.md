@@ -46,6 +46,50 @@ Each entry directly under `toolkit/commands/` is one command item: a `.md` file 
 a folder used as a namespace (`commands/opsx/apply.md` becomes `/opsx:apply`). The installer treats
 each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
 
+### The `jois` commands
+
+- `/jois:apply [change]` works through an OpenSpec change on the main thread, like `/opsx:apply`, but
+  commits each finished concern itself once tests and build are green, with no confirmation word.
+  Set it going and come back later. It commits on the current branch only (from `main` it creates
+  `jois/<change>` first), never pushes, amends, resets or rebases, and ends with a report of the
+  branch and every commit. It still stops on an ambiguous task, scope beyond the spec, a design
+  flaw, red checks, a blocker or an interruption. The `commit-hygiene` rule allows this for the
+  duration of the run only.
+- `/jois:stage` clears a messy working tree, with or without an OpenSpec change. It stages one
+  concern at a time, shows the message and a confirmation word, and waits. Typing the word commits
+  that concern and moves on, until the tree is clean. Secret files and build output are skipped and
+  named. It has no commit authority of its own.
+
+### Guard rails for `/jois:apply` (opt-in)
+
+"Never push" in the command text is an instruction, not enforcement. To make it hard, and to stop an
+unattended run stalling on permission prompts, add to your `settings.json` (`~/.claude/settings.json`
+or the project's `.claude/settings.json`). The installer never writes this file; adjust the test and
+build commands to your project:
+
+```json
+{
+  "permissions": {
+    "deny": ["Bash(git push*)"],
+    "allow": [
+      "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git add *)",
+      "Bash(git commit *)", "Bash(git switch -c *)", "Bash(openspec *)",
+      "Bash(pytest*)", "Bash(npm test*)", "Bash(npm run build*)"
+    ]
+  }
+}
+```
+
+### Commands stay out of the session context
+
+Every command declares `disable-model-invocation: true`, so its description is not loaded into each
+new session's skill listing (about 300 tokens for a typical set) while you can still type
+`/jois:stage`. `python check_docs.py` fails on a command without the flag. Skills such as
+`coding-standards` stay discoverable on purpose. `openspec update` does not touch the installed
+commands; it writes copies into the project's `.claude/commands/opsx` and `.claude/skills/openspec-*`,
+which carry no flag. In a project where you do not want them listed, delete the project's
+`.claude/commands/opsx` (the global install serves) or re-add the flag.
+
 ## Rules
 
 Each `.md` file directly under `toolkit/rules/` is one rule: a short instruction file Claude Code
@@ -67,7 +111,7 @@ confirmation word before Claude commits. Use `-Scope project` to keep the rules 
 
 ## Versions
 
-Every skill, rule and `jois-review` command declares its version in a `metadata:` map in its
+Every skill, rule and `jois` or `jois-review` command declares its version in a `metadata:` map in its
 frontmatter, as the Agent Skills format keeps it. Both keys are strings and are bumped by hand
 whenever the item's guidance changes: `version` is semver (`MAJOR.MINOR.PATCH`) and `last_updated`
 is the date of the change.

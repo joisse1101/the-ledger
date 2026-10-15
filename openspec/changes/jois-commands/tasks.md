@@ -26,8 +26,8 @@
 
 ## 6. Installer and docs
 
-- [ ] 6.1 Confirm `Install-Toolkit.ps1` installs the `jois` namespace with `-Command jois` and lists it in `-List` without change; run it against a temp `-Scope project -Path`
-- [ ] 6.2 Update `toolkit/README.md`: the `jois` namespace, `/jois:apply` and `/jois:stage`, context hiding and the note that `openspec update` writes unflagged project copies (remove or re-flag them), and the opt-in `settings.json` snippets (`permissions.deny` for `git push*`, an `allow` list for git, tests, build and openspec)
+- [x] 6.1 Confirm `Install-Toolkit.ps1` installs the `jois` namespace with `-Command jois` and lists it in `-List` without change; run it against a temp `-Scope project -Path`
+- [x] 6.2 Update `toolkit/README.md`: the `jois` namespace, `/jois:apply` and `/jois:stage`, context hiding and the note that `openspec update` writes unflagged project copies (remove or re-flag them), and the opt-in `settings.json` snippets (`permissions.deny` for `git push*`, an `allow` list for git, tests, build and openspec)
 - [ ] 6.3 Update `wiki/Coding-Standards.md` and `wiki/Repository-Layout.md` where they describe commit approval or the toolkit's commands; keep `CLAUDE.md` under 8 KB; run `cd api; python check_docs.py`
 
 ## 7. Finish
