@@ -35,7 +35,8 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Explanation lives in `wiki/`, one topic per page, linked from `Home.md` and `_Sidebar.md`.
 - Requirements live in `openspec/specs/`; wiki pages point at them and do not restate them.
 - `CLAUDE.md` files hold commands, conventions and pointers only. `python check_docs.py` (run from
-  `api/`) enforces links, paths and size budgets; CI runs it on every pull request.
+  `api/`) enforces links, paths, size budgets and toolkit frontmatter (versions, and
+  `disable-model-invocation: true` on every command); CI runs it on every pull request.
 - Link between wiki pages as `[text](Page-Name.md)`. The publish step strips the `.md` for the wiki.
 - A repo path in code formatting must exist. If it is deliberately absent from a checkout (a
   gitignored file), put `<!-- docs-check: ignore -->` on that line.
