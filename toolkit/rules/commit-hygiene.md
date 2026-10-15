@@ -1,6 +1,11 @@
+---
+metadata:
+  version: "1.0.0"
+  last_updated: "2026-10-14"
+---
 # Commit hygiene
 
-Applies only when you are about to commit. Nothing here applies otherwise.
+Applies only when you are about to commit.
 
 ## Never commit on your own
 

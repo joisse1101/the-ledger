@@ -475,7 +475,7 @@ def test_load_detail_is_memoized_by_file_stat(isolated_db, write_transcript, mon
     path = _write_session(isolated_db, write_transcript, entries=[_assistant("m1", new=0, read=100)])
     calls = []
     real = claude_context.parse_detail
-    monkeypatch.setattr(claude_context, "parse_detail", lambda lines: calls.append(1) or real(lines))
+    monkeypatch.setattr(claude_context, "parse_detail", lambda lines, session_id="": calls.append(1) or real(lines, session_id))
 
     assert len(load_detail("s1", "/x/proj").turns) == 1
     assert len(load_detail("s1", "/x/proj").turns) == 1
@@ -491,5 +491,293 @@ def test_load_detail_missing_or_unreadable_is_none(isolated_db, write_transcript
     assert load_detail("missing", "/x/proj") is None
 
     _write_session(isolated_db, write_transcript, entries=[_assistant("m1", read=100)])
-    monkeypatch.setattr(claude_context, "parse_detail", lambda _lines: (_ for _ in ()).throw(OSError("gone")))
+    monkeypatch.setattr(claude_context, "parse_detail", lambda *_args: (_ for _ in ()).throw(OSError("gone")))
     assert load_detail("s1", "/x/proj") is None
+
+
+# ---------------------------------------------------------------- startup attachments (recorded shapes)
+# Shapes observed in real transcripts (401 sessions): no removal field was ever non-empty, `instructions`
+# is re-emitted after a compaction, and later `skill_listing` entries hold only the newly added skills.
+
+
+def _instructions(*files, changed=None):
+    """`files` are (path, type, content); type is User, Project or AutoMem."""
+    entry = {"type": "instructions",
+             "files": [{"path": path, "type": kind, "content": content} for path, kind, content in files]}
+    if changed is not None:
+        entry.update(changed=True, reason="session_start")
+    return {"type": "attachment", "attachment": entry}
+
+
+def _skill_listing(*skills, initial=False):
+    """`skills` are (name, description); the content is one `- name: description` line each."""
+    return {"type": "attachment", "attachment": {
+        "type": "skill_listing", "isInitial": initial, "skillCount": len(skills),
+        "names": [name for name, _ in skills],
+        "content": "\n".join(f"- {name}: {text}" for name, text in skills)}}
+
+
+def _agent_listing(*agents, initial=False, removed=()):
+    """`agents` are (type, description)."""
+    return {"type": "attachment", "attachment": {
+        "type": "agent_listing_delta", "isInitial": initial, "builtInTypes": [], "showConcurrencyNote": False,
+        "addedTypes": [name for name, _ in agents], "removedTypes": list(removed),
+        "addedLines": [f"- {name}: {text}" for name, text in agents]}}
+
+
+def _mcp_instructions(*servers, removed=()):
+    """`servers` are (name, instructions); the block is `## name` then the instructions."""
+    return {"type": "attachment", "attachment": {
+        "type": "mcp_instructions_delta", "addedNames": [name for name, _ in servers],
+        "addedBlocks": [f"## {name}\n{text}" for name, text in servers], "removedNames": list(removed)}}
+
+
+def test_startup_attachments_do_not_disturb_the_existing_scan():
+    entries = [
+        _instructions(("/home/me/CLAUDE.md", "Project", "rules"), changed=True),
+        _skill_listing(("review", "Review code"), initial=True),
+        _agent_listing(("explorer", "Searches"), initial=True),
+        _mcp_instructions(("docs", "Use the docs tool")),
+        _assistant("m1", read=100),
+        _skill_listing(("deploy", "Ship it")),
+        _assistant("m2", read=150),
+    ]
+
+    turns, compactions, events = claude_context._scan(_lines(*entries))
+
+    assert [turn.context for turn in turns] == [102, 152]  # `_assistant` adds new=2
+    assert compactions == []
+
+
+# ---------------------------------------------------------------- startup events
+
+
+def _events(*entries):
+    return claude_context._scan(_lines(*entries))[2]
+
+
+def test_each_attachment_kind_becomes_one_event_at_the_current_turn_count():
+    events = _events(
+        _instructions(("C:\\Users\\me\\proj\\CLAUDE.md", "Project", "abcd")),
+        _skill_listing(("review", "Review code"), ("deploy", "Ship it"), initial=True),
+        _agent_listing(("explorer", "Searches"), initial=True),
+        _mcp_instructions(("docs", "Use it")),
+        _assistant("m1", read=10),
+        _skill_listing(("late", "Added later")),
+    )
+
+    assert [(e.position, e.category) for e in events] == [
+        (0, "memory"), (0, "skills"), (0, "agents"), (0, "mcp"), (1, "skills")]
+    memory, skills, agents, mcp, late = events
+    assert [(i.key, i.label) for i in memory.added] == [("C:\\Users\\me\\proj\\CLAUDE.md", "proj/CLAUDE.md")]
+    assert [i.key for i in skills.added] == ["review", "deploy"] and skills.replace
+    assert [i.key for i in agents.added] == ["explorer"] and agents.replace
+    assert [(i.key, i.text) for i in mcp.added] == [("docs", "## docs\nUse it")]
+    assert [i.key for i in late.added] == ["late"] and not late.replace
+
+
+def test_removals_are_collected_when_recorded():
+    events = _events(_agent_listing(removed=["explorer"]), _mcp_instructions(removed=["docs"]))
+
+    assert [(e.category, e.removed) for e in events] == [("agents", ("explorer",)), ("mcp", ("docs",))]
+
+
+def test_malformed_and_unrelated_attachments_are_skipped():
+    events = _events(
+        {"type": "attachment", "attachment": "nope"},
+        {"type": "attachment"},
+        {"type": "attachment", "attachment": {"type": "instructions", "files": [{"path": 3, "content": "x"}, "x"]}},
+        {"type": "attachment", "attachment": {"type": "skill_listing", "content": None}},
+        {"type": "attachment", "attachment": {"type": "deferred_tools_delta", "addedNames": ["Read"]}},
+        {"type": "attachment", "isSidechain": True,
+         "attachment": _skill_listing(("sub", "Subagent"))["attachment"]},
+        _skill_listing(("kept", "Fine")),
+    )
+
+    assert [i.key for e in events for i in e.added] == ["kept"]
+
+
+def test_a_multi_line_skill_description_stays_one_item():
+    [event] = _events(_skill_listing(("a", "first line\n  continued"), ("b", "other")))
+
+    assert [i.key for i in event.added] == ["a", "b"]
+    assert "continued" in event.added[0].text
+
+
+# ---------------------------------------------------------------- startup snapshots
+
+
+def _category(snapshot, name):
+    return next((c for c in snapshot.categories if c.name == name), None)
+
+
+def test_estimates_are_a_quarter_of_the_characters_rounded_up():
+    assert claude_context.estimate_tokens("") == 0
+    assert claude_context.estimate_tokens("abcd") == 1
+    assert claude_context.estimate_tokens("abcde") == 2
+
+
+def test_items_sum_to_their_category_and_are_largest_first():
+    breakdown = parse_detail(_lines(
+        _skill_listing(("small", "x" * 6), ("big", "y" * 94), initial=True),
+        _assistant("m1", read=10_000),
+    )).breakdown
+
+    [snapshot] = breakdown.snapshots
+    skills = _category(snapshot, "Skills")
+    assert [item.label for item in skills.items] == ["big", "small"]
+    assert skills.tokens == sum(item.tokens for item in skills.items)
+
+
+def test_a_skill_added_after_the_third_response_appears_from_the_fourth():
+    breakdown = parse_detail(_lines(
+        _skill_listing(("first", "x" * 40), initial=True),
+        _assistant("m1", read=5_000), _assistant("m2", read=5_000), _assistant("m3", read=5_000),
+        _skill_listing(("second", "y" * 40)),
+        _assistant("m4", read=5_000),
+    )).breakdown
+
+    assert [s.position for s in breakdown.snapshots] == [0, 3]
+    assert [t.snapshot for t in breakdown.turns] == [0, 0, 0, 1]
+    assert [i.label for i in _category(breakdown.snapshots[0], "Skills").items] == ["first"]
+    assert {i.label for i in _category(breakdown.snapshots[1], "Skills").items} == {"first", "second"}
+
+
+def test_a_removed_agent_leaves_later_snapshots_and_an_unrecorded_category_is_absent():
+    breakdown = parse_detail(_lines(
+        _agent_listing(("keep", "k" * 40), ("drop", "d" * 40), initial=True),
+        _assistant("m1", read=5_000),
+        _agent_listing(removed=["drop"]),
+        _assistant("m2", read=5_000),
+    )).breakdown
+
+    first, second = breakdown.snapshots
+    assert {i.label for i in _category(first, "Custom agents").items} == {"keep", "drop"}
+    assert [i.label for i in _category(second, "Custom agents").items] == ["keep"]
+    assert _category(second, "Skills") is None and _category(second, "MCP instructions") is None
+
+
+def test_an_identical_reemitted_instructions_entry_adds_no_snapshot():
+    memory = _instructions(("/p/CLAUDE.md", "Project", "z" * 40))
+    breakdown = parse_detail(_lines(memory, _assistant("m1", read=5_000), memory, _assistant("m2", read=5_000))).breakdown
+
+    assert len(breakdown.snapshots) == 1
+
+
+def test_memory_files_merge_by_path_and_a_later_entry_replaces_the_same_path():
+    breakdown = parse_detail(_lines(
+        _instructions(("/a/CLAUDE.md", "Project", "a" * 40), ("/u/RULES.md", "User", "u" * 40)),
+        _assistant("m1", read=5_000),
+        _instructions(("/a/CLAUDE.md", "Project", "a" * 400), changed=True),
+        _assistant("m2", read=5_000),
+    )).breakdown
+
+    second = _category(breakdown.snapshots[1], "Memory files")
+    assert {i.label: i.tokens for i in second.items} == {"a/CLAUDE.md": 100, "u/RULES.md": 10}
+
+
+# ---------------------------------------------------------------- per-response breakdown
+
+
+def _assert_rows_sum(detail):
+    for row, turn in zip(detail.breakdown.turns, detail.turns):
+        startup = sum(c.tokens for c in detail.breakdown.snapshots[row.snapshot].categories)
+        assert startup + sum(g.tokens for g in row.growth) + row.remainder == turn.context
+        assert row.remainder >= 0
+
+
+def test_every_response_sums_to_its_context_and_growth_is_exact_by_tool():
+    detail = parse_detail(_lines(
+        _skill_listing(("s", "x" * 400), initial=True),
+        _assistant("m1", new=0, read=1_000, tools=[("Read", {})]),
+        _assistant("m2", new=0, read=1_300, tools=[("Bash", {})]),
+        _assistant("m3", new=0, read=1_900, tools=[("Read", {})]),
+        _assistant("m4", new=0, read=2_000),
+    ))
+
+    _assert_rows_sum(detail)
+    assert detail.breakdown.turns[0].growth == []
+    assert {g.tool: g.tokens for g in detail.breakdown.turns[-1].growth} == {"Read": 400, "Bash": 600}
+
+
+def test_growth_matches_the_attribution_totals():
+    detail = parse_detail(_lines(
+        _assistant("m1", new=0, read=1_000, tools=[("Read", {})]),
+        _assistant("m2", new=0, read=1_300, tools=[("Bash", {})]),
+        _assistant("m3", new=0, read=1_900),
+    ))
+
+    final = {g.tool: g.tokens for g in detail.breakdown.turns[-1].growth}
+    assert final == {g.tool: g.tokens for g in detail.attribution.by_tool}
+
+
+def test_estimates_larger_than_the_first_response_are_scaled_down_and_the_remainder_is_zero():
+    detail = parse_detail(_lines(
+        _skill_listing(("a", "x" * 4_000), ("b", "y" * 4_000), initial=True),  # ~2,000 tokens estimated
+        _assistant("m1", new=0, read=500),
+    ))
+
+    [snapshot] = detail.breakdown.snapshots
+    assert sum(c.tokens for c in snapshot.categories) <= 500
+    assert detail.breakdown.turns[0].remainder == 500 - sum(c.tokens for c in snapshot.categories)
+    _assert_rows_sum(detail)
+
+
+def test_breakdown_restarts_after_a_compaction_and_the_summary_lands_in_the_remainder():
+    detail = parse_detail(_lines(
+        _skill_listing(("s", "x" * 400), initial=True),
+        _assistant("m1", new=0, read=1_000, tools=[("Read", {})]),
+        _assistant("m2", new=0, read=5_000),
+        _compact_boundary(),
+        _assistant("m3", new=0, read=1_500, tools=[("Bash", {})]),
+        _assistant("m4", new=0, read=1_800),
+    ))
+
+    _assert_rows_sum(detail)
+    rows = detail.breakdown.turns
+    assert rows[2].growth == []  # first response of the new segment
+    assert {g.tool: g.tokens for g in rows[3].growth} == {"Bash": 300}
+    assert rows[2].remainder > rows[0].remainder  # the summary is not startup content
+
+
+def test_startup_state_carries_across_a_compaction():
+    breakdown = parse_detail(_lines(
+        _skill_listing(("s", "x" * 400), initial=True),
+        _assistant("m1", new=0, read=1_000),
+        _compact_boundary(),
+        _assistant("m2", new=0, read=1_200),
+    )).breakdown
+
+    after = breakdown.snapshots[breakdown.turns[1].snapshot]
+    assert [i.label for i in _category(after, "Skills").items] == ["s"]
+
+
+def test_no_startup_content_leaves_growth_and_a_remainder_only():
+    detail = parse_detail(_lines(
+        _assistant("m1", new=0, read=1_000, tools=[("Read", {})]), _assistant("m2", new=0, read=1_400)))
+
+    assert detail.breakdown.snapshots == [claude_context.StartupSnapshot(0, [])]
+    assert [t.remainder for t in detail.breakdown.turns] == [1_000, 1_000]
+    assert detail.breakdown.turns[1].growth == [claude_context.GrowthRow("Read", 400)]
+
+
+def test_a_shrinking_context_without_compaction_still_sums():
+    detail = parse_detail(_lines(
+        _assistant("m1", new=0, read=2_000, tools=[("Read", {})]), _assistant("m2", new=0, read=1_500)))
+
+    _assert_rows_sum(detail)
+    assert detail.breakdown.turns[1].growth == [claude_context.GrowthRow("Read", -500)]
+
+
+def test_a_failing_breakdown_is_dropped_and_logged_with_the_session_id(monkeypatch, caplog):
+    monkeypatch.setattr(claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
+
+    with caplog.at_level("WARNING", logger="ledger"):
+        detail = parse_detail(_lines(_assistant("m1", read=10)), "sess-42")
+
+    assert detail.breakdown is None and len(detail.turns) == 1
+    assert "sess-42" in caplog.text
+
+
+def test_an_empty_transcript_has_an_empty_breakdown():
+    assert parse_detail([]).breakdown == claude_context.Breakdown(snapshots=[], turns=[])

@@ -74,4 +74,14 @@ testable and readable independent of the web framework wrapping it.
   `compact_boundary` compactions; growth attribution credits each turn's context delta to the first
   tool called in the previous turn (or "prompt / text"), since the latest compaction, with
   `first-turn context + attributed growth == current context` holding exactly. Main thread only —
-  subagent transcripts are ignored.
+  subagent transcripts are ignored. The same scan also collects the startup-content `attachment`
+  entries (`instructions`, `skill_listing`, `agent_listing_delta`, `mcp_instructions_delta`) as
+  events keyed by how many responses preceded them, and `build_breakdown()` turns them into
+  `SessionDetail.breakdown`: startup *snapshots* (memory files, skills, custom agents, MCP
+  instructions, each itemised, estimated as `chars/4` and scaled down so they never exceed the
+  segment's first response) and, per response, the exact cumulative growth by tool since the segment
+  start (a segment restarts at each compaction; same crediting rule as the attribution) plus a
+  remainder (system prompt, built-in tools, compaction summary) so every response's rows sum to its
+  exact context. Initial listings replace a category; later ones add (no removal has ever been seen
+  in a real transcript). A bad attachment drops the breakdown (`None`, logged with the session id),
+  never the detail.

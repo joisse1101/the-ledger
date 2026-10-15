@@ -21,7 +21,7 @@ Claude Code is the only supported tool today.
 Other things the script does:
 
 ```powershell
-.\Install-Toolkit.ps1 -List                                   # what's installed, and has it drifted?
+.\Install-Toolkit.ps1 -List                                   # what's installed, has it drifted, which versions?
 .\Install-Toolkit.ps1 -Skill coding-standards                 # just one skill
 .\Install-Toolkit.ps1 -Command opsx                           # just one command item
 .\Install-Toolkit.ps1 -Rule java.md                           # just one rule
@@ -64,6 +64,41 @@ boundaries, scoped to source-code file types), one path-scoped rule per technolo
 Java, Python, config files, scripts), and the `coding-standards` skill as an on-demand review
 checklist. The unscoped `commit-hygiene` rule keeps commits to one concern and requires the user's
 confirmation word before Claude commits. Use `-Scope project` to keep the rules out of unrelated projects. A project's own `CLAUDE.md` takes precedence.
+
+## Versions
+
+Every skill, rule and `jois-review` command declares its version in a `metadata:` map in its
+frontmatter, as the Agent Skills format keeps it. Both keys are strings and are bumped by hand
+whenever the item's guidance changes: `version` is semver (`MAJOR.MINOR.PATCH`) and `last_updated`
+is the date of the change.
+
+```yaml
+---
+name: coding-standards
+description: ...
+metadata:
+  version: "1.0.0"
+  last_updated: "2026-10-14"
+---
+```
+
+A rule's frontmatter holds the same `metadata:` block next to its `paths:`; an unscoped rule such
+as `commit-hygiene` has only the `metadata:` block and still loads in every session. A top-level
+`version:` key is not accepted. `python check_docs.py` (run from `api/`) fails on a missing or
+malformed version.
+
+`-List` shows each item's version and date, and for an item that differs it shows both the
+toolkit's and the installed version, so you can see at a glance that an installed copy is behind.
+The version says what changed and when; the content hash decides whether anything changed at all,
+so an edit that forgot to bump the version still shows as `differs`.
+
+`skills/coding-standards/scripts/Get-ItemHash.ps1` is the one place the hash and the version are
+computed. The installer dot-sources it, and you can run it on any skill folder, command folder or
+`.md` file (it needs Windows PowerShell):
+
+```powershell
+.\toolkit\skills\coding-standards\scripts\Get-ItemHash.ps1 -ItemPath ~\.claude\rules\python.md
+```
 
 ## Installing by hand
 

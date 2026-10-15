@@ -40,6 +40,9 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.on(CHANNELS.setOpacity, (_event, value: unknown) => {
       if (typeof value === 'number') win.setOpacity(value)
     })
+    ipcMain.on(CHANNELS.setContentHeight, (_event, value: unknown) => {
+      if (typeof value === 'number' && Number.isFinite(value)) win.setContentHeight(value)
+    })
     ipcMain.on(CHANNELS.toggleCollapse, () => win.toggleCollapse())
 
     const tray = new Tray(nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'tray.png')))

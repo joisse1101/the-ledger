@@ -274,6 +274,35 @@ def _recap(transcript: Optional[claude_transcripts.ClaudeTranscript], live_item:
     return recap
 
 
+def _breakdown_json(breakdown: Optional[claude_context.Breakdown]) -> Optional[dict]:
+    if breakdown is None:
+        return None
+    return {
+        "snapshots": [
+            {
+                "position": snapshot.position,
+                "categories": [
+                    {
+                        "name": category.name,
+                        "tokens": category.tokens,
+                        "items": [{"label": item.label, "tokens": item.tokens} for item in category.items],
+                    }
+                    for category in snapshot.categories
+                ],
+            }
+            for snapshot in breakdown.snapshots
+        ],
+        "turns": [
+            {
+                "snapshot": row.snapshot,
+                "growth": [{"tool": g.tool, "tokens": g.tokens} for g in row.growth],
+                "remainder": row.remainder,
+            }
+            for row in breakdown.turns
+        ],
+    }
+
+
 def _detail_json(detail: claude_context.SessionDetail) -> dict:
     attribution = detail.attribution
     return {
@@ -304,6 +333,7 @@ def _detail_json(detail: claude_context.SessionDetail) -> dict:
                 for i in attribution.largest
             ],
         },
+        "breakdown": _breakdown_json(detail.breakdown),
     }
 
 

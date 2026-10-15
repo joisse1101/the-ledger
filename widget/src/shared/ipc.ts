@@ -8,4 +8,5 @@ export const CHANNELS = {
   toggleCollapse: 'widget:toggle-collapse',
   opacity: 'widget:opacity',
   setOpacity: 'widget:set-opacity',
+  setContentHeight: 'widget:set-content-height',
 } as const

@@ -1,5 +1,7 @@
 import check_docs
 
+VERSION = 'metadata:\n  version: "1.0.0"\n  last_updated: "2026-10-14"'
+
 
 def _write(root, relative, text=""):
     path = root / relative
@@ -160,16 +162,16 @@ def _toolkit_tree(root):
     _passing_tree(root)
     _write(root, "toolkit/rules/core-principles.md", _scoped("py"))
     _write(root, "toolkit/rules/architecture-boundaries.md", _scoped("py"))
-    _write(root, "toolkit/rules/java.md", '---\npaths:\n  - "**/*.java"\n---\nJava\n')
+    _write(root, "toolkit/rules/java.md", f'---\n{VERSION}\npaths:\n  - "**/*.java"\n---\nJava\n')
     _write(
         root,
         "toolkit/skills/coding-standards/SKILL.md",
-        "Check against `core-principles` and `java`.\n",
+        f"---\n{VERSION}\n---\nCheck against `core-principles` and `java`.\n",
     )
 
 
 def _scoped(extension, padding=0):
-    return f'---\npaths:\n  - "**/*.{extension}"\n---\n' + "x" * padding
+    return f'---\n{VERSION}\npaths:\n  - "**/*.{extension}"\n---\n' + "x" * padding
 
 
 def test_toolkit_tree_passes(tmp_path):
@@ -205,7 +207,7 @@ def test_missing_always_on_rule(tmp_path):
 
 def test_scoped_rule_needs_paths_budget_and_unique_extensions(tmp_path):
     _toolkit_tree(tmp_path)
-    _write(tmp_path, "toolkit/rules/noscope.md", "no frontmatter\n")
+    _write(tmp_path, "toolkit/rules/noscope.md", f"---\n{VERSION}\n---\nno paths\n")
     _write(tmp_path, "toolkit/rules/big.md", _scoped("py", 3100))
     _write(tmp_path, "toolkit/rules/other.md", _scoped("java"))
     problems = _problems(tmp_path)
@@ -216,7 +218,7 @@ def test_scoped_rule_needs_paths_budget_and_unique_extensions(tmp_path):
 
 def test_unscoped_commit_rule_is_accepted_without_paths(tmp_path):
     _toolkit_tree(tmp_path)
-    _write(tmp_path, "toolkit/rules/commit-hygiene.md", "# Commit hygiene\n")
+    _write(tmp_path, "toolkit/rules/commit-hygiene.md", f"---\n{VERSION}\n---\n# Commit hygiene\n")
     assert _problems(tmp_path) == []
 
 
@@ -233,9 +235,78 @@ def test_skill_size_and_references(tmp_path):
     _write(
         tmp_path,
         "toolkit/skills/coding-standards/SKILL.md",
-        "Use `frontend-patterns` and `rules/common/coding-style.md`.\n" + "x" * 4100,
+        f"---\n{VERSION}\n---\nUse `frontend-patterns` and `rules/common/coding-style.md`.\n" + "x" * 6200,
     )
     problems = _problems(tmp_path)
-    assert any("4096-byte" in p for p in problems)
+    assert any("6144-byte" in p for p in problems)
     assert any("'frontend-patterns' is not in the toolkit" in p for p in problems)
     assert any("'rules/common/coding-style.md' is not in the toolkit" in p for p in problems)
+
+
+def _item(version='"1.0.0"', last_updated='"2026-10-14"', extra=""):
+    lines = ["---"]
+    if version is not None or last_updated is not None:
+        lines.append("metadata:")
+        if version is not None:
+            lines.append(f"  version: {version}")
+        if last_updated is not None:
+            lines.append(f"  last_updated: {last_updated}")
+    lines += [extra, "---", "Body", ""] if extra else ["---", "Body", ""]
+    return "\n".join(lines)
+
+
+def test_missing_and_malformed_versions_are_named(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/a.md", _item(None, None, 'paths:\n  - "**/*.toml"'))
+    _write(tmp_path, "toolkit/rules/b.md", _item('"v2"', '"2026-10-14"', 'paths:\n  - "**/*.yml"'))
+    _write(tmp_path, "toolkit/rules/c.md", _item('"1.0"', '"2026-10-14"', 'paths:\n  - "**/*.md"'))
+    _write(tmp_path, "toolkit/rules/d.md", _item('"1.0.0"', '"2026-13-40"', 'paths:\n  - "**/*.css"'))
+    _write(tmp_path, "toolkit/rules/e.md", _item('"1.0.0"', None, 'paths:\n  - "**/*.html"'))
+    problems = _problems(tmp_path)
+    assert "toolkit/rules/a.md: missing `metadata.version` (semver such as \"1.0.0\")" in problems
+    assert any("toolkit/rules/a.md: missing `metadata.last_updated`" in p for p in problems)
+    assert any("toolkit/rules/b.md: metadata.version 'v2' is not MAJOR.MINOR.PATCH" in p for p in problems)
+    assert any("toolkit/rules/c.md: metadata.version '1.0' is not MAJOR.MINOR.PATCH" in p for p in problems)
+    assert any("toolkit/rules/d.md: metadata.last_updated '2026-13-40' is not a date" in p for p in problems)
+    assert any("toolkit/rules/e.md: missing `metadata.last_updated`" in p for p in problems)
+
+
+def test_valid_metadata_passes_with_unquoted_values(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/a.md", _item("2.10.3", "2026-10-14", 'paths:\n  - "**/*.toml"'))
+    assert _problems(tmp_path) == []
+
+
+def test_top_level_version_is_rejected(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/rules/a.md", '---\nversion: 1.0.0\npaths:\n  - "**/*.toml"\n---\n')
+    problems = _problems(tmp_path)
+    assert any(
+        p.startswith("toolkit/rules/a.md: `version:` belongs under `metadata:`") for p in problems
+    )
+
+
+def test_version_is_required_on_skills_agents_and_review_commands(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/skills/other/SKILL.md", "---\nname: other\n---\n")
+    _write(tmp_path, "toolkit/agents/code-reviewer.md", "---\nname: code-reviewer\n---\n")
+    _write(tmp_path, "toolkit/commands/jois-review/apply.md", "no frontmatter\n")
+    _write(tmp_path, "toolkit/commands/opsx/apply.md", "generated, not versioned by us\n")
+    problems = _problems(tmp_path)
+    for rel in (
+        "toolkit/skills/other/SKILL.md",
+        "toolkit/agents/code-reviewer.md",
+        "toolkit/commands/jois-review/apply.md",
+    ):
+        assert any(p.startswith(f"{rel}: missing `metadata.version`") for p in problems)
+    assert not any("opsx" in p for p in problems)
+
+
+def test_skill_may_name_the_review_output_folder(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(
+        tmp_path,
+        "toolkit/skills/coding-standards/SKILL.md",
+        f"---\n{VERSION}\n---\nSave to `reviews/2026-10-14_1707.md`.\n",
+    )
+    assert _problems(tmp_path) == []

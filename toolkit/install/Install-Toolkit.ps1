@@ -14,7 +14,8 @@ entry there, not new code.
 
 A destination item that already exists and differs from the toolkit's copy is never overwritten
 silently: it is reported as "differs" and skipped unless -Force is given. "Differs" is decided by a
-hash over every file's relative path and content. -List shows that state per item without changing
+hash over every file's relative path and content (the same hash a saved review records; both come
+from skills\coding-standards\scripts\Get-ItemHash.ps1). -List shows that state per item without changing
 anything. -Uninstall removes only items that exist in the toolkit; anything else in the destination is
 left alone. Nothing outside the skills, commands and rules folders is touched (settings.json and hooks
 included).
@@ -40,7 +41,9 @@ Name of one rule to act on: a file name (java.md).
 Which tool's entry in targets.json to use. Default 'claude-code'.
 
 .PARAMETER List
-Show each toolkit item's state at the destination (missing / up to date / differs) and exit.
+Show each toolkit item's state at the destination (missing / up to date / differs) and exit. Items
+that declare metadata.version also show it, and a differing item shows both the toolkit's and the
+installed version.
 
 .PARAMETER Uninstall
 Remove the toolkit's items (or just the named ones) from the destination.
@@ -88,35 +91,16 @@ if ($Help) {
 
 $toolkitRoot = Split-Path $PSScriptRoot -Parent
 
-function Get-ItemHash([string]$Item) {
-    # A skill or command namespace is a folder; a single command is one file. Both hash the same
-    # way: every file's relative path and content, in a stable order. Get-Item's FullName is the
-    # same form Get-ChildItem reports below (Resolve-Path can keep 8.3 short names, which would
-    # throw off the relative-path substring).
-    $entry = Get-Item -LiteralPath $Item
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        if ($entry.PSIsContainer) {
-            $root = $entry.FullName.TrimEnd('\')
-            $files = Get-ChildItem -LiteralPath $root -Recurse -File |
-                Sort-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
-            $pairs = [System.Collections.Generic.List[object]]::new()
-            foreach ($f in $files) { $pairs.Add(@($f.FullName.Substring($root.Length + 1).Replace('\', '/'), $f.FullName)) }
-        }
-        else {
-            $pairs = [System.Collections.Generic.List[object]]::new()
-            $pairs.Add(@($entry.Name, $entry.FullName))
-        }
-        foreach ($pair in $pairs) {
-            $relBytes = [System.Text.Encoding]::UTF8.GetBytes($pair[0] + "`n")
-            [void]$sha.TransformBlock($relBytes, 0, $relBytes.Length, $null, 0)
-            $content = [System.IO.File]::ReadAllBytes($pair[1])
-            [void]$sha.TransformBlock($content, 0, $content.Length, $null, 0)
-        }
-        [void]$sha.TransformFinalBlock([byte[]]::new(0), 0, 0)
-        return [System.BitConverter]::ToString($sha.Hash)
-    }
-    finally { $sha.Dispose() }
+# One hash and version reader, shared with the review skill so a hash recorded in a review is the
+# one this script computes for the same item.
+$hashHelper = Join-Path $toolkitRoot 'skills\coding-standards\scripts\Get-ItemHash.ps1'
+if (-not (Test-Path -LiteralPath $hashHelper)) { throw "Missing helper: $hashHelper" }
+. $hashHelper
+
+function Format-Version($Version) {
+    if (-not $Version) { return 'none' }
+    if ($Version.LastUpdated) { return '{0} ({1})' -f $Version.Version, $Version.LastUpdated }
+    return $Version.Version
 }
 
 function Get-ItemState($Item) {
@@ -214,7 +198,15 @@ foreach ($root in ($items | ForEach-Object DestRoot | Select-Object -Unique)) { 
 
 if ($List) {
     foreach ($item in $items) {
-        Write-Host ("  {0,-8} {1,-30} {2}" -f $item.Kind, $item.Name, (Get-ItemState $item))
+        $state = Get-ItemState $item
+        $toolkitVersion = Get-ItemVersion $item.Source
+        $installedVersion = if ($state -eq 'missing') { $null } else { Get-ItemVersion $item.Dest }
+        $versions = if ($state -eq 'differs' -and ($toolkitVersion -or $installedVersion)) {
+            'toolkit {0}, installed {1}' -f (Format-Version $toolkitVersion), (Format-Version $installedVersion)
+        }
+        elseif ($toolkitVersion) { Format-Version $toolkitVersion }
+        else { '' }
+        Write-Host ("  {0,-8} {1,-30} {2,-11} {3}" -f $item.Kind, $item.Name, $state, $versions)
     }
     return
 }
