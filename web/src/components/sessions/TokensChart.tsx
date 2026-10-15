@@ -179,7 +179,25 @@ export function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scal
     },
   };
 
-  const layers: Record<string, unknown>[] = [bars];
+  // With hundreds of responses a bar is a pixel or two wide and nearly impossible to hover or click.
+  // This invisible layer sits under the bars and gives each response a full-height strip that is
+  // exactly one step wide (the band plus a transparent stroke making up the rest of the step), so the
+  // strips tile the plot and every x position belongs to the nearest response.
+  const hitZones = {
+    data: { values: turns.map((_, index) => ({ Response: index + 1 })) },
+    mark: {
+      type: "rect",
+      y: 0,
+      y2: { expr: "height" },
+      fill: "transparent",
+      stroke: "transparent",
+      strokeWidth: { expr: `max(0, width / ${count} - bandwidth('x'))` },
+      cursor: "pointer",
+    },
+    encoding: { x, tooltip: [{ field: "Response", type: "ordinal" }] },
+  };
+
+  const layers: Record<string, unknown>[] = hasBreakdown ? [hitZones, bars] : [bars];
 
   const misses = cacheMissRecords(turns);
   if (misses.length > 0) {

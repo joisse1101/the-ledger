@@ -89,6 +89,48 @@ describe("selected bar highlight", () => {
   });
 });
 
+describe("hit zones", () => {
+  async function zones(count: number, plotWidth: number) {
+    const turns = Array.from({ length: count }, (_, i) => turn(100 + i));
+    const view = new View(parse(compile(buildSpec(turns, [], (n) => n, true, null) as never).spec), { renderer: "none" });
+    view.signal("width", plotWidth);
+    await view.runAsync();
+    const found: { x: number; width: number; strokeWidth: number; response: number }[] = [];
+    const visit = (node: { items?: unknown[]; marktype?: string }) => {
+      for (const item of (node.items ?? []) as Record<string, any>[]) {
+        if (node.marktype === "rect" && item.stroke === "transparent") {
+          found.push({ x: item.x, width: item.width, strokeWidth: item.strokeWidth, response: item.datum.Response });
+        }
+        visit(item as never);
+      }
+    };
+    visit((view.scenegraph() as unknown as { root: Parameters<typeof visit>[0] }).root);
+    const width = view.signal("width") as number;
+    view.finalize();
+    return Object.assign(found.sort((a, b) => a.response - b.response), { width });
+  }
+
+  it("gives every response a zone, however many there are", async () => {
+    expect((await zones(486, 700)).map((z) => z.response)).toEqual(Array.from({ length: 486 }, (_, i) => i + 1));
+  });
+
+  it("widens a pixel-wide bar to a full step, so zones tile the plot", async () => {
+    const found = await zones(486, 700);
+    const step = found[1].x - found[0].x;
+
+    expect(found.width).toBeGreaterThan(0);
+    expect(step).toBeCloseTo(found.width / 486, 1);
+    for (const zone of found) expect(zone.width + zone.strokeWidth).toBeCloseTo(step, 1);
+  });
+
+  it("does not widen a zone beyond its step when there are only a few responses", async () => {
+    const found = await zones(3, 700);
+    const step = found[1].x - found[0].x;
+
+    for (const zone of found) expect(zone.width + zone.strokeWidth).toBeCloseTo(step, 1);
+  });
+});
+
 describe("mountTooltipIn", () => {
   it("moves vega-tooltip's element into the dialog so it shows above the modal", () => {
     const tooltip = document.createElement("div");

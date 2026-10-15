@@ -553,6 +553,19 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.session-dialog-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-dialog-id {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .session-dialog-title {
   margin: 0;
   font-size: 1.05rem;

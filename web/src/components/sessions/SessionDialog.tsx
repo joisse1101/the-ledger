@@ -345,7 +345,11 @@ export function SessionDialog({ sessionId, onClose }: SessionDialogProps) {
     <dialog ref={dialogRef} className="session-dialog" aria-label="Session detail">
       <div className="session-dialog-scroll">
         <header className="session-dialog-header">
-          <h2 className="session-dialog-title">{heading}</h2>
+          <div className="session-dialog-heading">
+            <h2 className="session-dialog-title">{heading}</h2>
+            {/* The list's Session ID column is hidden below the wide layout; this is always there. */}
+            {sessionId && heading !== sessionId && <code className="session-dialog-id">{sessionId}</code>}
+          </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={() => dialogRef.current?.close()}>
             <CloseIcon />
           </button>

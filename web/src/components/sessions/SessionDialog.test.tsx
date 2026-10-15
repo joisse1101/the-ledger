@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import type { SessionDetail, SessionResponse } from "../../api/types";
+import type { SessionDetail, SessionRecap, SessionResponse } from "../../api/types";
 import { SessionDialog } from "./SessionDialog";
 
 // The real chart needs Vega; stand in for it with one button per response that reports a selection.
@@ -54,8 +54,9 @@ function detail(withBreakdown: boolean): SessionDetail {
   };
 }
 
-function open(withBreakdown: boolean) {
-  response = { session_id: "s1", live: false, recap: null, readable: true, detail: detail(withBreakdown) };
+function open(withBreakdown: boolean, title?: string) {
+  const recap = title ? ({ title } as SessionRecap) : null;
+  response = { session_id: "s1", live: false, recap, readable: true, detail: detail(withBreakdown) };
   render(<SessionDialog sessionId="s1" onClose={() => {}} />);
 }
 
@@ -70,6 +71,20 @@ beforeAll(() => {
 });
 
 const panel = () => screen.queryByRole("region", { name: /Context breakdown for response/ });
+
+describe("SessionDialog session id", () => {
+  it("shows the session id under the title at any width", () => {
+    open(false, "My session");
+
+    expect(document.querySelector(".session-dialog-id")).toHaveTextContent("s1");
+  });
+
+  it("does not repeat the id when it is already the heading", () => {
+    open(false);
+
+    expect(document.querySelector(".session-dialog-id")).not.toBeInTheDocument();
+  });
+});
 
 describe("SessionDialog context breakdown", () => {
   it("shows no panel until a bar is selected", () => {
