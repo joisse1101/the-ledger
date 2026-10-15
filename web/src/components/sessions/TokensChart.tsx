@@ -13,7 +13,13 @@ export interface TokensChartProps {
   breakdown?: ContextBreakdown | null;
   /** Called with the 1-based response number when a bar is clicked or tapped. */
   onSelect?: (response: number) => void;
+  /** The 1-based response whose breakdown is pinned: its bar stays solid and the others dim. */
+  selected?: number | null;
 }
+
+/** The Vega signal that holds the selected response (null = none), so selecting never re-embeds the chart. */
+const SELECTED_SIGNAL = "selectedResponse";
+const DIMMED_OPACITY = 0.4;
 
 const KINDS = ["Cache read", "Cache written", "New"] as const;
 
@@ -78,10 +84,24 @@ export function breakdownTooltipHtml(content: TooltipContent, escape: (value: st
   return `<h2>${escape(content.title)}</h2><table>${rows}${note}</table>`;
 }
 
+/** vega-tooltip's default element id; it appends that one element to `document.body`. */
+const TOOLTIP_ELEMENT_ID = "vg-tooltip-element";
+
+/** A modal `<dialog>` is in the browser's top layer, above anything in the page whatever its
+ *  z-index, so a tooltip left in `<body>` would show underneath it. Moving the tooltip element
+ *  into the dialog puts it in the same layer. */
+export function mountTooltipIn(dialog: HTMLElement | null) {
+  const tooltip = document.getElementById(TOOLTIP_ELEMENT_ID);
+  if (tooltip && dialog && tooltip.parentElement !== dialog) dialog.appendChild(tooltip);
+}
+
 /** The tooltip for a value from one of the chart's layers: the breakdown for a bar, the plain
- *  `key: value` rows for the cache-miss and compaction markers. */
-function formatChartTooltip(turns: Turn[], breakdown: ContextBreakdown) {
+ *  `key: value` rows for the cache-miss and compaction markers. `formatTooltip` runs each time the
+ *  tooltip is about to show, after vega-tooltip has created its element, which makes it the place
+ *  to re-parent that element. */
+function formatChartTooltip(turns: Turn[], breakdown: ContextBreakdown, container: HTMLElement) {
   return (value: unknown, escape: (value: unknown) => string): string => {
+    mountTooltipIn(container.closest("dialog"));
     const fields = (value ?? {}) as Record<string, unknown>;
     const response = Number(fields.Response);
     const turn = turns[response - 1];
@@ -96,7 +116,7 @@ function formatChartTooltip(turns: Turn[], breakdown: ContextBreakdown) {
   };
 }
 
-function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, hasBreakdown: boolean) {
+export function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, hasBreakdown: boolean, selected: number | null) {
   const { hues, text, text2, grid } = themeColors();
   const count = turns.length;
   const xAxis = {
@@ -141,6 +161,12 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, has
         legend: { title: null, orient: "top" },
       },
       order: { field: "Kind", sort: "ascending" },
+      opacity: hasBreakdown
+        ? {
+            condition: { test: `${SELECTED_SIGNAL} === null || ${SELECTED_SIGNAL} === datum.Response`, value: 1 },
+            value: DIMMED_OPACITY,
+          }
+        : { value: 1 },
       tooltip: hasBreakdown
         ? [{ field: "Response", type: "ordinal" }]
         : [
@@ -196,6 +222,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, has
       font: "system-ui, -apple-system, 'Segoe UI', sans-serif",
       legend: { labelColor: text2, labelFontSize: scaled(12) },
     },
+    params: [{ name: SELECTED_SIGNAL, value: selected }],
     layer: layers,
   };
 }
@@ -206,8 +233,12 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, has
  *  needs it. Colors are read from the theme's CSS variables at embed time and the chart is
  *  re-embedded whenever the theme changes or the data changes; container width changes are
  *  handled by Vega itself (a spec with `width: "container"` sets up its own ResizeObserver). */
-export function TokensChart({ turns, compactions, breakdown = null, onSelect }: TokensChartProps) {
+export function TokensChart({ turns, compactions, breakdown = null, onSelect, selected = null }: TokensChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const embeddedRef = useRef<Result | null>(null);
+  // Read when (re-)embedding, so a new selection updates the signal below instead of rebuilding the chart.
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   // A ref, so a parent re-render with a new callback doesn't re-embed the chart.
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -227,9 +258,9 @@ export function TokensChart({ turns, compactions, breakdown = null, onSelect }: 
       const options = {
         actions: false,
         renderer: "svg" as const,
-        ...(breakdown ? { tooltip: { formatTooltip: formatChartTooltip(turns, breakdown) } } : {}),
+        ...(breakdown ? { tooltip: { formatTooltip: formatChartTooltip(turns, breakdown, container) } } : {}),
       };
-      vegaEmbed(container, buildSpec(turns, compactions, scaled, breakdown !== null) as never, options as never).then((embedded) => {
+      vegaEmbed(container, buildSpec(turns, compactions, scaled, breakdown !== null, selectedRef.current) as never, options as never).then((embedded) => {
         if (cancelled) {
           embedded.finalize();
           return;
@@ -241,15 +272,25 @@ export function TokensChart({ turns, compactions, breakdown = null, onSelect }: 
           });
         }
         result = embedded;
+        embeddedRef.current = embedded;
+        // The selection may have changed while Vega was loading.
+        embedded.view.signal(SELECTED_SIGNAL, selectedRef.current).runAsync();
       });
     });
 
     return () => {
       cancelled = true;
+      embeddedRef.current = null;
       result?.finalize();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a re-embed for new colors
   }, [turns, compactions, breakdown, theme, scaled]);
+
+  useEffect(() => {
+    const embedded = embeddedRef.current;
+    if (!embedded) return;
+    embedded.view.signal(SELECTED_SIGNAL, selected).runAsync();
+  }, [selected]);
 
   if (turns.length === 0) return null;
 

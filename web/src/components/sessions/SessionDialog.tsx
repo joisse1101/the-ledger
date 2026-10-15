@@ -141,7 +141,7 @@ function Detail({ detail }: { detail: SessionDetail }) {
           miss (a response that wrote more cache than it read); a dashed line marks a compaction.
           {breakdown && " Hover a bar to see what filled it; click or tap it to pin the full breakdown."}
         </p>
-        <TokensChart turns={detail.turns} compactions={detail.compactions} breakdown={breakdown} onSelect={setSelected} />
+        <TokensChart turns={detail.turns} compactions={detail.compactions} breakdown={breakdown} onSelect={setSelected} selected={selected} />
         {breakdown && selected !== null && selectedTurn && (
           <ContextBreakdownPanel
             key={selected}

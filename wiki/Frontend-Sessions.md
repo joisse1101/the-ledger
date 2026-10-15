@@ -31,7 +31,9 @@
   theme change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers
   and dashed compaction rules. With a `breakdown`, hovering a bar shows a compact category tooltip
   (a vega-tooltip `formatTooltip` that escapes every transcript-derived string) and a click or tap
-  reports the response number; `Detail` then pins `ContextBreakdownPanel` under the chart: every
+  reports the response number (the selected bar stays solid and the others dim, driven by a Vega
+  signal so selecting never re-embeds; the tooltip element is moved into the enclosing `<dialog>`,
+  because a modal sits in the browser's top layer above anything left in `<body>`); `Detail` then pins `ContextBreakdownPanel` under the chart: every
   category with tokens and its share of *that response's own context* (never of a model window),
   startup categories marked `~` as estimates, expandable to items, collapsed by default, dismissable,
   replaced when another bar is picked. `web/src/lib/contextBreakdown.ts` holds the share/row/tooltip logic.
