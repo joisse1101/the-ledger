@@ -22,11 +22,16 @@
   `useTranscripts`'s "Load more". Its columns include `Model` and `OpenSpec` (Yes/No), both sortable. A row opens `SessionDialog`, a native `<dialog>` (`showModal()`, so
   Esc/focus-trapping/inert background come for free; CSS turns it into a full-screen sheet under
   640px) kept mounted across selections so a poll updates it in place without losing scroll position.
-  It shows the recap block, its `Detail` section (current-context figure, `TokensChart`, "All
-  responses" table, "what filled the context" by-tool/largest-increases tables) and `DeleteControls`
+  It shows the recap block, its `Detail` section (current-context figure, `TokensChart`, the pinned
+  `ContextBreakdownPanel`, "All responses" table, "what filled the context" by-tool/largest-increases tables) and `DeleteControls`
   (confirm/cancel → `useDeleteSession`, disabled with a note when live, a 409 mid-confirm surfaces the
   server's message; hidden entirely when `useMeta().is_local` is false). `TokensChart` lazily
   `import()`s `vega-embed` (so the Sessions page, the first thing a phone opens, doesn't pay for its
   bundle cost until a detail view needs it) and rebuilds/re-embeds its spec whenever the turns or the
   theme change; its spec draws the stacked Cache read/Cache written/New bars with ▼ cache-miss markers
-  and dashed compaction rules.
+  and dashed compaction rules. With a `breakdown`, hovering a bar shows a compact category tooltip
+  (a vega-tooltip `formatTooltip` that escapes every transcript-derived string) and a click or tap
+  reports the response number; `Detail` then pins `ContextBreakdownPanel` under the chart: every
+  category with tokens and its share of *that response's own context* (never of a model window),
+  startup categories marked `~` as estimates, expandable to items, collapsed by default, dismissable,
+  replaced when another bar is picked. `web/src/lib/contextBreakdown.ts` holds the share/row/tooltip logic.

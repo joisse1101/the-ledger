@@ -40,7 +40,10 @@ npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/q
                    # list/ResponsiveList, projects/ProjectsList (a row click selects, never deletes),
                    # projects/ProjectDetailPanel (charts, empty range, delete button hidden off-machine,
                    # confirm/error flow), pages/ProjectsPage (`?project=` selection, range reset),
-                   # sessions/DecisionPrompt, sessions/RemoteModeControl, hooks/useDebouncedValue,
+                   # sessions/DecisionPrompt, sessions/RemoteModeControl, sessions/SessionDialog +
+                   # ContextBreakdownPanel (select/replace/dismiss the pinned breakdown, estimates
+                   # marked), sessions/TokensChart (tooltip markup escapes names), lib/contextBreakdown
+                   # (shares of a response's own context), hooks/useDebouncedValue,
                    # hooks/useViewportClass, lib/format, lib/tokens, lib/activityTrend,
                    # components/overview/ActivityLineChart (compiles the chart spec: one shared legend)
 npm run build      # tsc --noEmit, then vite build -> web/dist

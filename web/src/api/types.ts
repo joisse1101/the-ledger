@@ -187,6 +187,41 @@ export interface LargestIncrease {
   hint: string;
 }
 
+export interface BreakdownItem {
+  label: string;
+  tokens: number;
+}
+
+/** An estimated startup category (memory files, skills, custom agents, MCP instructions). */
+export interface BreakdownCategory {
+  name: string;
+  tokens: number;
+  items: BreakdownItem[];
+}
+
+/** The estimated startup content from response index `position` until the next snapshot. */
+export interface BreakdownSnapshot {
+  position: number;
+  categories: BreakdownCategory[];
+}
+
+export interface BreakdownGrowth {
+  tool: string;
+  tokens: number;
+}
+
+/** One response's rows: its snapshot's categories + exact growth by tool + remainder = its context. */
+export interface BreakdownTurn {
+  snapshot: number;
+  growth: BreakdownGrowth[];
+  remainder: number;
+}
+
+export interface ContextBreakdown {
+  snapshots: BreakdownSnapshot[];
+  turns: BreakdownTurn[];
+}
+
 export interface SessionDetail {
   turns: Turn[];
   compactions: Compaction[];
@@ -196,6 +231,8 @@ export interface SessionDetail {
     by_tool: ToolGrowth[];
     largest: LargestIncrease[];
   };
+  /** null when the server could not build it. */
+  breakdown: ContextBreakdown | null;
 }
 
 export interface SessionResponse {

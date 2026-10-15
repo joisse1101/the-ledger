@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Result } from "vega-embed";
-import type { Compaction, Turn } from "../../api/types";
+import type { Compaction, ContextBreakdown, Turn } from "../../api/types";
+import { responseRows, tooltipContent, type TooltipContent } from "../../lib/contextBreakdown";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import type { Scaled } from "../../lib/uiScale";
@@ -8,6 +9,10 @@ import type { Scaled } from "../../lib/uiScale";
 export interface TokensChartProps {
   turns: Turn[];
   compactions: Compaction[];
+  /** When present, hovering a bar shows that response's category breakdown instead of the plain fields. */
+  breakdown?: ContextBreakdown | null;
+  /** Called with the 1-based response number when a bar is clicked or tapped. */
+  onSelect?: (response: number) => void;
 }
 
 const KINDS = ["Cache read", "Cache written", "New"] as const;
@@ -63,7 +68,35 @@ function themeColors() {
   };
 }
 
-function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled) {
+/** The hover content as vega-tooltip markup. Every dynamic string goes through `escape`: tool names
+ *  and file labels come from the transcript. */
+export function breakdownTooltipHtml(content: TooltipContent, escape: (value: string) => string): string {
+  const rows = content.lines
+    .map((line) => `<tr><td class="key">${escape(line.name)}:</td><td class="value">${escape(line.value)}</td></tr>`)
+    .join("");
+  const note = content.estimateNote ? `<tr><td class="key" colspan="2">${escape(content.estimateNote)}</td></tr>` : "";
+  return `<h2>${escape(content.title)}</h2><table>${rows}${note}</table>`;
+}
+
+/** The tooltip for a value from one of the chart's layers: the breakdown for a bar, the plain
+ *  `key: value` rows for the cache-miss and compaction markers. */
+function formatChartTooltip(turns: Turn[], breakdown: ContextBreakdown) {
+  return (value: unknown, escape: (value: unknown) => string): string => {
+    const fields = (value ?? {}) as Record<string, unknown>;
+    const response = Number(fields.Response);
+    const turn = turns[response - 1];
+    if (fields.Note === undefined && turn) {
+      const content = tooltipContent(responseRows(breakdown, response - 1), response, turn.context);
+      return breakdownTooltipHtml(content, escape);
+    }
+    const rows = Object.entries(fields)
+      .map(([key, field]) => `<tr><td class="key">${escape(key)}:</td><td class="value">${escape(field)}</td></tr>`)
+      .join("");
+    return `<table>${rows}</table>`;
+  };
+}
+
+function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled, hasBreakdown: boolean) {
   const { hues, text, text2, grid } = themeColors();
   const count = turns.length;
   const xAxis = {
@@ -85,7 +118,7 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled) {
 
   const bars = {
     data: { values: chartRecords(turns) },
-    mark: { type: "bar" },
+    mark: { type: "bar", cursor: hasBreakdown ? "pointer" : undefined },
     encoding: {
       x,
       y: {
@@ -108,13 +141,15 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled) {
         legend: { title: null, orient: "top" },
       },
       order: { field: "Kind", sort: "ascending" },
-      tooltip: [
-        { field: "Response", type: "ordinal" },
-        { field: "Kind", type: "nominal" },
-        { field: "Tokens", type: "quantitative", format: "," },
-        { field: "Total", type: "quantitative", format: ",", title: "Context" },
-        { field: "Output", type: "quantitative", format: ",", title: "Output" },
-      ],
+      tooltip: hasBreakdown
+        ? [{ field: "Response", type: "ordinal" }]
+        : [
+            { field: "Response", type: "ordinal" },
+            { field: "Kind", type: "nominal" },
+            { field: "Tokens", type: "quantitative", format: "," },
+            { field: "Total", type: "quantitative", format: ",", title: "Context" },
+            { field: "Output", type: "quantitative", format: ",", title: "Output" },
+          ],
     },
   };
 
@@ -171,8 +206,11 @@ function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scaled) {
  *  needs it. Colors are read from the theme's CSS variables at embed time and the chart is
  *  re-embedded whenever the theme changes or the data changes; container width changes are
  *  handled by Vega itself (a spec with `width: "container"` sets up its own ResizeObserver). */
-export function TokensChart({ turns, compactions }: TokensChartProps) {
+export function TokensChart({ turns, compactions, breakdown = null, onSelect }: TokensChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // A ref, so a parent re-render with a new callback doesn't re-embed the chart.
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
   const { theme } = useTheme();
   const scaled = useScaled();
 
@@ -186,10 +224,21 @@ export function TokensChart({ turns, compactions }: TokensChartProps) {
 
     import("vega-embed").then(({ default: vegaEmbed }) => {
       if (cancelled) return;
-      vegaEmbed(container, buildSpec(turns, compactions, scaled) as never, { actions: false, renderer: "svg" }).then((embedded) => {
+      const options = {
+        actions: false,
+        renderer: "svg" as const,
+        ...(breakdown ? { tooltip: { formatTooltip: formatChartTooltip(turns, breakdown) } } : {}),
+      };
+      vegaEmbed(container, buildSpec(turns, compactions, scaled, breakdown !== null) as never, options as never).then((embedded) => {
         if (cancelled) {
           embedded.finalize();
           return;
+        }
+        if (breakdown) {
+          embedded.view.addEventListener("click", (_event, item) => {
+            const response = Number((item?.datum as { Response?: unknown } | undefined)?.Response);
+            if (Number.isInteger(response) && response >= 1) onSelectRef.current?.(response);
+          });
         }
         result = embedded;
       });
@@ -200,7 +249,7 @@ export function TokensChart({ turns, compactions }: TokensChartProps) {
       result?.finalize();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a re-embed for new colors
-  }, [turns, compactions, theme, scaled]);
+  }, [turns, compactions, breakdown, theme, scaled]);
 
   if (turns.length === 0) return null;
 

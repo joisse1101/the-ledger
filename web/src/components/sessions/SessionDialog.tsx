@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { LIVE_POLL_MS, useDeleteSession, useMeta, useSession } from "../../api/queries";
 import type { Compaction, SessionDetail, SessionRecap, Turn } from "../../api/types";
 import { formatContext, formatCost, formatCount, formatDateTime, formatText, formatTime } from "../../lib/format";
+import { responseRows } from "../../lib/contextBreakdown";
 import { humanizeTokens } from "../../lib/tokens";
 import { CostFigure } from "../CostFigure";
 import { CloseIcon } from "../icons";
+import { ContextBreakdownPanel } from "./ContextBreakdownPanel";
 import { TokensChart } from "./TokensChart";
 
 export interface SessionDialogProps {
@@ -108,7 +110,10 @@ function Recap({ recap }: { recap: SessionRecap }) {
   );
 }
 
+/** `key={session_id}` at the call site resets the selected response when a different session opens. */
 function Detail({ detail }: { detail: SessionDetail }) {
+  const [selected, setSelected] = useState<number | null>(null);
+
   if (detail.turns.length === 0) {
     return <p className="muted">This session hasn't had a response from Claude yet.</p>;
   }
@@ -116,6 +121,8 @@ function Detail({ detail }: { detail: SessionDetail }) {
   const lastContext = detail.turns[detail.turns.length - 1].context;
   const attribution = detail.attribution;
   const since = detail.compactions.length > 0 ? "the last compaction" : "the start of the session";
+  const breakdown = detail.breakdown;
+  const selectedTurn = selected === null ? undefined : detail.turns[selected - 1];
 
   return (
     <>
@@ -132,8 +139,18 @@ function Detail({ detail }: { detail: SessionDetail }) {
         <p className="detail-caption">
           Each bar is what one request sent: newly sent input plus cached tokens read and written. ▼ marks a cache
           miss (a response that wrote more cache than it read); a dashed line marks a compaction.
+          {breakdown && " Hover a bar to see what filled it; click or tap it to pin the full breakdown."}
         </p>
-        <TokensChart turns={detail.turns} compactions={detail.compactions} />
+        <TokensChart turns={detail.turns} compactions={detail.compactions} breakdown={breakdown} onSelect={setSelected} />
+        {breakdown && selected !== null && selectedTurn && (
+          <ContextBreakdownPanel
+            key={selected}
+            response={selected}
+            context={selectedTurn.context}
+            rows={responseRows(breakdown, selected - 1)}
+            onDismiss={() => setSelected(null)}
+          />
+        )}
         {compactionCaptions(detail).map((caption) => (
           <p key={caption} className="detail-caption">
             {caption}
@@ -349,7 +366,7 @@ export function SessionDialog({ sessionId, onClose }: SessionDialogProps) {
                 <>
                   {data.recap && <Recap recap={data.recap} />}
                   {!data.readable && <p className="detail-notice">Couldn't read this session's transcript.</p>}
-                  {data.readable && data.detail && <Detail detail={data.detail} />}
+                  {data.readable && data.detail && <Detail key={data.session_id} detail={data.detail} />}
                   {isLocal && (
                     <DeleteControls
                       key={data.session_id}
