@@ -77,7 +77,7 @@ describe('rows', () => {
   })
 
   it('keeps only the latest sparkline segments and leaves the rest of the label alone', () => {
-    expect(trimSparkline('394k ▲ +2.1k ▁▂▃▄▅▆▇█▁▂▃▄')).toBe('394k ▲ +2.1k ▅▆▇█▁▂▃▄')
+    expect(trimSparkline('394k ▲ +2.1k ▁▂▃▄▅▆▇█▁▂▃▄▅▆▇█▁▂▃▄')).toBe('394k ▲ +2.1k ▆▇█▁▂▃▄▅▆▇█▁▂▃▄')
     expect(trimSparkline('394k ▲ +2.1k ▁▂▃')).toBe('394k ▲ +2.1k ▁▂▃')
     expect(trimSparkline('42k')).toBe('42k')
   })
