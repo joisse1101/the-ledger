@@ -20,8 +20,8 @@
 
 ## 5. jois:stage
 
-- [ ] 5.1 Write `toolkit/commands/jois/stage.md` with `disable-model-invocation: true` and `metadata:`: status analysis, concern selection and splitting, explicit-path staging, the plain-text presentation with a fresh word and turn end, the commit-on-word loop to a clean tree, change requests, and the skip list for unsafe files
-- [ ] 5.2 Specify and document the partial-file split in the command (`git apply --cached` with a prepared patch, else report and ask) and the pre-staged-changes handling
+- [x] 5.1 Write `toolkit/commands/jois/stage.md` with `disable-model-invocation: true` and `metadata:`: status analysis, concern selection and splitting, explicit-path staging, the plain-text presentation with a fresh word and turn end, the commit-on-word loop to a clean tree, change requests, and the skip list for unsafe files
+- [x] 5.2 Specify and document the partial-file split in the command (`git apply --cached` with a prepared patch, else report and ask) and the pre-staged-changes handling
 - [ ] 5.3 Verify on a scratch repo with a bug fix, a 10-file deletion, a rename, a lockfile change and an untracked `.env`: four commits one at a time with different words, `.env` reported as skipped, "looks good" refused, and a clean tree at the end
 
 ## 6. Installer and docs
