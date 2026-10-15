@@ -14,8 +14,8 @@
 
 ## 4. jois:apply
 
-- [ ] 4.1 Write `toolkit/commands/jois/apply.md` with `disable-model-invocation: true` and `metadata:`: change selection, status and instructions, context files, per-task implementation, checks (found from `CLAUDE.md`), split by concern, stage by explicit path, commit with the attribution line, branch creation when on the default branch, the stop conditions, the closing report, and a note naming `opsx:apply` as its origin
-- [ ] 4.2 Add `commands/jois/*.md` to `_versioned_items` in `api/check_docs.py` with a test for a missing version in a jois command and an exempt opsx command; run `pytest` and `python check_docs.py`
+- [x] 4.1 Write `toolkit/commands/jois/apply.md` with `disable-model-invocation: true` and `metadata:`: change selection, status and instructions, context files, per-task implementation, checks (found from `CLAUDE.md`), split by concern, stage by explicit path, commit with the attribution line, branch creation when on the default branch, the stop conditions, the closing report, and a note naming `opsx:apply` as its origin
+- [x] 4.2 Add `commands/jois/*.md` to `_versioned_items` in `api/check_docs.py` with a test for a missing version in a jois command and an exempt opsx command; run `pytest` and `python check_docs.py`
 - [ ] 4.3 Verify end to end on a throwaway branch and a tiny two-task change: it commits each concern without a word, refuses to commit on a deliberately failing test, creates a branch when started on `main`, never pushes, and prints the commit report
 
 ## 5. jois:stage

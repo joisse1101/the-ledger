@@ -342,6 +342,7 @@ def _versioned_items(toolkit: Path) -> list[Path]:
             *toolkit.glob("skills/*/SKILL.md"),
             *toolkit.glob("agents/*.md"),
             *toolkit.glob("commands/jois-review/*.md"),
+            *toolkit.glob("commands/jois/*.md"),
         ]
     )
 
