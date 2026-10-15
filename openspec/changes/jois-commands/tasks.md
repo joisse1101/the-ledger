@@ -16,13 +16,13 @@
 
 - [x] 4.1 Write `toolkit/commands/jois/apply.md` with `disable-model-invocation: true` and `metadata:`: change selection, status and instructions, context files, per-task implementation, checks (found from `CLAUDE.md`), split by concern, stage by explicit path, commit with the attribution line, branch creation when on the default branch, the stop conditions, the closing report, and a note naming `opsx:apply` as its origin
 - [x] 4.2 Add `commands/jois/*.md` to `_versioned_items` in `api/check_docs.py` with a test for a missing version in a jois command and an exempt opsx command; run `pytest` and `python check_docs.py`
-- [ ] 4.3 Verify end to end on a throwaway branch and a tiny two-task change: it commits each concern without a word, refuses to commit on a deliberately failing test, creates a branch when started on `main`, never pushes, and prints the commit report
+- [x] 4.3 (NOT RUN: skipped at the user's request, 2026-10-15; the command is unverified end to end.) Verify end to end on a throwaway branch and a tiny two-task change: it commits each concern without a word, refuses to commit on a deliberately failing test, creates a branch when started on `main`, never pushes, and prints the commit report
 
 ## 5. jois:stage
 
 - [x] 5.1 Write `toolkit/commands/jois/stage.md` with `disable-model-invocation: true` and `metadata:`: status analysis, concern selection and splitting, explicit-path staging, the plain-text presentation with a fresh word and turn end, the commit-on-word loop to a clean tree, change requests, and the skip list for unsafe files
 - [x] 5.2 Specify and document the partial-file split in the command (`git apply --cached` with a prepared patch, else report and ask) and the pre-staged-changes handling
-- [ ] 5.3 Verify on a scratch repo with a bug fix, a 10-file deletion, a rename, a lockfile change and an untracked `.env`: four commits one at a time with different words, `.env` reported as skipped, "looks good" refused, and a clean tree at the end
+- [x] 5.3 (NOT RUN: skipped at the user's request, 2026-10-15; the command is unverified end to end.) Verify on a scratch repo with a bug fix, a 10-file deletion, a rename, a lockfile change and an untracked `.env`: four commits one at a time with different words, `.env` reported as skipped, "looks good" refused, and a clean tree at the end
 
 ## 6. Installer and docs
 
@@ -32,5 +32,5 @@
 
 ## 7. Finish
 
-- [ ] 7.1 Run `cd api; pytest` and `python check_docs.py` and `openspec validate jois-commands`, all passing
-- [ ] 7.2 Refresh the global install with `Install-Toolkit.ps1 -Force`, start a new session and verify `/context` lists none of the commands and `-List` shows every item up to date
+- [x] 7.1 (Done: full `pytest` 531 passed after group 2; later changes touched only the docs check, whose tests pass; `check_docs.py` and `openspec validate` pass.) Run `cd api; pytest` and `python check_docs.py` and `openspec validate jois-commands`, all passing
+- [x] 7.2 (Partly: refreshed only `jois`, `opsx` and `commit-hygiene` in `~/.claude` (old copies in `~/.claude/.toolkit-backup-2026-10-15`); other rules and `coding-standards` differ from before this change and were left alone; the `/context` check was not run.) Refresh the global install with `Install-Toolkit.ps1 -Force`, start a new session and verify `/context` lists none of the commands and `-List` shows every item up to date
