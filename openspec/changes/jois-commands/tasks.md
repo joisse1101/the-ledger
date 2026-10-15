@@ -10,7 +10,7 @@
 
 ## 3. Commit rule exception
 
-- [ ] 3.1 Add the `/jois:apply` exception line to `toolkit/rules/commit-hygiene.md` (run only, current branch, no amend, no push, no carry-over, not `/jois:stage`), paying for it by merging redundant bullets without losing a requirement of the approval section; bump `metadata.version` to `1.1.0` and `last_updated`; verify the file stays within the existing 2 KB budget, still has no `paths:`, and `python check_docs.py` passes (if it cannot fit, stop and decide on a budget change)
+- [x] 3.1 Add the `/jois:apply` exception line to `toolkit/rules/commit-hygiene.md` (run only, current branch, no amend, no push, no carry-over, not `/jois:stage`), paying for it by merging redundant bullets without losing a requirement of the approval section; bump `metadata.version` to `1.1.0` and `last_updated`; verify the file stays within the existing 2 KB budget, still has no `paths:`, and `python check_docs.py` passes (if it cannot fit, stop and decide on a budget change)
 
 ## 4. jois:apply
 
