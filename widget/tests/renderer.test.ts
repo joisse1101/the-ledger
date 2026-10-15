@@ -29,6 +29,7 @@ function setup(openResult: OpenRepoResult = 'opened') {
     toggleCollapse: vi.fn(),
     onOpacity: (cb) => (setOpacity = cb),
     setOpacity: vi.fn(),
+    setContentHeight: vi.fn(),
   }
   mount(document, bridge)
   return { bridge, push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
@@ -37,6 +38,34 @@ function setup(openResult: OpenRepoResult = 'opened') {
 const text = (selector: string) => document.querySelector(selector)?.textContent
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
+
+describe('window height', () => {
+  const rowsOf = (n: number) => Array.from({ length: n }, (_, i) => session({ session_id: `s${i}` }))
+
+  it('reports a height whenever the list changes', () => {
+    const { bridge, push } = setup()
+    vi.mocked(bridge.setContentHeight).mockClear()
+    push({ state: 'online', sessions: rowsOf(2) })
+    expect(bridge.setContentHeight).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops growing at ten rows', () => {
+    const { bridge, push } = setup()
+    // jsdom does no layout, so give every row a 30px box stacked down the list.
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30)
+    vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('row') ? Array.from(this.parentElement!.children).indexOf(this) * 30 : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.children.length * 30
+    })
+    push({ state: 'online', sessions: rowsOf(10) })
+    const atTen = vi.mocked(bridge.setContentHeight).mock.lastCall![0]
+    push({ state: 'online', sessions: rowsOf(14) })
+    expect(vi.mocked(bridge.setContentHeight).mock.lastCall![0]).toBe(atTen)
+    vi.restoreAllMocks()
+  })
+})
 
 describe('rows', () => {
   it('shows project, branch and the server label verbatim', () => {
@@ -48,7 +77,7 @@ describe('rows', () => {
   })
 
   it('keeps only the latest sparkline segments and leaves the rest of the label alone', () => {
-    expect(trimSparkline('394k ▲ +2.1k ▁▂▃▄▅▆▇█▁▂▃▄')).toBe('394k ▲ +2.1k ▅▆▇█▁▂▃▄')
+    expect(trimSparkline('394k ▲ +2.1k ▁▂▃▄▅▆▇█▁▂▃▄▅▆▇█▁▂▃▄')).toBe('394k ▲ +2.1k ▆▇█▁▂▃▄▅▆▇█▁▂▃▄')
     expect(trimSparkline('394k ▲ +2.1k ▁▂▃')).toBe('394k ▲ +2.1k ▁▂▃')
     expect(trimSparkline('42k')).toBe('42k')
   })

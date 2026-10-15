@@ -9,7 +9,10 @@ what a model's context window is, so nothing is expressed as a percentage of a l
 from __future__ import annotations
 
 import json
+import logging
 import os
+import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,7 +20,10 @@ from typing import Any, Iterable, Optional
 
 import claude_db
 
+log = logging.getLogger("ledger")
+
 SPARKLINE_TURNS = 24
+_CHARS_PER_TOKEN = 4  # the rough estimate for startup content; the transcript has no tokenizer to use
 _TAIL_WINDOW = 256 * 1024
 _SPARK_GLYPHS = "▁▂▃▄▅▆▇█"
 _NO_TOOL_LABEL = "prompt / text"
@@ -88,10 +94,133 @@ class Attribution:
 
 
 @dataclass(frozen=True)
+class StartupItem:
+    label: str
+    tokens: int
+
+
+@dataclass(frozen=True)
+class StartupCategory:
+    name: str
+    tokens: int  # always the sum of its items
+    items: list[StartupItem]
+
+
+@dataclass(frozen=True)
+class StartupSnapshot:
+    """The estimated startup content from `position` (a response index) until the next snapshot."""
+
+    position: int
+    categories: list[StartupCategory]
+
+
+@dataclass(frozen=True)
+class GrowthRow:
+    tool: str
+    tokens: int  # exact, cumulative since the start of the segment
+
+
+@dataclass(frozen=True)
+class TurnBreakdown:
+    snapshot: int  # index into Breakdown.snapshots
+    growth: list[GrowthRow]
+    remainder: int  # context minus every other row, so the rows always sum to the response's context
+
+
+@dataclass(frozen=True)
+class Breakdown:
+    snapshots: list[StartupSnapshot]
+    turns: list[TurnBreakdown]  # one per SessionDetail.turns entry
+
+
+@dataclass(frozen=True)
 class SessionDetail:
     turns: list[Turn]
     compactions: list[Compaction]
     attribution: Attribution
+    breakdown: Optional[Breakdown] = None  # None when it could not be built
+
+
+# ---------------------------------------------------------------- startup content events
+
+
+@dataclass(frozen=True)
+class RawItem:
+    key: str  # identity within a category: a file path, a skill, agent or server name
+    label: str
+    text: str
+
+
+@dataclass(frozen=True)
+class StartupEvent:
+    """Startup content Claude Code recorded just before response number `position` (0-based)."""
+
+    position: int
+    category: str  # memory | skills | agents | mcp
+    added: tuple[RawItem, ...]
+    removed: tuple[str, ...] = ()
+    replace: bool = False  # an initial listing: forget what the category held before
+
+
+def _str_list(value: Any) -> list[str]:
+    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+
+
+def _listing_items(text: str) -> tuple[RawItem, ...]:
+    """Group `- name: description` lines into items; a line not starting with `- ` continues the previous one."""
+    groups: list[list[str]] = []
+    for line in text.split("\n"):
+        if line.startswith("- ") or not groups:
+            groups.append([line])
+        else:
+            groups[-1].append(line)
+    items = []
+    for group in groups:
+        body = "\n".join(group)
+        name = (body[2:] if body.startswith("- ") else body).split(":", 1)[0].strip()
+        if name:
+            items.append(RawItem(key=name, label=name, text=body))
+    return tuple(items)
+
+
+def _memory_items(files: Any) -> tuple[RawItem, ...]:
+    items = []
+    for file in files if isinstance(files, list) else []:
+        if not isinstance(file, dict) or not isinstance(file.get("path"), str) or not isinstance(file.get("content"), str):
+            continue
+        path = file["path"]
+        items.append(RawItem(key=path, label="/".join(re.split(r"[\\/]", path)[-2:]), text=file["content"]))
+    return tuple(items)
+
+
+def _mcp_items(attachment: dict) -> tuple[RawItem, ...]:
+    blocks, names = _str_list(attachment.get("addedBlocks")), _str_list(attachment.get("addedNames"))
+    items = []
+    for index, block in enumerate(blocks):
+        name = names[index] if len(names) == len(blocks) else block.split("\n", 1)[0].removeprefix("## ").strip()
+        if name:
+            items.append(RawItem(key=name, label=name, text=block))
+    return tuple(items)
+
+
+def _startup_events(attachment: Any, position: int) -> list[StartupEvent]:
+    """The startup-content events carried by one transcript attachment, or [] for any other or malformed one."""
+    if not isinstance(attachment, dict):
+        return []
+    kind = attachment.get("type")
+    initial = attachment.get("isInitial") is True
+    if kind == "instructions":
+        event = StartupEvent(position, "memory", _memory_items(attachment.get("files")))
+    elif kind == "skill_listing" and isinstance(attachment.get("content"), str):
+        event = StartupEvent(position, "skills", _listing_items(attachment["content"]), replace=initial)
+    elif kind == "agent_listing_delta":
+        added = _listing_items("\n".join(_str_list(attachment.get("addedLines"))))
+        event = StartupEvent(position, "agents", added, tuple(_str_list(attachment.get("removedTypes"))), replace=initial)
+    elif kind == "mcp_instructions_delta":
+        event = StartupEvent(position, "mcp", _mcp_items(attachment), tuple(_str_list(attachment.get("removedNames"))))
+    else:
+        return []
+    return [event] if event.added or event.removed or event.replace else []
 
 
 # ---------------------------------------------------------------- parsing
@@ -122,9 +251,10 @@ def _tool_uses(content: Any) -> list[ToolUse]:
     ]
 
 
-def _scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction]]:
+def _scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction], list[StartupEvent]]:
     turns: dict[str, Turn] = {}
     compactions: list[Compaction] = []
+    events: list[StartupEvent] = []
 
     for line in lines:
         try:
@@ -132,6 +262,11 @@ def _scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction]]:
         except ValueError:
             continue
         if not isinstance(entry, dict):
+            continue
+
+        if entry.get("type") == "attachment":
+            if not entry.get("isSidechain"):
+                events.extend(_startup_events(entry.get("attachment"), len(turns)))
             continue
 
         if entry.get("type") == "system" and entry.get("subtype") == "compact_boundary":
@@ -174,7 +309,7 @@ def _scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction]]:
         turn.tools = (previous.tools if previous else []) + _tool_uses(message.get("content"))
         turns[message_id] = turn
 
-    return list(turns.values()), compactions
+    return list(turns.values()), compactions, events
 
 
 def extract_turns(lines: Iterable[str]) -> list[Turn]:
@@ -380,6 +515,11 @@ def is_cache_miss(index: int, turn: Turn) -> bool:
     return index > 0 and turn.cache_written > turn.cache_read
 
 
+def credited_tool(previous: Turn) -> ToolUse:
+    """The tool credited with the context growth that arrives at the response after `previous`."""
+    return previous.tools[0] if previous.tools else ToolUse(_NO_TOOL_LABEL)
+
+
 def attribute_growth(turns: list[Turn], compactions: list[Compaction]) -> Attribution:
     """Attribute context growth since the last compaction to the tool whose result caused it.
 
@@ -397,7 +537,7 @@ def attribute_growth(turns: list[Turn], compactions: list[Compaction]) -> Attrib
     increases: list[Increase] = []
     for offset in range(1, len(segment)):
         previous = segment[offset - 1]
-        tool = previous.tools[0] if previous.tools else ToolUse(_NO_TOOL_LABEL)
+        tool = credited_tool(previous)
         delta = segment[offset].context - previous.context
         entry = totals.setdefault(tool.name, [0, 0])
         entry[0] += delta
@@ -410,11 +550,108 @@ def attribute_growth(turns: list[Turn], compactions: list[Compaction]) -> Attrib
     return Attribution(floor=segment[0].context, current=segment[-1].context, by_tool=by_tool, largest=increases[:_TOP_INCREASES])
 
 
-def parse_detail(lines: Iterable[str]) -> SessionDetail:
-    turns, compactions = _scan(lines)
+# ---------------------------------------------------------------- context breakdown
+
+_CATEGORY_NAMES = (("memory", "Memory files"), ("skills", "Skills"), ("agents", "Custom agents"), ("mcp", "MCP instructions"))
+
+
+def estimate_tokens(text: str) -> int:
+    return -(-len(text) // _CHARS_PER_TOKEN)  # ceiling division
+
+
+def _apply_event(state: dict[str, dict[str, RawItem]], event: StartupEvent) -> None:
+    items = state.setdefault(event.category, {})
+    if event.replace:
+        items.clear()
+    for item in event.added:
+        items[item.key] = item
+    for key in event.removed:
+        items.pop(key, None)
+
+
+def _categories(state: dict[str, dict[str, RawItem]], floor: int) -> list[StartupCategory]:
+    """The state's categories with `chars/4` estimates, scaled down (never up) so they total at most `floor`."""
+    estimated = [
+        (name, sorted(((item.label, estimate_tokens(item.text)) for item in state[key].values()), key=lambda i: -i[1]))
+        for key, name in _CATEGORY_NAMES
+        if state.get(key)
+    ]
+    total = sum(tokens for _, items in estimated for _, tokens in items)
+    categories = []
+    for name, items in estimated:
+        # Integer arithmetic keeps the floor exact: the sum of floored shares can never exceed `floor`.
+        scaled = [StartupItem(label, tokens * floor // total if total > floor else tokens) for label, tokens in items]
+        categories.append(StartupCategory(name, sum(item.tokens for item in scaled), scaled))
+    return categories
+
+
+def build_breakdown(turns: list[Turn], compactions: list[Compaction], events: list[StartupEvent]) -> Breakdown:
+    """Split every response's context into estimated startup categories, exact growth by tool, and a remainder.
+
+    A segment starts at the first response and at the first response after each compaction. Growth is
+    cumulative within a segment and credited by `credited_tool`. Startup estimates are capped at the
+    segment's first response, so the remainder (`floor - startup`) is never negative and every row set
+    sums to its response's exact context.
+    """
+    if not turns:
+        return Breakdown(snapshots=[], turns=[])
+
+    segment_starts = sorted({0, *(c.position for c in compactions if 0 < c.position < len(turns))})
+    positions = sorted({*segment_starts, *(e.position for e in events if e.position < len(turns))})
+    pending = sorted(events, key=lambda e: e.position)  # stable: events at one position keep their order
+
+    state: dict[str, dict[str, RawItem]] = {}
+    snapshots: list[StartupSnapshot] = []
+    applied = 0
+    for position in positions:
+        while applied < len(pending) and pending[applied].position <= position:
+            _apply_event(state, pending[applied])
+            applied += 1
+        floor = turns[segment_starts[bisect_right(segment_starts, position) - 1]].context
+        categories = _categories(state, floor)
+        if not snapshots or snapshots[-1].categories != categories:
+            snapshots.append(StartupSnapshot(position, categories))
+
+    segment_set = set(segment_starts)
+    snapshot_positions = [snapshot.position for snapshot in snapshots]
+    rows: list[TurnBreakdown] = []
+    cumulative: dict[str, int] = {}
+    for index, turn in enumerate(turns):
+        if index in segment_set:
+            cumulative = {}
+        else:
+            previous = turns[index - 1]
+            tool = credited_tool(previous).name
+            cumulative[tool] = cumulative.get(tool, 0) + turn.context - previous.context
+        snapshot = bisect_right(snapshot_positions, index) - 1
+        startup = sum(category.tokens for category in snapshots[snapshot].categories)
+        growth = sorted(((tool, tokens) for tool, tokens in cumulative.items() if tokens), key=lambda g: -g[1])
+        remainder = turn.context - startup - sum(tokens for _, tokens in growth)
+        rows.append(TurnBreakdown(snapshot, [GrowthRow(tool, tokens) for tool, tokens in growth], remainder))
+    return Breakdown(snapshots=snapshots, turns=rows)
+
+
+def _safe_breakdown(
+    turns: list[Turn], compactions: list[Compaction], events: list[StartupEvent], session_id: str
+) -> Optional[Breakdown]:
+    """The breakdown, or None (logged) if it cannot be built, so a bad attachment never costs the detail view."""
+    try:
+        return build_breakdown(turns, compactions, events)
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError):
+        log.warning("context breakdown failed session_id=%s", session_id, exc_info=True)
+        return None
+
+
+def parse_detail(lines: Iterable[str], session_id: str = "") -> SessionDetail:
+    turns, compactions, events = _scan(lines)
     for index, turn in enumerate(turns):
         turn.cache_miss = is_cache_miss(index, turn)
-    return SessionDetail(turns=turns, compactions=compactions, attribution=attribute_growth(turns, compactions))
+    return SessionDetail(
+        turns=turns,
+        compactions=compactions,
+        attribution=attribute_growth(turns, compactions),
+        breakdown=_safe_breakdown(turns, compactions, events, session_id),
+    )
 
 
 # path -> (stat key at last parse, detail)
@@ -433,7 +670,7 @@ def load_detail(session_id: str, cwd: str) -> Optional[SessionDetail]:
             return cached[1]
 
         with path.open("r", encoding="utf-8", errors="replace") as f:
-            detail = parse_detail(f)
+            detail = parse_detail(f, session_id)
         _detail_cache[path] = (key, detail)
         return detail
     except (OSError, ValueError):

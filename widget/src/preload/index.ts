@@ -14,6 +14,7 @@ const bridge: WidgetBridge = {
     ipcRenderer.on('widget:opacity', (_event, opacity: number) => callback(opacity))
   },
   setOpacity: (opacity) => ipcRenderer.send('widget:set-opacity', opacity),
+  setContentHeight: (height) => ipcRenderer.send('widget:set-content-height', height),
   openSession: (sessionId): Promise<OpenRepoResult> => ipcRenderer.invoke('widget:open-session', sessionId),
   openLedger: () => ipcRenderer.send('widget:open-ledger'),
   toggleCollapse: () => ipcRenderer.send('widget:toggle-collapse'),

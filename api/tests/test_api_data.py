@@ -798,6 +798,60 @@ def test_session_detail_has_a_recap_and_turns_that_reconcile(with_turns, monkeyp
     assert attribution["floor"] + sum(g["tokens"] for g in attribution["by_tool"]) == attribution["current"]
 
 
+def test_session_detail_breakdown_without_startup_content_has_growth_and_a_remainder(with_turns, monkeypatch):
+    _use_live(monkeypatch)
+    detail = _client().get("/api/sessions/aaa-1").json()["detail"]
+
+    breakdown = detail["breakdown"]
+    assert breakdown["snapshots"] == [{"position": 0, "categories": []}]
+    assert len(breakdown["turns"]) == len(detail["turns"])
+    last = breakdown["turns"][-1]
+    assert {g["tool"]: g["tokens"] for g in last["growth"]} == {"Read": 10_000, "Bash": 5_000, "prompt / text": 16_000}
+    assert last["remainder"] == 50_000  # the first response's whole context
+
+
+def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_context(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    write_config(isolated_db / "claude.json", {})
+    folder = claude_db.sanitize_project_path("/h/alpha")
+    skills = {"type": "attachment", "attachment": {
+        "type": "skill_listing", "isInitial": True, "skillCount": 2, "names": ["a", "b"],
+        "content": "- a: " + "x" * 400 + "\n- b: " + "y" * 200}}
+    write_transcript(
+        isolated_db / "projects" / folder / "aaa-1.jsonl",
+        [
+            {"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/h/alpha", "version": "1.0",
+             "gitBranch": "main", "sessionId": "aaa-1", "message": {"content": "start"}},
+            skills,
+            _assistant("m1", read=10_000),
+            _assistant("m2", read=12_000, tools=[("Read", {})]),
+        ],
+    )
+    claude_db.refresh()
+    _use_live(monkeypatch)
+
+    detail = _client().get("/api/sessions/aaa-1").json()["detail"]
+
+    [snapshot] = detail["breakdown"]["snapshots"]
+    [category] = snapshot["categories"]
+    assert category["name"] == "Skills"
+    assert category["tokens"] == sum(item["tokens"] for item in category["items"]) > 0
+    for row, turn in zip(detail["breakdown"]["turns"], detail["turns"]):
+        assert category["tokens"] + sum(g["tokens"] for g in row["growth"]) + row["remainder"] == turn["context"]
+
+
+def test_session_detail_breakdown_failure_drops_only_the_breakdown(with_turns, monkeypatch):
+    _use_live(monkeypatch)
+    monkeypatch.setattr(server.claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
+    server.claude_context._detail_cache.clear()
+
+    detail = _client().get("/api/sessions/aaa-1").json()["detail"]
+
+    assert detail["breakdown"] is None
+    assert len(detail["turns"]) == 4
+
+
 def test_session_detail_for_a_live_session_is_flagged_and_uses_the_registry_cwd(with_turns, monkeypatch):
     _use_live(monkeypatch, [_live_session("aaa-1", cwd="/h/alpha")])
     body = _client().get("/api/sessions/aaa-1").json()

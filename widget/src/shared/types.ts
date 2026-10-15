@@ -23,6 +23,8 @@ export interface WidgetBridge {
   onCollapsed(callback: (collapsed: boolean) => void): void
   onOpacity(callback: (opacity: number) => void): void
   setOpacity(opacity: number): void
+  /** The height the window needs to show its content; the main process resizes to it. */
+  setContentHeight(height: number): void
   openSession(sessionId: string): Promise<OpenRepoResult>
   openLedger(): void
   toggleCollapse(): void
