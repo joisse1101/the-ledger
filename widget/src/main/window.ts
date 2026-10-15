@@ -14,6 +14,7 @@ export interface WidgetWindow {
   toggleCollapse(): void
   toggleVisible(): void
   setOpacity(value: number): void
+  setContentHeight(height: number): void
   show(): void
   isVisible(): boolean
 }
@@ -25,6 +26,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
   let collapsed = saved.collapsed
   let opacity = clampOpacity(saved.opacity)
   let lastState: LiveState | null = null
+  let contentHeight: number | null = null
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
   const collapsedRect = (): Rect => ({
@@ -94,6 +96,8 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       const current = window.getBounds()
       if (!collapsed) bounds = current
       collapsed = !collapsed
+      // Expanding restores the height the content last asked for, not the stale saved one.
+      if (!collapsed && contentHeight !== null) bounds = { ...bounds, height: contentHeight }
       window.setResizable(!collapsed)
       window.setBounds(collapsed ? { ...collapsedRect(), x: current.x, y: current.y } : { ...bounds, x: current.x, y: current.y })
       bounds = { ...bounds, x: current.x, y: current.y }
@@ -104,6 +108,16 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       opacity = clampOpacity(value)
       window.webContents.send(CHANNELS.opacity, opacity)
       saveState(stateFile, { bounds, collapsed, opacity })
+    },
+    setContentHeight(height) {
+      // While collapsed the list is hidden, so the measurement is the pill's, not the content's.
+      if (collapsed) return
+      contentHeight = Math.max(PILL_HEIGHT, Math.ceil(height))
+      // Only the height follows the content; position and width stay as the user left them.
+      const current = window.getBounds()
+      window.setBounds({ ...current, height: contentHeight })
+      bounds = { ...bounds, x: current.x, y: current.y, height: contentHeight }
+      persist()
     },
     toggleVisible() {
       if (window.isVisible()) window.hide()

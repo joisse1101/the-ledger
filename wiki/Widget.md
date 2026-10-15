@@ -69,6 +69,10 @@ script, so a cold start and the tray's "Start backend" share one code path.
 - Last position and size persist to `widget-state.json` under Electron's `userData` and are clamped
   onto a visible display on load (`widget/src/main/state.ts`). The header's `–` collapses the window
   to a one-line pill (count and pending count) and expands it again.
+- **Auto height.** The renderer measures its header, rows and note after every render and sends the
+  height over IPC (`setContentHeight`); the main process resizes only the height, keeping position
+  and width. It grows up to 10 rows, then the list scrolls. While collapsed the report is ignored, and
+  expanding restores the last content height.
 - A second launch focuses the running widget (`requestSingleInstanceLock`).
 - The tray menu: Open Ledger, Start backend, Show/Hide widget, Quit. The window has no taskbar entry.
 - The header has a small-sun and a big-sun button that step the background transparency (10–100%, 10% a click; big sun = more opaque) without fading the text; the value is remembered with the window position. A transparent frameless window may not be resizable by dragging on Windows.

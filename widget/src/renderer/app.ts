@@ -4,6 +4,8 @@ import { renderBody, summaryText } from './view.js'
 const NOTE_MS = 3000
 const OPACITY_STEP = 0.1
 const MIN_OPACITY = 0.1
+const MAX_ROWS = 10
+const BODY_BORDER = 2 // the 1px border above and below, which offsetHeight of the children excludes
 
 /** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #collapse, #fade, #solid. */
 export function mount(doc: Document, bridge: WidgetBridge): void {
@@ -14,10 +16,25 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
   let state: LiveState | null = null
   let noteTimer: ReturnType<typeof setTimeout> | undefined
 
+  // The window is as tall as its header, up to MAX_ROWS rows and the note; more rows scroll.
+  const reportHeight = () => {
+    const bar = byId('summary').parentElement as HTMLElement
+    const rows = body.children
+    const listHeight =
+      rows.length > MAX_ROWS
+        ? (rows[MAX_ROWS - 1] as HTMLElement).offsetTop + (rows[MAX_ROWS - 1] as HTMLElement).offsetHeight - body.offsetTop
+        : body.scrollHeight
+    bridge.setContentHeight(BODY_BORDER + bar.offsetHeight + listHeight + note.offsetHeight)
+  }
+
   const showNote = (text: string) => {
     note.textContent = text
+    reportHeight()
     clearTimeout(noteTimer)
-    noteTimer = setTimeout(() => (note.textContent = ''), NOTE_MS)
+    noteTimer = setTimeout(() => {
+      note.textContent = ''
+      reportHeight()
+    }, NOTE_MS)
   }
 
   const onOpen = async (sessionId: string) => {
@@ -29,13 +46,17 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
   const render = () => {
     summary.textContent = summaryText(state)
     renderBody(body, state, onOpen)
+    reportHeight()
   }
 
   bridge.onState((next) => {
     state = next
     render()
   })
-  bridge.onCollapsed((collapsed) => doc.body.classList.toggle('collapsed', collapsed))
+  bridge.onCollapsed((collapsed) => {
+    doc.body.classList.toggle('collapsed', collapsed)
+    reportHeight()
+  })
   let opacity = 1
   const applyOpacity = (next: number) => {
     opacity = next
