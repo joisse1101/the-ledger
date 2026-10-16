@@ -115,7 +115,9 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       contentHeight = Math.max(PILL_HEIGHT, Math.ceil(height))
       // Only the height follows the content; position and width stay as the user left them.
       const current = window.getBounds()
-      window.setBounds({ ...current, height: contentHeight })
+      // Skip a no-op resize: on a display with fractional DPI scaling, each getBounds/setBounds
+      // round trip can grow the window by a pixel, so state pushes made it creep outward.
+      if (current.height !== contentHeight) window.setBounds({ ...current, height: contentHeight })
       bounds = { ...bounds, x: current.x, y: current.y, height: contentHeight }
       persist()
     },
