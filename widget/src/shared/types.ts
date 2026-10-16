@@ -37,6 +37,11 @@ export interface RemoteQr {
   displayUrl: string
 }
 
+/** What the Remote status tooltip window draws. Built in the main process; the page only renders it. */
+export type TooltipContent =
+  | { kind: 'message'; text: string }
+  | { kind: 'qr'; svg: string; displayUrl: string; timeLeft: string | null }
+
 /** What the preload bridge exposes to the renderer as `window.widget`. */
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void
