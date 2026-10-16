@@ -106,3 +106,16 @@ def test_main_fails_clearly_when_no_token_exists_yet(tmp_path, monkeypatch, caps
     assert gateway_signin.main([]) == 1
     err = capsys.readouterr().err
     assert "start the backend" in err.lower()
+
+
+# ------------------------------------------------ signin_url / display_url
+
+
+def test_signin_url_is_the_https_address_with_the_token():
+    assert gateway_signin.signin_url("10.0.0.5", 8080, "tok") == "https://10.0.0.5:8080/?token=tok"
+
+
+def test_display_url_never_contains_the_token():
+    shown = gateway_signin.display_url("10.0.0.5", 8080)
+    assert shown == "https://10.0.0.5:8080"
+    assert "token" not in shown and "?" not in shown

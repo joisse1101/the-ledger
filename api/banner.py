@@ -62,6 +62,33 @@ def render_qr(text: str) -> Optional[str]:
     return rendered
 
 
+def render_qr_svg(text: str) -> Optional[str]:
+    """A scalable QR code for `text` as SVG on an opaque white square with a 4-module quiet zone
+    (so it scans on any background), or None if the qrcode package is missing."""
+    try:
+        import qrcode
+    except ImportError:
+        return None
+    qr = qrcode.QRCode(border=0)
+    qr.add_data(text)
+    qr.make()
+    border = 4
+    matrix = qr.get_matrix()
+    size = len(matrix) + 2 * border
+    modules = "".join(
+        f"M{x + border},{y + border}h1v1h-1z"
+        for y, row in enumerate(matrix)
+        for x, dark in enumerate(row)
+        if dark
+    )
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+        'shape-rendering="crispEdges">'
+        f'<rect width="{size}" height="{size}" fill="#fff"/>'
+        f'<path d="{modules}" fill="#000"/></svg>'
+    )
+
+
 def build_banner(*, frontend_port: int) -> str:
     """The startup text for the API process. It prints a link to the *frontend*
     rather than to itself: this process only ever serves `/api/*`, and only ever binds

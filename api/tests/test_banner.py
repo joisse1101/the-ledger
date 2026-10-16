@@ -1,5 +1,6 @@
 """The startup banner: address discovery, the QR code and the text."""
 
+import sys
 import types
 
 import banner
@@ -106,3 +107,19 @@ def test_local_only_banner_has_one_address_no_token_talk_and_the_preview_reminde
 def test_banner_uses_the_given_frontend_port():
     text = banner.build_banner(frontend_port=9000)
     assert "http://localhost:9000/" in text
+
+
+def test_render_qr_svg_is_a_white_square_with_dark_modules():
+    svg = banner.render_qr_svg("https://10.0.0.5:8080/?token=tok")
+    assert svg.startswith("<svg") and svg.endswith("</svg>")
+    assert 'fill="#fff"' in svg  # opaque background, so it scans on any widget transparency
+    assert 'fill="#000"' in svg
+    assert "token" not in svg  # the payload is encoded as modules, never written out
+    # the 4-module quiet zone: no dark module starts inside the border
+    first_module = int(svg.split('<path d="M')[1].split(",")[0])
+    assert first_module >= 4
+
+
+def test_render_qr_svg_steps_aside_without_the_qrcode_package(monkeypatch):
+    monkeypatch.setitem(sys.modules, "qrcode", None)
+    assert banner.render_qr_svg("anything") is None

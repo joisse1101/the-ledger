@@ -36,6 +36,16 @@ def read_token(
     return stored or None
 
 
+def signin_url(address: str, gateway_port: int, token: str) -> str:
+    """The link that signs a device in: the gateway's HTTPS address plus the access token."""
+    return f"{display_url(address, gateway_port)}/?token={token}"
+
+
+def display_url(address: str, gateway_port: int) -> str:
+    """The gateway's address as shown on screen: never carries the token."""
+    return f"https://{address}:{gateway_port}"
+
+
 def build_signin_banner(
     *,
     gateway_port: int,
@@ -54,11 +64,8 @@ def build_signin_banner(
     lines += [f"  http://localhost:{frontend_port}", ""]
     if addresses:
         lines.append("Open on another device (the link signs that device in):")
-        lines += [
-            f"  https://{address}:{gateway_port}/?token={token}"
-            for address in addresses
-        ]
-        qr = banner.render_qr(f"https://{addresses[0]}:{gateway_port}/?token={token}")
+        lines += [f"  {signin_url(address, gateway_port, token)}" for address in addresses]
+        qr = banner.render_qr(signin_url(addresses[0], gateway_port, token))
         if qr:
             lines += ["", f"Scan to open {addresses[0]}:", qr.rstrip("\n")]
     else:
