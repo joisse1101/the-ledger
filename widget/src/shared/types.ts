@@ -17,6 +17,26 @@ export type LiveState =
 
 export type OpenRepoResult = 'opened' | 'ended' | 'failed'
 
+export type RemoteStep = 'docker' | 'frontend' | 'gateway'
+
+/** The backend's Remote mode as the widget needs it. `unavailable` means the backend cannot be
+ *  reached or answered something unreadable, so the toggle has nothing to act on. */
+export type RemoteStatus =
+  | { state: 'unavailable' }
+  | { state: 'off' }
+  | { state: 'starting'; step: RemoteStep | null }
+  | { state: 'ready'; expiresAt: string | null }
+  | { state: 'failed'; reason: string }
+
+/** The sign-in code for another device. It holds the access token, so it lives only in the main
+ *  process and the tooltip: never stored, never logged. */
+export interface RemoteQr {
+  /** An SVG on an opaque white square. */
+  svg: string
+  /** The gateway's address without the token. */
+  displayUrl: string
+}
+
 /** What the preload bridge exposes to the renderer as `window.widget`. */
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void

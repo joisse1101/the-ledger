@@ -1,4 +1,4 @@
-import type { LiveSession, LiveState, OpenRepoResult } from '../shared/types'
+import type { LiveSession, LiveState, OpenRepoResult, RemoteQr, RemoteStatus, RemoteStep } from '../shared/types'
 
 export const POLL_TIMEOUT_MS = 3000
 
@@ -7,6 +7,32 @@ export interface Api {
   openRepo(sessionId: string): Promise<OpenRepoResult>
   /** Whether anything answers the backend's `/api/meta`. */
   backendUp(): Promise<boolean>
+  /** Remote mode as `/api/meta` reports it. */
+  fetchRemote(): Promise<RemoteStatus>
+  /** Turns Remote mode on or off and returns the state the backend answered with. */
+  setRemoteMode(enabled: boolean): Promise<RemoteStatus>
+  /** The sign-in code while Remote mode is ready, else null. */
+  fetchQr(): Promise<RemoteQr | null>
+}
+
+const STEPS: readonly string[] = ['docker', 'frontend', 'gateway']
+
+/** Reads the backend's `remote_mode` object; anything unexpected is `unavailable`, never a guess. */
+export function toRemoteStatus(remoteMode: unknown): RemoteStatus {
+  if (typeof remoteMode !== 'object' || remoteMode === null) return { state: 'unavailable' }
+  const { state, step, reason, expires_at: expiresAt } = remoteMode as Record<string, unknown>
+  switch (state) {
+    case 'off':
+      return { state: 'off' }
+    case 'starting':
+      return { state: 'starting', step: typeof step === 'string' && STEPS.includes(step) ? (step as RemoteStep) : null }
+    case 'ready':
+      return { state: 'ready', expiresAt: typeof expiresAt === 'string' ? expiresAt : null }
+    case 'failed':
+      return { state: 'failed', reason: typeof reason === 'string' && reason ? reason : 'Remote mode could not start' }
+    default:
+      return { state: 'unavailable' }
+  }
 }
 
 type FetchLike = typeof fetch
@@ -46,6 +72,43 @@ export function createApi(
         return response.status === 404 ? 'ended' : 'failed'
       } catch {
         return 'failed'
+      }
+    },
+
+    async fetchRemote() {
+      try {
+        const response = await fetchImpl(`${base}/api/meta`, { signal: signal() })
+        if (!response.ok) return { state: 'unavailable' }
+        return toRemoteStatus(((await response.json()) as { remote_mode?: unknown }).remote_mode)
+      } catch {
+        return { state: 'unavailable' }
+      }
+    },
+
+    async setRemoteMode(enabled) {
+      try {
+        const response = await fetchImpl(`${base}/api/remote-mode`, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'ledger', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+          signal: signal(),
+        })
+        if (!response.ok) return { state: 'unavailable' }
+        return toRemoteStatus(await response.json())
+      } catch {
+        return { state: 'unavailable' }
+      }
+    },
+
+    async fetchQr() {
+      try {
+        const response = await fetchImpl(`${base}/api/remote-mode/qr`, { signal: signal() })
+        if (!response.ok) return null
+        const body = (await response.json()) as { svg?: unknown; display_url?: unknown }
+        if (typeof body.svg !== 'string' || typeof body.display_url !== 'string') return null
+        return { svg: body.svg, displayUrl: body.display_url }
+      } catch {
+        return null
       }
     },
 
