@@ -118,7 +118,7 @@ Each command file under `toolkit/commands/jois/` SHALL declare `metadata.version
 where either is missing or malformed. The generated `opsx` commands are exempt.
 
 #### Scenario: Missing version
-- **WHEN** `toolkit/commands/jois/apply.md` has no `metadata.version`
+- **WHEN** `toolkit/commands/jois/stage.md` has no `metadata.version`
 - **THEN** the docs check SHALL fail and name the file
 
 #### Scenario: Opsx commands exempt

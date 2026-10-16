@@ -320,11 +320,11 @@ def test_commands_must_be_hidden_from_the_session_listing(tmp_path):
 
 def test_jois_commands_need_a_version_but_opsx_does_not(tmp_path):
     _toolkit_tree(tmp_path)
-    _write(tmp_path, "toolkit/commands/jois/apply.md", f"---\n{HIDDEN}\n---\nbody\n")
+    _write(tmp_path, "toolkit/commands/jois/unversioned.md", f"---\n{HIDDEN}\n---\nbody\n")
     _write(tmp_path, "toolkit/commands/jois/stage.md", f"---\n{HIDDEN}\n{VERSION}\n---\nbody\n")
     _write(tmp_path, "toolkit/commands/opsx/apply.md", f"---\n{HIDDEN}\n---\nbody\n")
     problems = _problems(tmp_path)
-    assert any(p.startswith("toolkit/commands/jois/apply.md: missing `metadata.version`") for p in problems)
+    assert any(p.startswith("toolkit/commands/jois/unversioned.md: missing `metadata.version`") for p in problems)
     assert not any("jois/stage.md" in p or "opsx" in p for p in problems)
 
 

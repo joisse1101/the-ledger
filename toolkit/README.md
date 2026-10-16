@@ -48,37 +48,10 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
 
 ### The `jois` commands
 
-- `/jois:apply [change]` works through an OpenSpec change on the main thread, like `/opsx:apply`, but
-  commits each finished concern itself once tests and build are green, with no confirmation word.
-  Set it going and come back later. It commits on the current branch only (from `main` it creates
-  `jois/<change>` first), never pushes, amends, resets or rebases, and ends with a report of the
-  branch and every commit. It still stops on an ambiguous task, scope beyond the spec, a design
-  flaw, red checks, a blocker or an interruption. The `commit-hygiene` rule allows this for the
-  duration of the run only.
 - `/jois:stage` clears a messy working tree, with or without an OpenSpec change. It stages one
   concern at a time, shows the message and a confirmation word, and waits. Typing the word commits
   that concern and moves on, until the tree is clean. Secret files and build output are skipped and
   named. It has no commit authority of its own.
-
-### Guard rails for `/jois:apply` (opt-in)
-
-"Never push" in the command text is an instruction, not enforcement. To make it hard, and to stop an
-unattended run stalling on permission prompts, add to your `settings.json` (`~/.claude/settings.json`
-or the project's `.claude/settings.json`). The installer never writes this file; adjust the test and
-build commands to your project:
-
-```json
-{
-  "permissions": {
-    "deny": ["Bash(git push*)"],
-    "allow": [
-      "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git add *)",
-      "Bash(git commit *)", "Bash(git switch -c *)", "Bash(openspec *)",
-      "Bash(pytest*)", "Bash(npm test*)", "Bash(npm run build*)"
-    ]
-  }
-}
-```
 
 ### Commands stay out of the session context
 

@@ -9,7 +9,7 @@ metadata:
 ---
 
 <!-- The pause below follows the commit block of the generated `commands/opsx/apply.md`, in a loop.
-Re-sync by hand if that block changes. Unlike /jois:apply, this command has NO commit authority:
+Re-sync by hand if that block changes. This command has NO commit authority of its own:
 every commit waits for the user's confirmation word. -->
 
 Clear a messy working tree in clean single-concern commits, each confirmed by the user. This does
