@@ -20,10 +20,10 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
   const reportHeight = () => {
     const bar = byId('summary').parentElement as HTMLElement
     const rows = body.children
-    const listHeight =
-      rows.length > MAX_ROWS
-        ? (rows[MAX_ROWS - 1] as HTMLElement).offsetTop + (rows[MAX_ROWS - 1] as HTMLElement).offsetHeight - body.offsetTop
-        : body.scrollHeight
+    // Measure to the last visible row, not body.scrollHeight: the list stretches to fill the window,
+    // so its scrollHeight never drops below the current height and the window could not shrink.
+    const lastRow = rows[Math.min(rows.length, MAX_ROWS) - 1] as HTMLElement | undefined
+    const listHeight = lastRow ? lastRow.offsetTop + lastRow.offsetHeight - body.offsetTop : 0
     bridge.setContentHeight(BODY_BORDER + bar.offsetHeight + listHeight + note.offsetHeight)
   }
 

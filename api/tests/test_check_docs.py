@@ -1,5 +1,6 @@
 import check_docs
 
+HIDDEN = "disable-model-invocation: true"
 VERSION = 'metadata:\n  version: "1.0.0"\n  last_updated: "2026-10-14"'
 
 
@@ -291,7 +292,7 @@ def test_version_is_required_on_skills_agents_and_review_commands(tmp_path):
     _write(tmp_path, "toolkit/skills/other/SKILL.md", "---\nname: other\n---\n")
     _write(tmp_path, "toolkit/agents/code-reviewer.md", "---\nname: code-reviewer\n---\n")
     _write(tmp_path, "toolkit/commands/jois-review/apply.md", "no frontmatter\n")
-    _write(tmp_path, "toolkit/commands/opsx/apply.md", "generated, not versioned by us\n")
+    _write(tmp_path, "toolkit/commands/opsx/apply.md", f"---\n{HIDDEN}\n---\ngenerated, not versioned by us\n")
     problems = _problems(tmp_path)
     for rel in (
         "toolkit/skills/other/SKILL.md",
@@ -300,6 +301,31 @@ def test_version_is_required_on_skills_agents_and_review_commands(tmp_path):
     ):
         assert any(p.startswith(f"{rel}: missing `metadata.version`") for p in problems)
     assert not any("opsx" in p for p in problems)
+
+
+def test_commands_must_be_hidden_from_the_session_listing(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/commands/opsx/apply.md", f"---\nname: a\n{HIDDEN}\n---\nbody\n")
+    _write(tmp_path, "toolkit/commands/opsx/sync.md", "---\nname: s\n---\nbody\n")
+    _write(
+        tmp_path,
+        "toolkit/commands/jois/deep/stage.md",
+        "---\nname: st\ndisable-model-invocation: false\n---\n",
+    )
+    problems = _problems(tmp_path)
+    assert any(p.startswith("toolkit/commands/opsx/sync.md: missing `disable-model-invocation") for p in problems)
+    assert any(p.startswith("toolkit/commands/jois/deep/stage.md: missing `disable-model-invocation") for p in problems)
+    assert not any(p.startswith("toolkit/commands/opsx/apply.md") for p in problems)
+
+
+def test_jois_commands_need_a_version_but_opsx_does_not(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/commands/jois/unversioned.md", f"---\n{HIDDEN}\n---\nbody\n")
+    _write(tmp_path, "toolkit/commands/jois/stage.md", f"---\n{HIDDEN}\n{VERSION}\n---\nbody\n")
+    _write(tmp_path, "toolkit/commands/opsx/apply.md", f"---\n{HIDDEN}\n---\nbody\n")
+    problems = _problems(tmp_path)
+    assert any(p.startswith("toolkit/commands/jois/unversioned.md: missing `metadata.version`") for p in problems)
+    assert not any("jois/stage.md" in p or "opsx" in p for p in problems)
 
 
 def test_skill_may_name_the_review_output_folder(tmp_path):

@@ -77,14 +77,19 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
   const persist = () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
-      const current = window.getBounds()
-      // While collapsed only the position is meaningful; the expanded size is kept as it was.
-      bounds = collapsed ? { ...bounds, x: current.x, y: current.y } : current
       saveState(stateFile, { bounds, collapsed, opacity })
     }, SAVE_DELAY_MS)
   }
-  window.on('moved', persist)
-  window.on('resized', persist)
+  // Both events fire only for the user's own drag or resize, so this is the one place the
+  // window's reported bounds are trusted; programmatic resizes work from the remembered bounds.
+  const adoptUserBounds = () => {
+    const current = window.getBounds()
+    // While collapsed only the position is meaningful; the expanded size is kept as it was.
+    bounds = collapsed ? { ...bounds, x: current.x, y: current.y } : current
+    persist()
+  }
+  window.on('moved', adoptUserBounds)
+  window.on('resized', adoptUserBounds)
 
   return {
     window,
@@ -114,9 +119,11 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
       if (collapsed) return
       contentHeight = Math.max(PILL_HEIGHT, Math.ceil(height))
       // Only the height follows the content; position and width stay as the user left them.
-      const current = window.getBounds()
-      window.setBounds({ ...current, height: contentHeight })
-      bounds = { ...bounds, x: current.x, y: current.y, height: contentHeight }
+      // Build the rect from the remembered bounds, not getBounds: on a display with fractional DPI
+      // scaling each getBounds/setBounds round trip can grow the window by a pixel, which crept
+      // outward (width included) as the height now changes both ways.
+      bounds = { ...bounds, height: contentHeight }
+      if (window.getBounds().height !== contentHeight) window.setBounds(bounds)
       persist()
     },
     toggleVisible() {

@@ -4,6 +4,7 @@ description: "Update a change - revise existing planning artifacts and keep them
 allowed-tools: Bash(openspec:*)
 category: "Workflow"
 tags: ["workflow", "artifacts", "experimental"]
+disable-model-invocation: true
 ---
 
 Revise a change's existing planning artifacts and keep them coherent. Never edit code.
