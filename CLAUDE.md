@@ -34,7 +34,7 @@ The venv already exists at `api/.venv`; use `api\.venv\Scripts\python.exe` rathe
 The API and the frontend are two processes on two ports (8501 and 4173).
 
 ```powershell
-.\Start-Ledger.ps1              # backend + frontend (+ gateway); -Mode dev for hot reload
+.\Start-Ledger.ps1              # backend + frontend; -Mode dev for hot reload, -Remote adds the gateway
 .\Stop-Ledger.ps1
 
 cd api; pytest                  # Python tests, run from api/ (that's where pyproject.toml is)

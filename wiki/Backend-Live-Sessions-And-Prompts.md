@@ -23,12 +23,23 @@
   lines can appear while a dialog is still open — and releases the hook with "no answer" so it exits.
   A 30-minute maximum age is the backstop. `sweep()` isn't on a timer: `/api/live`, the
   pending-decision route and the answer route each run it first (`server._sweep_prompts`), so an
-  already-answered prompt gives a 409 rather than "succeeding". **Remote mode** is only state here
-  (`set_remote_mode`/`remote_mode`/`remote_mode_enabled`): in-memory, off after 8 hours and after any
-  backend restart, and only a local request can turn it on or off. It is purely an access gate on
+  already-answered prompt gives a 409 rather than "succeeding". **Remote mode**'s access gate is only state here
+  (`set_remote_mode`/`remote_mode`/`remote_mode_enabled`): in-memory, off after any backend restart,
+  and only a local request can turn it on or off. It is purely an access gate on
   *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
   it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
   browser always can (`server._can_see_prompts`).
+- `api/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
+  calls `start()`/`stop()`, which return at once; a state machine runs off, `starting` (with a `step`:
+  `docker`, `frontend`, `gateway`), then `ready` or `failed` (with a `reason`, shown for 30 s), and
+  `/api/meta.remote_mode` reports `{enabled, expires_at, state, step, reason}`. Only at `ready` does it
+  open the access gate above and start the **8-hour** timer; turning off, the timer, a failure or a
+  newer `start()` closes the gate and runs `docker compose down`, stopping the frontend only if it
+  started it. It knows nothing about HTTP: everything touching the machine goes through a `System`
+  object (`api/remote_system.py`'s `RealSystem`: Docker Desktop, `docker compose`, the frontend
+  process, port probes), which tests replace with a fake and never run for real.
+- `GET /api/remote-mode/qr` returns the sign-in code as an SVG plus the token-free address and the
+  expiry: local requests only, 409 unless `ready`.
 - `POST /api/sessions/{id}/open-repo` shells out to `hooks/scripts/Open-ClaudeRepoWindow.ps1`
   (`server.OPEN_REPO_SCRIPT`, `subprocess.run`, the script unmodified) with a
   `claudecode://open?path=<url-encoded cwd>` URI — the repo's own copy, not the one installed under

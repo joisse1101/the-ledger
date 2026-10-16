@@ -5,7 +5,8 @@
 `widget/` is a small Electron app: a frameless, always-on-top window that lists the live Claude Code
 sessions with each one's context size, so the Ledger is useful without opening it. It is read-only
 and Windows-only, like `hooks/`. It has its own `package.json`, imports nothing from `web/`, and is
-the only part of the repo that is not a service, a hook or a skill.
+is the only part of the repo that is not a service, a hook or a skill. Its one write is the Remote
+mode switch described below.
 
 ## How it works
 
@@ -60,9 +61,21 @@ script, so a cold start and the tray's "Start backend" share one code path.
   hidden, with `api/` as its working directory.
 - **Open Ledger** (tray or the header button) starts the frontend only if it is not already up:
   `npm run build` first if `web/dist` is missing, then `npm run preview -- --port <f>` hidden, then
-  opens the browser. The gateway and Docker are never touched.
-- **Quit** (tray) tree-kills (`taskkill /T /F`) only the processes the widget started. If the widget
+  opens the browser. The widget never starts Docker or the gateway itself.
+- **Quit** (tray) first turns Remote mode off if the widget started the backend (otherwise the
+  gateway container would outlive it), then tree-kills (`taskkill /T /F`) only the processes the widget started. If the widget
   is killed instead of quit, its backend can be orphaned; the next launch finds it running and adopts it.
+
+## Remote mode
+
+The header has a Remote mode toggle. The widget only asks: it calls `POST /api/remote-mode` and reads
+`remote_mode` from `/api/meta` on its poll; Docker, the frontend and the gateway are the backend's job
+(see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)). While it starts, and when it
+fails, the Ledger button's tooltip shows the step or reason; at `ready`, hovering the Ledger button shows a
+small separate window (`widget/src/main/tooltipWindow.ts`, a frameless, unfocusable,
+mouse-transparent, sandboxed page with a strict CSP) with the sign-in QR, the `https://` address and
+the time left. The QR is fetched only while hovering and held in memory only; the token is never
+shown or stored. `remoteTooltip.ts` holds the message text and placement logic.
 
 ## Window
 

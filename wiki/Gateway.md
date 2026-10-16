@@ -9,7 +9,14 @@ alongside those two processes.
 Requires Docker Desktop (Windows/Mac; this relies on `host.docker.internal` reaching a
 loopback-only bind, a Docker Desktop behavior — see
 `openspec/changes/archive/2026-09-23-add-nginx-lan-gateway/design.md`). With the backend and frontend already
-running:
+running. **Normally you don't start it yourself:** turn **Remote mode** on from the Ledger's Sessions
+page or the desktop widget and the backend starts Docker Desktop if needed, the frontend if it isn't
+up, and the gateway, then shows the sign-in QR (a modal in the Ledger, a tooltip on the widget's Ledger
+button; both show `https://<address>:<port>` and never the token). Turning it off, or the 8 hours
+running out, runs `docker compose down` and stops the frontend only if Remote mode started it; Docker
+Desktop is left running. The lifecycle is `api/remote_gateway.py` (state machine) over
+`api/remote_system.py` (the real Docker/npm/port calls); see
+[Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md). To run just the container by hand:
 
 ```powershell
 cd gateway
