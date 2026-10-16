@@ -9,9 +9,11 @@ import {
   LIVE_POLL_MS,
   useAnswerDecision,
   useDeleteProject,
+  useMeta,
   useOpenRepo,
   useOverview,
   usePendingDecision,
+  useRemoteQr,
   useSetRemoteMode,
 } from "./queries";
 import type { DecisionAnswer, LiveResponse } from "./types";
@@ -147,14 +149,20 @@ describe("the session control hooks", () => {
   });
 
   it("sets Remote mode with a JSON body and puts the reply into the cached meta", async () => {
-    const remoteMode = { enabled: true, expires_at: "2026-09-24T20:00:00+00:00" };
+    const remoteMode = {
+      enabled: true,
+      expires_at: "2026-09-24T20:00:00+00:00",
+      state: "ready",
+      step: null,
+      reason: null,
+    };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(remoteMode));
     vi.stubGlobal("fetch", fetchMock);
     const client = createQueryClient();
     client.setQueryData(keys.meta, {
       refreshed_at: null,
       is_local: true,
-      remote_mode: { enabled: false, expires_at: null },
+      remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null },
     });
 
     const { result } = renderHook(() => useSetRemoteMode(), { wrapper: wrapper(client) });
@@ -268,6 +276,65 @@ describe("the overview query", () => {
     await waitFor(() =>
       expect(fetchMock.mock.calls.filter(([url]) => url.startsWith("/api/overview")).length).toBeGreaterThan(before),
     );
+    client.clear();
+  });
+});
+
+describe("Remote mode queries", () => {
+  function wrapper(client: ReturnType<typeof createQueryClient>) {
+    return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+
+  const meta = (state: string) =>
+    jsonResponse({
+      refreshed_at: null,
+      is_local: true,
+      remote_mode: { enabled: false, expires_at: null, state, step: state === "starting" ? "docker" : null, reason: null },
+    });
+
+  it("polls the meta every second while Remote mode is starting", async () => {
+    const fetchMock = vi.fn(async () => meta("starting"));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    renderHook(() => useMeta(), { wrapper: wrapper(client) });
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2), { timeout: 3000 });
+    client.clear();
+  });
+
+  it("does not poll fast when Remote mode is off", async () => {
+    const fetchMock = vi.fn(async () => meta("off"));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    renderHook(() => useMeta(), { wrapper: wrapper(client) });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    client.clear();
+  });
+
+  it("fetches the sign-in code only while enabled, and does not keep it afterwards", async () => {
+    const qr = { svg: "<svg/>", display_url: "https://192.168.1.20:8080", expires_at: null };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(qr));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result, rerender, unmount } = renderHook(({ on }) => useRemoteQr(on), {
+      wrapper: wrapper(client),
+      initialProps: { on: false },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    rerender({ on: true });
+    await waitFor(() => expect(result.current.data).toEqual(qr));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/remote-mode/qr");
+
+    // Closing the dialog unmounts the hook; the token-bearing code must not linger in the cache.
+    unmount();
+    await waitFor(() => expect(client.getQueryCache().find({ queryKey: ["remote-qr"] })).toBeUndefined());
     client.clear();
   });
 });

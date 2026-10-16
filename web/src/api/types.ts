@@ -1,11 +1,30 @@
 // Shapes of the JSON the Python server sends. Dates are ISO strings; the client
 // formats them, and shows `--` for anything missing.
 
-/** Whether other devices may see and answer a session's pending prompts. Only the machine running
- *  the app can change it; it turns itself off after 8 hours and on every backend restart. */
+export type RemoteState = "off" | "starting" | "ready" | "failed";
+
+/** Whether the app is reachable from other devices, and whether they may see and answer a
+ *  session's pending prompts. Turning it on starts Docker, the web interface and the gateway as
+ *  needed, so it passes through `starting`. Only the machine running the app can change it; it
+ *  turns itself off after 8 hours and on every backend restart. */
 export interface RemoteMode {
+  /** True only once `state` is `ready`. */
   enabled: boolean;
   /** ISO timestamp it turns itself off, or null while it is off. */
+  expires_at: string | null;
+  state: RemoteState;
+  /** While `starting`: `docker`, `frontend` or `gateway`. */
+  step: "docker" | "frontend" | "gateway" | null;
+  /** While `failed`: why it could not start. */
+  reason: string | null;
+}
+
+/** The gateway's sign-in code. Local requests only: the code contains the access token. */
+export interface RemoteQr {
+  /** An SVG of the code on an opaque white square. */
+  svg: string;
+  /** The gateway's address without the token, for showing under the code. */
+  display_url: string;
   expires_at: string | null;
 }
 
