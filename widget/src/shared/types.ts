@@ -45,6 +45,11 @@ export interface WidgetBridge {
   setOpacity(opacity: number): void
   /** The height the window needs to show its content; the main process resizes to it. */
   setContentHeight(height: number): void
+  onRemote(callback: (status: RemoteStatus) => void): void
+  /** Asks the backend to turn Remote mode on or off; the new state arrives through `onRemote`. */
+  setRemote(enabled: boolean): void
+  /** The pointer entered or left the Ledger button, which shows the Remote status tooltip. */
+  ledgerHover(hovering: boolean): void
   openSession(sessionId: string): Promise<OpenRepoResult>
   openLedger(): void
   toggleCollapse(): void

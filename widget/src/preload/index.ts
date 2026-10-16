@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { LiveState, OpenRepoResult, WidgetBridge } from '../shared/types'
+import type { LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../shared/types'
 
 // A sandboxed preload cannot require local files, so the channel names are repeated here from
 // shared/ipc.ts; tests/ipc.test.ts fails if they drift.
@@ -13,6 +13,11 @@ const bridge: WidgetBridge = {
   onOpacity: (callback) => {
     ipcRenderer.on('widget:opacity', (_event, opacity: number) => callback(opacity))
   },
+  onRemote: (callback) => {
+    ipcRenderer.on('widget:remote-state', (_event, status: RemoteStatus) => callback(status))
+  },
+  setRemote: (enabled) => ipcRenderer.send('widget:set-remote', enabled),
+  ledgerHover: (hovering) => ipcRenderer.send('widget:ledger-hover', hovering),
   setOpacity: (opacity) => ipcRenderer.send('widget:set-opacity', opacity),
   setContentHeight: (height) => ipcRenderer.send('widget:set-content-height', height),
   openSession: (sessionId): Promise<OpenRepoResult> => ipcRenderer.invoke('widget:open-session', sessionId),

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../src/renderer/app'
-import { summaryText, trimSparkline } from '../src/renderer/view'
-import type { LiveSession, LiveState, OpenRepoResult, WidgetBridge } from '../src/shared/types'
+import { remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
+import type { LiveSession, LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../src/shared/types'
 
 const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   session_id: 's1',
@@ -16,11 +16,12 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
 function setup(openResult: OpenRepoResult = 'opened') {
   document.body.className = ''
   document.body.innerHTML = `
-    <span id="summary"></span><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
+    <span id="summary"></span><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
     <main id="body"></main><footer id="note"></footer>`
   let push!: (s: LiveState) => void
   let setCollapsed!: (c: boolean) => void
   let setOpacity!: (o: number) => void
+  let pushRemote!: (s: RemoteStatus) => void
   const bridge: WidgetBridge = {
     onState: (cb) => (push = cb),
     onCollapsed: (cb) => (setCollapsed = cb),
@@ -28,11 +29,14 @@ function setup(openResult: OpenRepoResult = 'opened') {
     openLedger: vi.fn(),
     toggleCollapse: vi.fn(),
     onOpacity: (cb) => (setOpacity = cb),
+    onRemote: (cb) => (pushRemote = cb),
+    setRemote: vi.fn(),
+    ledgerHover: vi.fn(),
     setOpacity: vi.fn(),
     setContentHeight: vi.fn(),
   }
   mount(document, bridge)
-  return { bridge, push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
+  return { bridge, pushRemote: (s: RemoteStatus) => pushRemote(s), push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
 }
 
 const text = (selector: string) => document.querySelector(selector)?.textContent
@@ -219,5 +223,62 @@ describe('opacity', () => {
     setOpacity(1)
     click('solid')
     expect(alpha()).toBe('1')
+  })
+})
+
+describe('Remote mode toggle', () => {
+  const remote = () => document.getElementById('remote') as HTMLButtonElement
+
+  it('is disabled until the backend has answered, and when it is unavailable', () => {
+    const { pushRemote } = setup()
+    pushRemote({ state: 'unavailable' })
+    expect(remote().disabled).toBe(true)
+    pushRemote({ state: 'off' })
+    expect(remote().disabled).toBe(false)
+  })
+
+  it.each([
+    [{ state: 'off' }, 'off', 'false'],
+    [{ state: 'starting', step: 'docker' }, 'starting', 'mixed'],
+    [{ state: 'ready', expiresAt: null }, 'ready', 'true'],
+    [{ state: 'failed', reason: 'Docker did not start in time' }, 'failed', 'false'],
+  ] as [RemoteStatus, string, string][])('shows %j without a hover', (status, state, checked) => {
+    const { pushRemote } = setup()
+    pushRemote(status)
+    expect(remote().dataset.state).toBe(state)
+    expect(remote().getAttribute('aria-checked')).toBe(checked)
+  })
+
+  it('asks for Remote mode on from off or failed', () => {
+    const { bridge, pushRemote } = setup()
+    pushRemote({ state: 'off' })
+    remote().click()
+    pushRemote({ state: 'failed', reason: 'x' })
+    remote().click()
+    expect(vi.mocked(bridge.setRemote).mock.calls).toEqual([[true], [true]])
+  })
+
+  it('asks for it off from starting (cancel) and from ready', () => {
+    const { bridge, pushRemote } = setup()
+    pushRemote({ state: 'starting', step: 'gateway' })
+    remote().click()
+    pushRemote({ state: 'ready', expiresAt: null })
+    remote().click()
+    expect(vi.mocked(bridge.setRemote).mock.calls).toEqual([[false], [false]])
+  })
+
+  it('says what a click does, including why a start failed', () => {
+    expect(remoteTitle({ state: 'off' })).toMatch(/turn remote mode on/i)
+    expect(remoteTitle({ state: 'starting', step: null })).toMatch(/cancel/i)
+    expect(remoteTitle({ state: 'ready', expiresAt: null })).toMatch(/turn it off/i)
+    expect(remoteTitle({ state: 'failed', reason: 'Docker Desktop is not installed' })).toContain('Docker Desktop is not installed')
+  })
+
+  it('tells the main process when the pointer enters and leaves the Ledger button', () => {
+    const { bridge } = setup()
+    const ledger = document.getElementById('ledger')!
+    ledger.dispatchEvent(new MouseEvent('mouseenter'))
+    ledger.dispatchEvent(new MouseEvent('mouseleave'))
+    expect(vi.mocked(bridge.ledgerHover).mock.calls).toEqual([[true], [false]])
   })
 })
