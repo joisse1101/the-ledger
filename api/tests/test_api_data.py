@@ -14,6 +14,7 @@ from claude_context import LiveContext
 from claude_sessions import ClaudeSession
 from live_snapshot import LiveSnapshot
 from pending_decisions import PendingDecisions
+from remote_gateway import RemoteGateway
 
 
 def _client():
@@ -432,24 +433,89 @@ def test_answer_from_another_device_still_needs_the_token_and_csrf_header(isolat
 
 # ---------------------------------------------------------------- Remote mode: GET /api/meta + POST /api/remote-mode
 
+OFF_STATE = {"state": "off", "step": None, "reason": None}
+
+
+class _EverythingUp:
+    """A System where Docker, the web interface and the gateway are all already running."""
+
+    def __init__(self):
+        self.calls = []
+
+    def docker_installed(self): return True
+    def docker_ready(self): return True
+    def start_docker_desktop(self): self.calls.append("start_docker")
+    def frontend_up(self): return True
+    def start_frontend(self): return "frontend"
+    def stop_frontend(self, handle): self.calls.append("stop_frontend")
+    def compose_up(self): self.calls.append("compose_up"); return True
+    def compose_down(self): self.calls.append("compose_down"); return True
+    def gateway_container_exists(self): return True
+    def gateway_up(self): return True
+    def sleep(self, seconds): pass
+
+
+def _use_remote(monkeypatch, store, system=None):
+    """Remote mode wired to `store` with a synchronous worker, so a toggle is done by the time it returns."""
+    system = system or _EverythingUp()
+    gateway = RemoteGateway(
+        system,
+        on_ready=lambda: store.set_remote_mode(True),
+        on_off=lambda: store.set_remote_mode(False),
+        spawn=lambda work: work(),
+        schedule=lambda delay, work: type("Handle", (), {"cancel": lambda self: None})(),
+    )
+    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(server, "remote", gateway)
+    return gateway, system
+
 
 def test_meta_reports_remote_mode_off_by_default(isolated_db, monkeypatch):
     monkeypatch.setattr(server, "decisions", PendingDecisions())
-    assert _client().get("/api/meta").json()["remote_mode"] == {"enabled": False, "expires_at": None}
+    monkeypatch.setattr(server, "remote", None)
+    assert _client().get("/api/meta").json()["remote_mode"] == {"enabled": False, "expires_at": None, **OFF_STATE}
 
 
 def test_a_local_request_switches_remote_mode_without_a_token(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    _use_remote(monkeypatch, PendingDecisions())
     client = _client()
 
     on = client.post("/api/remote-mode", json={"enabled": True})
     assert on.status_code == 200
     assert on.json()["enabled"] is True and on.json()["expires_at"]
+    assert on.json()["state"] == "ready"
     assert client.get("/api/meta").json()["remote_mode"] == on.json()
 
     off = client.post("/api/remote-mode", json={"enabled": False})
-    assert off.json() == {"enabled": False, "expires_at": None}
+    assert off.json() == {"enabled": False, "expires_at": None, **OFF_STATE}
     assert client.get("/api/meta").json()["remote_mode"] == off.json()
+
+
+def test_turning_remote_mode_on_starts_the_gateway_and_off_closes_it(isolated_db, monkeypatch):
+    _, system = _use_remote(monkeypatch, PendingDecisions())
+    client = _client()
+    client.post("/api/remote-mode", json={"enabled": True})
+    assert system.calls == ["compose_up"]
+    client.post("/api/remote-mode", json={"enabled": False})
+    assert system.calls[-1] == "compose_down"
+
+
+def test_remote_mode_is_not_on_while_it_is_still_starting(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    gateway, _ = _use_remote(monkeypatch, store)
+    monkeypatch.setattr(gateway, "_spawn", lambda work: None)  # the worker never gets to run
+
+    body = _client().post("/api/remote-mode", json={"enabled": True}).json()
+
+    assert body["state"] == "starting" and body["step"] == "docker"
+    assert body["enabled"] is False and body["expires_at"] is None
+    assert store.remote_mode_enabled() is False
+
+
+def test_a_local_switch_is_unavailable_before_the_gateway_exists(isolated_db, monkeypatch):
+    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    monkeypatch.setattr(server, "remote", None)
+    assert _client().post("/api/remote-mode", json={"enabled": True}).status_code == 503
 
 
 def test_a_remote_request_with_a_valid_token_cannot_switch_remote_mode(isolated_db, monkeypatch):
@@ -485,7 +551,7 @@ def test_meta_shows_another_device_the_remote_mode_state(isolated_db, monkeypatc
     meta = _remote_client().get("/api/meta").json()
 
     assert meta["is_local"] is False
-    assert meta["remote_mode"] == store.remote_mode() and meta["remote_mode"]["enabled"] is True
+    assert meta["remote_mode"] == {**store.remote_mode(), **OFF_STATE} and meta["remote_mode"]["enabled"] is True
 
 
 # ---------------------------------------------------------------- POST /api/sessions/{id}/open-repo
@@ -996,3 +1062,78 @@ def test_a_project_path_not_in_the_snapshot_is_rejected_and_nothing_is_deleted(w
 
 def test_deleting_a_project_without_a_path_is_422(with_projects):
     assert with_projects.delete("/api/projects").status_code == 422
+
+
+# ---------------------------------------------------------------- GET /api/remote-mode/qr
+
+
+def _ready_remote(monkeypatch):
+    store = PendingDecisions()
+    gateway, _ = _use_remote(monkeypatch, store)
+    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(server, "gateway_port", 8080)
+    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
+    return gateway
+
+
+def test_the_qr_is_refused_while_remote_mode_is_not_ready(isolated_db, monkeypatch):
+    _ready_remote(monkeypatch)
+    response = _client().get("/api/remote-mode/qr")
+    assert response.status_code == 409
+    assert "not ready" in response.json()["detail"]
+
+
+def test_the_qr_for_a_local_request_carries_the_svg_and_a_token_free_address(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    encoded = []
+    monkeypatch.setattr(server.banner, "render_qr_svg", lambda text: encoded.append(text) or "<svg/>")
+    gateway.start()
+
+    body = _client().get("/api/remote-mode/qr").json()
+
+    assert encoded == [f"https://192.168.1.20:8080/?token={TOKEN}"]  # the first address, token inside the code
+    assert body["svg"] == "<svg/>"
+    assert body["display_url"] == "https://192.168.1.20:8080"
+    assert TOKEN not in body["display_url"]
+    assert body["expires_at"]
+
+
+def test_the_qr_is_refused_to_another_device_even_with_the_token(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    gateway.start()
+
+    response = _remote_client().get("/api/remote-mode/qr")
+
+    assert response.status_code == 403
+    assert TOKEN not in response.text and "svg" not in response.text
+
+
+def test_the_qr_is_refused_to_a_device_without_the_token(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    gateway.start()
+    assert _remote_client(token=False).get("/api/remote-mode/qr").status_code == 401
+
+
+def test_the_qr_needs_a_network_address(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: [])
+    gateway.start()
+    assert _client().get("/api/remote-mode/qr").status_code == 409
+
+
+# ---------------------------------------------------------------- startup cleanup
+
+
+def test_startup_closes_a_gateway_an_earlier_backend_left_running(isolated_db, monkeypatch):
+    calls = []
+
+    class Stub:
+        def stop_leftovers(self):
+            calls.append("stop_leftovers")
+
+    monkeypatch.setattr(server, "remote", Stub())
+    # lifespan() provisions a token when none is set: stub it so no real api/.ledger/token is touched.
+    monkeypatch.setattr(server, "access_token", "tok-123")
+    with TestClient(server.app):
+        pass
+    assert calls == ["stop_leftovers"]

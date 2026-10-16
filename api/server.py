@@ -27,8 +27,11 @@ import claude_projects
 import claude_transcripts
 import overview_stats
 import transcript_query
+import gateway_signin
+import remote_system
 from live_snapshot import LiveSnapshot
 from pending_decisions import PendingDecisions
+from remote_gateway import RemoteGateway
 from security import SecurityMiddleware, is_local, provision_token
 
 log = logging.getLogger("ledger")
@@ -46,9 +49,30 @@ live = LiveSnapshot()
 # In-memory pending tool-permission decisions relayed from live sessions; see pending_decisions.py.
 decisions = PendingDecisions()
 
+# Remote mode's lifecycle (container runtime, web interface, gateway); built by main() or, for the
+# --reload subprocess, by lifespan(). None until then; see remote_gateway.py.
+remote: Optional[RemoteGateway] = None
+gateway_port: int = remote_system.DEFAULT_GATEWAY_PORT
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 # Invoked, unmodified, by POST /api/sessions/{id}/open-repo - this repo's own copy, not any
 # installed-under-%USERPROFILE% one, so opening a repo window needs no separate install step.
 OPEN_REPO_SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "hooks" / "scripts" / "Open-ClaudeRepoWindow.ps1"
+
+
+def _make_remote(backend_port: int, frontend_port: int) -> RemoteGateway:
+    """Remote mode's lifecycle for these ports. Reaching `ready` opens the prompt gate for other
+    devices and starts its 8 hour window; turning off closes the gate again."""
+    global gateway_port
+    gateway_port = remote_system.gateway_port(REPO_ROOT)
+    system = remote_system.RealSystem(
+        repo_root=REPO_ROOT, backend_port=backend_port, frontend_port=frontend_port, gateway_port=gateway_port
+    )
+    return RemoteGateway(
+        system,
+        on_ready=lambda: decisions.set_remote_mode(True),
+        on_off=lambda: decisions.set_remote_mode(False),
+    )
 
 
 def locked_refresh() -> datetime:
@@ -82,6 +106,13 @@ async def lifespan(app: FastAPI):
     global access_token
     if access_token is None:
         access_token = provision_token()
+
+    global remote
+    if remote is None:
+        env_settings = parse_settings([])
+        remote = _make_remote(env_settings.port, env_settings.frontend_port)
+    # Remote mode starts off, so a gateway an earlier backend left running is closed now.
+    await asyncio.to_thread(remote.stop_leftovers)
 
     await asyncio.to_thread(_startup_snapshot)
     task = asyncio.create_task(refresh_loop())
@@ -118,8 +149,14 @@ def get_meta(request: Request) -> dict:
     return {
         "refreshed_at": _iso(claude_db.refreshed_at()),
         "is_local": is_local(request),
-        "remote_mode": decisions.remote_mode(),
+        "remote_mode": _remote_mode_status(),
     }
+
+
+def _remote_mode_status() -> dict:
+    """The prompt gate (`enabled`, `expires_at`) plus the lifecycle (`state`, `step`, `reason`)."""
+    lifecycle = remote.status() if remote else {"state": "off", "step": None, "reason": None}
+    return {**decisions.remote_mode(), **lifecycle}
 
 
 class RemoteModeRequest(BaseModel):
@@ -132,8 +169,33 @@ def post_remote_mode(body: RemoteModeRequest, request: Request) -> dict:
     # prompts while Remote mode is on, but never lets it change Remote mode itself.
     if not is_local(request):
         raise HTTPException(status_code=403, detail="switching Remote mode requires a local request")
-    decisions.set_remote_mode(body.enabled)
-    return decisions.remote_mode()
+    if remote is None:
+        raise HTTPException(status_code=503, detail="Remote mode is not available yet")
+    if body.enabled:
+        remote.start()  # returns at once; clients watch the state in /api/meta
+    else:
+        remote.stop()
+    return _remote_mode_status()
+
+
+@app.get("/api/remote-mode/qr")
+def get_remote_mode_qr(request: Request) -> dict:
+    # The code contains the access token, so even a valid token isn't enough to read it.
+    if not is_local(request):
+        raise HTTPException(status_code=403, detail="the sign-in code requires a local request")
+    if remote is None or not remote.is_ready():
+        raise HTTPException(status_code=409, detail="Remote mode is not ready")
+    addresses = banner.discover_ipv4()
+    if not addresses or access_token is None:
+        raise HTTPException(status_code=409, detail="No network address was found for this machine")
+    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], gateway_port, access_token))
+    if svg is None:
+        raise HTTPException(status_code=503, detail="QR codes are unavailable (the qrcode package is missing)")
+    return {
+        "svg": svg,
+        "display_url": gateway_signin.display_url(addresses[0], gateway_port),
+        "expires_at": decisions.remote_mode()["expires_at"],
+    }
 
 
 @app.post("/api/refresh")
@@ -635,12 +697,18 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     # anyone off this machine can ever present it, so the backend no longer gates this on
     # its own bind address.
     access_token = provision_token()
+    global remote
+    remote = _make_remote(settings.port, settings.frontend_port)
 
     print(banner.build_banner(frontend_port=settings.frontend_port), flush=True)
 
     # No access log: it would write every ?token=... URL to the terminal. proxy_headers off:
     # the peer address must stay the real one, not whatever a header claims.
     if settings.reload:
+        # The reload subprocess builds its own Remote mode lifecycle (see lifespan()); the ports
+        # reach it through the same env vars parse_settings reads.
+        os.environ["LEDGER_PORT"] = str(settings.port)
+        os.environ["LEDGER_FRONTEND_PORT"] = str(settings.frontend_port)
         # reload=True only takes effect when the app is passed as an import string - uvicorn
         # watches the cwd, and on each change spawns a fresh subprocess that imports "server:app"
         # itself (this process's own `app` object above is never reused); see lifespan() for how
