@@ -12,4 +12,5 @@ export const CHANNELS = {
   remoteState: 'widget:remote-state',
   setRemote: 'widget:set-remote',
   ledgerHover: 'widget:ledger-hover',
+  tooltip: 'widget:tooltip',
 } as const

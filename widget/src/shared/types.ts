@@ -42,6 +42,11 @@ export type TooltipContent =
   | { kind: 'message'; text: string }
   | { kind: 'qr'; svg: string; displayUrl: string; timeLeft: string | null }
 
+/** What the tooltip window's preload exposes to its page as `window.tooltip`. */
+export interface TooltipBridge {
+  onContent(callback: (content: TooltipContent) => void): void
+}
+
 /** What the preload bridge exposes to the renderer as `window.widget`. */
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void
