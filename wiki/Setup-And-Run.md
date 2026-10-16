@@ -37,19 +37,21 @@ Open the frontend's URL (http://localhost:4173 by default), not the API's — th
 show you.
 
 **Or start everything at once** with the root `Start-Ledger.ps1`, which runs the two processes
-above (each in its own window, so their logs/Ctrl+C stay independent) plus the gateway
-(see [Gateway](Gateway.md)), in one call — paired with `Stop-Ledger.ps1` to stop exactly what it started (backend/frontend
-window PIDs recorded to the root `.ledger-run.json`, gitignored, and the gateway container):
+above (each in its own window, so their logs/Ctrl+C stay independent) in one call — paired with
+`Stop-Ledger.ps1` to stop exactly what it started (backend/frontend window PIDs recorded to the root
+`.ledger-run.json`, gitignored) and any gateway container, however it was started. The gateway is not
+part of the default start: it comes up through **Remote mode** (the switch in the Ledger or the
+widget; see [Gateway](Gateway.md)), or with `-Remote` here:
 
 ```powershell
 .\Start-Ledger.ps1              # build mode (default) — matches normal local use
 .\Start-Ledger.ps1 -Mode dev    # backend + frontend as hot-reloading dev servers instead
-.\Start-Ledger.ps1 -NoGateway   # skip the gateway container (this machine only)
+.\Start-Ledger.ps1 -Remote      # also turn Remote mode on: Docker, the gateway, then the sign-in QR
 .\Stop-Ledger.ps1               # stop the backend/frontend windows and the gateway
 ```
 
-`-Mode` changes how both the backend and frontend windows start — the gateway always starts the
-same way either way. `build` runs `npm run build` + `npm run preview` and starts the backend
+`-NoGateway` is still accepted but does nothing. `-Mode` changes how both the backend and frontend
+windows start. `build` runs `npm run build` + `npm run preview` and starts the backend
 without `--reload`; `dev` runs `npm run dev` and starts the backend with `python server.py
 --reload` (uvicorn restarts the process on any saved change under `api/`). Port overrides
 (`-BackendPort`/`-FrontendPort`/`-GatewayPort`) follow the same `.env` precedence as

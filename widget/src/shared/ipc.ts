@@ -9,4 +9,8 @@ export const CHANNELS = {
   opacity: 'widget:opacity',
   setOpacity: 'widget:set-opacity',
   setContentHeight: 'widget:set-content-height',
+  remoteState: 'widget:remote-state',
+  setRemote: 'widget:set-remote',
+  ledgerHover: 'widget:ledger-hover',
+  tooltip: 'widget:tooltip',
 } as const

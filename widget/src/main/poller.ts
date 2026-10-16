@@ -1,5 +1,3 @@
-import type { LiveState } from '../shared/types'
-
 export const POLL_INTERVAL_MS = 2000
 
 export interface Poller {
@@ -9,9 +7,9 @@ export interface Poller {
 }
 
 /** Polls on a fixed delay between polls (never overlapping), pushing every result to `onState`. */
-export function startPoller(
-  fetchLive: () => Promise<LiveState>,
-  onState: (state: LiveState) => void,
+export function startPoller<T>(
+  fetchLive: () => Promise<T>,
+  onState: (state: T) => void,
   intervalMs = POLL_INTERVAL_MS,
 ): Poller {
   let timer: ReturnType<typeof setTimeout> | undefined

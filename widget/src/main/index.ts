@@ -4,9 +4,12 @@ import { createApi } from './api'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
 import { startPoller } from './poller'
+import { RemoteTooltip } from './remoteTooltip'
+import type { RemoteStatus } from '../shared/types'
 import { loadState } from './state'
 import { Supervisor } from './supervisor'
 import { createDeps } from './system'
+import { createTooltipWindow } from './tooltipWindow'
 import { createWidgetWindow, type WidgetWindow } from './window'
 
 // One widget per user session: a second launch just brings the first one forward.
@@ -26,6 +29,21 @@ if (!app.requestSingleInstanceLock()) {
     widget = win
     const poller = startPoller(() => api.fetchLive(), (state) => win.sendState(state))
 
+    // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
+    let remote: RemoteStatus = { state: 'unavailable' }
+    const tooltipWindow = createTooltipWindow()
+    const tooltip = new RemoteTooltip({
+      fetchQr: () => api.fetchQr(),
+      present: (content) => (content ? tooltipWindow.show(content, win.window.getBounds()) : tooltipWindow.hide()),
+      now: Date.now,
+    })
+    const applyRemote = (status: RemoteStatus) => {
+      remote = status
+      win.sendRemote(status)
+      tooltip.onStatus(status)
+    }
+    const remotePoller = startPoller(() => api.fetchRemote(), applyRemote)
+
     // Cold start: bring up the backend if nothing answers. A backend that is already running is
     // adopted and, being not ours, is never stopped by Quit.
     void supervisor.ensureBackend()
@@ -35,6 +53,16 @@ if (!app.requestSingleInstanceLock()) {
       const result = await api.openRepo(sessionId)
       if (result === 'ended') void poller.refresh()
       return result
+    })
+    ipcMain.on(CHANNELS.setRemote, (_event, enabled: unknown) => {
+      if (typeof enabled !== 'boolean') return
+      void api.setRemoteMode(enabled).then((status) => {
+        applyRemote(status)
+        void remotePoller.refresh()
+      })
+    })
+    ipcMain.on(CHANNELS.ledgerHover, (_event, hovering: unknown) => {
+      if (typeof hovering === 'boolean') tooltip.setHover(hovering)
     })
     ipcMain.on(CHANNELS.openLedger, () => void supervisor.openLedger())
     ipcMain.on(CHANNELS.setOpacity, (_event, value: unknown) => {
@@ -58,8 +86,24 @@ if (!app.requestSingleInstanceLock()) {
     tray.on('click', () => win.show())
     tray.on('right-click', () => tray.popUpContextMenu(buildMenu()))
 
-    app.on('before-quit', () => {
+    // Quitting kills a backend this widget started, and Remote mode would die with it while its
+    // gateway container kept running. So close Remote mode first, then stop what we started.
+    let quitting = false
+    app.on('before-quit', (event) => {
       poller.stop()
+      remotePoller.stop()
+      tooltip.dispose()
+      tooltipWindow.destroy()
+      const remoteActive = remote.state === 'starting' || remote.state === 'ready'
+      if (!quitting && remoteActive && supervisor.ownedNames().includes('backend')) {
+        quitting = true
+        event.preventDefault()
+        void api.setRemoteMode(false).finally(() => {
+          supervisor.stopOwned()
+          app.quit()
+        })
+        return
+      }
       supervisor.stopOwned()
     })
   })

@@ -15,7 +15,11 @@
   answered it says the session already moved on (as does a 409) instead of going blank, and it shows
   nothing on a non-local device while Remote mode is off. `LiveList` badges a row (`pending-badge`)
   from `/api/live`'s `pending_decision`, and carries `RemoteModeControl`: a switch on the machine
-  running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere. **All**
+  running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere. The switch drives
+  the whole of Remote mode through `POST /api/remote-mode`, shows the starting step ("Starting
+  Docker…") or the failure reason from `/api/meta.remote_mode`, and stays checked while starting so
+  it can cancel. Once `ready`, a **Show QR** button opens `RemoteQrDialog` (`useRemoteQr`, which
+  fetches `/api/remote-mode/qr` only while open): the code, the address, never the token. **All**
   (`SessionsPage`): `AllList` debounces its search box (`useDebouncedValue`, 300ms), drives
   `Project`/`Version`/`Branch` `FilterMultiselect`s (`<details>`-based checkbox lists — no
   popover/portal machinery needed) off the API's option lists, and pages 50-at-a-time via

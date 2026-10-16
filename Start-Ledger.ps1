@@ -1,17 +1,20 @@
 <#
 .SYNOPSIS
-Starts the whole Ledger app from one place: backend, frontend and (optionally) the LAN gateway.
+Starts the Ledger app from one place: backend and frontend, plus the LAN gateway with -Remote.
 
 .DESCRIPTION
-Starts all three pieces of the app: the backend (`python server.py`), the frontend (a `vite` dev
-server, or a `vite build` + `vite preview`, per -Mode), and the gateway container (unless
--NoGateway) - each still the same separate process/container CLAUDE.md's "Setup & Run" describes,
+Starts the backend (`python server.py`) and the frontend (a `vite` dev server, or a `vite build` +
+`vite preview`, per -Mode) - each the same separate process CLAUDE.md's "Setup & Run" describes,
 just launched together. Backend and frontend each open in their own window so their logs and Ctrl+C
-stay independent; the gateway is a container, so it's started inline (`docker compose up -d
---build`) and this script then prints its sign-in link/QR the same way gateway\Start-Gateway.ps1
-does. The backend/frontend window PIDs are recorded to the root .ledger-run.json (gitignored) so the
+stay independent. Their window PIDs are recorded to the root .ledger-run.json (gitignored) so the
 paired Stop-Ledger.ps1 can stop exactly these two windows (and their child processes) without
 touching any other window you have open.
+
+The gateway is no longer part of the default start. It comes up through Remote mode (the switch in
+the dashboard or the desktop widget), which starts Docker if needed and the gateway and shuts them
+down again after 8 hours. -Remote does the same from here: it asks the backend to turn Remote mode
+on, waits until it is ready, and prints the sign-in link/QR the same way gateway\Start-Gateway.ps1
+does. The backend, not this script, owns the gateway: it is started and stopped by Remote mode.
 
 -Mode picks how the backend and frontend run - it has no effect on the gateway, which always starts
 the same way either way. `build` (the default, matching normal local use) runs `npm run build` once
@@ -27,8 +30,9 @@ parameter, then the repo root's .env (see .env.example), then an already-set
 BACKEND_PORT/FRONTEND_PORT/GATEWAY_PORT environment variable, then the hardcoded defaults (8501,
 4173, 8080) - the same precedence gateway\Start-Gateway.ps1 uses.
 
-The gateway needs Docker Desktop; -NoGateway skips it entirely, leaving the app reachable from this
-machine only (see CLAUDE.md's "From another device on your network").
+The gateway needs Docker Desktop. Without -Remote the app is reachable from this machine only (see
+CLAUDE.md's "From another device on your network"). The backend learns the gateway port from the
+root .env, then GATEWAY_PORT, so an explicit -GatewayPort only reaches it when .env doesn't set one.
 
 -InstallBackupTask registers (or updates) the daily Task Scheduler entry that keeps
 `api/.history/history.db` accumulating between runs of this app - the same thing
@@ -41,8 +45,12 @@ backend/frontend/gateway from still starting normally. The paired Stop-Ledger.ps
 'build' (default): build the frontend once and serve it with `vite preview`; backend without
 --reload. 'dev': hot-reloading vite dev server; backend with --reload.
 
+.PARAMETER Remote
+Also turn Remote mode on: start Docker if needed and the gateway, wait until it is ready, and print
+the sign-in link/QR. Switch it off from the dashboard or the widget (or run Stop-Ledger.ps1).
+
 .PARAMETER NoGateway
-Skip the gateway container (this machine only).
+Accepted for old command lines and does nothing: the gateway is no longer started by default.
 
 .PARAMETER InstallBackupTask
 Also register (or update) the daily history-backup scheduled task - see
@@ -62,15 +70,15 @@ Show this help and exit (-h works too).
 
 .EXAMPLE
 .\Start-Ledger.ps1
-Build mode: backend + frontend + gateway.
+Build mode: backend + frontend, this machine only.
 
 .EXAMPLE
 .\Start-Ledger.ps1 -Mode dev
 Backend and frontend as hot-reloading dev servers.
 
 .EXAMPLE
-.\Start-Ledger.ps1 -NoGateway
-Skip the gateway container.
+.\Start-Ledger.ps1 -Remote
+Backend + frontend, then Remote mode on with its sign-in QR.
 
 .EXAMPLE
 .\Start-Ledger.ps1 -BackendPort 9000 -FrontendPort 5000 -GatewayPort 9090
@@ -88,6 +96,7 @@ scheduled task this script's -InstallBackupTask installs).
 param(
     [ValidateSet('dev', 'build')]
     [string]$Mode = 'build',
+    [switch]$Remote,
     [switch]$NoGateway,
     [switch]$InstallBackupTask,
     [int]$BackendPort,
@@ -129,6 +138,10 @@ $GatewayPort = Resolve-Port -Explicit $GatewayPort -Name 'GATEWAY_PORT' -Default
 $venvPython = Join-Path $PSScriptRoot 'api\.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
 
+if ($NoGateway) {
+    Write-Host "Note: -NoGateway does nothing now - the gateway only starts with Remote mode (-Remote)."
+}
+
 if ($InstallBackupTask) {
     Write-Host "Installing the daily history-backup scheduled task..."
     try {
@@ -137,6 +150,9 @@ if ($InstallBackupTask) {
         Write-Warning "Failed to install the history-backup task: $_"
     }
 }
+
+# The backend reads these when Remote mode starts the gateway.
+$env:GATEWAY_PORT = $GatewayPort
 
 Write-Host "Starting backend on port $BackendPort in $Mode mode (new window)..."
 $backendReloadFlag = if ($Mode -eq 'dev') { ' --reload' } else { '' }
@@ -160,34 +176,57 @@ $frontendProc = Start-Process powershell -ArgumentList '-NoExit', '-Command', $f
 
 Write-Host "Frontend will be at http://localhost:$FrontendPort"
 
-if ($NoGateway) {
-    Write-Host "Skipping the gateway (-NoGateway) - reachable from this machine only."
+if (-not $Remote) {
+    Write-Host "Reachable from this machine only. Turn on Remote mode (dashboard or widget), or run with -Remote, for the gateway."
     exit 0
 }
 
-Write-Host "Starting gateway on port $GatewayPort..."
-$env:GATEWAY_PORT = $GatewayPort
-$env:BACKEND_PORT = $BackendPort
-$env:FRONTEND_PORT = $FrontendPort
+$backendUrl = "http://127.0.0.1:$BackendPort"
 
-Push-Location (Join-Path $PSScriptRoot 'gateway')
-try {
-    docker compose up -d --build
-} finally {
-    Pop-Location
+# The backend is starting in its own window; wait for it to answer before asking it for anything.
+function Get-RemoteMode {
+    try {
+        return (Invoke-RestMethod -Uri "$backendUrl/api/meta" -TimeoutSec 3).remote_mode
+    } catch {
+        return $null
+    }
 }
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Gateway failed to start (is Docker Desktop running?) - backend and frontend are still up in their own windows."
+
+Write-Host "Waiting for the backend..."
+$deadline = (Get-Date).AddSeconds(60)
+while ($null -eq (Get-RemoteMode) -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 1
+}
+if ($null -eq (Get-RemoteMode)) {
+    Write-Warning "The backend didn't answer on port $BackendPort - Remote mode was not turned on."
     exit 1
 }
 
-# The backend just started in its own window above and needs a moment to provision its access
-# token before gateway_signin.py (which only reads it, never provisions it) has anything to read.
-$tokenFile = Join-Path $PSScriptRoot 'api\.ledger\token'
-$waited = 0
-while (-not (Test-Path $tokenFile) -and $waited -lt 30) {
-    Start-Sleep -Seconds 1
-    $waited++
+Write-Host "Turning Remote mode on (Docker and the gateway start if needed)..."
+try {
+    Invoke-RestMethod -Method Post -Uri "$backendUrl/api/remote-mode" -ContentType 'application/json' `
+        -Headers @{ 'X-Requested-With' = 'ledger' } -Body '{"enabled": true}' | Out-Null
+} catch {
+    Write-Warning "Could not turn Remote mode on: $_"
+    exit 1
+}
+
+# Docker Desktop can take minutes to come up, so give it room.
+$deadline = (Get-Date).AddMinutes(5)
+$lastStep = $null
+do {
+    Start-Sleep -Seconds 2
+    $status = Get-RemoteMode
+    if ($status -and $status.state -eq 'starting' -and $status.step -ne $lastStep) {
+        $lastStep = $status.step
+        Write-Host "  starting: $lastStep"
+    }
+} while ($status -and $status.state -eq 'starting' -and (Get-Date) -lt $deadline)
+
+if (-not $status -or $status.state -ne 'ready') {
+    $reason = if ($status -and $status.reason) { $status.reason } else { 'it did not become ready in time' }
+    Write-Warning "Remote mode did not start: $reason. Backend and frontend are still up in their own windows."
+    exit 1
 }
 
 & $python (Join-Path $PSScriptRoot 'api\gateway_signin.py') --gateway-port $GatewayPort

@@ -20,8 +20,9 @@ frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Lay
 
 | Endpoint | Notes |
 |---|---|
-| `GET /api/meta` | `{refreshed_at, is_local, remote_mode: {enabled, expires_at}}` — `is_local` is `security.is_local(request)` for *this* request, so the frontend can hide controls a remote device can't use |
-| `POST /api/remote-mode` | Body `{enabled}`; **local requests only** (403 otherwise, token or not). Returns the new `remote_mode` |
+| `GET /api/meta` | `{refreshed_at, is_local, remote_mode: {enabled, expires_at, state, step, reason}}` (`state` is `off`, `starting`, `ready` or `failed`) — `is_local` is `security.is_local(request)` for *this* request, so the frontend can hide controls a remote device can't use |
+| `POST /api/remote-mode` | Body `{enabled}`; **local requests only** (403 otherwise, token or not). Starts or stops the whole of Remote mode (Docker, frontend, gateway); returns at once with the new `remote_mode`, which clients follow in `/api/meta` while it is `starting` |
+| `GET /api/remote-mode/qr` | `{svg, display_url, expires_at}` — the sign-in QR (it encodes the token; `display_url` doesn't). **Local only**, 409 unless Remote mode is `ready` |
 | `POST /api/refresh` | Forces a `locked_refresh()`, returns the new `refreshed_at` |
 | `GET /api/live` | `{sessions: [...]}` from the shared `LiveSnapshot` (see `live_snapshot.py`); each session carries `git_branch` (from `ledger.db`, `""` when unknown) and gains `pending_decision: {id, tool_name, tool_input} \| null` (its oldest pending prompt), always `null` for a non-local request while Remote mode is off. Sweeps stale prompts first |
 | `GET /api/sessions/{id}/pending-decision` | `{pending_decision}`, same visibility rule as `/api/live`; polled by the Live control view |
@@ -52,3 +53,4 @@ never receives a legitimate cross-origin request to allow (`test_server.py` asse
   it) are still here and still exercised by `test_banner.py`, but are no longer called from the
   backend's own startup path — `api/gateway_signin.py` reuses them instead (see [Gateway](Gateway.md)) to
   build the gateway's own sign-in banner/QR from the gateway side, once the gateway container starts.
+  `render_qr_svg()` is the same code as an SVG for `GET /api/remote-mode/qr`.

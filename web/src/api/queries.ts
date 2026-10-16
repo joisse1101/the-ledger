@@ -15,6 +15,7 @@ import type {
   PendingDecisionResponse,
   ProjectsResponse,
   RemoteMode,
+  RemoteQr,
   SessionResponse,
   TimeRange,
   TranscriptQuery,
@@ -24,6 +25,7 @@ import type {
 export const LIVE_POLL_MS = 2000;
 export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
+const REMOTE_STARTING_POLL_MS = 1000; // Remote mode takes a while to start; watch it closely
 export const PAGE_SIZE = 50;
 // Matches the server's own default (overview_stats.BUCKET_MINUTES), so an unscoped cache key
 // collides with one that named it explicitly.
@@ -45,7 +47,8 @@ export function useMeta() {
   return useQuery({
     queryKey: keys.meta,
     queryFn: () => apiFetch<Meta>("/api/meta"),
-    refetchInterval: META_POLL_MS,
+    refetchInterval: (query) =>
+      query.state.data?.remote_mode.state === "starting" ? REMOTE_STARTING_POLL_MS : META_POLL_MS,
     refetchIntervalInBackground: false,
   });
 }
@@ -220,6 +223,19 @@ export function useSetRemoteMode() {
     onSuccess: (remoteMode) => {
       client.setQueryData<Meta>(keys.meta, (meta) => (meta ? { ...meta, remote_mode: remoteMode } : meta));
     },
+  });
+}
+
+/** The sign-in code for other devices. Fetched only while `enabled` (the dialog is open), and
+ *  dropped from the cache the moment it closes: the code holds the access token. */
+export function useRemoteQr(enabled: boolean) {
+  return useQuery({
+    queryKey: ["remote-qr"] as const,
+    queryFn: () => apiFetch<RemoteQr>("/api/remote-mode/qr"),
+    enabled,
+    gcTime: 0,
+    staleTime: 0,
+    retry: false,
   });
 }
 

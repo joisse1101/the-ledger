@@ -1,6 +1,9 @@
 :root {
   color-scheme: light dark;
   --bg-alpha: 1;
+  --status-ok: #3a9d5d;
+  --status-bad: #c0392b;
+  --status-busy: #d9a400;
 }
 
 /* Values copied by hand from web/src/theme/tokens.css (the widget imports nothing from web/),
@@ -79,6 +82,14 @@ button {
 }
 .actions button { color: var(--brand-text); background: var(--brand-border-muted); border-color: var(--brand-border-strong); line-height: 1.2; }
 .actions button:hover { background: var(--brand-accent); color: var(--text-on-accent); }
+/* Remote mode: the dot says where it is without a hover (amber pulse while starting). */
+.remote { display: inline-flex; align-items: center; gap: 5px; }
+.remote:disabled { opacity: 0.5; cursor: default; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.remote[data-state="ready"] .dot { background: var(--status-ok); }
+.remote[data-state="failed"] .dot { background: var(--status-bad); }
+.remote[data-state="starting"] .dot { background: var(--status-busy); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
 .sun.small { font-size: 10px; }
 .sun.big { font-size: 16px; line-height: 1; }
 
@@ -121,5 +132,6 @@ button:hover { background: var(--bg-surface-hover); }
 body.collapsed .list,
 body.collapsed .note,
 body.collapsed .sun,
+body.collapsed #remote,
 body.collapsed #ledger { display: none; }
 body.collapsed .bar { border-bottom: 0; }

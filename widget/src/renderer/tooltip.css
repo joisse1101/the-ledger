@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light dark;
+}
+
+/* Same palette as style.css, copied by hand (the widget imports nothing from web/). Unlike the
+   widget window this is always opaque: the code has to scan whatever the transparency setting. */
+:root {
+  --bg-main: #f3eef0;
+  --text-main: #241820;
+  --text-muted: #6b5a61;
+  --border-subtle: #e7dfe2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #121214;
+    --text-main: #fff;
+    --text-muted: #a1a1aa;
+    --border-subtle: #27272a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: 12px/1.35 "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+body { border: 1px solid var(--border-subtle); }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.message { margin: 0; }
+
+/* The SVG carries its own white square and quiet zone, so it scans on the dark theme too. */
+.code {
+  width: 196px;
+  height: 196px;
+  image-rendering: pixelated;
+}
+
+.address { margin: 0; font-family: "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; }
+.left { margin: 0; color: var(--text-muted); }

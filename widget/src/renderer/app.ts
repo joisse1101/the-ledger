@@ -1,5 +1,5 @@
 import type { LiveState, WidgetBridge } from '../shared/types'
-import { renderBody, summaryText } from './view.js'
+import { remoteTitle, renderBody, summaryText } from './view.js'
 
 const NOTE_MS = 3000
 const OPACITY_STEP = 0.1
@@ -7,7 +7,7 @@ const MIN_OPACITY = 0.1
 const MAX_ROWS = 10
 const BODY_BORDER = 2 // the 1px border above and below, which offsetHeight of the children excludes
 
-/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #collapse, #fade, #solid. */
+/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #remote, #collapse, #fade, #solid. */
 export function mount(doc: Document, bridge: WidgetBridge): void {
   const byId = (id: string) => doc.getElementById(id) as HTMLElement
   const summary = byId('summary')
@@ -70,7 +70,23 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
   bridge.onOpacity(applyOpacity)
   byId('fade').addEventListener('click', () => step(-OPACITY_STEP))
   byId('solid').addEventListener('click', () => step(OPACITY_STEP))
-  byId('ledger').addEventListener('click', () => bridge.openLedger())
+  // Remote mode: one click turns it on (or retries after a failure), another turns it off, and
+  // while it is starting a click cancels. The state comes back from the backend, not from here.
+  const remote = byId('remote') as HTMLButtonElement
+  let remoteOn = false
+  bridge.onRemote((status) => {
+    remoteOn = status.state === 'starting' || status.state === 'ready'
+    remote.dataset.state = status.state
+    remote.disabled = status.state === 'unavailable'
+    remote.setAttribute('aria-checked', status.state === 'ready' ? 'true' : status.state === 'starting' ? 'mixed' : 'false')
+    remote.title = remoteTitle(status)
+  })
+  remote.addEventListener('click', () => bridge.setRemote(!remoteOn))
+  // The Ledger button's hover shows the Remote status tooltip (see main/remoteTooltip.ts).
+  const ledger = byId('ledger')
+  ledger.addEventListener('mouseenter', () => bridge.ledgerHover(true))
+  ledger.addEventListener('mouseleave', () => bridge.ledgerHover(false))
+  ledger.addEventListener('click', () => bridge.openLedger())
   byId('collapse').addEventListener('click', () => bridge.toggleCollapse())
   render()
 }

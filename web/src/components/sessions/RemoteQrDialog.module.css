@@ -1,0 +1,53 @@
+.root {
+  padding: 0; /* the body carries the padding, so a click on the dialog element itself is the backdrop */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  width: min(22rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  box-shadow: var(--shadow-lg);
+}
+
+.root::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+/* The code is drawn on its own white square, whatever the theme, so it scans in dark mode too. */
+.code {
+  width: min(16rem, 100%);
+  height: auto;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+}
+
+.address {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+
+.caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+}

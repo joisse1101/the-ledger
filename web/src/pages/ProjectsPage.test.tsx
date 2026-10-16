@@ -77,7 +77,7 @@ function stubApi() {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
-      if (url.startsWith("/api/meta")) return json({ refreshed_at: null, is_local: true });
+      if (url.startsWith("/api/meta")) return json({ refreshed_at: null, is_local: true, remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null } });
       if (url.startsWith("/api/overview")) return json(populated);
       if (url.startsWith("/api/projects")) return json({ projects: [alpha, beta] });
       return json({});

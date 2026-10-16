@@ -5,7 +5,9 @@ Stops what Start-Ledger.ps1 started: backend, frontend and gateway.
 .DESCRIPTION
 Stops the backend and frontend windows (found via the PIDs Start-Ledger.ps1 recorded to the root
 .ledger-run.json, removed once used) and the gateway container (`docker compose down`, same as
-gateway\Stop-Gateway.ps1) - all three, in one call.
+gateway\Stop-Gateway.ps1) - all three, in one call. The gateway is stopped however it was started
+(Remote mode from the dashboard or widget, -Remote, or gateway\Start-Gateway.ps1); when Docker isn't
+running there is no gateway, so that step is skipped quietly.
 
 Only ever touches processes Start-Ledger.ps1 itself launched - it won't find or stop a
 backend/frontend you started by hand in your own terminal (there's no .ledger-run.json for those).
@@ -86,6 +88,12 @@ if (Test-Path $stateFile) {
 
 if ($NoGateway) {
     Write-Host "Leaving the gateway running (-NoGateway)."
+    exit 0
+}
+
+if (Get-Command docker -ErrorAction SilentlyContinue) { & docker info *> $null }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue) -or $LASTEXITCODE -ne 0) {
+    Write-Host "Docker isn't running - no gateway to stop."
     exit 0
 }
 

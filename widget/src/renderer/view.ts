@@ -1,4 +1,4 @@
-import type { LiveSession, LiveState } from '../shared/types'
+import type { LiveSession, LiveState, RemoteStatus } from '../shared/types'
 
 /** Header text: the one-line summary shown both expanded and as the collapsed pill. */
 export function summaryText(state: LiveState | null): string {
@@ -8,6 +8,22 @@ export function summaryText(state: LiveState | null): string {
   if (count === 0) return 'No live sessions'
   const pending = state.sessions.filter((s) => s.pending_decision).length
   return pending > 0 ? `${count} live · ${pending} pending` : `${count} live`
+}
+
+/** The Remote toggle's hover text: what it is now and what a click does. */
+export function remoteTitle(status: RemoteStatus): string {
+  switch (status.state) {
+    case 'unavailable':
+      return 'Remote mode (backend offline)'
+    case 'off':
+      return 'Turn Remote mode on'
+    case 'starting':
+      return 'Starting Remote mode... click to cancel'
+    case 'ready':
+      return 'Remote mode is on. Click to turn it off'
+    case 'failed':
+      return `Remote mode could not start: ${status.reason}. Click to try again`
+  }
 }
 
 /** Sparkline segments kept in a row; the label's trailing glyphs are the newest responses. */
