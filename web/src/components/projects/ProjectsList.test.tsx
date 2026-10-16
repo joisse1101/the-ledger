@@ -39,7 +39,7 @@ function stubApi(isLocal: boolean) {
     "fetch",
     vi.fn(async (url: string) => {
       const body = url.startsWith("/api/meta")
-        ? { refreshed_at: null, is_local: isLocal }
+        ? { refreshed_at: null, is_local: isLocal, remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null } }
         : { projects: [project] };
       return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
     }),

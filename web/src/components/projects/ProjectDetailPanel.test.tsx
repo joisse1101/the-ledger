@@ -85,7 +85,7 @@ function stubApi({ isLocal = true, overview = populated, deleteResponse }: ApiOp
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.startsWith("/api/meta")) return json({ refreshed_at: null, is_local: isLocal });
+      if (url.startsWith("/api/meta")) return json({ refreshed_at: null, is_local: isLocal, remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null } });
       if (url.startsWith("/api/overview")) return json(overview);
       if (url.startsWith("/api/projects") && init?.method === "DELETE") {
         return deleteResponse ? deleteResponse() : json({ deleted: project.path });
