@@ -4,6 +4,7 @@ import { createApi } from './api'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
 import { startPoller } from './poller'
+import type { RemoteStatus } from '../shared/types'
 import { loadState } from './state'
 import { Supervisor } from './supervisor'
 import { createDeps } from './system'
@@ -26,6 +27,16 @@ if (!app.requestSingleInstanceLock()) {
     widget = win
     const poller = startPoller(() => api.fetchLive(), (state) => win.sendState(state))
 
+    // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
+    let remote: RemoteStatus = { state: 'unavailable' }
+    const remotePoller = startPoller(
+      () => api.fetchRemote(),
+      (status) => {
+        remote = status
+        win.sendRemote(status)
+      },
+    )
+
     // Cold start: bring up the backend if nothing answers. A backend that is already running is
     // adopted and, being not ours, is never stopped by Quit.
     void supervisor.ensureBackend()
@@ -35,6 +46,14 @@ if (!app.requestSingleInstanceLock()) {
       const result = await api.openRepo(sessionId)
       if (result === 'ended') void poller.refresh()
       return result
+    })
+    ipcMain.on(CHANNELS.setRemote, (_event, enabled: unknown) => {
+      if (typeof enabled !== 'boolean') return
+      void api.setRemoteMode(enabled).then((status) => {
+        remote = status
+        win.sendRemote(status)
+        void remotePoller.refresh()
+      })
     })
     ipcMain.on(CHANNELS.openLedger, () => void supervisor.openLedger())
     ipcMain.on(CHANNELS.setOpacity, (_event, value: unknown) => {
@@ -58,8 +77,22 @@ if (!app.requestSingleInstanceLock()) {
     tray.on('click', () => win.show())
     tray.on('right-click', () => tray.popUpContextMenu(buildMenu()))
 
-    app.on('before-quit', () => {
+    // Quitting kills a backend this widget started, and Remote mode would die with it while its
+    // gateway container kept running. So close Remote mode first, then stop what we started.
+    let quitting = false
+    app.on('before-quit', (event) => {
       poller.stop()
+      remotePoller.stop()
+      const remoteActive = remote.state === 'starting' || remote.state === 'ready'
+      if (!quitting && remoteActive && supervisor.ownedNames().includes('backend')) {
+        quitting = true
+        event.preventDefault()
+        void api.setRemoteMode(false).finally(() => {
+          supervisor.stopOwned()
+          app.quit()
+        })
+        return
+      }
       supervisor.stopOwned()
     })
   })

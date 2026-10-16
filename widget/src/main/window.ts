@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
 import { CHANNELS } from '../shared/ipc'
-import type { LiveState } from '../shared/types'
+import type { LiveState, RemoteStatus } from '../shared/types'
 import { clampOpacity, clampToDisplays, saveState, type Rect, type WidgetState } from './state'
 
 const PILL_HEIGHT = 34
@@ -11,6 +11,7 @@ const SAVE_DELAY_MS = 300
 export interface WidgetWindow {
   window: BrowserWindow
   sendState(state: LiveState): void
+  sendRemote(status: RemoteStatus): void
   toggleCollapse(): void
   toggleVisible(): void
   setOpacity(value: number): void
@@ -26,6 +27,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
   let collapsed = saved.collapsed
   let opacity = clampOpacity(saved.opacity)
   let lastState: LiveState | null = null
+  let lastRemote: RemoteStatus | null = null
   let contentHeight: number | null = null
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -68,6 +70,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
     window.webContents.send(CHANNELS.collapsed, collapsed)
     window.webContents.send(CHANNELS.opacity, opacity)
     if (lastState) window.webContents.send(CHANNELS.state, lastState)
+    if (lastRemote) window.webContents.send(CHANNELS.remoteState, lastRemote)
   }
   window.webContents.on('did-finish-load', () => {
     push()
@@ -96,6 +99,10 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
     sendState(state) {
       lastState = state
       if (!window.isDestroyed()) window.webContents.send(CHANNELS.state, state)
+    },
+    sendRemote(status) {
+      lastRemote = status
+      if (!window.isDestroyed()) window.webContents.send(CHANNELS.remoteState, status)
     },
     toggleCollapse() {
       const current = window.getBounds()

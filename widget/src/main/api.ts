@@ -1,6 +1,8 @@
 import type { LiveSession, LiveState, OpenRepoResult, RemoteQr, RemoteStatus, RemoteStep } from '../shared/types'
 
 export const POLL_TIMEOUT_MS = 3000
+/** Turning Remote mode off runs `docker compose down` inside the request, so it gets longer. */
+export const REMOTE_SWITCH_TIMEOUT_MS = 20_000
 
 export interface Api {
   fetchLive(): Promise<LiveState>
@@ -91,7 +93,7 @@ export function createApi(
           method: 'POST',
           headers: { 'X-Requested-With': 'ledger', 'Content-Type': 'application/json' },
           body: JSON.stringify({ enabled }),
-          signal: signal(),
+          signal: AbortSignal.timeout(REMOTE_SWITCH_TIMEOUT_MS),
         })
         if (!response.ok) return { state: 'unavailable' }
         return toRemoteStatus(await response.json())
