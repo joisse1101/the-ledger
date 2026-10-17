@@ -36,6 +36,17 @@ export interface Meta {
   remote_mode: RemoteMode;
 }
 
+/** One file in the file-drop folder; `modified` is a local ISO timestamp. */
+export interface FileEntry {
+  name: string;
+  size: number;
+  modified: string;
+}
+
+export interface FilesResponse {
+  files: FileEntry[];
+}
+
 export interface LiveContext {
   size: number;
   growth: number | null;

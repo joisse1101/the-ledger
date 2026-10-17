@@ -6,8 +6,10 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiFetch, withQuery } from "./client";
+import { uploadFile } from "./upload";
 import type {
   DecisionAnswer,
+  FilesResponse,
   LiveResponse,
   Meta,
   OverviewGroupBy,
@@ -41,6 +43,7 @@ export const keys = {
   overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy, bucketMinutes?: number) =>
     ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? DEFAULT_BUCKET_MINUTES] as const,
   projects: ["projects"] as const,
+  files: ["files"] as const,
 };
 
 export function useMeta() {
@@ -244,5 +247,40 @@ export function useOpenRepo(id: string) {
   return useMutation({
     mutationFn: () =>
       apiFetch<{ opened: string }>(`/api/sessions/${encodeURIComponent(id)}/open-repo`, { method: "POST" }),
+  });
+}
+
+/** The file-drop folder. Only asked for while Remote mode is on: with it off the server refuses. */
+export function useFiles(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.files,
+    queryFn: () => apiFetch<FilesResponse>("/api/files"),
+    enabled,
+    retry: false,
+  });
+}
+
+/** Uploads one file, reporting progress as a 0-1 fraction; rejects with an ApiError (507 when the
+ *  PC's disk is full, 403 when Remote mode has since turned off). */
+export function useUploadFile() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, onProgress }: { file: File; onProgress: (fraction: number) => void }) =>
+      uploadFile(file, onProgress),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.files });
+    },
+  });
+}
+
+/** Local requests only; a remote device gets a 403. */
+export function useDeleteFile() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      apiFetch<{ deleted: string }>(`/api/files/${encodeURIComponent(name)}`, { method: "DELETE" }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.files });
+    },
   });
 }
