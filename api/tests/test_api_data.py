@@ -1,5 +1,6 @@
 """The data endpoints (/api/live, /api/transcripts, ...) over throwaway ~/.claude fixtures."""
 
+import subprocess
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -8,9 +9,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.repositories import claude_db
+from app.domain import claude_context
+from app.infra import banner
+from app.repositories import claude_db, claude_transcripts
 import server
 from app import deps
+from app.routers import sessions as sessions_router
 from app.domain.claude_context import LiveContext
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
@@ -561,7 +565,7 @@ def test_meta_shows_another_device_the_remote_mode_state(isolated_db, monkeypatc
 def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeypatch):
     _use_live(monkeypatch, [_live_session("live-1", cwd="/h/alpha")])
     calls = []
-    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     response = _client().post("/api/sessions/live-1/open-repo")
 
@@ -570,7 +574,7 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
     assert len(calls) == 1
     (command,), kwargs = calls[0]
     assert command[0] == "powershell.exe"
-    assert command[-2] == str(server.OPEN_REPO_SCRIPT)
+    assert command[-2] == str(sessions_router.OPEN_REPO_SCRIPT)
     assert command[-1] == "claudecode://open?path=%2Fh%2Falpha"
     assert kwargs == {"check": False}
 
@@ -578,7 +582,7 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
 def test_open_repo_is_404_for_an_unknown_or_not_live_session(isolated_db, monkeypatch):
     _use_live(monkeypatch)
     calls = []
-    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     response = _client().post("/api/sessions/nope-1/open-repo")
 
@@ -910,8 +914,8 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
 
 def test_session_detail_breakdown_failure_drops_only_the_breakdown(with_turns, monkeypatch):
     _use_live(monkeypatch)
-    monkeypatch.setattr(server.claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
-    server.claude_context._detail_cache.clear()
+    monkeypatch.setattr(claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
+    claude_context._detail_cache.clear()
 
     detail = _client().get("/api/sessions/aaa-1").json()["detail"]
 
@@ -938,7 +942,7 @@ def test_session_only_known_to_the_registry_gets_a_recap_from_it(isolated_db, mo
 
 
 def test_unreadable_transcript_is_readable_false_not_an_error(api, monkeypatch):
-    monkeypatch.setattr(server.claude_context, "load_detail", lambda session_id, cwd: None)
+    monkeypatch.setattr(claude_context, "load_detail", lambda session_id, cwd: None)
     response = api.get("/api/sessions/aaa-1")
     assert response.status_code == 200
     body = response.json()
@@ -958,10 +962,10 @@ def test_malformed_session_ids_are_rejected_before_any_filesystem_access(api, mo
     def boom(*args, **kwargs):
         raise AssertionError("the filesystem was touched")
 
-    monkeypatch.setattr(server.claude_context, "load_detail", boom)
-    monkeypatch.setattr(server.claude_context, "transcript_path", boom)
-    monkeypatch.setattr(server.claude_transcripts, "delete_transcript", boom)
-    monkeypatch.setattr(server.claude_db, "transcript_path_for_session", boom)
+    monkeypatch.setattr(claude_context, "load_detail", boom)
+    monkeypatch.setattr(claude_context, "transcript_path", boom)
+    monkeypatch.setattr(claude_transcripts, "delete_transcript", boom)
+    monkeypatch.setattr(claude_db, "transcript_path_for_session", boom)
     for method in (api.get, api.delete):
         assert method(f"/api/sessions/{bad_id}").status_code in (404, 422)
 
@@ -973,7 +977,7 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
         seen.append(cwd)
         return None
 
-    monkeypatch.setattr(server.claude_context, "load_detail", spy)
+    monkeypatch.setattr(claude_context, "load_detail", spy)
     api.get("/api/sessions/aaa-1", params={"cwd": "/etc"})
     assert seen == ["/h/alpha"]
 
@@ -1073,7 +1077,7 @@ def _ready_remote(monkeypatch):
     gateway, _ = _use_remote(monkeypatch, store)
     monkeypatch.setattr(deps, "access_token", TOKEN)
     monkeypatch.setattr(deps, "gateway_port", 8080)
-    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
     return gateway
 
 
@@ -1087,7 +1091,7 @@ def test_the_qr_is_refused_while_remote_mode_is_not_ready(isolated_db, monkeypat
 def test_the_qr_for_a_local_request_carries_the_svg_and_a_token_free_address(isolated_db, monkeypatch):
     gateway = _ready_remote(monkeypatch)
     encoded = []
-    monkeypatch.setattr(server.banner, "render_qr_svg", lambda text: encoded.append(text) or "<svg/>")
+    monkeypatch.setattr(banner, "render_qr_svg", lambda text: encoded.append(text) or "<svg/>")
     gateway.start()
 
     body = _client().get("/api/remote-mode/qr").json()
@@ -1117,7 +1121,7 @@ def test_the_qr_is_refused_to_a_device_without_the_token(isolated_db, monkeypatc
 
 def test_the_qr_needs_a_network_address(isolated_db, monkeypatch):
     gateway = _ready_remote(monkeypatch)
-    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: [])
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: [])
     gateway.start()
     assert _client().get("/api/remote-mode/qr").status_code == 409
 
