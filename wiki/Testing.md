@@ -15,6 +15,9 @@ Python tests, one file per module under test:
   `test_claude_sessions.py`, `test_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
   monkeypatches `paths.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
+- Layering: `api/tests/test_layers.py` scans the imports under `api/app/` and fails when a layer imports
+  one above it, or when `repositories`, `domain`, `infra` or `services` import FastAPI. `tests/services/` holds
+  the service and error-mapping tests.
 - API/backend: `test_main.py` (the FastAPI app's lifespan/refresh wiring, asserts no
   `CORSMiddleware` is registered), `test_security.py` (the auth middleware — local vs. remote,
   bearer-token matching, CSRF header, Host rebinding-guard), `test_banner.py` (address discovery,
