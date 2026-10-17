@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.services.errors import Conflict, Forbidden, InvalidInput, NotFound, OperationFailed, ServiceError, Unavailable
+from app.services.errors import Conflict, Forbidden, InvalidInput, NotFound, OperationFailed, ServiceError, StorageFull, Unavailable
 
 STATUS_BY_ERROR: dict[type[ServiceError], int] = {
     InvalidInput: 422,
@@ -14,6 +14,7 @@ STATUS_BY_ERROR: dict[type[ServiceError], int] = {
     NotFound: 404,
     OperationFailed: 500,
     Unavailable: 503,
+    StorageFull: 507,
 }
 
 

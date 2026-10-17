@@ -29,3 +29,7 @@ class OperationFailed(ServiceError):
 
 class Unavailable(ServiceError):
     """A feature the request needs isn't available right now (HTTP 503)."""
+
+
+class StorageFull(ServiceError):
+    """There is no room to store what was sent (HTTP 507)."""
