@@ -8,12 +8,13 @@ existing file is never overwritten.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import AsyncIterable, Iterable, Mapping
 
 DEFAULT_DIR = Path(__file__).resolve().parent / ".ledger" / "transfer"
 INCOMING_DIR = ".incoming"
@@ -87,24 +88,44 @@ def save_stream(folder: Path, raw_name: str, chunks: Iterable[bytes]) -> FileEnt
 
     Raises OSError (for example disk full) after removing the partial file, and re-raises whatever the
     chunk iterator raises (a dropped connection) the same way."""
-    incoming = folder / INCOMING_DIR
-    incoming.mkdir(parents=True, exist_ok=True)
-    temp = incoming / uuid.uuid4().hex
+    temp = _new_temp(folder)
     try:
         with temp.open("wb") as handle:
             for chunk in chunks:
                 handle.write(chunk)
-        for candidate in _unique_names(sanitize_name(raw_name)):
-            target = folder / candidate
-            try:
-                os.link(temp, target)  # fails if the name exists, so nothing is overwritten
-            except FileExistsError:
-                continue
-            stat = target.stat()
-            return FileEntry(name=candidate, size=stat.st_size, modified=stat.st_mtime)
-        raise AssertionError("unreachable: _unique_names never ends")  # pragma: no cover
+        return _place(folder, temp, raw_name)
     finally:
         temp.unlink(missing_ok=True)
+
+
+async def save_async_stream(folder: Path, raw_name: str, chunks: AsyncIterable[bytes]) -> FileEntry:
+    """`save_stream` for an async chunk source (a request body); disk writes run off the event loop."""
+    temp = _new_temp(folder)
+    try:
+        with temp.open("wb") as handle:
+            async for chunk in chunks:
+                await asyncio.to_thread(handle.write, chunk)
+        return await asyncio.to_thread(_place, folder, temp, raw_name)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def _new_temp(folder: Path) -> Path:
+    incoming = folder / INCOMING_DIR
+    incoming.mkdir(parents=True, exist_ok=True)
+    return incoming / uuid.uuid4().hex
+
+
+def _place(folder: Path, temp: Path, raw_name: str) -> FileEntry:
+    for candidate in _unique_names(sanitize_name(raw_name)):
+        target = folder / candidate
+        try:
+            os.link(temp, target)  # fails if the name exists, so nothing is overwritten
+        except FileExistsError:
+            continue
+        stat = target.stat()
+        return FileEntry(name=candidate, size=stat.st_size, modified=stat.st_mtime)
+    raise AssertionError("unreachable: _unique_names never ends")  # pragma: no cover
 
 
 def resolve_existing(folder: Path, name: str) -> Path:
