@@ -25,6 +25,7 @@ import pytest
 import uvicorn
 
 import server
+from app import deps
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
@@ -60,9 +61,9 @@ class _Api:
         self.url = f"http://127.0.0.1:{self.port}"
         self.store = PendingDecisions(max_age=max_age)
         self.activity: dict[str, datetime] = {}
-        monkeypatch.setattr(server, "decisions", self.store)
+        monkeypatch.setattr(deps, "decisions", self.store)
         monkeypatch.setattr(
-            server,
+            deps,
             "live",
             LiveSnapshot(
                 load_sessions=lambda: [_session(SESSION)],

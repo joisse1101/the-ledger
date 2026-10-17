@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.infra import file_drop
 import server
+from app import deps
 from app.domain.pending_decisions import PendingDecisions
 
 TOKEN = "s3cret-token-value_0123456789"
@@ -34,8 +35,8 @@ def _phone():
 @pytest.fixture
 def store(monkeypatch, tmp_path):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     monkeypatch.setenv("LEDGER_TRANSFER_DIR", str(tmp_path / "drop"))
     return store
 
@@ -237,7 +238,7 @@ def test_a_download_link_serves_the_file_without_the_token_once(remote_on):
 
 def test_a_download_link_expires(remote_on, monkeypatch):
     clock = [0.0]
-    monkeypatch.setattr(server, "download_tickets", file_drop.DownloadTickets(ttl=60, clock=lambda: clock[0]))
+    monkeypatch.setattr(deps, "download_tickets", file_drop.DownloadTickets(ttl=60, clock=lambda: clock[0]))
     _phone().put("/api/files?name=a.txt", content=b"x")
     url = _link()
 

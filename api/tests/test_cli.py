@@ -3,10 +3,12 @@
 import pytest
 
 import server
+from app.core.config import parse_settings
+from app import deps
 
 
 def parse(*argv, **environ):
-    return server.parse_settings(list(argv), environ)
+    return parse_settings(list(argv), environ)
 
 
 # ------------------------------------------------ options
@@ -82,7 +84,7 @@ def launched(monkeypatch):
     """Run main() without starting a server; report what uvicorn was asked to do."""
     calls = []
     monkeypatch.setattr(server.uvicorn, "run", lambda app, **kwargs: calls.append((app, kwargs)))
-    monkeypatch.setattr(server, "access_token", None)  # restored afterwards; main() assigns it
+    monkeypatch.setattr(deps, "access_token", None)  # restored afterwards; main() assigns it
     monkeypatch.setattr(server, "provision_token", lambda: "tok-123")
     monkeypatch.delenv("LEDGER_TOKEN", raising=False)
     yield calls
@@ -96,7 +98,7 @@ def test_default_launch_is_local_with_no_access_log_and_provisions_a_token(launc
     assert kwargs == {"host": "127.0.0.1", "port": 8501, "access_log": False, "proxy_headers": False}
     # Token provisioning is unconditional now: the gateway, not this bind address,
     # decides who can ever present it.
-    assert server.access_token == "tok-123"
+    assert deps.access_token == "tok-123"
     out = capsys.readouterr().out
     assert "http://localhost:4173/" in out  # the frontend's default port, not the API's
     assert "token" not in out.lower()  # nothing about network sign-in is printed here anymore
@@ -113,7 +115,7 @@ def test_a_custom_port_and_frontend_port_are_passed_through(launched, capsys):
 def test_a_configured_token_is_used_even_when_local_only(launched, monkeypatch):
     monkeypatch.setenv("LEDGER_TOKEN", "from-env")
     server.main([])
-    assert server.access_token == "tok-123"  # via provision_token, which honours the env var
+    assert deps.access_token == "tok-123"  # via provision_token, which honours the env var
 
 
 def test_reload_passes_an_import_string_not_the_app_object(launched):

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.repositories import claude_db
 import server
+from app import deps, refresh
 from app.domain.live_snapshot import LiveSnapshot
 
 
@@ -70,7 +71,7 @@ def test_concurrent_refreshes_run_one_after_the_other(monkeypatch):
         return datetime.now()
 
     monkeypatch.setattr(claude_db, "refresh", slow_refresh)
-    threads = [threading.Thread(target=server.locked_refresh) for _ in range(4)]
+    threads = [threading.Thread(target=refresh.locked_refresh) for _ in range(4)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -83,10 +84,10 @@ def test_refresh_loop_calls_refresh_again_after_each_interval(monkeypatch):
     import asyncio
 
     calls = []
-    monkeypatch.setattr(server, "locked_refresh", lambda: calls.append(1))
+    monkeypatch.setattr(refresh, "locked_refresh", lambda: calls.append(1))
 
     async def run():
-        task = asyncio.create_task(server.refresh_loop(0.01))
+        task = asyncio.create_task(refresh.refresh_loop(0.01))
         await asyncio.sleep(0.15)
         task.cancel()
 
@@ -104,10 +105,10 @@ def test_refresh_loop_survives_a_failed_scan(monkeypatch):
         if len(calls) == 1:
             raise RuntimeError("disk hiccup")
 
-    monkeypatch.setattr(server, "locked_refresh", flaky)
+    monkeypatch.setattr(refresh, "locked_refresh", flaky)
 
     async def run():
-        task = asyncio.create_task(server.refresh_loop(0.01))
+        task = asyncio.create_task(refresh.refresh_loop(0.01))
         await asyncio.sleep(0.15)
         task.cancel()
 
@@ -120,7 +121,7 @@ def test_lifespan_seeds_the_snapshot(isolated_db, monkeypatch):
     monkeypatch.setattr(claude_db.atexit, "register", lambda *a: None)
     # lifespan() provisions a token itself when none is set (see its docstring) - stub that out so
     # this test doesn't touch the real api/.ledger/token file.
-    monkeypatch.setattr(server, "access_token", None)
+    monkeypatch.setattr(deps, "access_token", None)
     monkeypatch.setattr(server, "provision_token", lambda: "tok-123")
     with _client() as started:
         assert started.get("/api/meta").json()["refreshed_at"] is not None

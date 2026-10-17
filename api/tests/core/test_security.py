@@ -12,6 +12,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.repositories import claude_db
 import server
+from app import deps
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
 from app.core.security import SecurityMiddleware, provision_token
@@ -24,13 +25,13 @@ REPO = Path(__file__).resolve().parents[3]
 
 @pytest.fixture(autouse=True)
 def _isolated(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "live", LiveSnapshot(load_sessions=lambda: []))
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    monkeypatch.setattr(deps, "live", LiveSnapshot(load_sessions=lambda: []))
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
 
 
 @pytest.fixture
 def token(monkeypatch):
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     return TOKEN
 
 
@@ -104,7 +105,7 @@ def test_loopback_needs_no_token_even_when_none_is_configured():
 
 
 def test_with_no_token_configured_nothing_remote_gets_in():
-    assert server.access_token is None
+    assert deps.access_token is None
     assert remote().get("/api/meta").status_code == 401
     assert remote().get("/api/meta", headers={"Authorization": "Bearer "}).status_code == 401
 
@@ -206,7 +207,7 @@ def test_meta_reports_is_local_false_for_a_remote_request(token):
 
 
 def test_a_changed_token_refuses_the_old_one(monkeypatch):
-    monkeypatch.setattr(server, "access_token", "new-token-value")
+    monkeypatch.setattr(deps, "access_token", "new-token-value")
     assert remote().get("/api/meta", headers=BEARER).status_code == 401
     assert remote().get("/api/meta", headers={"Authorization": "Bearer new-token-value"}).status_code == 200
 

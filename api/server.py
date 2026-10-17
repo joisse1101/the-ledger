@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import errno
 import logging
 import os
 import pathlib
 import subprocess
-import threading
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Any, Literal, Mapping, Optional, Sequence, Union
+from typing import Annotated, Any, Literal, Optional, Sequence, Union
 from urllib.parse import quote
 
 import uvicorn
@@ -22,6 +19,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
 
+from app import deps, refresh
+from app.core.config import parse_settings
 from app.infra import banner
 from app.infra import file_drop
 from app.domain import claude_context
@@ -31,72 +30,15 @@ from app.repositories import claude_transcripts
 from app.domain import overview_stats
 from app.domain import transcript_query
 import gateway_signin
-from app.infra import remote_system
-from app.domain.live_snapshot import LiveSnapshot
-from app.domain.pending_decisions import PendingDecisions
-from app.infra.remote_gateway import RemoteGateway
 from app.core.security import SecurityMiddleware, is_local, provision_token
 
 log = logging.getLogger("ledger")
 
-# The background rescan runs every 10 minutes for as long as the server is up.
-REFRESH_INTERVAL_SECONDS = 10 * 60
-
-# refresh() rewrites both tables and can take seconds on a big history, so it is
-# serialised process-wide: startup, the timer and POST /api/refresh never overlap.
-_refresh_lock = threading.Lock()
-
-# The one place the live registry is read from; see LiveSnapshot.
-live = LiveSnapshot()
-
-# In-memory pending tool-permission decisions relayed from live sessions; see pending_decisions.py.
-decisions = PendingDecisions()
-
-# Remote mode's lifecycle (container runtime, web interface, gateway); built by main() or, for the
-# --reload subprocess, by lifespan(). None until then; see remote_gateway.py.
-remote: Optional[RemoteGateway] = None
-gateway_port: int = remote_system.DEFAULT_GATEWAY_PORT
-REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO_ROOT = deps.REPO_ROOT
 
 # Invoked, unmodified, by POST /api/sessions/{id}/open-repo - this repo's own copy, not any
 # installed-under-%USERPROFILE% one, so opening a repo window needs no separate install step.
-OPEN_REPO_SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "hooks" / "scripts" / "Open-ClaudeRepoWindow.ps1"
-
-
-def _make_remote(backend_port: int, frontend_port: int) -> RemoteGateway:
-    """Remote mode's lifecycle for these ports. Reaching `ready` opens the prompt gate for other
-    devices and starts its 8 hour window; turning off closes the gate again."""
-    global gateway_port
-    gateway_port = remote_system.gateway_port(REPO_ROOT)
-    system = remote_system.RealSystem(
-        repo_root=REPO_ROOT, backend_port=backend_port, frontend_port=frontend_port, gateway_port=gateway_port
-    )
-    return RemoteGateway(
-        system,
-        on_ready=lambda: decisions.set_remote_mode(True),
-        on_off=lambda: decisions.set_remote_mode(False),
-    )
-
-
-def locked_refresh() -> datetime:
-    with _refresh_lock:
-        return claude_db.refresh()
-
-
-def _startup_snapshot() -> None:
-    with _refresh_lock:
-        claude_db.startup()
-
-
-async def refresh_loop(interval: float = REFRESH_INTERVAL_SECONDS) -> None:
-    """Rescan every `interval` seconds, in a worker thread, until cancelled."""
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            await asyncio.to_thread(locked_refresh)
-        except Exception:
-            # A bad scan must not end the loop; the next tick tries again.
-            log.exception("background refresh failed")
+OPEN_REPO_SCRIPT = REPO_ROOT / "hooks" / "scripts" / "Open-ClaudeRepoWindow.ps1"
 
 
 @asynccontextmanager
@@ -106,19 +48,17 @@ async def lifespan(app: FastAPI):
     # separate process that never runs main() at all, so this is that process's only chance to
     # provision the token it actually serves with (re-reads the same stored file main() already
     # wrote, so it's the same token either way).
-    global access_token
-    if access_token is None:
-        access_token = provision_token()
+    if deps.access_token is None:
+        deps.access_token = provision_token()
 
-    global remote
-    if remote is None:
+    if deps.remote is None:
         env_settings = parse_settings([])
-        remote = _make_remote(env_settings.port, env_settings.frontend_port)
+        deps.remote = deps.make_remote(env_settings.port, env_settings.frontend_port)
     # Remote mode starts off, so a gateway an earlier backend left running is closed now.
-    await asyncio.to_thread(remote.stop_leftovers)
+    await asyncio.to_thread(deps.remote.stop_leftovers)
 
-    await asyncio.to_thread(_startup_snapshot)
-    task = asyncio.create_task(refresh_loop())
+    await asyncio.to_thread(refresh.startup_snapshot)
+    task = asyncio.create_task(refresh.refresh_loop())
     try:
         yield
     finally:
@@ -133,14 +73,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Set by main() on every start. While None (tests that never call main()), no token
-# exists, so every request that isn't plain local is refused.
-access_token: Optional[str] = None
-
-DEFAULT_FRONTEND_PORT = 4173  # Vite's own `vite preview` default
-
 app.add_middleware(GZipMiddleware, minimum_size=1024)
-app.add_middleware(SecurityMiddleware, token=lambda: access_token)
+app.add_middleware(SecurityMiddleware, token=lambda: deps.access_token)
 
 
 def _iso(value) -> Optional[str]:
@@ -152,14 +86,8 @@ def get_meta(request: Request) -> dict:
     return {
         "refreshed_at": _iso(claude_db.refreshed_at()),
         "is_local": is_local(request),
-        "remote_mode": _remote_mode_status(),
+        "remote_mode": deps.remote_mode_status(),
     }
-
-
-def _remote_mode_status() -> dict:
-    """The prompt gate (`enabled`, `expires_at`) plus the lifecycle (`state`, `step`, `reason`)."""
-    lifecycle = remote.status() if remote else {"state": "off", "step": None, "reason": None}
-    return {**decisions.remote_mode(), **lifecycle}
 
 
 class RemoteModeRequest(BaseModel):
@@ -172,13 +100,13 @@ def post_remote_mode(body: RemoteModeRequest, request: Request) -> dict:
     # prompts while Remote mode is on, but never lets it change Remote mode itself.
     if not is_local(request):
         raise HTTPException(status_code=403, detail="switching Remote mode requires a local request")
-    if remote is None:
+    if deps.remote is None:
         raise HTTPException(status_code=503, detail="Remote mode is not available yet")
     if body.enabled:
-        remote.start()  # returns at once; clients watch the state in /api/meta
+        deps.remote.start()  # returns at once; clients watch the state in /api/meta
     else:
-        remote.stop()
-    return _remote_mode_status()
+        deps.remote.stop()
+    return deps.remote_mode_status()
 
 
 @app.get("/api/remote-mode/qr")
@@ -186,49 +114,34 @@ def get_remote_mode_qr(request: Request) -> dict:
     # The code contains the access token, so even a valid token isn't enough to read it.
     if not is_local(request):
         raise HTTPException(status_code=403, detail="the sign-in code requires a local request")
-    if remote is None or not remote.is_ready():
+    if deps.remote is None or not deps.remote.is_ready():
         raise HTTPException(status_code=409, detail="Remote mode is not ready")
     addresses = banner.discover_ipv4()
-    if not addresses or access_token is None:
+    if not addresses or deps.access_token is None:
         raise HTTPException(status_code=409, detail="No network address was found for this machine")
-    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], gateway_port, access_token))
+    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], deps.gateway_port, deps.access_token))
     if svg is None:
         raise HTTPException(status_code=503, detail="QR codes are unavailable (the qrcode package is missing)")
     return {
         "svg": svg,
-        "display_url": gateway_signin.display_url(addresses[0], gateway_port),
-        "expires_at": decisions.remote_mode()["expires_at"],
+        "display_url": gateway_signin.display_url(addresses[0], deps.gateway_port),
+        "expires_at": deps.decisions.remote_mode()["expires_at"],
     }
 
 
 @app.post("/api/refresh")
 def post_refresh() -> dict:
-    return {"refreshed_at": _iso(locked_refresh())}
-
-
-def _can_see_prompts(request: Request) -> bool:
-    """The machine's own browser always sees pending prompts; another device only while Remote mode is on."""
-    return is_local(request) or decisions.remote_mode_enabled()
-
-
-def _sweep_prompts() -> None:
-    """Drop every pending prompt whose session already moved on (answered in the terminal, say).
-
-    Run ahead of each read/answer of the pending prompts rather than on a timer of its own: a
-    prompt only matters while something is polling, and the transcript reads it costs are cached
-    by file stat.
-    """
-    decisions.sweep(live.latest_activity)
+    return {"refreshed_at": _iso(refresh.locked_refresh())}
 
 
 @app.get("/api/live")
 def get_live(request: Request) -> dict:
-    _sweep_prompts()
-    visible = _can_see_prompts(request)
+    deps.sweep_prompts()
+    visible = deps.can_see_prompts(request)
     return {
         "sessions": [
-            {**item, "pending_decision": decisions.peek(item["session_id"]) if visible else None}
-            for item in live.get()
+            {**item, "pending_decision": deps.decisions.peek(item["session_id"]) if visible else None}
+            for item in deps.live.get()
         ]
     }
 
@@ -282,7 +195,7 @@ def get_transcripts(
         limit=limit,
         offset=offset,
     )
-    live_ids = live.live_ids()
+    live_ids = deps.live.live_ids()
     return {
         "items": [_transcript_item(t, live_ids) for t in page.items],
         "total": page.total,
@@ -407,9 +320,9 @@ def get_session(session_id: SessionId) -> dict:
     # The working directory is only ever taken from the registry or the snapshot,
     # never from the request, so a client can't point the transcript lookup elsewhere.
     transcript = _find_transcript(session_id)
-    live_ids = live.live_ids()
-    live_item = next((s for s in live.get() if s["session_id"] == session_id), None)
-    cwd = live.cwd_for(session_id) or (transcript.cwd if transcript else None)
+    live_ids = deps.live.live_ids()
+    live_item = next((s for s in deps.live.get() if s["session_id"] == session_id), None)
+    cwd = deps.live.cwd_for(session_id) or (transcript.cwd if transcript else None)
     if cwd is None:
         raise HTTPException(status_code=404, detail="unknown session")
 
@@ -430,9 +343,9 @@ def delete_session(session_id: SessionId, request: Request) -> dict:
         raise HTTPException(status_code=403, detail="delete requires a local request")
     # Liveness comes from a fresh registry read: the 1s cached list could still say
     # "not live" for a session that started a moment ago.
-    if live.is_live_now(session_id):
+    if deps.live.is_live_now(session_id):
         raise HTTPException(status_code=409, detail="session is live and cannot be deleted")
-    with _refresh_lock:  # a concurrent rescan could otherwise re-add the row
+    with refresh.lock:  # a concurrent rescan could otherwise re-add the row
         if claude_db.transcript_path_for_session(session_id) is None:
             raise HTTPException(status_code=404, detail="unknown session")
         if not claude_transcripts.delete_transcript(session_id):
@@ -453,14 +366,14 @@ async def post_decision(session_id: SessionId, body: DecisionRequest, request: R
     # one could then be "answered" as if it were real).
     if not is_local(request):
         raise HTTPException(status_code=403, detail="registering a prompt requires a local request")
-    return await decisions.request_decision(session_id, body.tool_name, body.tool_input)
+    return await deps.decisions.request_decision(session_id, body.tool_name, body.tool_input)
 
 
 @app.get("/api/sessions/{session_id}/pending-decision")
 def get_pending_decision(session_id: SessionId, request: Request) -> dict:
-    _sweep_prompts()
-    visible = _can_see_prompts(request)
-    return {"pending_decision": decisions.peek(session_id) if visible else None}
+    deps.sweep_prompts()
+    visible = deps.can_see_prompts(request)
+    return {"pending_decision": deps.decisions.peek(session_id) if visible else None}
 
 
 QUESTION_TOOL = "AskUserQuestion"
@@ -523,16 +436,16 @@ def post_decision_answer(
 ) -> dict:
     # Token and CSRF header were already checked by the middleware; Remote mode is the extra gate
     # for another device.
-    if not _can_see_prompts(request):
+    if not deps.can_see_prompts(request):
         raise HTTPException(status_code=403, detail="Remote mode is off")
-    _sweep_prompts()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
-    prompt = decisions.get(session_id, prompt_id)
+    deps.sweep_prompts()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
+    prompt = deps.decisions.get(session_id, prompt_id)
     if prompt is None:
         raise HTTPException(status_code=409, detail="this session already moved on")
     answer = _checked_answer(prompt, body)
     # A plain `def` route runs in Starlette's threadpool; answer() wakes the hook's waiting request
     # on that request's own event loop, so calling it from here is safe.
-    if not decisions.answer(session_id, prompt_id, answer):
+    if not deps.decisions.answer(session_id, prompt_id, answer):
         raise HTTPException(status_code=409, detail="this session already moved on")
     return {"answered": prompt_id}
 
@@ -540,7 +453,7 @@ def post_decision_answer(
 @app.post("/api/sessions/{session_id}/open-repo")
 def post_open_repo(session_id: SessionId) -> dict:
     # The registry's own cwd, never a request parameter - the same rule GET /api/sessions/{id} follows.
-    cwd = live.cwd_for(session_id)
+    cwd = deps.live.cwd_for(session_id)
     if cwd is None:
         raise HTTPException(status_code=404, detail="unknown or not-live session")
     uri = f"claudecode://open?path={quote(cwd, safe='')}"
@@ -553,16 +466,12 @@ def post_open_repo(session_id: SessionId) -> dict:
 
 def _require_file_drop() -> None:
     """The Files feature exists only while Remote mode is on, for the PC's own browser too."""
-    if not decisions.remote_mode_enabled():
+    if not deps.decisions.remote_mode_enabled():
         raise HTTPException(status_code=403, detail="Remote mode is off")
 
 
 def _file_json(entry: file_drop.FileEntry) -> dict:
     return {"name": entry.name, "size": entry.size, "modified": datetime.fromtimestamp(entry.modified).isoformat()}
-
-
-# Single-use links for downloading drop-folder files; see file_drop.DownloadTickets.
-download_tickets = file_drop.DownloadTickets()
 
 
 def _drop_file(name: str) -> pathlib.Path:
@@ -600,13 +509,13 @@ def get_file(name: str) -> FileResponse:
 @app.post("/api/files/{name}/download-link", dependencies=[Depends(_require_file_drop)])
 def post_download_link(name: str) -> dict:
     _drop_file(name)  # 404 for a file that isn't there, before a ticket is spent on it
-    return {"url": f"/api/files/download/{download_tickets.issue(name)}"}
+    return {"url": f"/api/files/download/{deps.download_tickets.issue(name)}"}
 
 
 @app.get("/api/files/download/{ticket}", dependencies=[Depends(_require_file_drop)])
 def get_download(ticket: str) -> FileResponse:
     # Reachable without the bearer token (see security.py): the ticket is the credential.
-    name = download_tickets.redeem(ticket)
+    name = deps.download_tickets.redeem(ticket)
     if name is None:
         raise HTTPException(status_code=403, detail="this download link is invalid or has expired")
     path = _drop_file(name)
@@ -654,7 +563,7 @@ def delete_project(path: str, request: Request) -> dict:
     # delete below removes a directory tree, so it never runs on arbitrary input.
     if path not in {p.path for p in claude_projects.load_projects()}:
         raise HTTPException(status_code=404, detail="unknown project")
-    with _refresh_lock:
+    with refresh.lock:
         claude_projects.delete_project(path)
         removed = claude_transcripts.delete_project_transcripts(path)
     return {"deleted": path, "transcript_folders_removed": removed}
@@ -685,96 +594,14 @@ def get_overview(
     )
 
 
-# ---------------------------------------------------------------- command line
-
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8501
-_LOOPBACK_BINDS = frozenset({"127.0.0.1", "localhost", "::1"})
-
-
-@dataclass(frozen=True)
-class Settings:
-    host: str
-    port: int
-    frontend_port: int
-    reload: bool = False
-
-    @property
-    def exposed(self) -> bool:
-        """Whether devices other than this machine can connect."""
-        return self.host not in _LOOPBACK_BINDS
-
-
-def _parse_port(value: Optional[int], env_name: str, environ: Mapping[str, str], default: int, parser) -> int:
-    port = default
-    if value is not None:
-        port = value
-    elif environ.get(env_name, "").strip():
-        try:
-            port = int(environ[env_name])
-        except ValueError:
-            parser.error(f"{env_name} must be a number, got {environ[env_name]!r}")
-    if port not in range(1, 65536):
-        parser.error(f"port must be between 1 and 65535, got {port}")
-    return port
-
-
-def parse_settings(
-    argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.environ
-) -> Settings:
-    """--host beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501;
-    --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link — this
-    process never connects to the frontend's port itself). `--lan` is no longer a bind mode: other
-    devices now reach the app through the containerized gateway (see CLAUDE.md), so passing it exits
-    with an error rather than doing anything. `--reload` has no env var (dev-only, always explicit)."""
-    parser = argparse.ArgumentParser(
-        prog="python server.py",
-        description="The Ledger: a dashboard for your Claude Code sessions.",
-    )
-    parser.add_argument(
-        "--lan",
-        action="store_true",
-        help="removed - start the containerized gateway instead (see CLAUDE.md's Setup & Run)",
-    )
-    parser.add_argument("--host", help=f"address to bind (default {DEFAULT_HOST}, env LEDGER_HOST)")
-    parser.add_argument("--port", type=int, help=f"port to serve on (default {DEFAULT_PORT}, env LEDGER_PORT)")
-    parser.add_argument(
-        "--frontend-port",
-        type=int,
-        help=f"port the frontend is served on (default {DEFAULT_FRONTEND_PORT}, env LEDGER_FRONTEND_PORT)",
-    )
-    parser.add_argument(
-        "--reload",
-        action="store_true",
-        help="restart on code changes (dev only - imports the app fresh per restart, so this "
-        "process's own startup banner/token print reflects only the very first start)",
-    )
-    args = parser.parse_args(argv)
-
-    if args.lan:
-        parser.error(
-            "--lan has been removed: other devices connect through the containerized gateway now "
-            "(see CLAUDE.md's Setup & Run), not a backend bind mode."
-        )
-
-    host = args.host or environ.get("LEDGER_HOST") or DEFAULT_HOST
-    port = _parse_port(args.port, "LEDGER_PORT", environ, DEFAULT_PORT, parser)
-    frontend_port = _parse_port(
-        args.frontend_port, "LEDGER_FRONTEND_PORT", environ, DEFAULT_FRONTEND_PORT, parser
-    )
-    return Settings(host=host, port=port, frontend_port=frontend_port, reload=args.reload)
-
-
 def main(argv: Optional[Sequence[str]] = None) -> None:
-    global access_token
     settings = parse_settings(argv)
 
     # Provisioned unconditionally: the gateway (a separate process) is what decides whether
     # anyone off this machine can ever present it, so the backend no longer gates this on
     # its own bind address.
-    access_token = provision_token()
-    global remote
-    remote = _make_remote(settings.port, settings.frontend_port)
+    deps.access_token = provision_token()
+    deps.remote = deps.make_remote(settings.port, settings.frontend_port)
 
     print(banner.build_banner(frontend_port=settings.frontend_port), flush=True)
 

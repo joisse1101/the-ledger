@@ -5,6 +5,7 @@ import pytest
 
 from app.repositories import claude_db
 import server
+from app import deps
 
 
 @pytest.fixture
@@ -68,7 +69,7 @@ def no_real_remote_mode(monkeypatch):
     """Remote mode drives real Docker, so every test gets an inert one unless it installs its own.
     server.main(--reload) also exports the ports for the reload subprocess: set-then-unset makes
     monkeypatch restore the environment afterwards."""
-    monkeypatch.setattr(server, "remote", _InertRemote())
+    monkeypatch.setattr(deps, "remote", _InertRemote())
     for name in ("LEDGER_PORT", "LEDGER_FRONTEND_PORT"):
         monkeypatch.setenv(name, "0")
         monkeypatch.delenv(name)
