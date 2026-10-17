@@ -36,8 +36,19 @@ export function trimSparkline(label: string, max = SPARK_SEGMENTS): string {
   return label.slice(0, match.index) + match[0].slice(-max)
 }
 
-/** Registry statuses that mean the session is no longer running; a pending prompt takes precedence. */
-const FINISHED_STATUSES: ReadonlySet<string> = new Set(['idle', 'stopped'])
+/** Statuses that leave a row untinted: the session is working, or the registry gave no status
+ *  (the backend reports a missing one as `unknown`). */
+const UNTINTED_STATUSES: ReadonlySet<string> = new Set(['busy', 'unknown', ''])
+
+export type RowTint = 'pending' | 'done' | 'error'
+
+/** The tint for a row: a pending prompt wins, then idle is green, any status other than busy or
+ *  none is red, and busy or no status keeps the default look. */
+export function rowTint(session: LiveSession): RowTint | null {
+  if (session.pending_decision) return 'pending'
+  if (session.status === 'idle') return 'done'
+  return UNTINTED_STATUSES.has(session.status) ? null : 'error'
+}
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   doc: Document,
@@ -89,8 +100,8 @@ function renderRow(doc: Document, session: LiveSession, showAutoApprove: boolean
     auto.addEventListener('click', () => actions.onAutoApprove(session.session_id, !session.auto_approve))
     row.append(auto)
   }
-  if (session.pending_decision) row.classList.add('pending')
-  else if (FINISHED_STATUSES.has(session.status)) row.classList.add('done')
+  const tint = rowTint(session)
+  if (tint) row.classList.add(tint)
   return row
 }
 

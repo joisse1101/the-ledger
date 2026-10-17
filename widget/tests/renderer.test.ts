@@ -122,24 +122,31 @@ describe('pending row', () => {
   })
 })
 
-describe('finished row', () => {
-  it.each(['idle', 'stopped'])('marks a %s session as done', (status) => {
+describe('status tint', () => {
+  it('marks an idle session as done', () => {
     const { push } = setup()
-    push({ state: 'online', relayHookSeen: false, sessions: [session({ status })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status: 'idle' })] })
     expect(document.querySelector('.row.done')).not.toBeNull()
   })
 
-  it('leaves a running session unmarked', () => {
+  it.each(['running', 'waiting', 'something-else'])('marks a %s session as an error', (status) => {
     const { push } = setup()
-    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status })] })
+    expect(document.querySelector('.row.error')).not.toBeNull()
     expect(document.querySelector('.row.done')).toBeNull()
   })
 
-  it('shows a pending prompt over the finished tint', () => {
+  it.each(['busy', 'unknown', ''])('leaves a session with status %j untinted', (status) => {
     const { push } = setup()
-    push({ state: 'online', relayHookSeen: false, sessions: [session({ status: 'idle', pending_decision: { id: 'p' } })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status })] })
+    expect(document.querySelector('.row.done, .row.error, .row.pending')).toBeNull()
+  })
+
+  it.each(['idle', 'running'])('shows a pending prompt over a %s status', (status) => {
+    const { push } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status, pending_decision: { id: 'p' } })] })
     expect(document.querySelector('.row.pending')).not.toBeNull()
-    expect(document.querySelector('.row.done')).toBeNull()
+    expect(document.querySelector('.row.done, .row.error')).toBeNull()
   })
 })
 
