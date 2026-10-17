@@ -22,13 +22,13 @@
   result) stamped after it was registered — only `user` lines count, since `assistant`/bookkeeping
   lines can appear while a dialog is still open — and releases the hook with "no answer" so it exits.
   A 30-minute maximum age is the backstop. `sweep()` isn't on a timer: `/api/live`, the
-  pending-decision route and the answer route each run it first (`deps.sweep_prompts`), so an
+  pending-decision route and the answer route each run it first (`prompt_service.sweep`), so an
   already-answered prompt gives a 409 rather than "succeeding". **Remote mode**'s access gate is only state here
   (`set_remote_mode`/`remote_mode`/`remote_mode_enabled`): in-memory, off after any backend restart,
   and only a local request can turn it on or off. It is purely an access gate on
   *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
   it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
-  browser always can (`deps.can_see_prompts`).
+  browser always can (`prompt_service.can_see`).
 - `api/app/infra/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
   calls `start()`/`stop()`, which return at once; a state machine runs off, `starting` (with a `step`:
   `docker`, `frontend`, `gateway`), then `ready` or `failed` (with a `reason`, shown for 30 s), and

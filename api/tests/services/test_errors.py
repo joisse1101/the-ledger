@@ -5,12 +5,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.routers.errors import register_error_handlers
-from app.services.errors import Conflict, Forbidden, InvalidInput, NotFound, OperationFailed
+from app.services.errors import Conflict, Forbidden, InvalidInput, NotFound, OperationFailed, Unavailable
 
 
 @pytest.mark.parametrize(
     ("error", "status"),
-    [(InvalidInput, 422), (Conflict, 409), (Forbidden, 403), (NotFound, 404), (OperationFailed, 500)],
+    [(InvalidInput, 422), (Conflict, 409), (Forbidden, 403), (NotFound, 404), (OperationFailed, 500), (Unavailable, 503)],
 )
 def test_error_maps_to_status_and_detail(error, status):
     app = FastAPI()

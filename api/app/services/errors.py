@@ -25,3 +25,7 @@ class NotFound(ServiceError):
 
 class OperationFailed(ServiceError):
     """The server could not carry the request out (HTTP 500)."""
+
+
+class Unavailable(ServiceError):
+    """A feature the request needs isn't available right now (HTTP 503)."""

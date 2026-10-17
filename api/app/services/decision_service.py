@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal, Optional, Union
 
 from app import deps
+from app.services import prompt_service
 from app.services.errors import Conflict, InvalidInput
 
 QUESTION_TOOL = "AskUserQuestion"
@@ -66,7 +67,7 @@ def answer_prompt(
     answers: Optional[Answers],
     reason: Optional[str],
 ) -> None:
-    deps.sweep_prompts()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
+    prompt_service.sweep()  # a prompt answered in the terminal a moment ago should 409, not "succeed"
     prompt = deps.decisions.get(session_id, prompt_id)
     if prompt is None:
         raise Conflict("this session already moved on")

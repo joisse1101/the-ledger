@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from app import deps, refresh
+from app import refresh
 from app.core.security import is_local
 from app.repositories import claude_db
 from app.schemas.common import iso
+from app.services import remote_service
 
 router = APIRouter()
 
@@ -17,7 +18,7 @@ def get_meta(request: Request) -> dict:
     return {
         "refreshed_at": iso(claude_db.refreshed_at()),
         "is_local": is_local(request),
-        "remote_mode": deps.remote_mode_status(),
+        "remote_mode": remote_service.remote_mode_status(),
     }
 
 

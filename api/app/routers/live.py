@@ -4,18 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from app import deps
+from app.core.security import is_local
+from app.services import prompt_service
 
 router = APIRouter()
 
 
 @router.get("/api/live")
 def get_live(request: Request) -> dict:
-    deps.sweep_prompts()
-    visible = deps.can_see_prompts(request)
-    return {
-        "sessions": [
-            {**item, "pending_decision": deps.decisions.peek(item["session_id"]) if visible else None}
-            for item in deps.live.get()
-        ]
-    }
+    return {"sessions": prompt_service.live_with_prompts(is_local(request))}

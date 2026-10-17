@@ -1,6 +1,6 @@
-"""Process-wide state the routers share: the live registry, pending prompts, Remote mode and the token.
+"""Process-wide state the services share: the live registry, pending prompts, Remote mode and the token.
 
-One module holds it so a route reads `deps.decisions` at call time and a test swaps it with
+One module holds it so a service reads `deps.decisions` at call time and a test swaps it with
 `monkeypatch.setattr(deps, "decisions", ...)`.
 """
 
@@ -9,9 +9,6 @@ from __future__ import annotations
 import pathlib
 from typing import Optional
 
-from fastapi import Request
-
-from app.core.security import is_local
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
 from app.infra import file_drop, remote_system
@@ -51,24 +48,3 @@ def make_remote(backend_port: int, frontend_port: int) -> RemoteGateway:
         on_ready=lambda: decisions.set_remote_mode(True),
         on_off=lambda: decisions.set_remote_mode(False),
     )
-
-
-def remote_mode_status() -> dict:
-    """The prompt gate (`enabled`, `expires_at`) plus the lifecycle (`state`, `step`, `reason`)."""
-    lifecycle = remote.status() if remote else {"state": "off", "step": None, "reason": None}
-    return {**decisions.remote_mode(), **lifecycle}
-
-
-def can_see_prompts(request: Request) -> bool:
-    """The machine's own browser always sees pending prompts; another device only while Remote mode is on."""
-    return is_local(request) or decisions.remote_mode_enabled()
-
-
-def sweep_prompts() -> None:
-    """Drop every pending prompt whose session already moved on (answered in the terminal, say).
-
-    Run ahead of each read/answer of the pending prompts rather than on a timer of its own: a
-    prompt only matters while something is polling, and the transcript reads it costs are cached
-    by file stat.
-    """
-    decisions.sweep(live.latest_activity)
