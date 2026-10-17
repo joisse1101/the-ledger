@@ -17,7 +17,7 @@ from app.domain.pending_decisions import PendingDecisions
 from app.infra import file_drop, remote_system
 from app.infra.remote_gateway import RemoteGateway
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[2].parent
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # The one place the live registry is read from; see LiveSnapshot.
 live = LiveSnapshot()
