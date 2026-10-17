@@ -11,9 +11,9 @@ env var) restarts the process on any saved change under `api/`; it works by hand
 import string `"app.main:app"` instead of the already-built `app` object, since only the string form
 lets uvicorn re-import the module fresh per restart — which is also why `main()`'s own token
 provisioning (see `lifespan` below) is duplicated, guarded, in `lifespan` itself: the reload
-subprocess re-imports the module without ever calling `main()`. Every module it imports lives
-alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
-the import setup it needs. Its `lifespan` calls `snapshot.startup()` in a worker thread on start and runs
+subprocess re-imports the module without ever calling `main()`. Run it as a module from `api/` (`python -m app`) so `app` is importable. A route handler only parses the request, calls a
+function in `api/app/services/` and shapes the response with `api/app/schemas/`; the services raise the domain
+errors in `api/app/services/errors.py` and `api/app/routers/errors.py` turns them into 403/404/409/422/500/503/507. Its `lifespan` calls `snapshot.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
 `refresh.lock` (`api/app/refresh.py`) shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
 is never triggered twice concurrently. It serves `/api/*` only — no HTML, no static assets; the
