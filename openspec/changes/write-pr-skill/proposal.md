@@ -18,7 +18,7 @@ human who does every merge.
   visual-proof section. "Related Issues" is left out when there are none.
 - It blocks on secrets or `.env` files in the diff and warns on debug prints and oversized groups.
 - It pushes and runs `gh pr create` only after the user types a confirmation word.
-- It never merges. A skill-scoped `PreToolUse` hook blocks `gh pr merge` while the skill runs.
+- It never merges. A skill-scoped `PreToolUse` hook blocks `gh pr merge` once the skill is invoked.
 - It ends with a list of every PR it opened, in merge order, with the `gh pr merge <n> -s -d`
   command for each, for the user to run.
 - Package the template and the PR guidelines as support files inside the skill folder.
@@ -36,8 +36,8 @@ None.
 
 ## Impact
 
-- New: `toolkit/skills/write-pr/SKILL.md`, the PR template and guidelines as support files, and a
-  small `.ps1` guard script for the hook.
+- New: `toolkit/skills/write-pr/SKILL.md` (with the inline merge-guard hook) and the PR template and
+  guidelines as support files.
 - Updated: `toolkit/README.md` (skills section), the matching `wiki/` page, `openspec/specs/toolkit-skills`.
 - `python check_docs.py` must pass: version block, size budgets, links.
 - No change to the installer; a skill folder is already a unit it installs.

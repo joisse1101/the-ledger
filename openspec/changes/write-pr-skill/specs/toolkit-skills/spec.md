@@ -82,10 +82,10 @@ report it and open nothing.
 
 ### Requirement: The skill never merges
 The skill SHALL NOT merge a PR, enable auto-merge, or pass `--auto`. A hook declared by the skill
-SHALL block `gh pr merge` and the merge API endpoint while the skill runs.
+SHALL block `gh pr merge` and the merge API endpoint from the moment the skill is invoked.
 
-#### Scenario: Merge attempted during the skill
-- **WHEN** a merge command is attempted while the skill is running
+#### Scenario: Merge attempted after the skill is invoked
+- **WHEN** a merge command is attempted in a session where the skill has been invoked
 - **THEN** the hook SHALL block it and the PR SHALL stay open
 
 ### Requirement: Merge-order summary

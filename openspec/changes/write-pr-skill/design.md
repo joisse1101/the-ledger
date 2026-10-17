@@ -21,8 +21,10 @@ confirmation-word loop (`jois/stage.md`) to copy the pattern from. Commands in t
 ## Decisions
 
 **Folder layout.** `toolkit/skills/write-pr/SKILL.md` holds the workflow and the never-merge rule
-only. `pr-template.md` and `guidelines.md` sit beside it, read on demand, and `scripts/Block-Merge.ps1`
-is the hook. This keeps the loaded text small and the folder self-contained.
+only. `pr-template.md` and `guidelines.md` sit beside it, read on demand. The merge guard is an
+inline `PreToolUse` command in the frontmatter, not a script file: a hook command cannot reliably
+locate a script inside an installed skill folder (tested on 2.1.302). This keeps the loaded text
+small and the folder self-contained.
 *Alternative:* everything in SKILL.md - rejected, the guidelines are long and only needed while writing a body.
 
 **Grouping.** The skill proposes groups from commit types, scopes and touched paths, then waits for
@@ -62,15 +64,11 @@ order: stack order first, independent PRs marked any order.
 
 ## Risks / Trade-offs
 
-- [Skill-scoped hook syntax or behavior differs on the installed version] → first task tests it by
-  attempting a merge inside the skill; fall back to a global deny rule if it does not block.
+- [The frontmatter hook outlives the skill's steps] → verified on 2.1.302 that it stays active for the
+  rest of the session once the skill is invoked; accepted, since the user merges in their own terminal.
 - [Hook pattern misses an unusual merge spelling, such as an alias or `gh api` variant] → match on
   `pr merge` and `/merge` in the command text, and keep the instruction layer as well.
 - [Stacked PRs need a rebase after each squash-merge] → the summary names the exact `git rebase --onto`
   step for each dependent PR.
 - [Grouping heuristic proposes the wrong split] → the user confirms before anything is created.
 - [Assumed-run tests] → the box reflects the user's stated assumption, and CI is the real check.
-
-## Open Questions
-
-- Exact `hooks:` frontmatter fields for a skill on the installed Claude Code version; settled in the first task.
