@@ -11,10 +11,11 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   context: { label: '394k ▲ +2.1k ▁▂▃▅' },
   status: 'busy',
   pending_decision: null,
+  auto_approve: false,
   ...over,
 })
 
-function setup(openResult: OpenRepoResult = 'opened') {
+function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true) {
   document.body.className = ''
   document.body.innerHTML = `
     <span id="summary"></span><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
@@ -32,6 +33,7 @@ function setup(openResult: OpenRepoResult = 'opened') {
     onOpacity: (cb) => (setOpacity = cb),
     onRemote: (cb) => (pushRemote = cb),
     setRemote: vi.fn(),
+    setAutoApprove: vi.fn(async () => autoApproveResult),
     ledgerHover: vi.fn(),
     setOpacity: vi.fn(),
     setContentHeight: vi.fn(),
@@ -50,7 +52,7 @@ describe('window height', () => {
   it('reports a height whenever the list changes', () => {
     const { bridge, push } = setup()
     vi.mocked(bridge.setContentHeight).mockClear()
-    push({ state: 'online', sessions: rowsOf(2) })
+    push({ state: 'online', relayHookSeen: false, sessions: rowsOf(2) })
     expect(bridge.setContentHeight).toHaveBeenCalledTimes(1)
   })
 
@@ -64,9 +66,9 @@ describe('window height', () => {
     vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) {
       return this.children.length * 30
     })
-    push({ state: 'online', sessions: rowsOf(10) })
+    push({ state: 'online', relayHookSeen: false, sessions: rowsOf(10) })
     const atTen = vi.mocked(bridge.setContentHeight).mock.lastCall![0]
-    push({ state: 'online', sessions: rowsOf(14) })
+    push({ state: 'online', relayHookSeen: false, sessions: rowsOf(14) })
     expect(vi.mocked(bridge.setContentHeight).mock.lastCall![0]).toBe(atTen)
     vi.restoreAllMocks()
   })
@@ -75,7 +77,7 @@ describe('window height', () => {
 describe('rows', () => {
   it('shows project, branch and the server label verbatim', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
     expect(text('.name')).toBe('the-ledgermain')
     expect(text('.branch')).toBe('main')
     expect(text('.ctx')).toBe('394k ▲ +2.1k ▁▂▃▅')
@@ -89,14 +91,14 @@ describe('rows', () => {
 
   it('shows -- when the context is unavailable and leaves other rows alone', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session({ context: null }), session({ session_id: 's2', context: { label: '42k' } })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ context: null }), session({ session_id: 's2', context: { label: '42k' } })] })
     const labels = [...document.querySelectorAll('.ctx')].map((n) => n.textContent)
     expect(labels).toEqual(['--', '42k'])
   })
 
   it('shows no percentage or limit text for any row', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session(), session({ session_id: 's2', context: null, pending_decision: { id: 'p' } })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session(), session({ session_id: 's2', context: null, pending_decision: { id: 'p' } })] })
     expect(document.body.textContent).not.toMatch(/%|limit|window|of \d/i)
   })
 })
@@ -105,17 +107,17 @@ describe('pending row', () => {
   it('tints the row but never shows the prompt content or controls', () => {
     const { push } = setup()
     const decision = { id: 'p1', tool_name: 'Bash', tool_input: { command: 'rm -rf secret' } }
-    push({ state: 'online', sessions: [session({ pending_decision: decision })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ pending_decision: decision })] })
     expect(document.querySelector('.row.pending')).not.toBeNull()
     expect(document.querySelector('.badge')).toBeNull()
     expect(document.body.textContent).not.toMatch(/Bash|rm -rf|secret|pending decision/)
-    expect(document.querySelectorAll('button.row button, .row input, .row textarea')).toHaveLength(0)
+    expect(document.querySelectorAll('.row input, .row textarea, .row button:not(.row-open, .auto-approve)')).toHaveLength(0)
     expect(text('#summary')).toBe('1 live · 1 pending')
   })
 
   it('leaves the row untinted when nothing is pending', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
     expect(document.querySelector('.row.pending')).toBeNull()
   })
 })
@@ -123,19 +125,19 @@ describe('pending row', () => {
 describe('finished row', () => {
   it.each(['idle', 'stopped'])('marks a %s session as done', (status) => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session({ status })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status })] })
     expect(document.querySelector('.row.done')).not.toBeNull()
   })
 
   it('leaves a running session unmarked', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
     expect(document.querySelector('.row.done')).toBeNull()
   })
 
   it('shows a pending prompt over the finished tint', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session({ status: 'idle', pending_decision: { id: 'p' } })] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status: 'idle', pending_decision: { id: 'p' } })] })
     expect(document.querySelector('.row.pending')).not.toBeNull()
     expect(document.querySelector('.row.done')).toBeNull()
   })
@@ -144,14 +146,14 @@ describe('finished row', () => {
 describe('empty and offline states', () => {
   it('says there are no live sessions', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [] })
+    push({ state: 'online', relayHookSeen: false, sessions: [] })
     expect(text('.empty')).toBe('No live sessions')
     expect(document.querySelector('.row')).toBeNull()
   })
 
   it('shows offline with no rows, even right after rows were shown', () => {
     const { push } = setup()
-    push({ state: 'online', sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
     push({ state: 'offline' })
     expect(document.querySelector('.row')).toBeNull()
     expect(text('.offline')).toMatch(/offline/i)
@@ -161,7 +163,7 @@ describe('empty and offline states', () => {
   it('recovers when the backend returns', () => {
     const { push } = setup()
     push({ state: 'offline' })
-    push({ state: 'online', sessions: [session()] })
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
     expect(document.querySelectorAll('.row')).toHaveLength(1)
     expect(document.querySelector('.offline')).toBeNull()
   })
@@ -170,22 +172,22 @@ describe('empty and offline states', () => {
 describe('summaryText', () => {
   it('covers each state', () => {
     expect(summaryText(null)).toBe('Connecting...')
-    expect(summaryText({ state: 'online', sessions: [session(), session()] })).toBe('2 live')
+    expect(summaryText({ state: 'online', relayHookSeen: false, sessions: [session(), session()] })).toBe('2 live')
   })
 })
 
 describe('clicks', () => {
   it('opens the clicked session', async () => {
     const { push, bridge } = setup()
-    push({ state: 'online', sessions: [session({ session_id: 'abc' })] })
-    ;(document.querySelector('.row') as HTMLElement).click()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ session_id: 'abc' })] })
+    ;(document.querySelector('.row-open') as HTMLElement).click()
     expect(bridge.openSession).toHaveBeenCalledWith('abc')
   })
 
   it('shows a transient note when the session ended', async () => {
     const { push } = setup('ended')
-    push({ state: 'online', sessions: [session()] })
-    ;(document.querySelector('.row') as HTMLElement).click()
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
+    ;(document.querySelector('.row-open') as HTMLElement).click()
     await vi.advanceTimersByTimeAsync(0)
     expect(text('#note')).toBe('Session ended')
     await vi.advanceTimersByTimeAsync(3500)
@@ -194,11 +196,75 @@ describe('clicks', () => {
 
   it('shows a generic note on failure and keeps working', async () => {
     const { push } = setup('failed')
-    push({ state: 'online', sessions: [session()] })
-    ;(document.querySelector('.row') as HTMLElement).click()
+    push({ state: 'online', relayHookSeen: false, sessions: [session()] })
+    ;(document.querySelector('.row-open') as HTMLElement).click()
     await vi.advanceTimersByTimeAsync(0)
     expect(text('#note')).toMatch(/Couldn't open/)
     expect(document.querySelectorAll('.row')).toHaveLength(1)
+  })
+})
+
+describe('auto-approve button', () => {
+  const hookSeen = (sessions: LiveSession[]): LiveState => ({ state: 'online', relayHookSeen: true, sessions })
+  const autoButton = () => document.querySelector('.auto-approve') as HTMLButtonElement
+
+  it('is not offered before the relay hook has been seen', () => {
+    const { push } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ auto_approve: true })] })
+    expect(autoButton()).toBeNull()
+  })
+
+  it('sits beside the open button inside the row, never nested in it', () => {
+    const { push } = setup()
+    push(hookSeen([session()]))
+    const row = document.querySelector('.row') as HTMLElement
+    expect(autoButton().parentElement).toBe(row)
+    expect(row.lastElementChild).toBe(autoButton())
+    expect(document.querySelector('.row-open .auto-approve')).toBeNull()
+  })
+
+  it('shows whether auto-approve is on', () => {
+    const { push } = setup()
+    push(hookSeen([session({ auto_approve: true })]))
+    expect(autoButton().getAttribute('aria-pressed')).toBe('true')
+    expect(autoButton().title).toMatch(/is on/)
+    push(hookSeen([session({ auto_approve: false })]))
+    expect(autoButton().getAttribute('aria-pressed')).toBe('false')
+    expect(autoButton().title).toMatch(/Turn on/)
+  })
+
+  it('asks for the opposite state and does not open the repo window', () => {
+    const { push, bridge } = setup()
+    push(hookSeen([session({ session_id: 'abc', auto_approve: false })]))
+    autoButton().click()
+    expect(bridge.setAutoApprove).toHaveBeenCalledWith('abc', true)
+    expect(bridge.openSession).not.toHaveBeenCalled()
+
+    push(hookSeen([session({ session_id: 'abc', auto_approve: true })]))
+    autoButton().click()
+    expect(bridge.setAutoApprove).toHaveBeenLastCalledWith('abc', false)
+  })
+
+  it('follows the next poll rather than flipping by itself', async () => {
+    const { push } = setup()
+    push(hookSeen([session({ auto_approve: false })]))
+    autoButton().click()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(autoButton().getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('shows a note when the backend refused', async () => {
+    const { push } = setup('opened', false)
+    push(hookSeen([session()]))
+    autoButton().click()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(text('#note')).toMatch(/Couldn't change auto-approve/)
+  })
+
+  it('leaves a pending row with no other controls', () => {
+    const { push } = setup()
+    push(hookSeen([session({ pending_decision: { id: 'p1' } })]))
+    expect(document.querySelectorAll('.row button')).toHaveLength(2)
   })
 })
 

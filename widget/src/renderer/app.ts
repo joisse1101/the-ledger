@@ -43,9 +43,13 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
     else if (result === 'failed') showNote("Couldn't open the repo window")
   }
 
+  const onAutoApprove = async (sessionId: string, enabled: boolean) => {
+    if (!(await bridge.setAutoApprove(sessionId, enabled))) showNote("Couldn't change auto-approve")
+  }
+
   const render = () => {
     summary.textContent = summaryText(state)
-    renderBody(body, state, onOpen)
+    renderBody(body, state, { onOpen, onAutoApprove })
     reportHeight()
   }
 

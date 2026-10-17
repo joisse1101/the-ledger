@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApi } from '../src/main/api'
 import { json, startStub, type Stub } from './stubServer'
@@ -8,15 +9,41 @@ afterEach(async () => {
   stub = undefined
 })
 
-const session = { session_id: 's1', project: 'p', git_branch: 'main', context: { label: '394k' }, pending_decision: null }
+const session = {
+  session_id: 's1',
+  project: 'p',
+  git_branch: 'main',
+  context: { label: '394k' },
+  pending_decision: null,
+  auto_approve: false,
+}
+
+/** Answers /api/live with one session and /api/meta with `metaBody` (or a status). */
+const liveAndMeta = (meta: { status: number; body: unknown }) => (req: IncomingMessage, res: ServerResponse) =>
+  req.url === '/api/live' ? json(res, 200, { sessions: [session] }) : json(res, meta.status, meta.body)
 
 describe('fetchLive', () => {
   it('returns the sessions when the backend answers', async () => {
-    stub = await startStub((_req, res) => json(res, 200, { sessions: [session] }))
+    stub = await startStub(liveAndMeta({ status: 200, body: { relay_hook_seen: true } }))
     const result = await createApi(stub.port).fetchLive()
-    expect(result).toEqual({ state: 'online', sessions: [session] })
+    expect(result).toEqual({ state: 'online', sessions: [session], relayHookSeen: true })
     expect(stub.requests[0].url).toBe('/api/live')
     expect(stub.requests[0].headers.host).toBe(`127.0.0.1:${stub.port}`)
+  })
+
+  it('reads whether the relay hook was seen from /api/meta', async () => {
+    stub = await startStub(liveAndMeta({ status: 200, body: { relay_hook_seen: false } }))
+    expect(await createApi(stub.port).fetchLive()).toMatchObject({ state: 'online', relayHookSeen: false })
+    expect(stub.requests.map((r) => r.url)).toEqual(['/api/live', '/api/meta'])
+  })
+
+  it.each([
+    ['a missing field', 200, {}],
+    ['a non-boolean field', 200, { relay_hook_seen: 'yes' }],
+    ['an error status', 500, { relay_hook_seen: true }],
+  ])('treats %s in /api/meta as the hook not seen', async (_name, status, body) => {
+    stub = await startStub(liveAndMeta({ status, body }))
+    expect(await createApi(stub.port).fetchLive()).toMatchObject({ state: 'online', relayHookSeen: false })
   })
 
   it('is offline on a non-200 and carries no rows', async () => {
@@ -70,6 +97,29 @@ describe('openRepo', () => {
     await stub.close()
     stub = undefined
     expect(await createApi(port).openRepo('s1')).toBe('failed')
+  })
+})
+
+describe('setAutoApprove', () => {
+  it('POSTs the new state with the CSRF header and reports success', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { auto_approve: true }))
+    expect(await createApi(stub.port).setAutoApprove('s 1', true)).toBe(true)
+    expect(stub.requests[0].method).toBe('POST')
+    expect(stub.requests[0].url).toBe('/api/sessions/s%201/auto-approve')
+    expect(stub.requests[0].headers['x-requested-with']).toBe('ledger')
+  })
+
+  it('reports failure on an error status', async () => {
+    stub = await startStub((_req, res) => json(res, 404, { detail: 'this session is not live' }))
+    expect(await createApi(stub.port).setAutoApprove('s1', true)).toBe(false)
+  })
+
+  it('reports failure when the backend cannot be reached', async () => {
+    stub = await startStub((_req, res) => json(res, 200, {}))
+    const port = stub.port
+    await stub.close()
+    stub = undefined
+    expect(await createApi(port).setAutoApprove('s1', false)).toBe(false)
   })
 })
 

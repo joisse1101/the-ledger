@@ -51,10 +51,26 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-function renderRow(doc: Document, session: LiveSession, onOpen: (sessionId: string) => void): HTMLElement {
-  const row = el(doc, 'button', 'row')
-  row.type = 'button'
+/** The auto-approve button's hover text: what it is now and what a click does. */
+export function autoApproveTitle(on: boolean): string {
+  return on
+    ? 'Auto-approve is on: permission prompts are approved for you. Click to turn it off'
+    : "Turn on auto-approve: approve this session's permission prompts for me"
+}
+
+export interface RowActions {
+  onOpen: (sessionId: string) => void
+  onAutoApprove: (sessionId: string, enabled: boolean) => void
+}
+
+/** A row is a wrapper holding two sibling buttons (a button cannot nest in a button): the one that
+ *  opens the repo window, which fills the row, and, once the relay hook has been seen, the
+ *  auto-approve button at its right end. */
+function renderRow(doc: Document, session: LiveSession, showAutoApprove: boolean, actions: RowActions): HTMLElement {
+  const row = el(doc, 'div', 'row')
   row.dataset.sessionId = session.session_id
+  const open = el(doc, 'button', 'row-open')
+  open.type = 'button'
 
   const name = el(doc, 'span', 'name', session.project)
   if (session.git_branch) name.append(el(doc, 'span', 'branch', session.git_branch))
@@ -62,19 +78,24 @@ function renderRow(doc: Document, session: LiveSession, onOpen: (sessionId: stri
   // The server's own label (size, growth marker, sparkline); only the sparkline is shortened. `--` when unknown.
   const context = el(doc, 'span', 'ctx', trimSparkline(session.context?.label || '--'))
 
-  row.append(name, context)
+  open.append(name, context)
+  open.addEventListener('click', () => actions.onOpen(session.session_id))
+  row.append(open)
+  if (showAutoApprove) {
+    const auto = el(doc, 'button', 'auto-approve', 'Auto')
+    auto.type = 'button'
+    auto.setAttribute('aria-pressed', String(session.auto_approve))
+    auto.title = autoApproveTitle(session.auto_approve)
+    auto.addEventListener('click', () => actions.onAutoApprove(session.session_id, !session.auto_approve))
+    row.append(auto)
+  }
   if (session.pending_decision) row.classList.add('pending')
   else if (FINISHED_STATUSES.has(session.status)) row.classList.add('done')
-  row.addEventListener('click', () => onOpen(session.session_id))
   return row
 }
 
 /** Replaces the list area's content for the given state. Offline never shows rows. */
-export function renderBody(
-  body: HTMLElement,
-  state: LiveState | null,
-  onOpen: (sessionId: string) => void,
-): void {
+export function renderBody(body: HTMLElement, state: LiveState | null, actions: RowActions): void {
   const doc = body.ownerDocument
   body.replaceChildren()
   if (!state) return
@@ -86,5 +107,5 @@ export function renderBody(
     body.append(el(doc, 'p', 'empty', 'No live sessions'))
     return
   }
-  for (const session of state.sessions) body.append(renderRow(doc, session, onOpen))
+  for (const session of state.sessions) body.append(renderRow(doc, session, state.relayHookSeen, actions))
 }

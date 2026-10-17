@@ -17,6 +17,8 @@ const bridge: WidgetBridge = {
     ipcRenderer.on('widget:remote-state', (_event, status: RemoteStatus) => callback(status))
   },
   setRemote: (enabled) => ipcRenderer.send('widget:set-remote', enabled),
+  setAutoApprove: (sessionId, enabled): Promise<boolean> =>
+    ipcRenderer.invoke('widget:set-auto-approve', sessionId, enabled),
   ledgerHover: (hovering) => ipcRenderer.send('widget:ledger-hover', hovering),
   setOpacity: (opacity) => ipcRenderer.send('widget:set-opacity', opacity),
   setContentHeight: (height) => ipcRenderer.send('widget:set-content-height', height),
