@@ -214,6 +214,29 @@ export function useAnswerDecision(sessionId: string) {
   });
 }
 
+/** Turns one session's auto-approve on or off. Only the machine running the app may; anything else
+ *  gets a 403. The row in the cached Live list is updated at once so the switch doesn't flicker. */
+export function useSetAutoApprove(sessionId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiFetch<{ auto_approve: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}/auto-approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: ({ auto_approve }) => {
+      client.setQueryData<LiveResponse>(keys.live, (live) =>
+        live
+          ? { ...live, sessions: live.sessions.map((s) => (s.session_id === sessionId ? { ...s, auto_approve } : s)) }
+          : live,
+      );
+    },
+    // Approving what was already pending changes the rest of the row too.
+    onSettled: () => void client.invalidateQueries({ queryKey: keys.live }),
+  });
+}
+
 /** Turns Remote mode on or off. Only the machine running the app may; anything else gets a 403. */
 export function useSetRemoteMode() {
   const client = useQueryClient();

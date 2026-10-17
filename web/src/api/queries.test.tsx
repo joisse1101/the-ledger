@@ -14,6 +14,7 @@ import {
   useOverview,
   usePendingDecision,
   useRemoteQr,
+  useSetAutoApprove,
   useSetRemoteMode,
 } from "./queries";
 import type { DecisionAnswer, LiveResponse } from "./types";
@@ -207,6 +208,49 @@ describe("the session control hooks", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
     expect(init.headers.get("X-Requested-With")).toBe("ledger");
+    client.clear();
+  });
+
+  it("switches a session's auto-approve and refreshes the Live list", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ auto_approve: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+    client.setQueryData(keys.live, {
+      sessions: [
+        { session_id: "abc", auto_approve: false },
+        { session_id: "other", auto_approve: false },
+      ],
+    });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    const { result } = renderHook(() => useSetAutoApprove("abc"), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync(true));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/sessions/abc/auto-approve");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ enabled: true });
+    expect(init.headers.get("X-Requested-With")).toBe("ledger");
+    const live = client.getQueryData<{ sessions: { auto_approve: boolean }[] }>(keys.live);
+    expect(live?.sessions.map((s) => s.auto_approve)).toEqual([true, false]);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.live });
+    client.clear();
+  });
+
+  it("surfaces a 403 when another device tries to switch auto-approve", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "switching auto-approve requires a local request" }), {
+          status: 403,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useSetAutoApprove("abc"), { wrapper: wrapper(client) });
+    await expect(act(() => result.current.mutateAsync(true))).rejects.toMatchObject({ status: 403 });
     client.clear();
   });
 });
