@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLive, useMeta } from "../../api/queries";
 import { NARROW_QUERY } from "../../lib/breakpoints";
 import { CloseIcon } from "../icons";
+import { AutoApproveControl } from "./AutoApproveControl";
 import { LiveControl } from "./LiveControl";
 
 const isNarrow = () => window.matchMedia(NARROW_QUERY).matches;
@@ -42,7 +43,10 @@ export function LiveSessionPanel({ sessionId, focusKey, onClose }: LiveSessionPa
   return (
     <section ref={panelRef} className="live-panel" aria-label="Session control">
       <header className="live-panel-header">
-        <h2 className="live-panel-title">{heading}</h2>
+        <div className="live-panel-heading">
+          <h2 className="live-panel-title">{heading}</h2>
+          <AutoApproveControl session={session} />
+        </div>
         <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
           <CloseIcon />
         </button>

@@ -21,6 +21,8 @@
   --brand-border-strong: #c98da0;
   --warn-bg: #fff4d6;
   --warn-text: #5c3d00;
+  --done-bg: #ddf3e4;
+  --done-text: #0f4a25;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +38,8 @@
     --brand-border-strong: #b8738a;
     --warn-bg: #3d2f00;
     --warn-text: #ffe29a;
+    --done-bg: #12361f;
+    --done-text: #b3ecc4;
   }
 }
 
@@ -97,18 +101,36 @@ button:hover { background: var(--bg-surface-hover); }
 
 .list { flex: 1; overflow-y: auto; }
 
+/* A row is a wrapper: the open-repo button fills it and the auto-approve button sits at its right end. */
 .row {
   display: flex;
   align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-right: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.row:hover { background: var(--bg-surface-hover); }
+
+.row-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  width: 100%;
-  padding: 6px 10px;
+  padding: 6px 0 6px 10px;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
   border-radius: 0;
+  background: transparent;
   text-align: left;
 }
+.row-open:hover { background: transparent; }
+
+/* Auto-approve: outlined while off, filled while on. */
+.auto-approve { flex-shrink: 0; padding: 0 6px; font-size: 10px; line-height: 1.6; color: var(--text-muted); }
+.auto-approve[aria-pressed="true"] { background: var(--brand-accent); border-color: var(--brand-accent); color: var(--text-on-accent); }
+.auto-approve[aria-pressed="true"]:hover { background: var(--brand-accent); opacity: 0.85; }
 
 .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .branch { margin-left: 6px; font-weight: 400; color: var(--text-muted); }
@@ -123,6 +145,10 @@ button:hover { background: var(--bg-surface-hover); }
 /* A session waiting on a decision tints its whole row instead of showing a badge. */
 .row.pending, .row.pending:hover { background: var(--warn-bg); color: var(--warn-text); }
 .row.pending .branch { color: inherit; opacity: 0.75; }
+
+/* A session that has finished running tints its row green. */
+.row.done, .row.done:hover { background: var(--done-bg); color: var(--done-text); }
+.row.done .branch { color: inherit; opacity: 0.75; }
 
 .empty { margin: 0; padding: 14px 10px; color: var(--text-muted); }
 

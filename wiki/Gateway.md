@@ -14,8 +14,8 @@ page or the desktop widget and the backend starts Docker Desktop if needed, the 
 up, and the gateway, then shows the sign-in QR (a modal in the Ledger, a tooltip on the widget's Ledger
 button; both show `https://<address>:<port>` and never the token). Turning it off, or the 8 hours
 running out, runs `docker compose down` and stops the frontend only if Remote mode started it; Docker
-Desktop is left running. The lifecycle is `api/remote_gateway.py` (state machine) over
-`api/remote_system.py` (the real Docker/npm/port calls); see
+Desktop is left running. The lifecycle is `api/app/infra/remote_gateway.py` (state machine) over
+`api/app/infra/remote_system.py` (the real Docker/npm/port calls); see
 [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md). To run just the container by hand:
 
 ```powershell
@@ -33,7 +33,7 @@ misconfiguration; accept it once. An old `http://` sign-in link no longer works:
 device signs it in (the token is stored in that browser's `localStorage` and stripped from the
 address bar) and every subsequent request from it carries `Authorization: Bearer <token>`. A local
 request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other request
-needs it, checked by `api/security.py`'s `SecurityMiddleware` (see [Security](Backend-Security.md)) exactly as
+needs it, checked by `api/app/core/security.py`'s `SecurityMiddleware` (see [Security](Backend-Security.md)) exactly as
 before — the gateway adds no auth of its own, it only relays. A token is not enough for everything,
 though: deleting a session/project and switching Remote mode need a *local* request outright, and
 answering a live session's prompts from another device needs Remote mode on (see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)). Only do this on a network you trust — the certificate is self-signed, so the encryption
@@ -58,6 +58,11 @@ frontend link for — `--frontend-port` is cosmetic only now (CORS is gone entir
 frontend never calls the backend cross-origin any more). Passing `--lan` is a removed no-op: it
 exits with an error pointing at the gateway instead.
 
+`location /api/files` (more specific than `/api/`) turns off the 1 MB body limit and request/response
+buffering and allows hour-long transfers, so a large file streams straight to the backend instead of
+failing with a 413 or spooling to the container's disk. See [API routes](Backend-API-Routes.md) for the
+file-drop routes.
+
 The only thing that ever grants LAN access (see [Setup and run](Setup-And-Run.md)); the backend and
 frontend stay loopback-only always. It **terminates TLS and serves HTTPS only**: the `Dockerfile`
 installs `openssl` at image build time to generate a self-signed EC certificate/key
@@ -79,7 +84,7 @@ touches names that are actually set environment variables) into
 `http://host.docker.internal:${FRONTEND_PORT}` — `host.docker.internal` is Docker Desktop's
 mechanism for a container to reach a host process bound to loopback only (Windows/Mac only; this is
 why the gateway needs Docker Desktop specifically). Both locations forward
-`X-Real-IP`/`X-Forwarded-For`/`Host`, so `api/security.py`'s existing "relayed by a proxy = treat as
+`X-Real-IP`/`X-Forwarded-For`/`Host`, so `api/app/core/security.py`'s existing "relayed by a proxy = treat as
 remote" rule gates gateway traffic exactly like it always gated the old `--lan` mode — the gateway
 adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-8080}`
 and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment variables (defaults

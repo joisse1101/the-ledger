@@ -7,13 +7,13 @@ afterEach(() => vi.useRealTimers())
 
 describe('startPoller', () => {
   it('polls immediately, then on the interval, pushing every result', async () => {
-    const results: LiveState[] = [{ state: 'online', sessions: [] }, { state: 'offline' }]
+    const results: LiveState[] = [{ state: 'online', relayHookSeen: false, sessions: [] }, { state: 'offline' }]
     const fetchLive = vi.fn(async () => results.shift() ?? { state: 'offline' as const })
     const seen: LiveState[] = []
     const poller = startPoller(fetchLive, (s) => seen.push(s), 1000)
 
     await vi.advanceTimersByTimeAsync(0)
-    expect(seen).toEqual([{ state: 'online', sessions: [] }])
+    expect(seen).toEqual([{ state: 'online', relayHookSeen: false, sessions: [] }])
     await vi.advanceTimersByTimeAsync(1000)
     expect(seen.at(-1)).toEqual({ state: 'offline' })
     poller.stop()

@@ -6,6 +6,20 @@ server {
     ssl_certificate_key /etc/nginx/certs/gateway.key;
     ssl_protocols TLSv1.2 TLSv1.3;
 
+    # File drop: stream big uploads straight to the backend instead of capping them at Nginx's 1 MB
+    # default or spooling them to this container's disk first.
+    location /api/files {
+        client_max_body_size 0;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_pass http://host.docker.internal:${BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
     location /api/ {
         proxy_pass http://host.docker.internal:${BACKEND_PORT};
         proxy_set_header Host $host;

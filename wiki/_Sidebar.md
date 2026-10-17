@@ -20,6 +20,7 @@
 - [Sessions](Frontend-Sessions.md)
 - [Overview](Frontend-Overview.md)
 - [Projects](Frontend-Projects.md)
+- [Files](Frontend-Files.md)
 - [Shared components](Frontend-Shared-Components.md)
 
 **Services**

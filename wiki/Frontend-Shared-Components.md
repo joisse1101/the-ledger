@@ -30,7 +30,7 @@
 - **`web/src/lib/format.ts`** — display formatting for API values (`formatTime`, `formatDateTime`,
   `formatCost`, `formatContext`, `formatText`, `formatCount`; every one renders `"--"` for a missing
   value). **`web/src/lib/tokens.ts`** — `humanizeTokens`/`formatGrowth`, a deliberate port of
-  `claude_context.py`'s `humanise_tokens`/`format_growth` so the two languages agree on what a
+  `api/app/domain/context/formatting.py`'s `humanise_tokens`/`format_growth` so the two languages agree on what a
   context figure reads as (the API already sends a ready-made `label` string for the Live list from
   the Python formatter directly; these are for the raw numbers the API sends elsewhere — the All
   list's Context column, the detail view's "Current context" figure).

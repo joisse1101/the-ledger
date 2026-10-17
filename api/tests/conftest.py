@@ -3,13 +3,13 @@ from pathlib import Path
 
 import pytest
 
-import claude_db
-import server
+from app import deps
+from app.repositories.db import paths
 
 
 @pytest.fixture
 def isolated_db(tmp_path, monkeypatch):
-    """Point claude_db at a throwaway db/config/projects-dir under tmp_path
+    """Point the db paths at a throwaway db/config/projects-dir under tmp_path
     so tests never touch the real ~/.claude.json or ~/.claude/projects/."""
     db_file = tmp_path / "ledger.db"
     history_db_file = tmp_path / "history.db"
@@ -17,10 +17,10 @@ def isolated_db(tmp_path, monkeypatch):
     projects_dir = tmp_path / "projects"
     projects_dir.mkdir()
 
-    monkeypatch.setattr(claude_db, "db_path", lambda: db_file)
-    monkeypatch.setattr(claude_db, "history_db_path", lambda: history_db_file)
-    monkeypatch.setattr(claude_db, "config_path", lambda: config_file)
-    monkeypatch.setattr(claude_db, "projects_dir", lambda: projects_dir)
+    monkeypatch.setattr(paths, "db_path", lambda: db_file)
+    monkeypatch.setattr(paths, "history_db_path", lambda: history_db_file)
+    monkeypatch.setattr(paths, "config_path", lambda: config_file)
+    monkeypatch.setattr(paths, "projects_dir", lambda: projects_dir)
 
     return tmp_path
 
@@ -45,7 +45,7 @@ def write_transcript():
 
 
 class _InertRemote:
-    """Stands in for server.remote so no test starts, stops or probes real Docker."""
+    """Stands in for deps.remote so no test starts, stops or probes real Docker."""
 
     def status(self):
         return {"state": "off", "step": None, "reason": None}
@@ -66,9 +66,9 @@ class _InertRemote:
 @pytest.fixture(autouse=True)
 def no_real_remote_mode(monkeypatch):
     """Remote mode drives real Docker, so every test gets an inert one unless it installs its own.
-    server.main(--reload) also exports the ports for the reload subprocess: set-then-unset makes
+    cli.main(--reload) also exports the ports for the reload subprocess: set-then-unset makes
     monkeypatch restore the environment afterwards."""
-    monkeypatch.setattr(server, "remote", _InertRemote())
+    monkeypatch.setattr(deps, "remote", _InertRemote())
     for name in ("LEDGER_PORT", "LEDGER_FRONTEND_PORT"):
         monkeypatch.setenv(name, "0")
         monkeypatch.delenv(name)

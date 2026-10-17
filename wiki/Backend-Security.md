@@ -2,7 +2,7 @@
 
 > Requirements live in `openspec/specs/network-access/spec.md`. This page describes how the code meets them, not what it must do.
 
-- `api/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
+- `api/app/core/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
   A request is **local** only when `request.client.host` is loopback (`127.0.0.1`/`::1`/
   `::ffff:127.0.0.1`) *and* carries none of `Forwarded`/`X-Forwarded-For`/`X-Real-IP` (so a tunnel or
   reverse proxy on the same machine is treated as remote, not silently trusted); local requests must
@@ -23,5 +23,9 @@
   `POST /api/sessions/{id}/decisions` call it and refuse a non-local request with 403 regardless of
   any token (so a remote device can read, and — with Remote mode on — answer prompts, but never
   delete or flip Remote mode), and `GET /api/meta` reports it back as `is_local` so the frontend can
-  hide those controls up front. The route-level check is the actual security boundary; hiding the
+  hide those controls up front. The one request a non-local device may make without the token is a **file-drop download link**:
+`GET /api/files/download/<ticket>`. `security.py` only matches that path shape (`_DOWNLOAD_LINK`, GET
+only); the route redeems the ticket (single-use, 60 seconds, one file) and still refuses while Remote
+mode is off, so the ticket, not the middleware, is the credential. A browser download can't carry the
+bearer header, which is why this exists; see [API routes](Backend-API-Routes.md). The route-level check is the actual security boundary; hiding the
   buttons is only UX.

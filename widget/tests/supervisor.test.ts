@@ -41,7 +41,7 @@ describe('backend ownership', () => {
     expect(await sup.ensureBackend()).toBe('started')
     expect(log.spawned[0]).toMatchObject({
       command: 'py.exe',
-      args: ['server.py', '--port', '8501', '--frontend-port', '4173'],
+      args: ['-m', 'app', '--port', '8501', '--frontend-port', '4173'],
       cwd: 'C:/r/api',
     })
     sup.stopOwned()

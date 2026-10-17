@@ -61,6 +61,12 @@ if (!app.requestSingleInstanceLock()) {
         void remotePoller.refresh()
       })
     })
+    ipcMain.handle(CHANNELS.setAutoApprove, async (_event, sessionId: unknown, enabled: unknown) => {
+      if (typeof sessionId !== 'string' || typeof enabled !== 'boolean') return false
+      const ok = await api.setAutoApprove(sessionId, enabled)
+      void poller.refresh()
+      return ok
+    })
     ipcMain.on(CHANNELS.ledgerHover, (_event, hovering: unknown) => {
       if (typeof hovering === 'boolean') tooltip.setHover(hovering)
     })

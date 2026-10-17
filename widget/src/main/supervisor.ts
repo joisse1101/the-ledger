@@ -59,7 +59,7 @@ export class Supervisor {
       'backend',
       deps.spawn({
         command: deps.paths.python,
-        args: ['server.py', '--port', String(deps.backendPort), '--frontend-port', String(deps.frontendPort)],
+        args: ['-m', 'app', '--port', String(deps.backendPort), '--frontend-port', String(deps.frontendPort)],
         cwd: deps.paths.apiDir,
       }),
     )

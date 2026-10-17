@@ -1,5 +1,6 @@
 """The data endpoints (/api/live, /api/transcripts, ...) over throwaway ~/.claude fixtures."""
 
+import subprocess
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -8,19 +9,24 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import claude_db
-import server
-from claude_context import LiveContext
-from claude_sessions import ClaudeSession
-from live_snapshot import LiveSnapshot
-from pending_decisions import PendingDecisions
-from remote_gateway import RemoteGateway
+from app.infra import banner
+from app.repositories import claude_transcripts
+from app.repositories.db import history, paths, queries, scanner, snapshot
+from app import main as app_main
+from app import deps
+from app.services import session_service
+from app.domain.context import breakdown as context_breakdown, detail as context_detail, tail as context_tail
+from app.domain.context.models import LiveContext
+from app.repositories.claude_sessions import ClaudeSession
+from app.domain.live_snapshot import LiveSnapshot
+from app.domain.pending_decisions import PendingDecisions
+from app.infra.remote_gateway import RemoteGateway
 
 
 def _client():
     """A client the security middleware treats as the browser on this machine."""
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://localhost",
         client=("127.0.0.1", 50000),
         headers={"X-Requested-With": "ledger"},
@@ -32,10 +38,10 @@ BEARER = {"Authorization": f"Bearer {TOKEN}"}
 
 
 def _remote_client(*, token=True, csrf=True):
-    """A phone on the LAN, by default carrying the access token (set `server.access_token` to
+    """A phone on the LAN, by default carrying the access token (set `deps.access_token` to
     TOKEN first) and the custom header every non-GET request needs."""
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://192.168.1.20:8501",
         client=("192.168.1.50", 5000),
         headers={**(BEARER if token else {}), **({"X-Requested-With": "ledger"} if csrf else {})},
@@ -52,13 +58,13 @@ def _live_session(session_id="live-1", cwd="/h/alpha", pid=7):
 
 def _use_live(monkeypatch, sessions=(), context=lambda session_id, cwd: None):
     monkeypatch.setattr(
-        server, "live", LiveSnapshot(load_sessions=lambda: list(sessions), live_context=context)
+        deps, "live", LiveSnapshot(load_sessions=lambda: list(sessions), live_context=context)
     )
 
 
 def _add_session(root, write_transcript, session_id, cwd, *, branch="main", version="1.0", text="hello",
                  ts="2024-01-01T10:00:00Z"):
-    folder = claude_db.sanitize_project_path(cwd)
+    folder = paths.sanitize_project_path(cwd)
     write_transcript(
         root / "projects" / folder / f"{session_id}.jsonl",
         [
@@ -77,7 +83,7 @@ def seeded(isolated_db, write_config, write_transcript):
                  ts="2024-01-02T10:00:00Z")
     _add_session(isolated_db, write_transcript, "ccc-3", "/h/beta", branch="main", version="2.0", text="third",
                  ts="2024-01-03T10:00:00Z")
-    claude_db.refresh()
+    snapshot.refresh()
     return isolated_db
 
 
@@ -114,7 +120,7 @@ def test_live_with_nothing_running_is_an_empty_list(isolated_db, monkeypatch):
 
 def test_live_reflects_a_pending_decision(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     _use_live(monkeypatch, [_live_session("live-1")])
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
 
@@ -127,7 +133,7 @@ def test_live_reflects_a_pending_decision(isolated_db, monkeypatch):
 
 def test_live_shows_the_oldest_prompt_first(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     _use_live(monkeypatch, [_live_session("live-1")])
     first = store.register("live-1", "Bash", {"command": "first"})
     store.register("live-1", "Bash", {"command": "second"})
@@ -137,8 +143,8 @@ def test_live_shows_the_oldest_prompt_first(isolated_db, monkeypatch):
 
 def test_live_hides_prompts_from_another_device_unless_remote_mode_is_on(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     _use_live(monkeypatch, [_live_session("live-1")])
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
 
@@ -153,10 +159,10 @@ def test_live_hides_prompts_from_another_device_unless_remote_mode_is_on(isolate
 
 def test_live_drops_a_prompt_once_its_transcript_moved_on(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     later = datetime.now(timezone.utc) + timedelta(seconds=30)
     monkeypatch.setattr(
-        server, "live",
+        deps, "live",
         LiveSnapshot(load_sessions=lambda: [_live_session("live-1")], latest_activity=lambda sid, cwd: later),
     )
     store.register("live-1", "Bash", {"command": "ls"})
@@ -204,7 +210,7 @@ def _answer(session_id, prompt_id, body, client=None):
 
 def test_decisions_answered_returns_the_answer_to_the_hook(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     _use_live(monkeypatch, [_live_session("live-1")])
     thread, result, prompt = _start_hook(store)
     assert prompt["tool_name"] == "Bash" and prompt["tool_input"] == {"command": "ls"}
@@ -219,7 +225,7 @@ def test_decisions_answered_returns_the_answer_to_the_hook(isolated_db, monkeypa
 
 def test_decisions_cleared_without_an_answer_returns_no_decision(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     thread, result, prompt = _start_hook(store)
 
     store.clear("live-1", prompt["id"])
@@ -231,7 +237,7 @@ def test_decisions_cleared_without_an_answer_returns_no_decision(isolated_db, mo
 
 def test_decisions_wait_elapsing_returns_no_decision(isolated_db, monkeypatch):
     store = PendingDecisions(max_age=0.2)
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
 
     response = _client().post(
         "/api/sessions/live-1/decisions", json={"tool_name": "Bash", "tool_input": {"command": "ls"}}
@@ -244,8 +250,8 @@ def test_decisions_wait_elapsing_returns_no_decision(isolated_db, monkeypatch):
 
 def test_decisions_are_only_registered_by_a_local_request(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
 
     response = _remote_client().post(
         "/api/sessions/live-1/decisions", json={"tool_name": "Bash", "tool_input": {"command": "ls"}}
@@ -255,17 +261,105 @@ def test_decisions_are_only_registered_by_a_local_request(isolated_db, monkeypat
     assert store.for_session("live-1") == []
 
 
+# ---------------------------------------------------------------- auto-approve: POST /api/sessions/{id}/auto-approve
+
+
+def test_live_rows_carry_the_auto_approve_state(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1"), _live_session("live-2")])
+    store.set_auto_approve("live-1", True)
+    store.register("live-1", "Edit", {})
+    store.approve_pending("live-1")
+
+    rows = {s["session_id"]: s for s in _client().get("/api/live").json()["sessions"]}
+
+    assert rows["live-1"]["auto_approve"] is True
+    assert rows["live-1"]["last_auto_approved"]["tool_name"] == "Edit"
+    assert rows["live-2"]["auto_approve"] is False
+    assert rows["live-2"]["last_auto_approved"] is None
+
+
+def test_live_rows_show_auto_approve_to_another_device(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    store.set_auto_approve("live-1", True)
+
+    assert _remote_client().get("/api/live").json()["sessions"][0]["auto_approve"] is True
+
+
+def test_live_drops_auto_approve_for_a_session_that_left(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch)
+    store.set_auto_approve("live-1", True)
+
+    _client().get("/api/live")
+
+    assert store.auto_approve_enabled("live-1") is False
+
+
+def test_auto_approve_route_switches_it_for_a_local_request(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    prompt_id = store.register("live-1", "Edit", {})
+
+    on = _client().post("/api/sessions/live-1/auto-approve", json={"enabled": True})
+    assert on.status_code == 200
+    assert on.json() == {"auto_approve": True}
+    assert store.get("live-1", prompt_id) is None  # the pending prompt was approved
+
+    off = _client().post("/api/sessions/live-1/auto-approve", json={"enabled": False})
+    assert off.json() == {"auto_approve": False}
+
+
+def test_auto_approve_cannot_be_switched_from_another_device(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+    _use_live(monkeypatch, [_live_session("live-1")])
+
+    response = _remote_client().post("/api/sessions/live-1/auto-approve", json={"enabled": True})
+
+    assert response.status_code == 403
+    assert store.auto_approve_enabled("live-1") is False
+
+
+def test_auto_approve_for_an_unknown_session_is_404(isolated_db, monkeypatch):
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
+    _use_live(monkeypatch)
+
+    response = _client().post("/api/sessions/nope/auto-approve", json={"enabled": True})
+
+    assert response.status_code == 404
+
+
+def test_meta_reports_when_the_relay_hook_has_been_seen(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+
+    assert _client().get("/api/meta").json()["relay_hook_seen"] is False
+    store.register("live-1", "Bash", {"command": "ls"})
+
+    assert _client().get("/api/meta").json()["relay_hook_seen"] is True
+    assert _remote_client().get("/api/meta").json()["relay_hook_seen"] is True
+
+
 # ---------------------------------------------------------------- GET /api/sessions/{id}/pending-decision
 
 
 def test_pending_decision_endpoint_reports_none(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
     assert _client().get("/api/sessions/live-1/pending-decision").json() == {"pending_decision": None}
 
 
 def test_pending_decision_endpoint_reports_the_oldest_prompt(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     first = store.register("live-1", "Edit", {"file": "a.py"})
     store.register("live-1", "Edit", {"file": "b.py"})
 
@@ -276,8 +370,8 @@ def test_pending_decision_endpoint_reports_the_oldest_prompt(isolated_db, monkey
 
 def test_pending_decision_endpoint_follows_the_visibility_rule(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
 
     # Local: always visible. Another device: only while Remote mode is on.
@@ -310,7 +404,7 @@ def test_pending_decision_endpoint_follows_the_visibility_rule(isolated_db, monk
 )
 def test_answer_resolves_the_hook_with_each_shape(isolated_db, monkeypatch, tool_name, tool_input, body, expected):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     _use_live(monkeypatch, [_live_session("live-1")])
     thread, result, prompt = _start_hook(store, tool_name, tool_input)
 
@@ -353,7 +447,7 @@ def test_an_answer_that_does_not_fit_the_prompt_is_422_and_leaves_it_pending(
     isolated_db, monkeypatch, tool_name, tool_input, body
 ):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     prompt_id = store.register("live-1", tool_name, tool_input)
 
     response = _answer("live-1", prompt_id, body)
@@ -363,13 +457,13 @@ def test_an_answer_that_does_not_fit_the_prompt_is_422_and_leaves_it_pending(
 
 
 def test_answer_is_409_when_the_prompt_is_gone(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
     assert _answer("live-1", "deadbeef", {"decision": "allow"}).status_code == 409
 
 
 def test_answer_is_409_for_an_already_answered_prompt(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
 
     assert _answer("live-1", prompt_id, {"decision": "allow"}).status_code == 200
@@ -378,10 +472,10 @@ def test_answer_is_409_for_an_already_answered_prompt(isolated_db, monkeypatch):
 
 def test_answer_is_409_when_the_session_moved_on_in_the_terminal(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     later = datetime.now(timezone.utc) + timedelta(seconds=30)
     monkeypatch.setattr(
-        server, "live",
+        deps, "live",
         LiveSnapshot(load_sessions=lambda: [_live_session("live-1")], latest_activity=lambda sid, cwd: later),
     )
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
@@ -391,7 +485,7 @@ def test_answer_is_409_when_the_session_moved_on_in_the_terminal(isolated_db, mo
 
 def test_answer_names_its_own_prompt_when_two_are_open(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
+    monkeypatch.setattr(deps, "decisions", store)
     first = store.register("live-1", "Bash", {"command": "one"})
     second = store.register("live-1", "Bash", {"command": "two"})
 
@@ -401,8 +495,8 @@ def test_answer_names_its_own_prompt_when_two_are_open(isolated_db, monkeypatch)
 
 def test_answer_from_another_device_needs_remote_mode(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
     body = {"decision": "allow"}
 
@@ -418,8 +512,8 @@ def test_answer_from_another_device_needs_remote_mode(isolated_db, monkeypatch):
 
 def test_answer_from_another_device_still_needs_the_token_and_csrf_header(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     store.set_remote_mode(True)
     prompt_id = store.register("live-1", "Bash", {"command": "ls"})
     url = f"/api/sessions/live-1/decisions/{prompt_id}/answer"
@@ -465,14 +559,14 @@ def _use_remote(monkeypatch, store, system=None):
         spawn=lambda work: work(),
         schedule=lambda delay, work: type("Handle", (), {"cancel": lambda self: None})(),
     )
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "remote", gateway)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "remote", gateway)
     return gateway, system
 
 
 def test_meta_reports_remote_mode_off_by_default(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
-    monkeypatch.setattr(server, "remote", None)
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
+    monkeypatch.setattr(deps, "remote", None)
     assert _client().get("/api/meta").json()["remote_mode"] == {"enabled": False, "expires_at": None, **OFF_STATE}
 
 
@@ -513,15 +607,15 @@ def test_remote_mode_is_not_on_while_it_is_still_starting(isolated_db, monkeypat
 
 
 def test_a_local_switch_is_unavailable_before_the_gateway_exists(isolated_db, monkeypatch):
-    monkeypatch.setattr(server, "decisions", PendingDecisions())
-    monkeypatch.setattr(server, "remote", None)
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
+    monkeypatch.setattr(deps, "remote", None)
     assert _client().post("/api/remote-mode", json={"enabled": True}).status_code == 503
 
 
 def test_a_remote_request_with_a_valid_token_cannot_switch_remote_mode(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     remote = _remote_client()
 
     assert remote.post("/api/remote-mode", json={"enabled": True}).status_code == 403
@@ -534,8 +628,8 @@ def test_a_remote_request_with_a_valid_token_cannot_switch_remote_mode(isolated_
 
 def test_a_remote_request_without_the_token_cannot_switch_remote_mode(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     client = _remote_client(token=False)
 
     assert client.post("/api/remote-mode", json={"enabled": True}).status_code == 401
@@ -544,8 +638,8 @@ def test_a_remote_request_without_the_token_cannot_switch_remote_mode(isolated_d
 
 def test_meta_shows_another_device_the_remote_mode_state(isolated_db, monkeypatch):
     store = PendingDecisions()
-    monkeypatch.setattr(server, "decisions", store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
     store.set_remote_mode(True)
 
     meta = _remote_client().get("/api/meta").json()
@@ -560,7 +654,7 @@ def test_meta_shows_another_device_the_remote_mode_state(isolated_db, monkeypatc
 def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeypatch):
     _use_live(monkeypatch, [_live_session("live-1", cwd="/h/alpha")])
     calls = []
-    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     response = _client().post("/api/sessions/live-1/open-repo")
 
@@ -569,7 +663,7 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
     assert len(calls) == 1
     (command,), kwargs = calls[0]
     assert command[0] == "powershell.exe"
-    assert command[-2] == str(server.OPEN_REPO_SCRIPT)
+    assert command[-2] == str(session_service.OPEN_REPO_SCRIPT)
     assert command[-1] == "claudecode://open?path=%2Fh%2Falpha"
     assert kwargs == {"check": False}
 
@@ -577,7 +671,7 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
 def test_open_repo_is_404_for_an_unknown_or_not_live_session(isolated_db, monkeypatch):
     _use_live(monkeypatch)
     calls = []
-    monkeypatch.setattr(server.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     response = _client().post("/api/sessions/nope-1/open-repo")
 
@@ -726,7 +820,7 @@ def test_overview_scoped_projects_with_the_same_basename_are_not_merged(
     _add_session(isolated_db, write_transcript, "one-1", "/h/one/app", branch="main")
     _add_session(isolated_db, write_transcript, "two-1", "/h/two/app", branch="dev")
     _add_session(isolated_db, write_transcript, "two-2", "/h/two/app", branch="dev")
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
     client = _client()
 
@@ -754,12 +848,12 @@ def test_overview_scoped_call_still_applies_the_range(with_projects):
 def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
     """A session already pruned from disk - known only from history.db, never ledger.db.
 
-    Timestamps are UTC-aware, matching every real row: claude_db._parse_iso_timestamp()
+    Timestamps are UTC-aware, matching every real row: scanner.parse_iso_timestamp()
     always attaches an offset, so a real history.db row is never naive - unlike the seeded
     live rows here (parsed from "...Z" timestamps), a naive one would crash sort_transcripts()
     comparing it against them.
     """
-    folder = claude_db.sanitize_project_path(cwd)
+    folder = paths.sanitize_project_path(cwd)
     row = {
         "session_id": session_id,
         "path": Path(f"/whatever/{folder}/{session_id}.jsonl"),
@@ -784,7 +878,7 @@ def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
 
 
 def test_transcripts_lists_a_history_only_pruned_session(api):
-    claude_db.upsert_history_transcripts([_history_only_row()])
+    history.upsert_history_transcripts([_history_only_row()])
     response = api.get("/api/transcripts")
     assert response.status_code == 200
     assert "pruned-1" in _ids(response)
@@ -792,7 +886,7 @@ def test_transcripts_lists_a_history_only_pruned_session(api):
 
 
 def test_overview_counts_a_history_only_pruned_session(api):
-    claude_db.upsert_history_transcripts([_history_only_row()])
+    history.upsert_history_transcripts([_history_only_row()])
     body = api.get("/api/overview").json()
     assert body["summary"]["sessions"] == 4
     by_group = {row["group"]: row["sessions"] for row in body["groups"]}
@@ -825,7 +919,7 @@ def _assistant(message_id, *, new=0, read=0, written=0, tools=(), ts="2024-01-01
 def with_turns(isolated_db, write_config, write_transcript):
     """One session, aaa-1 in /h/alpha, with four assistant turns growing 50k -> 81k."""
     write_config(isolated_db / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/h/alpha")
+    folder = paths.sanitize_project_path("/h/alpha")
     write_transcript(
         isolated_db / "projects" / folder / "aaa-1.jsonl",
         [
@@ -837,7 +931,7 @@ def with_turns(isolated_db, write_config, write_transcript):
             _assistant("m4", read=65_000, written=16_000),
         ],
     )
-    claude_db.refresh()
+    snapshot.refresh()
     return isolated_db
 
 
@@ -880,7 +974,7 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
     isolated_db, write_config, write_transcript, monkeypatch
 ):
     write_config(isolated_db / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/h/alpha")
+    folder = paths.sanitize_project_path("/h/alpha")
     skills = {"type": "attachment", "attachment": {
         "type": "skill_listing", "isInitial": True, "skillCount": 2, "names": ["a", "b"],
         "content": "- a: " + "x" * 400 + "\n- b: " + "y" * 200}}
@@ -894,13 +988,13 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
             _assistant("m2", read=12_000, tools=[("Read", {})]),
         ],
     )
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
 
     detail = _client().get("/api/sessions/aaa-1").json()["detail"]
 
-    [snapshot] = detail["breakdown"]["snapshots"]
-    [category] = snapshot["categories"]
+    [startup_snapshot] = detail["breakdown"]["snapshots"]
+    [category] = startup_snapshot["categories"]
     assert category["name"] == "Skills"
     assert category["tokens"] == sum(item["tokens"] for item in category["items"]) > 0
     for row, turn in zip(detail["breakdown"]["turns"], detail["turns"]):
@@ -909,8 +1003,8 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
 
 def test_session_detail_breakdown_failure_drops_only_the_breakdown(with_turns, monkeypatch):
     _use_live(monkeypatch)
-    monkeypatch.setattr(server.claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
-    server.claude_context._detail_cache.clear()
+    monkeypatch.setattr(context_breakdown, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
+    context_detail._detail_cache.clear()
 
     detail = _client().get("/api/sessions/aaa-1").json()["detail"]
 
@@ -937,7 +1031,7 @@ def test_session_only_known_to_the_registry_gets_a_recap_from_it(isolated_db, mo
 
 
 def test_unreadable_transcript_is_readable_false_not_an_error(api, monkeypatch):
-    monkeypatch.setattr(server.claude_context, "load_detail", lambda session_id, cwd: None)
+    monkeypatch.setattr(context_detail, "load_detail", lambda session_id, cwd: None)
     response = api.get("/api/sessions/aaa-1")
     assert response.status_code == 200
     body = response.json()
@@ -957,10 +1051,10 @@ def test_malformed_session_ids_are_rejected_before_any_filesystem_access(api, mo
     def boom(*args, **kwargs):
         raise AssertionError("the filesystem was touched")
 
-    monkeypatch.setattr(server.claude_context, "load_detail", boom)
-    monkeypatch.setattr(server.claude_context, "transcript_path", boom)
-    monkeypatch.setattr(server.claude_transcripts, "delete_transcript", boom)
-    monkeypatch.setattr(server.claude_db, "transcript_path_for_session", boom)
+    monkeypatch.setattr(context_detail, "load_detail", boom)
+    monkeypatch.setattr(context_tail, "transcript_path", boom)
+    monkeypatch.setattr(claude_transcripts, "delete_transcript", boom)
+    monkeypatch.setattr(queries, "transcript_path_for_session", boom)
     for method in (api.get, api.delete):
         assert method(f"/api/sessions/{bad_id}").status_code in (404, 422)
 
@@ -972,7 +1066,7 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
         seen.append(cwd)
         return None
 
-    monkeypatch.setattr(server.claude_context, "load_detail", spy)
+    monkeypatch.setattr(context_detail, "load_detail", spy)
     api.get("/api/sessions/aaa-1", params={"cwd": "/etc"})
     assert seen == ["/h/alpha"]
 
@@ -982,17 +1076,17 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
 
 def test_deleting_a_live_session_is_409_and_keeps_the_file(seeded, monkeypatch):
     _use_live(monkeypatch, [_live_session("bbb-2")])
-    path = claude_db.transcript_path_for_session("bbb-2")
+    path = queries.transcript_path_for_session("bbb-2")
     response = _client().delete("/api/sessions/bbb-2")
     assert response.status_code == 409
     assert path.exists()
-    assert claude_db.transcript_path_for_session("bbb-2") is not None
+    assert queries.transcript_path_for_session("bbb-2") is not None
 
 
 def test_liveness_for_delete_is_a_fresh_read_not_the_cached_snapshot(seeded, monkeypatch):
     sessions = []
     monkeypatch.setattr(
-        server, "live", LiveSnapshot(load_sessions=lambda: list(sessions), ttl=3600)
+        deps, "live", LiveSnapshot(load_sessions=lambda: list(sessions), ttl=3600)
     )
     client = _client()
     assert client.get("/api/live").json() == {"sessions": []}  # the cache now says "nothing live"
@@ -1001,7 +1095,7 @@ def test_liveness_for_delete_is_a_fresh_read_not_the_cached_snapshot(seeded, mon
 
 
 def test_deleting_a_finished_session_removes_the_file_and_the_row(api):
-    path = claude_db.transcript_path_for_session("bbb-2")
+    path = queries.transcript_path_for_session("bbb-2")
     response = api.delete("/api/sessions/bbb-2")
     assert response.status_code == 200
     assert not path.exists()
@@ -1025,7 +1119,7 @@ def with_projects(seeded, write_config, monkeypatch):
             "/h/beta": {},
         },
     )
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
     return _client()
 
@@ -1040,7 +1134,7 @@ def test_projects_lists_what_the_snapshot_knows(with_projects):
 
 
 def test_deleting_a_project_removes_its_entry_and_transcripts(with_projects, seeded):
-    alpha_files = [claude_db.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2")]
+    alpha_files = [queries.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2")]
     response = with_projects.delete("/api/projects", params={"path": "/h/alpha"})
     assert response.status_code == 200
     assert [p["path"] for p in with_projects.get("/api/projects").json()["projects"]] == ["/h/beta"]
@@ -1051,7 +1145,7 @@ def test_deleting_a_project_removes_its_entry_and_transcripts(with_projects, see
 
 @pytest.mark.parametrize("path", ["/h/alph", "/h/alpha/", "/h", "..", "/h/alpha/../beta", ""])
 def test_a_project_path_not_in_the_snapshot_is_rejected_and_nothing_is_deleted(with_projects, seeded, path):
-    files = [claude_db.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2", "ccc-3")]
+    files = [queries.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2", "ccc-3")]
     config_before = (seeded / "claude.json").read_text(encoding="utf-8")
     response = with_projects.delete("/api/projects", params={"path": path})
     assert response.status_code == 404
@@ -1070,9 +1164,9 @@ def test_deleting_a_project_without_a_path_is_422(with_projects):
 def _ready_remote(monkeypatch):
     store = PendingDecisions()
     gateway, _ = _use_remote(monkeypatch, store)
-    monkeypatch.setattr(server, "access_token", TOKEN)
-    monkeypatch.setattr(server, "gateway_port", 8080)
-    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+    monkeypatch.setattr(deps, "gateway_port", 8080)
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
     return gateway
 
 
@@ -1086,7 +1180,7 @@ def test_the_qr_is_refused_while_remote_mode_is_not_ready(isolated_db, monkeypat
 def test_the_qr_for_a_local_request_carries_the_svg_and_a_token_free_address(isolated_db, monkeypatch):
     gateway = _ready_remote(monkeypatch)
     encoded = []
-    monkeypatch.setattr(server.banner, "render_qr_svg", lambda text: encoded.append(text) or "<svg/>")
+    monkeypatch.setattr(banner, "render_qr_svg", lambda text: encoded.append(text) or "<svg/>")
     gateway.start()
 
     body = _client().get("/api/remote-mode/qr").json()
@@ -1116,7 +1210,7 @@ def test_the_qr_is_refused_to_a_device_without_the_token(isolated_db, monkeypatc
 
 def test_the_qr_needs_a_network_address(isolated_db, monkeypatch):
     gateway = _ready_remote(monkeypatch)
-    monkeypatch.setattr(server.banner, "discover_ipv4", lambda: [])
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: [])
     gateway.start()
     assert _client().get("/api/remote-mode/qr").status_code == 409
 
@@ -1131,9 +1225,9 @@ def test_startup_closes_a_gateway_an_earlier_backend_left_running(isolated_db, m
         def stop_leftovers(self):
             calls.append("stop_leftovers")
 
-    monkeypatch.setattr(server, "remote", Stub())
+    monkeypatch.setattr(deps, "remote", Stub())
     # lifespan() provisions a token when none is set: stub it so no real api/.ledger/token is touched.
-    monkeypatch.setattr(server, "access_token", "tok-123")
-    with TestClient(server.app):
+    monkeypatch.setattr(deps, "access_token", "tok-123")
+    with TestClient(app_main.app):
         pass
     assert calls == ["stop_leftovers"]

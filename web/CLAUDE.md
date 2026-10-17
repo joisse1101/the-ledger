@@ -7,6 +7,7 @@
 | Live and All session pages | [Frontend-Sessions](../wiki/Frontend-Sessions.md) |
 | Overview page and charts | [Frontend-Overview](../wiki/Frontend-Overview.md) |
 | Projects page | [Frontend-Projects](../wiki/Frontend-Projects.md) |
+| Files page, `upload.ts` | [Frontend-Files](../wiki/Frontend-Files.md) |
 | `ButtonSelector`, `ConfirmDialog`, `lib/` | [Frontend-Shared-Components](../wiki/Frontend-Shared-Components.md) |
 | Test list | [Testing](../wiki/Testing.md) |
 

@@ -61,7 +61,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 |---|---|
 | Running, ports, `.env`, scheduled backup task | [Setup-And-Run](wiki/Setup-And-Run.md) |
 | Tests | [Testing](wiki/Testing.md) |
-| SQLite snapshot, `claude_*.py` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
+| SQLite snapshot, `app/repositories/` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
 | `history.db`, `backup_history.py` | [Backend-History-Store](wiki/Backend-History-Store.md) |
 | `/api/*` routes | [Backend-API-Routes](wiki/Backend-API-Routes.md) |
 | Auth, locality, CSRF (`security.py`) | [Backend-Security](wiki/Backend-Security.md) |
@@ -72,6 +72,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 | Live and All session pages | [Frontend-Sessions](wiki/Frontend-Sessions.md) |
 | Overview page and charts | [Frontend-Overview](wiki/Frontend-Overview.md) |
 | Projects page | [Frontend-Projects](wiki/Frontend-Projects.md) |
+| Files page, file-drop routes | [Frontend-Files](wiki/Frontend-Files.md), [Backend-API-Routes](wiki/Backend-API-Routes.md) |
 | `ButtonSelector`, `ConfirmDialog`, formatting | [Frontend-Shared-Components](wiki/Frontend-Shared-Components.md) |
 | Nginx gateway, HTTPS, LAN access | [Gateway](wiki/Gateway.md) |
 | Toast hooks, relay hook | [Hooks](wiki/Hooks.md) |

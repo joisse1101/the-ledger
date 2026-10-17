@@ -6,7 +6,7 @@ Starts the gateway container and prints the sign-in link/QR for other devices on
 Starts the gateway container (building it if needed) and then prints the sign-in link/QR for every
 device on this network, via api\gateway_signin.py.
 
-The backend (`python server.py`) must already be running so a token exists to print - if it isn't,
+The backend (`python -m app`) must already be running so a token exists to print - if it isn't,
 gateway_signin.py says so and this script's exit code reflects that.
 
 Precedence per port (highest wins): an explicit -GatewayPort/-BackendPort/-FrontendPort, then the

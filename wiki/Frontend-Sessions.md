@@ -10,7 +10,12 @@
   session's oldest pending prompt rendered by `DecisionPrompt` (Approve/Deny with an optional reason
   for a permission prompt; the real options, multi-select and free text for an `AskUserQuestion`, via
   `web/src/lib/prompt.ts`) and an "Open repo window" button (`useOpenRepo`). The panel reads the Live list from
-  the query cache with `auto: false`, so only `LiveList`'s switch drives polling.
+  the query cache with `auto: false`, so only `LiveList`'s switch drives polling. Beside the panel's
+  title, `AutoApproveControl` is a per-session **Auto-approve** switch (`useSetAutoApprove`): on the
+  machine running the app only, read-only "Auto-approve on" text on another device, and shown nowhere
+  until `/api/meta.relay_hook_seen`. `LiveControl` adds a "Last auto-approved: tool at time" line. The
+  Live list (not All) gains an **Auto-approve** column marking sessions that have it on, under the same
+  `relay_hook_seen` gate; on narrow cards it is a badge instead.
   `usePendingDecision` polls while it's mounted; a prompt that vanishes without this view having
   answered it says the session already moved on (as does a 409) instead of going blank, and it shows
   nothing on a non-local device while Remote mode is off. `LiveList` badges a row (`pending-badge`)

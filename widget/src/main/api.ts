@@ -15,6 +15,8 @@ export interface Api {
   setRemoteMode(enabled: boolean): Promise<RemoteStatus>
   /** The sign-in code while Remote mode is ready, else null. */
   fetchQr(): Promise<RemoteQr | null>
+  /** Switches one session's auto-approve; false when the backend refused or did not answer. */
+  setAutoApprove(sessionId: string, enabled: boolean): Promise<boolean>
 }
 
 const STEPS: readonly string[] = ['docker', 'frontend', 'gateway']
@@ -51,6 +53,18 @@ export function createApi(
   const base = `http://127.0.0.1:${backendPort}`
   const signal = () => AbortSignal.timeout(timeoutMs)
 
+  /** Whether `/api/meta` says a prompt has been relayed. Anything unreadable counts as not seen:
+   *  the auto-approve button stays hidden rather than appear on a guess. */
+  const relayHookSeen = async (): Promise<boolean> => {
+    try {
+      const response = await fetchImpl(`${base}/api/meta`, { signal: signal() })
+      if (!response.ok) return false
+      return ((await response.json()) as { relay_hook_seen?: unknown }).relay_hook_seen === true
+    } catch {
+      return false
+    }
+  }
+
   return {
     async fetchLive() {
       try {
@@ -58,7 +72,7 @@ export function createApi(
         if (!response.ok) return { state: 'offline' }
         const body = (await response.json()) as { sessions?: LiveSession[] }
         if (!Array.isArray(body.sessions)) return { state: 'offline' }
-        return { state: 'online', sessions: body.sessions }
+        return { state: 'online', sessions: body.sessions, relayHookSeen: await relayHookSeen() }
       } catch {
         return { state: 'offline' }
       }
@@ -111,6 +125,20 @@ export function createApi(
         return { svg: body.svg, displayUrl: body.display_url }
       } catch {
         return null
+      }
+    },
+
+    async setAutoApprove(sessionId, enabled) {
+      try {
+        const response = await fetchImpl(`${base}/api/sessions/${encodeURIComponent(sessionId)}/auto-approve`, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'ledger', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+          signal: signal(),
+        })
+        return response.ok
+      } catch {
+        return false
       }
     },
 

@@ -8,7 +8,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 
 - Six top-level folders: `api/`, `web/`, `gateway/`, `hooks/`, `toolkit/` and `widget/`. All Python,
   tests and virtualenv included, lives in `api/`; the widget is TypeScript with its own `package.json`. See [Repository layout](Repository-Layout.md).
-- One module per concern. The data layer (`api/claude_*.py`) has no FastAPI dependency, so it can be
+- One module per concern. The data layer (`api/app/repositories/`, `api/app/domain/`) has no FastAPI dependency, so it can be
   read and tested on its own. See [Backend: data layer](Backend-Data-Layer.md).
 - One test file per module under test, named `test_<module>.py`. See [Testing](Testing.md).
 
@@ -18,7 +18,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Names say what a thing is. Prefer a longer, clear name to an abbreviation.
 - Comments explain why (a constraint, a trap, a decision), not what the next line does.
 - Keep functions short enough to read without scrolling; pull pure logic out of I/O so it can be
-  tested directly (for example `api/overview_stats.py` and `api/transcript_query.py`).
+  tested directly (for example `api/app/domain/overview_stats.py` and `api/app/domain/transcript_query.py`).
 - Handle failure at the edge that knows what to do about it; do not swallow errors deeper down.
 
 ## Frontend

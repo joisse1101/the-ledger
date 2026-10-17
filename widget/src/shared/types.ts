@@ -1,18 +1,23 @@
 /** Shapes shared by the main process, the preload bridge and the renderer. Types only. */
 
-/** The subset of `GET /api/live`'s per-session payload the widget uses. */
+/** The subset of `GET /api/live`'s per-session payload the widget uses. `LiveState` adds
+ *  `relayHookSeen`, read from `/api/meta`: auto-approve is offered only once it is true. */
 export interface LiveSession {
   session_id: string
   project: string
   git_branch: string
   /** `label` is built by the server (`claude_context.format_context`) and shown verbatim. */
   context: { label: string } | null
+  /** The session registry's state: `busy` while running, `idle` once the turn has finished. */
+  status: string
   /** Only its presence matters; the widget never reads or shows the prompt itself. */
   pending_decision: unknown | null
+  /** Whether the backend approves this session's plain permission prompts by itself. */
+  auto_approve: boolean
 }
 
 export type LiveState =
-  | { state: 'online'; sessions: LiveSession[] }
+  | { state: 'online'; sessions: LiveSession[]; relayHookSeen: boolean }
   | { state: 'offline' }
 
 export type OpenRepoResult = 'opened' | 'ended' | 'failed'
@@ -60,6 +65,9 @@ export interface WidgetBridge {
   setRemote(enabled: boolean): void
   /** The pointer entered or left the Ledger button, which shows the Remote status tooltip. */
   ledgerHover(hovering: boolean): void
+  /** Switches one session's auto-approve; resolves false when the backend refused or was unreachable.
+   *  The new state arrives with the next poll. */
+  setAutoApprove(sessionId: string, enabled: boolean): Promise<boolean>
   openSession(sessionId: string): Promise<OpenRepoResult>
   openLedger(): void
   toggleCollapse(): void

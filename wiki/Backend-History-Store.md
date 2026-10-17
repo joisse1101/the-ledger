@@ -2,7 +2,7 @@
 
 > Requirements live in `openspec/specs/transcript-history/spec.md`. This page describes how the code meets them, not what it must do.
 
-  `claude_db.py` also owns a second, durable store at `history_db_path()` (`api/.history/history.db`,
+  `api/app/repositories/db/` also owns a second, durable store at `history_db_path()` (`api/.history/history.db`,
   gitignored) holding the same `transcripts` table shape as `ledger.db`'s (shared via
   `_ensure_history_schema()`) — unlike `ledger.db`, nothing ever wipes this file or its rows: no
   `atexit` hook, no delete-and-reinsert in `refresh()`. `upsert_history_transcripts()` writes rows into
@@ -20,8 +20,8 @@
   still recognized as known — and `claude_transcripts.delete_transcript()` treats its missing file
   (`unlink()`'s `FileNotFoundError`) as "already gone" rather than a failure, purging whichever store
   actually has the row.
-- `api/backup_history.py` is a standalone script, runnable independently of `server.py` (no server
-  process needed): it calls `claude_db._scan_projects()`/`_scan_transcripts()` directly — the same
+- `api/backup_history.py` is a standalone script, runnable independently of the backend (no server
+  process needed): it calls `scanner.scan_projects()`/`scan_transcripts()` directly — the same
   scan `refresh()` itself calls — and upserts the results straight into `history.db`, skipping
   `ledger.db` entirely. It's meant to be triggered daily by an OS-level scheduled task (see [Setup and run](Setup-And-Run.md)) so history keeps accumulating even when the app isn't running; safe to run repeatedly,
   since the upsert overwrites an unchanged session's row rather than growing it.

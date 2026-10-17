@@ -6,16 +6,19 @@ pip install -r requirements-dev.txt  # requirements.txt + pytest + httpx
 pytest
 ```
 
-Run pytest from `api/` — that's where `pyproject.toml` lives. It sets `pythonpath = ["."]` (so bare
-imports like `import server`/`import claude_db` work under pytest the same way running
-`api/server.py` directly puts its own directory on `sys.path` at runtime) and `testpaths = ["tests"]`.
+Run pytest from `api/` — that's where `pyproject.toml` lives. It sets `pythonpath = ["."]` (so
+`from app import deps` and the root scripts import under pytest the same way `python -m app` run
+from `api/` puts the cwd on `sys.path`) and `testpaths = ["tests"]`.
 
 Python tests, one file per module under test:
 - Data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
-  `test_claude_sessions.py`, `test_claude_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
-  monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
+  `test_claude_sessions.py`, `test_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
+  monkeypatches `paths.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
-- API/backend: `test_server.py` (the FastAPI app's lifespan/refresh wiring, asserts no
+- Layering: `api/tests/test_layers.py` scans the imports under `api/app/` and fails when a layer imports
+  one above it, or when `repositories`, `domain`, `infra` or `services` import FastAPI. `tests/services/` holds
+  the service and error-mapping tests.
+- API/backend: `test_main.py` (the FastAPI app's lifespan/refresh wiring, asserts no
   `CORSMiddleware` is registered), `test_security.py` (the auth middleware — local vs. remote,
   bearer-token matching, CSRF header, Host rebinding-guard), `test_banner.py` (address discovery,
   QR rendering, the backend's now-simpler local-only startup banner), `test_cli.py`

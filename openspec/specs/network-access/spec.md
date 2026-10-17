@@ -45,7 +45,9 @@ the user to open the address printed when the server started. Delete actions and
 mode follow the stricter, local-only rules defined by "Delete actions require a local request" and
 "Switching Remote mode requires a local request" instead of this token rule. Whether another device
 may see or answer a pending prompt at all additionally depends on Remote mode, defined by the
-remote-session-control capability. The app's page shell (the files that render the empty dashboard before any data loads) is not itself
+remote-session-control capability. The one exception to the token rule is a file-drop download
+link, defined by the file-drop capability: a single-use, short-lived link for one named file that
+is itself the credential and reaches nothing else. The app's page shell (the files that render the empty dashboard before any data loads) is not itself
 gated by the token — see the following requirement.
 
 #### Scenario: No token from another device
@@ -74,6 +76,11 @@ gated by the token — see the following requirement.
 - **WHEN** a device on the network sends a prompt-answer or open-repo-window request without the
   token
 - **THEN** it is refused and no action is taken
+
+#### Scenario: A file download link needs no token but nothing else does
+- **WHEN** a phone without the token opens a valid file-drop download link, and then requests any
+  other data address
+- **THEN** the link returns its one file, and every other request is refused as unauthorized
 
 ### Requirement: The page shell carries no data and needs no token
 The static files that render the app's empty page (before any data has loaded) SHALL be servable to any device that can reach them, on the same machine or over the network, without the token. This is safe only because that shell contains no session, project, or transcript data by itself — every scenario in the previous requirement still applies to the data that fills it in.

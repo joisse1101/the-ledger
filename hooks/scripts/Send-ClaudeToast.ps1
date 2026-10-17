@@ -41,7 +41,7 @@ if ($Help) {
 }
 
 # Context size = input + cache read + cache written tokens on the latest real
-# main-thread assistant turn. Same rule as claude_context.py;
+# main-thread assistant turn. Same rule as api/app/domain/context/parsing.py;
 # if one changes, review the other. Returns $null on any problem, so the toast
 # just omits the line.
 function Get-ContextTokens {
@@ -93,7 +93,7 @@ function Get-ContextTokens {
 }
 
 # 742 -> "742", 80618 -> "81k", 1234567 -> "1.2M". Same boundaries as
-# claude_context.humanise_tokens.
+# formatting.humanise_tokens.
 function Format-TokenCount {
     param([long]$Count)
     if ($Count -lt 1000) { return "$Count" }

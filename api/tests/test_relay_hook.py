@@ -24,10 +24,11 @@ import httpx
 import pytest
 import uvicorn
 
-import server
-from claude_sessions import ClaudeSession
-from live_snapshot import LiveSnapshot
-from pending_decisions import PendingDecisions
+from app import main as app_main
+from app import deps
+from app.repositories.claude_sessions import ClaudeSession
+from app.domain.live_snapshot import LiveSnapshot
+from app.domain.pending_decisions import PendingDecisions
 
 pytestmark = pytest.mark.skipif(
     sys.platform != "win32" or shutil.which("powershell.exe") is None,
@@ -53,16 +54,16 @@ def _free_port() -> int:
 
 
 class _Api:
-    """A real uvicorn server for `server.app` on a loopback port, with a fresh prompt store."""
+    """A real uvicorn server for `app_main.app` on a loopback port, with a fresh prompt store."""
 
     def __init__(self, monkeypatch, *, max_age: float = 60.0):
         self.port = _free_port()
         self.url = f"http://127.0.0.1:{self.port}"
         self.store = PendingDecisions(max_age=max_age)
         self.activity: dict[str, datetime] = {}
-        monkeypatch.setattr(server, "decisions", self.store)
+        monkeypatch.setattr(deps, "decisions", self.store)
         monkeypatch.setattr(
-            server,
+            deps,
             "live",
             LiveSnapshot(
                 load_sessions=lambda: [_session(SESSION)],
@@ -71,7 +72,7 @@ class _Api:
             ),
         )
         config = uvicorn.Config(
-            server.app, host="127.0.0.1", port=self.port, lifespan="off", log_level="warning"
+            app_main.app, host="127.0.0.1", port=self.port, lifespan="off", log_level="warning"
         )
         self._uvicorn = uvicorn.Server(config)
         self._thread = threading.Thread(target=self._uvicorn.run, daemon=True)

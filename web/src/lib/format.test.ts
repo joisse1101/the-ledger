@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   estimatedCostTooltip,
+  formatBytes,
   formatContext,
   formatCost,
   formatCount,
@@ -104,5 +105,22 @@ describe("formatTimeLeft", () => {
     expect(formatTimeLeft(0)).toBe("<1m");
     expect(formatTimeLeft(-5000)).toBe("<1m");
     expect(formatTimeLeft(Number.NaN)).toBe("<1m");
+  });
+});
+
+describe("formatBytes", () => {
+  it("shows small sizes in bytes and larger ones in the biggest fitting unit", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(999)).toBe("999 B");
+    expect(formatBytes(1500)).toBe("1.5 KB");
+    expect(formatBytes(20_000_000)).toBe("20 MB");
+    expect(formatBytes(1_234_000_000)).toBe("1.2 GB");
+    expect(formatBytes(250_000_000)).toBe("250 MB");
+  });
+
+  it("shows -- for a missing or bad size", () => {
+    expect(formatBytes(null)).toBe("--");
+    expect(formatBytes(-1)).toBe("--");
+    expect(formatBytes(Number.NaN)).toBe("--");
   });
 });

@@ -34,6 +34,20 @@ export interface Meta {
    *  the Remote mode switch key off it. */
   is_local: boolean;
   remote_mode: RemoteMode;
+  /** True once any prompt has been relayed since the backend started; auto-approve is offered
+   *  nowhere until then. */
+  relay_hook_seen: boolean;
+}
+
+/** One file in the file-drop folder; `modified` is a local ISO timestamp. */
+export interface FileEntry {
+  name: string;
+  size: number;
+  modified: string;
+}
+
+export interface FilesResponse {
+  files: FileEntry[];
 }
 
 export interface LiveContext {
@@ -66,6 +80,12 @@ export type DecisionAnswer =
   | { decision: "deny"; reason?: string }
   | { decision: "answer"; answers: Record<string, string | string[]> };
 
+/** The latest prompt the app approved on a session's behalf. `at` is an ISO timestamp. */
+export interface AutoApproved {
+  tool_name: string;
+  at: string;
+}
+
 export interface LiveSession {
   session_id: string;
   pid: number;
@@ -80,6 +100,8 @@ export interface LiveSession {
   first_prompt: string;
   context: LiveContext | null;
   pending_decision: PendingDecision | null;
+  auto_approve: boolean;
+  last_auto_approved: AutoApproved | null;
 }
 
 export interface LiveResponse {

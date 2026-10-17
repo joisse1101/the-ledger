@@ -81,6 +81,11 @@ export function LiveControl({ sessionId, session, liveLoaded, onAnswered }: Live
         </dl>
       )}
       {exited && <p className="detail-notice">This session is no longer live.</p>}
+      {session?.last_auto_approved && (
+        <p className="detail-caption">
+          Last auto-approved: {session.last_auto_approved.tool_name} at {formatDateTime(session.last_auto_approved.at)}
+        </p>
+      )}
 
       {pending.isError && !decision && (
         <p className="detail-caption">Couldn't check for a pending prompt. Retrying…</p>
