@@ -2,7 +2,7 @@
 `history.db`, Ledger's durable transcript store - see `openspec/changes/add-transcript-history-backup/`.
 
 Meant to be triggered by an OS-level scheduled task (e.g. Windows Task Scheduler) so history
-keeps accumulating even when `server.py` isn't running. Deliberately does its own scan via
+keeps accumulating even when the backend isn't running. Deliberately does its own scan via
 `claude_db`'s lower-level `_scan_projects()`/`_scan_transcripts()` (the same pair `refresh()`
 calls internally) rather than going through `refresh()`/`ledger.db` at all - `ledger.db` is a
 disposable cache with no bearing on what `history.db` needs, and skipping it avoids the

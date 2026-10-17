@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
 from app.repositories import claude_db
-import server
+from app import main as app_main
 from app import deps, refresh
 from app.domain.live_snapshot import LiveSnapshot
 
@@ -11,13 +11,13 @@ from app.domain.live_snapshot import LiveSnapshot
 def test_no_cors_middleware_is_registered():
     # CORS is dropped entirely (not just shrunk): every legitimate caller reaches the
     # API through a same-origin proxy, so there is no allow-list to maintain.
-    assert not any(m.cls is CORSMiddleware for m in server.app.user_middleware)
+    assert not any(m.cls is CORSMiddleware for m in app_main.app.user_middleware)
 
 
 def _client():
     """A client the security middleware treats as the browser on this machine."""
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://localhost",
         client=("127.0.0.1", 50000),
         headers={"X-Requested-With": "ledger"},
@@ -122,6 +122,6 @@ def test_lifespan_seeds_the_snapshot(isolated_db, monkeypatch):
     # lifespan() provisions a token itself when none is set (see its docstring) - stub that out so
     # this test doesn't touch the real api/.ledger/token file.
     monkeypatch.setattr(deps, "access_token", None)
-    monkeypatch.setattr(server, "provision_token", lambda: "tok-123")
+    monkeypatch.setattr(app_main, "provision_token", lambda: "tok-123")
     with _client() as started:
         assert started.get("/api/meta").json()["refreshed_at"] is not None

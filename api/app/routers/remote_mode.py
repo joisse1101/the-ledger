@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-import gateway_signin
 from app import deps
 from app.core.security import is_local
-from app.infra import banner
+from app.infra import banner, gateway_signin
 from app.schemas.remote import RemoteModeRequest
 
 router = APIRouter()

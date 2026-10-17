@@ -8,7 +8,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 
 - Six top-level folders: `api/`, `web/`, `gateway/`, `hooks/`, `toolkit/` and `widget/`. All Python,
   tests and virtualenv included, lives in `api/`; the widget is TypeScript with its own `package.json`. See [Repository layout](Repository-Layout.md).
-- One module per concern. The data layer (`api/claude_*.py`) has no FastAPI dependency, so it can be
+- One module per concern. The data layer (`api/app/repositories/`, `api/app/domain/`) has no FastAPI dependency, so it can be
   read and tested on its own. See [Backend: data layer](Backend-Data-Layer.md).
 - One test file per module under test, named `test_<module>.py`. See [Testing](Testing.md).
 

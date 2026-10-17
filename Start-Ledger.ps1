@@ -3,7 +3,7 @@
 Starts the Ledger app from one place: backend and frontend, plus the LAN gateway with -Remote.
 
 .DESCRIPTION
-Starts the backend (`python server.py`) and the frontend (a `vite` dev server, or a `vite build` +
+Starts the backend (`python -m app`) and the frontend (a `vite` dev server, or a `vite build` +
 `vite preview`, per -Mode) - each the same separate process CLAUDE.md's "Setup & Run" describes,
 just launched together. Backend and frontend each open in their own window so their logs and Ctrl+C
 stay independent. Their window PIDs are recorded to the root .ledger-run.json (gitignored) so the
@@ -21,8 +21,8 @@ the same way either way. `build` (the default, matching normal local use) runs `
 and then serves the built app via `vite preview`, which doesn't rebuild on save, and starts the
 backend without `--reload`. `dev` runs `vite`'s hot-reloading dev server instead, and starts the
 backend with uvicorn's `--reload` (restarts on saved changes under `api/`) - for actively working on
-either side. `--reload` re-imports server.py fresh per restart, so the backend's own startup
-banner/token print (see server.py's `main()`) is only ever accurate for the first start of a
+either side. `--reload` re-imports the app fresh per restart, so the backend's own startup
+banner/token print (see `app/cli.py`'s `main()`) is only ever accurate for the first start of a
 `-Mode dev` session.
 
 Port precedence per BackendPort/FrontendPort/GatewayPort (highest wins): an explicit -*Port
@@ -156,7 +156,7 @@ $env:GATEWAY_PORT = $GatewayPort
 
 Write-Host "Starting backend on port $BackendPort in $Mode mode (new window)..."
 $backendReloadFlag = if ($Mode -eq 'dev') { ' --reload' } else { '' }
-$backendCommand = "Set-Location '$PSScriptRoot\api'; & '$python' server.py --port $BackendPort --frontend-port $FrontendPort$backendReloadFlag"
+$backendCommand = "Set-Location '$PSScriptRoot\api'; & '$python' -m app --port $BackendPort --frontend-port $FrontendPort$backendReloadFlag"
 $backendProc = Start-Process powershell -ArgumentList '-NoExit', '-Command', $backendCommand -PassThru
 
 Write-Host "Starting frontend on port $FrontendPort in $Mode mode (new window)..."

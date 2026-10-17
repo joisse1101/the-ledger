@@ -59,7 +59,7 @@ The backend is started by the widget's main process (`widget/src/main/supervisor
 script, so a cold start and the tray's "Start backend" share one code path.
 
 - If `/api/meta` answers, the backend is adopted and never stopped by the widget.
-- Otherwise the widget spawns `api\.venv\Scripts\python.exe server.py --port <p> --frontend-port <f>`
+- Otherwise the widget spawns `api\.venv\Scripts\python.exe -m app --port <p> --frontend-port <f>`
   hidden, with `api/` as its working directory.
 - **Open Ledger** (tray or the header button) starts the frontend only if it is not already up:
   `npm run build` first if `web/dist` is missing, then `npm run preview -- --port <f>` hidden, then

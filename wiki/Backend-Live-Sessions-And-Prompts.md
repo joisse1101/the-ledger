@@ -22,13 +22,13 @@
   result) stamped after it was registered — only `user` lines count, since `assistant`/bookkeeping
   lines can appear while a dialog is still open — and releases the hook with "no answer" so it exits.
   A 30-minute maximum age is the backstop. `sweep()` isn't on a timer: `/api/live`, the
-  pending-decision route and the answer route each run it first (`server._sweep_prompts`), so an
+  pending-decision route and the answer route each run it first (`deps.sweep_prompts`), so an
   already-answered prompt gives a 409 rather than "succeeding". **Remote mode**'s access gate is only state here
   (`set_remote_mode`/`remote_mode`/`remote_mode_enabled`): in-memory, off after any backend restart,
   and only a local request can turn it on or off. It is purely an access gate on
   *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
   it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
-  browser always can (`server._can_see_prompts`).
+  browser always can (`deps.can_see_prompts`).
 - `api/app/infra/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
   calls `start()`/`stop()`, which return at once; a state machine runs off, `starting` (with a `step`:
   `docker`, `frontend`, `gateway`), then `ready` or `failed` (with a `reason`, shown for 30 s), and
@@ -41,7 +41,7 @@
 - `GET /api/remote-mode/qr` returns the sign-in code as an SVG plus the token-free address and the
   expiry: local requests only, 409 unless `ready`.
 - `POST /api/sessions/{id}/open-repo` shells out to `hooks/scripts/Open-ClaudeRepoWindow.ps1`
-  (`server.OPEN_REPO_SCRIPT`, `subprocess.run`, the script unmodified) with a
+  (`OPEN_REPO_SCRIPT` in `api/app/routers/sessions.py`, `subprocess.run`, the script unmodified) with a
   `claudecode://open?path=<url-encoded cwd>` URI — the repo's own copy, not the one installed under
   `%USERPROFILE%\.claude\hooks\`, so `api/` now depends on that file in `hooks/` even though `hooks/`
   is otherwise standalone. It needs no install step, only that the API run from this checkout.

@@ -24,7 +24,7 @@ always its own separate process:
 ```powershell
 # Terminal 1, in api/: the API (defaults to http://localhost:8501)
 cd api
-python server.py
+python -m app
 
 # Terminal 2, in web/: build once, then serve the built frontend (defaults to http://localhost:4173)
 cd web
@@ -52,13 +52,13 @@ widget; see [Gateway](Gateway.md)), or with `-Remote` here:
 
 `-NoGateway` is still accepted but does nothing. `-Mode` changes how both the backend and frontend
 windows start. `build` runs `npm run build` + `npm run preview` and starts the backend
-without `--reload`; `dev` runs `npm run dev` and starts the backend with `python server.py
+without `--reload`; `dev` runs `npm run dev` and starts the backend with `python -m app
 --reload` (uvicorn restarts the process on any saved change under `api/`). Port overrides
 (`-BackendPort`/`-FrontendPort`/`-GatewayPort`) follow the same `.env` precedence as
 `gateway\Start-Gateway.ps1` (see [Gateway](Gateway.md)).
 
-`server.py --reload` (also usable directly, outside `Start-Ledger.ps1`) only works because uvicorn
-is given `"server:app"` as an import string rather than the already-constructed `app` object — that
+`python -m app --reload` (also usable directly, outside `Start-Ledger.ps1`) only works because uvicorn
+is given `"app.main:app"` as an import string rather than the already-constructed `app` object — that
 lets it re-import the module fresh in a new subprocess on every change, which is also why the
 backend's startup banner and access-token print in the terminal are only accurate for the very
 first start of a `--reload` session (each subsequent restart re-provisions the same stored token
@@ -69,7 +69,7 @@ edit `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` there. `Start-Gateway.ps1`/
 `gateway/docker-compose.yml` read it directly — it's the source of truth for what port Nginx
 proxies `/api/*` and `/` to inside the container. The backend and frontend themselves are still
 separate local processes that don't read this file: if you change `BACKEND_PORT`/`FRONTEND_PORT`
-away from the defaults (8501/4173), also pass `python server.py --port <BACKEND_PORT>` and
+away from the defaults (8501/4173), also pass `python -m app --port <BACKEND_PORT>` and
 `npm run preview -- --port <FRONTEND_PORT>` so they actually run on the ports the gateway expects,
 or the gateway will fail to reach them. A custom `BACKEND_PORT` also needs to be set in the
 frontend process's own environment (e.g. `BACKEND_PORT=<port> npm run preview -- --port
@@ -104,5 +104,5 @@ Backup'`, or right-click the task in Task Scheduler → Run) to confirm it works
 `sqlite3 api/.history/history.db "SELECT COUNT(*) FROM transcripts"`, or Python's builtin `sqlite3`
 module if that CLI isn't installed), or check `Get-ScheduledTaskInfo -TaskName 'Ledger History
 Backup'`'s `LastTaskResult` (`0` = success). Daily is deliberately decoupled from whether
-`server.py` is even running — this project isn't meant to run as an always-on daemon, so a trigger
+the backend is even running — this project isn't meant to run as an always-on daemon, so a trigger
 tied to the app's own uptime could miss the backup for weeks.

@@ -50,7 +50,7 @@ def parse_settings(
     devices now reach the app through the containerized gateway (see CLAUDE.md), so passing it exits
     with an error rather than doing anything. `--reload` has no env var (dev-only, always explicit)."""
     parser = argparse.ArgumentParser(
-        prog="python server.py",
+        prog="python -m app",
         description="The Ledger: a dashboard for your Claude Code sessions.",
     )
     parser.add_argument(

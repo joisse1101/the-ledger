@@ -61,7 +61,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 |---|---|
 | Running, ports, `.env`, scheduled backup task | [Setup-And-Run](wiki/Setup-And-Run.md) |
 | Tests | [Testing](wiki/Testing.md) |
-| SQLite snapshot, `claude_*.py` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
+| SQLite snapshot, `app/repositories/` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
 | `history.db`, `backup_history.py` | [Backend-History-Store](wiki/Backend-History-Store.md) |
 | `/api/*` routes | [Backend-API-Routes](wiki/Backend-API-Routes.md) |
 | Auth, locality, CSRF (`security.py`) | [Backend-Security](wiki/Backend-Security.md) |

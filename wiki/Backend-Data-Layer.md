@@ -16,7 +16,7 @@ testable and readable independent of the web framework wrapping it.
   stamps a `meta.refreshed_at` timestamp; `refreshed_at()` reads that timestamp back. This is the
   *only* place disk gets rescanned — triggered explicitly via `POST /api/refresh`, plus once
   automatically via `startup()` on process start, plus a periodic 10-minute `asyncio` loop task (see
-  `api/server.py`). `startup()` treats the database as a pure derived cache: it deletes any leftover
+  `api/app/refresh.py`). `startup()` treats the database as a pure derived cache: it deletes any leftover
   db file from a previous run, calls `refresh()` to rebuild it from disk, and registers an `atexit`
   handler to delete it again on exit (best-effort). `db_path()` returns `api/.ledger/ledger.db` (gitignored;
   that `.ledger/` is also where the LAN access token lives — see [Security](Backend-Security.md)).

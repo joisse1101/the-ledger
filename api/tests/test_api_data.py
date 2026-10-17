@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from app.domain import claude_context
 from app.infra import banner
 from app.repositories import claude_db, claude_transcripts
-import server
+from app import main as app_main
 from app import deps
 from app.routers import sessions as sessions_router
 from app.domain.claude_context import LiveContext
@@ -25,7 +25,7 @@ from app.infra.remote_gateway import RemoteGateway
 def _client():
     """A client the security middleware treats as the browser on this machine."""
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://localhost",
         client=("127.0.0.1", 50000),
         headers={"X-Requested-With": "ledger"},
@@ -40,7 +40,7 @@ def _remote_client(*, token=True, csrf=True):
     """A phone on the LAN, by default carrying the access token (set `deps.access_token` to
     TOKEN first) and the custom header every non-GET request needs."""
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://192.168.1.20:8501",
         client=("192.168.1.50", 5000),
         headers={**(BEARER if token else {}), **({"X-Requested-With": "ledger"} if csrf else {})},
@@ -1139,6 +1139,6 @@ def test_startup_closes_a_gateway_an_earlier_backend_left_running(isolated_db, m
     monkeypatch.setattr(deps, "remote", Stub())
     # lifespan() provisions a token when none is set: stub it so no real api/.ledger/token is touched.
     monkeypatch.setattr(deps, "access_token", "tok-123")
-    with TestClient(server.app):
+    with TestClient(app_main.app):
         pass
     assert calls == ["stop_leftovers"]

@@ -1,20 +1,21 @@
 # Backend: API routes
 
-`api/server.py` is both the ASGI app and the CLI (`python server.py [--host] [--port]
+`api/app/main.py` is the ASGI app (middleware, `lifespan`, one router per file in `api/app/routers/`) and
+`api/app/cli.py` the CLI (`python -m app [--host] [--port]
 [--frontend-port] [--reload]`, env `LEDGER_HOST`/`LEDGER_PORT`/`LEDGER_FRONTEND_PORT`; default host
 `127.0.0.1` port `8501`). It always binds loopback only now — `--frontend-port` only controls the
 printed frontend link, and `--lan` is still recognized by the parser but exits with an error
 pointing at the gateway (`gateway/`) instead of binding `0.0.0.0`; the gateway container is the only
 thing that ever grants LAN access (see [Setup and run](Setup-And-Run.md)). `--reload` (dev only, no
 env var) restarts the process on any saved change under `api/`; it works by handing uvicorn the
-import string `"server:app"` instead of the already-built `app` object, since only the string form
+import string `"app.main:app"` instead of the already-built `app` object, since only the string form
 lets uvicorn re-import the module fresh per restart — which is also why `main()`'s own token
 provisioning (see `lifespan` below) is duplicated, guarded, in `lifespan` itself: the reload
 subprocess re-imports the module without ever calling `main()`. Every module it imports lives
 alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
 the import setup it needs. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
-`_refresh_lock` shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
+`refresh.lock` (`api/app/refresh.py`) shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
 is never triggered twice concurrently. It serves `/api/*` only — no HTML, no static assets; the
 frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Layer.md)). Routes:
 
@@ -51,7 +52,7 @@ There's no static-file serving or SPA fallback here; that's `vite preview`'s job
 refused request) wrap every route. There is no `CORSMiddleware` at all: the frontend only ever
 calls relative `/api/...` paths (`vite dev`'s proxy, `vite preview`'s proxy, or the gateway's proxy),
 so no browser page is ever served from a different origin than the one it calls, and the backend
-never receives a legitimate cross-origin request to allow (`test_server.py` asserts no
+never receives a legitimate cross-origin request to allow (`test_main.py` asserts no
 `CORSMiddleware` is registered).
 
 - `api/app/infra/banner.py` — what the server prints at startup: always a reminder that the frontend is a

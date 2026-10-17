@@ -20,7 +20,7 @@
   still recognized as known — and `claude_transcripts.delete_transcript()` treats its missing file
   (`unlink()`'s `FileNotFoundError`) as "already gone" rather than a failure, purging whichever store
   actually has the row.
-- `api/backup_history.py` is a standalone script, runnable independently of `server.py` (no server
+- `api/backup_history.py` is a standalone script, runnable independently of the backend (no server
   process needed): it calls `claude_db._scan_projects()`/`_scan_transcripts()` directly — the same
   scan `refresh()` itself calls — and upserts the results straight into `history.db`, skipping
   `ledger.db` entirely. It's meant to be triggered daily by an OS-level scheduled task (see [Setup and run](Setup-And-Run.md)) so history keeps accumulating even when the app isn't running; safe to run repeatedly,

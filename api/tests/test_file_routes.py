@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.infra import file_drop
-import server
+from app import main as app_main
 from app import deps
 from app.domain.pending_decisions import PendingDecisions
 
@@ -16,7 +16,7 @@ TOKEN = "s3cret-token-value_0123456789"
 
 def _local():
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://localhost",
         client=("127.0.0.1", 50000),
         headers={"X-Requested-With": "ledger"},
@@ -25,7 +25,7 @@ def _local():
 
 def _phone():
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://192.168.1.20:8501",
         client=("192.168.1.50", 5000),
         headers={"Authorization": f"Bearer {TOKEN}", "X-Requested-With": "ledger"},
@@ -63,7 +63,7 @@ def test_every_file_route_is_refused_while_remote_mode_is_off(store, tmp_path, m
 
 
 def test_a_phone_without_the_token_is_unauthorized(remote_on):
-    bare = TestClient(server.app, base_url="http://192.168.1.20:8501", client=("192.168.1.50", 5000))
+    bare = TestClient(app_main.app, base_url="http://192.168.1.20:8501", client=("192.168.1.50", 5000))
 
     assert bare.get("/api/files").status_code == 401
 
@@ -215,7 +215,7 @@ def test_operations_are_logged_as_key_value_lines_without_contents(remote_on, ca
 
 def _bare_phone():
     """A phone browser following a link: no token, no custom header."""
-    return TestClient(server.app, base_url="http://192.168.1.20:8501", client=("192.168.1.50", 5000))
+    return TestClient(app_main.app, base_url="http://192.168.1.20:8501", client=("192.168.1.50", 5000))
 
 
 def _link(name="a.txt"):

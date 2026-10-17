@@ -24,7 +24,7 @@ import httpx
 import pytest
 import uvicorn
 
-import server
+from app import main as app_main
 from app import deps
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
@@ -54,7 +54,7 @@ def _free_port() -> int:
 
 
 class _Api:
-    """A real uvicorn server for `server.app` on a loopback port, with a fresh prompt store."""
+    """A real uvicorn server for `app_main.app` on a loopback port, with a fresh prompt store."""
 
     def __init__(self, monkeypatch, *, max_age: float = 60.0):
         self.port = _free_port()
@@ -72,7 +72,7 @@ class _Api:
             ),
         )
         config = uvicorn.Config(
-            server.app, host="127.0.0.1", port=self.port, lifespan="off", log_level="warning"
+            app_main.app, host="127.0.0.1", port=self.port, lifespan="off", log_level="warning"
         )
         self._uvicorn = uvicorn.Server(config)
         self._thread = threading.Thread(target=self._uvicorn.run, daemon=True)

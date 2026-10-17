@@ -3,7 +3,7 @@ address discovery/QR, and prints the same content the old `--lan` banner used to
 
 import pytest
 
-import gateway_signin
+from app.infra import gateway_signin
 
 
 # ------------------------------------------------ read_token

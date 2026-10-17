@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.repositories import claude_db
-import server
+from app import main as app_main
 from app import deps
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
@@ -38,13 +38,13 @@ def token(monkeypatch):
 def remote(**kwargs):
     """A phone on the LAN: a non-loopback client addressing the machine by its LAN IP."""
     kwargs.setdefault("base_url", "http://192.168.1.20:8501")
-    return TestClient(server.app, client=("192.168.1.50", 5000), follow_redirects=False, **kwargs)
+    return TestClient(app_main.app, client=("192.168.1.50", 5000), follow_redirects=False, **kwargs)
 
 
 def local(host="localhost", client="127.0.0.1", headers=None, **kwargs):
     # `host` goes in the Host header itself, so values httpx would reject in a URL still get sent.
     return TestClient(
-        server.app,
+        app_main.app,
         base_url="http://localhost",
         client=(client, 50000),
         follow_redirects=False,
@@ -121,7 +121,7 @@ def test_no_response_ever_sets_a_cookie(token):
 
 def test_the_default_test_client_is_not_local():
     # Starlette's own TestClient identifies as host "testclient": not loopback, so refused.
-    assert TestClient(server.app).get("/api/meta").status_code == 401
+    assert TestClient(app_main.app).get("/api/meta").status_code == 401
 
 
 def test_a_request_with_no_client_address_is_not_local():
