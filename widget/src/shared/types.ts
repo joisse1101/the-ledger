@@ -7,6 +7,8 @@ export interface LiveSession {
   git_branch: string
   /** `label` is built by the server (`claude_context.format_context`) and shown verbatim. */
   context: { label: string } | null
+  /** The session registry's state: `busy` while running, `idle` once the turn has finished. */
+  status: string
   /** Only its presence matters; the widget never reads or shows the prompt itself. */
   pending_decision: unknown | null
 }

@@ -36,6 +36,9 @@ export function trimSparkline(label: string, max = SPARK_SEGMENTS): string {
   return label.slice(0, match.index) + match[0].slice(-max)
 }
 
+/** Registry statuses that mean the session is no longer running; a pending prompt takes precedence. */
+const FINISHED_STATUSES: ReadonlySet<string> = new Set(['idle', 'stopped'])
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   doc: Document,
   tag: K,
@@ -61,6 +64,7 @@ function renderRow(doc: Document, session: LiveSession, onOpen: (sessionId: stri
 
   row.append(name, context)
   if (session.pending_decision) row.classList.add('pending')
+  else if (FINISHED_STATUSES.has(session.status)) row.classList.add('done')
   row.addEventListener('click', () => onOpen(session.session_id))
   return row
 }

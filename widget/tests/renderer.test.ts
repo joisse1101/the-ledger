@@ -9,6 +9,7 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   project: 'the-ledger',
   git_branch: 'main',
   context: { label: '394k ▲ +2.1k ▁▂▃▅' },
+  status: 'busy',
   pending_decision: null,
   ...over,
 })
@@ -116,6 +117,27 @@ describe('pending row', () => {
     const { push } = setup()
     push({ state: 'online', sessions: [session()] })
     expect(document.querySelector('.row.pending')).toBeNull()
+  })
+})
+
+describe('finished row', () => {
+  it.each(['idle', 'stopped'])('marks a %s session as done', (status) => {
+    const { push } = setup()
+    push({ state: 'online', sessions: [session({ status })] })
+    expect(document.querySelector('.row.done')).not.toBeNull()
+  })
+
+  it('leaves a running session unmarked', () => {
+    const { push } = setup()
+    push({ state: 'online', sessions: [session()] })
+    expect(document.querySelector('.row.done')).toBeNull()
+  })
+
+  it('shows a pending prompt over the finished tint', () => {
+    const { push } = setup()
+    push({ state: 'online', sessions: [session({ status: 'idle', pending_decision: { id: 'p' } })] })
+    expect(document.querySelector('.row.pending')).not.toBeNull()
+    expect(document.querySelector('.row.done')).toBeNull()
   })
 })
 

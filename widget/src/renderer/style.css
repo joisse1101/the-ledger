@@ -21,6 +21,8 @@
   --brand-border-strong: #c98da0;
   --warn-bg: #fff4d6;
   --warn-text: #5c3d00;
+  --done-bg: #ddf3e4;
+  --done-text: #0f4a25;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +38,8 @@
     --brand-border-strong: #b8738a;
     --warn-bg: #3d2f00;
     --warn-text: #ffe29a;
+    --done-bg: #12361f;
+    --done-text: #b3ecc4;
   }
 }
 
@@ -123,6 +127,10 @@ button:hover { background: var(--bg-surface-hover); }
 /* A session waiting on a decision tints its whole row instead of showing a badge. */
 .row.pending, .row.pending:hover { background: var(--warn-bg); color: var(--warn-text); }
 .row.pending .branch { color: inherit; opacity: 0.75; }
+
+/* A session that has finished running tints its row green. */
+.row.done, .row.done:hover { background: var(--done-bg); color: var(--done-text); }
+.row.done .branch { color: inherit; opacity: 0.75; }
 
 .empty { margin: 0; padding: 14px 10px; color: var(--text-muted); }
 

@@ -30,6 +30,8 @@ Electron main process                      renderer (sandboxed)
   toast, or `--` when `context` is null. The widget has no token formatter of its own.
 - **Pending tint.** A row gets the `pending` class (warm background) when `pending_decision` is set,
   with no badge text. The prompt itself is never read or shown, and nothing can be approved here; answer in the terminal or the Ledger.
+- **Finished tint.** A row gets the `done` class (green background) when the session's `status` is
+  `idle` or `stopped`, i.e. it is no longer running. A pending decision wins over it.
 - **Row click** calls `POST /api/sessions/{id}/open-repo` (the toast-click action). A 404 shows a
   brief "Session ended" note and refreshes the list.
 - **Branch.** `/api/live` items carry `git_branch`, looked up from `ledger.db` in `LiveSnapshot`
