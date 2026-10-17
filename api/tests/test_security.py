@@ -337,3 +337,15 @@ def test_a_preflight_request_gets_no_cors_treatment():
         },
     )
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_only_a_get_of_the_download_link_shape_skips_the_token(token):
+    link = "/api/files/download/" + "a" * 32
+
+    # The shape match lets a GET through to the route (which then refuses the invented ticket)...
+    assert remote().get(link).status_code != 401
+    # ...but no other method, and no near-miss path, gets past the token check.
+    assert remote().delete(link, headers=HEADER).status_code == 401
+    assert remote().post(link, headers=HEADER).status_code == 401
+    assert remote().get("/api/files/download/short").status_code == 401
+    assert remote().get("/api/files/download/" + "a" * 32 + "/x").status_code == 401

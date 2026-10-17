@@ -207,3 +207,84 @@ def test_operations_are_logged_as_key_value_lines_without_contents(remote_on, ca
     assert "file_drop op=download name=a.txt" in lines
     assert "file_drop op=delete name=a.txt" in lines
     assert not any("top secret" in line for line in lines)
+
+
+# ------------------------------------------------------------------ single-use download links
+
+
+def _bare_phone():
+    """A phone browser following a link: no token, no custom header."""
+    return TestClient(server.app, base_url="http://192.168.1.20:8501", client=("192.168.1.50", 5000))
+
+
+def _link(name="a.txt"):
+    return _phone().post(f"/api/files/{name}/download-link").json()["url"]
+
+
+def test_a_download_link_serves_the_file_without_the_token_once(remote_on):
+    _phone().put("/api/files?name=a.txt", content=b"contents")
+    url = _link()
+
+    first = _bare_phone().get(url)
+    second = _bare_phone().get(url)
+
+    assert first.status_code == 200
+    assert first.content == b"contents"
+    assert "attachment" in first.headers["content-disposition"]
+    assert first.headers["cache-control"] == "no-store"
+    assert second.status_code == 403
+
+
+def test_a_download_link_expires(remote_on, monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr(server, "download_tickets", file_drop.DownloadTickets(ttl=60, clock=lambda: clock[0]))
+    _phone().put("/api/files?name=a.txt", content=b"x")
+    url = _link()
+
+    clock[0] = 61
+
+    assert _bare_phone().get(url).status_code == 403
+
+
+def test_asking_for_a_link_needs_the_token(remote_on):
+    _phone().put("/api/files?name=a.txt", content=b"x")
+
+    assert _bare_phone().post("/api/files/a.txt/download-link", headers={"X-Requested-With": "ledger"}).status_code == 401
+
+
+def test_a_link_for_a_missing_file_is_404(remote_on):
+    assert _phone().post("/api/files/gone.txt/download-link").status_code == 404
+
+
+def test_a_download_link_does_not_open_anything_else(remote_on):
+    _phone().put("/api/files?name=a.txt", content=b"x")
+    ticket = _link().rsplit("/", 1)[1]
+    bare = _bare_phone()
+
+    assert bare.get("/api/files").status_code == 401
+    assert bare.get(f"/api/files/{ticket}").status_code == 401
+    assert bare.get(f"/api/files/download/{ticket}/more").status_code == 401
+    assert bare.get("/api/meta").status_code == 401
+
+
+def test_an_invented_download_link_is_refused(remote_on):
+    assert _bare_phone().get("/api/files/download/" + "a" * 32).status_code == 403
+
+
+def test_a_download_link_is_refused_once_remote_mode_is_off(remote_on):
+    _phone().put("/api/files?name=a.txt", content=b"x")
+    url = _link()
+
+    remote_on.set_remote_mode(False)
+
+    assert _bare_phone().get(url).status_code == 403
+
+
+def test_the_ticket_is_never_logged(remote_on, caplog):
+    caplog.set_level(logging.INFO, logger="ledger")
+    _phone().put("/api/files?name=a.txt", content=b"x")
+    url = _link()
+    _bare_phone().get(url)
+
+    ticket = url.rsplit("/", 1)[1]
+    assert not any(ticket in record.getMessage() for record in caplog.records if record.name == "ledger")

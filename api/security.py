@@ -33,6 +33,10 @@ CSRF_VALUE = "ledger"
 
 LOOPBACK_CLIENTS = frozenset({"127.0.0.1", "::1", "::ffff:127.0.0.1"})
 FORWARD_HEADERS = ("forwarded", "x-forwarded-for", "x-real-ip")
+# The one address that works without the bearer token: a file-drop download link. The ticket in the
+# path is the credential (single-use, expires in a minute) and the route redeems it; this is only
+# the shape match that lets the request reach that route.
+_DOWNLOAD_LINK = re.compile(r"^/api/files/download/[A-Za-z0-9_-]{16,128}$")
 _LOOPBACK_HOST = re.compile(r"^(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?$", re.IGNORECASE)
 
 UNAUTHORIZED_MESSAGE = (
@@ -75,6 +79,10 @@ def _matches(token: Optional[str], supplied: Optional[str]) -> bool:
     return hmac.compare_digest(token.encode("utf-8"), supplied.encode("utf-8"))
 
 
+def _is_download_link(request: Request) -> bool:
+    return request.method == "GET" and _DOWNLOAD_LINK.match(request.url.path) is not None
+
+
 def _bearer(request: Request) -> Optional[str]:
     scheme, _, credential = request.headers.get("authorization", "").partition(" ")
     return credential.strip() if scheme.lower() == "bearer" else None
@@ -108,7 +116,7 @@ class SecurityMiddleware:
                 return PlainTextResponse(
                     "Forbidden: this address must be opened as localhost.\n", status_code=403
                 )
-        elif not _matches(token, _bearer(request)):
+        elif not _matches(token, _bearer(request)) and not _is_download_link(request):
             return PlainTextResponse(UNAUTHORIZED_MESSAGE, status_code=401)
 
         if request.method != "GET" and request.headers.get(CSRF_HEADER) != CSRF_VALUE:

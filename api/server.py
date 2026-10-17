@@ -561,6 +561,10 @@ def _file_json(entry: file_drop.FileEntry) -> dict:
     return {"name": entry.name, "size": entry.size, "modified": datetime.fromtimestamp(entry.modified).isoformat()}
 
 
+# Single-use links for downloading drop-folder files; see file_drop.DownloadTickets.
+download_tickets = file_drop.DownloadTickets()
+
+
 def _drop_file(name: str) -> pathlib.Path:
     try:
         return file_drop.resolve_existing(file_drop.drop_dir(os.environ), name)
@@ -591,6 +595,23 @@ def get_file(name: str) -> FileResponse:
     path = _drop_file(name)
     log.info("file_drop op=download name=%s", name)
     return FileResponse(path, filename=name)
+
+
+@app.post("/api/files/{name}/download-link", dependencies=[Depends(_require_file_drop)])
+def post_download_link(name: str) -> dict:
+    _drop_file(name)  # 404 for a file that isn't there, before a ticket is spent on it
+    return {"url": f"/api/files/download/{download_tickets.issue(name)}"}
+
+
+@app.get("/api/files/download/{ticket}", dependencies=[Depends(_require_file_drop)])
+def get_download(ticket: str) -> FileResponse:
+    # Reachable without the bearer token (see security.py): the ticket is the credential.
+    name = download_tickets.redeem(ticket)
+    if name is None:
+        raise HTTPException(status_code=403, detail="this download link is invalid or has expired")
+    path = _drop_file(name)
+    log.info("file_drop op=download name=%s", name)
+    return FileResponse(path, filename=name, headers={"Cache-Control": "no-store"})
 
 
 @app.delete("/api/files/{name}", dependencies=[Depends(_require_file_drop)])

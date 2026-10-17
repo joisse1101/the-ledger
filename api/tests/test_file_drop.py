@@ -140,3 +140,52 @@ def test_delete_file_removes_only_the_named_file(folder):
     assert [e.name for e in file_drop.list_files(folder)] == ["b.txt"]
     with pytest.raises(file_drop.FileDropError):
         file_drop.delete_file(folder, "a.txt")
+
+
+class _Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+def test_a_download_ticket_names_its_file_and_works_once():
+    tickets = file_drop.DownloadTickets()
+    ticket = tickets.issue("a.txt")
+
+    assert tickets.redeem(ticket) == "a.txt"
+    assert tickets.redeem(ticket) is None
+
+
+def test_a_download_ticket_expires():
+    clock = _Clock()
+    tickets = file_drop.DownloadTickets(ttl=60, clock=clock)
+    ticket = tickets.issue("a.txt")
+
+    clock.now = 61
+    assert tickets.redeem(ticket) is None
+
+
+def test_an_unknown_download_ticket_is_refused():
+    assert file_drop.DownloadTickets().redeem("not-a-ticket") is None
+
+
+def test_tickets_are_unique_and_independent():
+    tickets = file_drop.DownloadTickets()
+    first, second = tickets.issue("a.txt"), tickets.issue("b.txt")
+
+    assert first != second
+    assert tickets.redeem(second) == "b.txt"
+    assert tickets.redeem(first) == "a.txt"
+
+
+def test_issuing_drops_expired_tickets():
+    clock = _Clock()
+    tickets = file_drop.DownloadTickets(ttl=60, clock=clock)
+    stale = tickets.issue("old.txt")
+
+    clock.now = 120
+    tickets.issue("new.txt")
+
+    assert stale not in tickets._tickets

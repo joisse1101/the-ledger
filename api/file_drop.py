@@ -11,14 +11,18 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import secrets
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterable, Iterable, Mapping
+from typing import AsyncIterable, Callable, Iterable, Mapping, Optional
 
 DEFAULT_DIR = Path(__file__).resolve().parent / ".ledger" / "transfer"
 INCOMING_DIR = ".incoming"
 MAX_NAME_LENGTH = 200
+DOWNLOAD_TICKET_TTL_SECONDS = 60.0
 FALLBACK_NAME = "file"
 
 _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -140,3 +144,34 @@ def resolve_existing(folder: Path, name: str) -> Path:
 
 def delete_file(folder: Path, name: str) -> None:
     resolve_existing(folder, name).unlink()
+
+
+class DownloadTickets:
+    """Single-use, short-lived tickets that let a browser download one file without the bearer header.
+
+    A ticket names one file, works once and expires after `ttl` seconds. In memory only: a restart
+    drops every ticket, which is the safe direction."""
+
+    def __init__(
+        self, ttl: float = DOWNLOAD_TICKET_TTL_SECONDS, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self._ttl = ttl
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._tickets: dict[str, tuple[str, float]] = {}  # ticket -> (file name, expires at)
+
+    def issue(self, name: str) -> str:
+        ticket = secrets.token_urlsafe(24)
+        with self._lock:
+            now = self._clock()
+            self._tickets = {t: entry for t, entry in self._tickets.items() if entry[1] > now}
+            self._tickets[ticket] = (name, now + self._ttl)
+        return ticket
+
+    def redeem(self, ticket: str) -> Optional[str]:
+        """The file name the ticket was issued for, once; None for an unknown, used or expired one."""
+        with self._lock:
+            entry = self._tickets.pop(ticket, None)
+        if entry is None or entry[1] <= self._clock():
+            return None
+        return entry[0]
