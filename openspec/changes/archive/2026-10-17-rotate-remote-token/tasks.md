@@ -21,4 +21,4 @@
 
 - [x] 4.1 Run `cd api; pytest` and `cd web; npm test; npm run build` and confirm all pass; the frontend is untouched, so a failure there is a regression to investigate.
 - [x] 4.2 Run `openspec validate rotate-remote-token --strict` and confirm it passes.
-- [ ] 4.3 Manually, with Docker available: start with `.\Start-Ledger.ps1`, turn Remote on from the dashboard, scan the QR on a phone and confirm it signs in; turn Remote off and on and confirm the phone shows "This device isn't signed in" until it scans the new QR; confirm `api/.ledger/token` is not created.
+- [x] 4.3 Manually, with Docker available: start with `.\Start-Ledger.ps1`, turn Remote on from the dashboard, scan the QR on a phone and confirm it signs in; turn Remote off and on and confirm the phone shows "This device isn't signed in" until it scans the new QR; confirm `api/.ledger/token` is not created.
