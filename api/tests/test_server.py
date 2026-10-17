@@ -2,9 +2,9 @@ import pytest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-import claude_db
+from app.repositories import claude_db
 import server
-from live_snapshot import LiveSnapshot
+from app.domain.live_snapshot import LiveSnapshot
 
 
 def test_no_cors_middleware_is_registered():

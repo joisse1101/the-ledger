@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import claude_db
+from app.repositories import claude_db
 import server
-from claude_context import LiveContext
-from claude_sessions import ClaudeSession
-from live_snapshot import LiveSnapshot
-from pending_decisions import PendingDecisions
-from remote_gateway import RemoteGateway
+from app.domain.claude_context import LiveContext
+from app.repositories.claude_sessions import ClaudeSession
+from app.domain.live_snapshot import LiveSnapshot
+from app.domain.pending_decisions import PendingDecisions
+from app.infra.remote_gateway import RemoteGateway
 
 
 def _client():

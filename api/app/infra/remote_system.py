@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
-from remote_gateway import RemoteStartError
+from app.infra.remote_gateway import RemoteStartError
 
 DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml and .env.example
 DOCKER_INFO_TIMEOUT_SECONDS = 15

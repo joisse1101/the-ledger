@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from claude_transcripts import load_transcripts
+from app.repositories.claude_transcripts import load_transcripts
 
 
 def sessions_dir() -> Path:

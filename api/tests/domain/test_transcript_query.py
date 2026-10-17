@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import claude_db
-import claude_transcripts
-import transcript_query as tq
-from claude_transcripts import ClaudeTranscript
+from app.repositories import claude_db
+from app.repositories import claude_transcripts
+from app.domain import transcript_query as tq
+from app.repositories.claude_transcripts import ClaudeTranscript
 
 
 def _transcript(**overrides):

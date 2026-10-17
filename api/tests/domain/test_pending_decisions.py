@@ -2,8 +2,8 @@ import asyncio
 import threading
 from datetime import datetime, timedelta, timezone
 
-import claude_context
-from pending_decisions import PendingDecisions
+from app.domain import claude_context
+from app.domain.pending_decisions import PendingDecisions
 
 T0 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 

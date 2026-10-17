@@ -2,7 +2,7 @@
 
 > Requirements live in `openspec/specs/network-access/spec.md`. This page describes how the code meets them, not what it must do.
 
-- `api/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
+- `api/app/core/security.py` — one ASGI middleware gating every request (its requirements are the `network-access` spec).
   A request is **local** only when `request.client.host` is loopback (`127.0.0.1`/`::1`/
   `::ffff:127.0.0.1`) *and* carries none of `Forwarded`/`X-Forwarded-For`/`X-Real-IP` (so a tunnel or
   reverse proxy on the same machine is treated as remote, not silently trusted); local requests must

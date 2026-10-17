@@ -1,7 +1,7 @@
 import json
 
-import claude_db
-import claude_projects
+from app.repositories import claude_db
+from app.repositories import claude_projects
 
 
 def test_load_projects_maps_fields(isolated_db, write_config):

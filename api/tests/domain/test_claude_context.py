@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-import claude_context
-from claude_context import (
+from app.domain import claude_context
+from app.domain.claude_context import (
     Compaction,
     LiveContext,
     ToolUse,

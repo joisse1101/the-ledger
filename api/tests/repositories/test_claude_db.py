@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-import claude_db
+from app.repositories import claude_db
 
 
 # ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ def test_scan_transcript_file_context_is_none_without_a_real_turn(tmp_path, writ
 
 
 def test_scan_transcript_file_context_matches_the_live_gauge(tmp_path, write_transcript):
-    import claude_context
+    from app.domain import claude_context
 
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(

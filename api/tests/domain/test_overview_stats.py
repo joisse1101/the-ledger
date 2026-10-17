@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import claude_db
-import claude_transcripts
-import overview_stats as overview
-from claude_transcripts import ClaudeTranscript
+from app.repositories import claude_db
+from app.repositories import claude_transcripts
+from app.domain import overview_stats as overview
+from app.repositories.claude_transcripts import ClaudeTranscript
 
 _FROZEN_NOW = datetime(2024, 6, 15, 12, 0, 0)
 

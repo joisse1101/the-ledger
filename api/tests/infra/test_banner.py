@@ -3,7 +3,7 @@
 import sys
 import types
 
-import banner
+from app.infra import banner
 
 # ------------------------------------------------ address filter
 

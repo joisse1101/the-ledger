@@ -43,7 +43,7 @@ frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Lay
 | `GET /api/overview?range=&project=&group_by=` | 422 for an unknown range label or `group_by` (`project` default, or `branch`); `project` (a path from `/api/projects`) scopes it to that project's transcripts and 404s unless it exactly matches a known project (its folder is derived server-side via `claude_db.sanitize_project_path`); otherwise `overview_stats.overview()`'s payload, whose donut/bar rows are `groups` (each keyed `group`) plus `group_order`; every response (empty or not) also carries `available_ranges`, the `TIME_RANGES` labels with at least one session in scope (the project's, when scoped), which the Projects panel uses to disable empty range buttons |
 
 The drop folder is `api/.ledger/transfer/` (gitignored), or `LEDGER_TRANSFER_DIR` if set; its logic lives
-in `api/file_drop.py` (no web imports), which also holds `DownloadTickets`. The routes never accept a path,
+in `api/app/infra/file_drop.py` (no web imports), which also holds `DownloadTickets`. The routes never accept a path,
 only a bare file name, and log `file_drop op=... name=...` lines without contents or tickets.
 
 There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
@@ -54,7 +54,7 @@ so no browser page is ever served from a different origin than the one it calls,
 never receives a legitimate cross-origin request to allow (`test_server.py` asserts no
 `CORSMiddleware` is registered).
 
-- `api/banner.py` — what the server prints at startup: always a reminder that the frontend is a
+- `api/app/infra/banner.py` — what the server prints at startup: always a reminder that the frontend is a
   separate process and how to start it (`cd web && npm run preview`), plus its local URL — the
   backend has no LAN-facing state to report any more, so that's the whole banner (`build_banner()`).
   Its `discover_ipv4()` (a UDP-connect trick to find the outbound interface, plus hostname

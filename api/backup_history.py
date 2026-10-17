@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence
 
-import claude_db
+from app.repositories import claude_db
 
 
 def backup() -> int:

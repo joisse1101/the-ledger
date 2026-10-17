@@ -25,9 +25,9 @@ import pytest
 import uvicorn
 
 import server
-from claude_sessions import ClaudeSession
-from live_snapshot import LiveSnapshot
-from pending_decisions import PendingDecisions
+from app.repositories.claude_sessions import ClaudeSession
+from app.domain.live_snapshot import LiveSnapshot
+from app.domain.pending_decisions import PendingDecisions
 
 pytestmark = pytest.mark.skipif(
     sys.platform != "win32" or shutil.which("powershell.exe") is None,

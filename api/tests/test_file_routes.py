@@ -6,9 +6,9 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
-import file_drop
+from app.infra import file_drop
 import server
-from pending_decisions import PendingDecisions
+from app.domain.pending_decisions import PendingDecisions
 
 TOKEN = "s3cret-token-value_0123456789"
 

@@ -10,16 +10,16 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-import claude_db
+from app.repositories import claude_db
 import server
-from live_snapshot import LiveSnapshot
-from pending_decisions import PendingDecisions
-from security import SecurityMiddleware, provision_token
+from app.domain.live_snapshot import LiveSnapshot
+from app.domain.pending_decisions import PendingDecisions
+from app.core.security import SecurityMiddleware, provision_token
 
 TOKEN = "s3cret-token-value_0123456789"
 HEADER = {"X-Requested-With": "ledger"}
 BEARER = {"Authorization": f"Bearer {TOKEN}"}
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(autouse=True)

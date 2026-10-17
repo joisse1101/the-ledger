@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 
-from claude_transcripts import ClaudeTranscript
+from app.repositories.claude_transcripts import ClaudeTranscript
 
 # Sortable fields, by the name the API and UI use for them.
 SORT_FIELDS = (

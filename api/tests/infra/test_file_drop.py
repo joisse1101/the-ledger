@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-import file_drop
+from app.infra import file_drop
 
 
 @pytest.fixture

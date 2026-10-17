@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from remote_gateway import RemoteStartError
-from remote_system import RealSystem, gateway_port
+from app.infra.remote_gateway import RemoteStartError
+from app.infra.remote_system import RealSystem, gateway_port
 
 
 class Recorder:

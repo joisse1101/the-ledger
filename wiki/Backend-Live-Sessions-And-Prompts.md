@@ -2,7 +2,7 @@
 
 > Requirements live in `openspec/specs/remote-session-control/spec.md`. This page describes how the code meets them, not what it must do.
 
-- `api/live_snapshot.py` — `LiveSnapshot`, a lock-guarded, TTL-coalesced (`LIVE_TTL_SECONDS = 1.0`)
+- `api/app/domain/live_snapshot.py` — `LiveSnapshot`, a lock-guarded, TTL-coalesced (`LIVE_TTL_SECONDS = 1.0`)
   wrapper around `claude_sessions.load_sessions()` + `claude_context.live_context()` per session, so
   N browsers/phones polling `/api/live` every ~2s cost about one recompute per second rather than N —
   those two modules' own caches assume a single caller, so every read of them from the API goes
@@ -10,7 +10,7 @@
   (`context: null` for that one). `is_live_now()` bypasses the TTL for delete decisions (see the
   `DELETE /api/sessions/{id}` route in [API routes](Backend-API-Routes.md)); `cwd_for()` is used server-side only, never sent to a
   client. `latest_activity()` (through the same lock) feeds the pending-prompt sweep below.
-- `api/pending_decisions.py` — `PendingDecisions`, the in-memory, lock-guarded store (same spirit as
+- `api/app/domain/pending_decisions.py` — `PendingDecisions`, the in-memory, lock-guarded store (same spirit as
   `LiveSnapshot`; nothing touches disk) behind answering a live session's blocking prompts from the
   dashboard, plus the **Remote mode** switch. The prompts come from the optional relay hook (see [Hooks](Hooks.md)): a `PermissionRequest` hook fires only when Claude Code is about to show a dialog
   (a tool-permission prompt or an `AskUserQuestion`), runs *alongside* the terminal dialog rather than
@@ -29,14 +29,14 @@
   *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
   it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
   browser always can (`server._can_see_prompts`).
-- `api/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
+- `api/app/infra/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
   calls `start()`/`stop()`, which return at once; a state machine runs off, `starting` (with a `step`:
   `docker`, `frontend`, `gateway`), then `ready` or `failed` (with a `reason`, shown for 30 s), and
   `/api/meta.remote_mode` reports `{enabled, expires_at, state, step, reason}`. Only at `ready` does it
   open the access gate above and start the **8-hour** timer; turning off, the timer, a failure or a
   newer `start()` closes the gate and runs `docker compose down`, stopping the frontend only if it
   started it. It knows nothing about HTTP: everything touching the machine goes through a `System`
-  object (`api/remote_system.py`'s `RealSystem`: Docker Desktop, `docker compose`, the frontend
+  object (`api/app/infra/remote_system.py`'s `RealSystem`: Docker Desktop, `docker compose`, the frontend
   process, port probes), which tests replace with a fake and never run for real.
 - `GET /api/remote-mode/qr` returns the sign-in code as an SVG plus the token-free address and the
   expiry: local requests only, 409 unless `ready`.

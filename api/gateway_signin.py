@@ -15,8 +15,8 @@ import os
 import sys
 from typing import Mapping, Optional, Sequence
 
-import banner
-from security import LEDGER_DIR, TOKEN_ENV
+from app.infra import banner
+from app.core.security import LEDGER_DIR, TOKEN_ENV
 
 DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml's GATEWAY_PORT default
 DEFAULT_FRONTEND_PORT = 4173  # matches .env.example's FRONTEND_PORT default

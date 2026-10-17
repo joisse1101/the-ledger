@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import claude_db
+from app.repositories import claude_db
 
 
 @dataclass

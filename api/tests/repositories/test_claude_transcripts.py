@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import claude_db
-import claude_transcripts
+from app.repositories import claude_db
+from app.repositories import claude_transcripts
 
 
 def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcript):

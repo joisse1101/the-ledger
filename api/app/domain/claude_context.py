@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-import claude_db
+from app.repositories import claude_db
 
 log = logging.getLogger("ledger")
 

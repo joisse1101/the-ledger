@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterable, Callable, Iterable, Mapping, Optional
 
-DEFAULT_DIR = Path(__file__).resolve().parent / ".ledger" / "transfer"
+DEFAULT_DIR = Path(__file__).resolve().parents[2] / ".ledger" / "transfer"
 INCOMING_DIR = ".incoming"
 MAX_NAME_LENGTH = 200
 DOWNLOAD_TICKET_TTL_SECONDS = 60.0

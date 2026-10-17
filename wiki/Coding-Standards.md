@@ -18,7 +18,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Names say what a thing is. Prefer a longer, clear name to an abbreviation.
 - Comments explain why (a constraint, a trap, a decision), not what the next line does.
 - Keep functions short enough to read without scrolling; pull pure logic out of I/O so it can be
-  tested directly (for example `api/overview_stats.py` and `api/transcript_query.py`).
+  tested directly (for example `api/app/domain/overview_stats.py` and `api/app/domain/transcript_query.py`).
 - Handle failure at the edge that knows what to do about it; do not swallow errors deeper down.
 
 ## Frontend

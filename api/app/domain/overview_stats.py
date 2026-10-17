@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional, Sequence
 
-from claude_transcripts import ClaudeTranscript
+from app.repositories.claude_transcripts import ClaudeTranscript
 
 # Time-range filter options, in display order:
 # - Each value is an inclusive (oldest days ago, newest days ago) pair, e.g.

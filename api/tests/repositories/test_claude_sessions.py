@@ -1,6 +1,6 @@
 import json
 
-import claude_sessions
+from app.repositories import claude_sessions
 
 
 def _write_session_file(path, **overrides):

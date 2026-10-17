@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from claude_context import LiveContext
-from claude_sessions import ClaudeSession
-from live_snapshot import LiveSnapshot
+from app.domain.claude_context import LiveContext
+from app.repositories.claude_sessions import ClaudeSession
+from app.domain.live_snapshot import LiveSnapshot
 
 
 def _session(session_id="s1", pid=1, cwd="/x/proj"):

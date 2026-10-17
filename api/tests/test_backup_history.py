@@ -3,7 +3,7 @@ without any server process running (mirrors the isolated_db fixture the rest of 
 claude_db suite uses, so this never touches the real ~/.claude.json or ~/.claude/projects/)."""
 
 import backup_history
-import claude_db
+from app.repositories import claude_db
 
 
 def _write_one_session(tmp_path, write_config, write_transcript, session_id="s1"):

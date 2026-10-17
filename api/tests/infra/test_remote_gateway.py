@@ -2,7 +2,7 @@
 
 import pytest
 
-from remote_gateway import RemoteGateway
+from app.infra.remote_gateway import RemoteGateway
 
 
 class FakeSystem:

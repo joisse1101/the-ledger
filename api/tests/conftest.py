@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-import claude_db
+from app.repositories import claude_db
 import server
 
 

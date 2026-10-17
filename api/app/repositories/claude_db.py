@@ -23,11 +23,11 @@ _BUSY_TIMEOUT_MS = 10_000
 
 
 def db_path() -> Path:
-    return Path(__file__).parent / ".ledger" / "ledger.db"
+    return Path(__file__).resolve().parents[2] / ".ledger" / "ledger.db"
 
 
 def history_db_path() -> Path:
-    return Path(__file__).parent / ".history" / "history.db"
+    return Path(__file__).resolve().parents[2] / ".history" / "history.db"
 
 
 def config_path() -> Path:

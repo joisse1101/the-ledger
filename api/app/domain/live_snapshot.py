@@ -13,9 +13,9 @@ import time
 from datetime import datetime
 from typing import Any, Callable, Optional
 
-import claude_context
-import claude_db
-import claude_sessions
+from app.domain import claude_context
+from app.repositories import claude_db
+from app.repositories import claude_sessions
 
 LIVE_TTL_SECONDS = 1.0
 
