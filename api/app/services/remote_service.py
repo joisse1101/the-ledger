@@ -24,12 +24,13 @@ def set_enabled(enabled: bool) -> dict:
 
 
 def sign_in_code() -> dict:
-    if deps.remote is None or not deps.remote.is_ready():
+    token = deps.access_token
+    if deps.remote is None or not deps.remote.is_ready() or token is None:
         raise Conflict("Remote mode is not ready")
     addresses = banner.discover_ipv4()
-    if not addresses or deps.access_token is None:
+    if not addresses:
         raise Conflict("No network address was found for this machine")
-    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], deps.gateway_port, deps.access_token))
+    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], deps.gateway_port, token))
     if svg is None:
         raise Unavailable("QR codes are unavailable (the qrcode package is missing)")
     return {

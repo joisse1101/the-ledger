@@ -81,6 +81,7 @@ class RemoteGateway:
         self,
         system: System,
         *,
+        on_start: Callable[[], None],
         on_ready: Callable[[], None],
         on_off: Callable[[], None],
         ttl: float = REMOTE_MODE_TTL_SECONDS,
@@ -92,6 +93,7 @@ class RemoteGateway:
         gateway_timeout: float = GATEWAY_TIMEOUT_SECONDS,
     ) -> None:
         self._system = system
+        self._on_start = on_start
         self._on_ready = on_ready
         self._on_off = on_off
         self._ttl = ttl
@@ -128,7 +130,10 @@ class RemoteGateway:
     # ------------------------------------------------------------ turning on and off
 
     def start(self) -> None:
-        """Begin bringing everything up in the background. A no-op while starting or ready."""
+        """Begin bringing everything up in the background. A no-op while starting or ready.
+
+        `on_start` runs under the lock on the way in; `on_off` also runs under it on every way out
+        (`stop()` and a failed start), so a callback must not call back into this object."""
         with self._lock:
             if self._state in (STARTING, READY):
                 return
@@ -137,6 +142,7 @@ class RemoteGateway:
             self._cancel = threading.Event()
             cancel = self._cancel
             self._state, self._step, self._reason = STARTING, STEP_DOCKER, None
+            self._on_start()
         self._spawn(lambda: self._run(generation, cancel))
 
     def stop(self) -> None:
@@ -146,10 +152,10 @@ class RemoteGateway:
             self._cancel.set()
             self._state, self._step, self._reason = OFF, None, None
             expiry, self._expiry = self._expiry, None
+            self._on_off()  # before the teardown, which can wait on Docker: revoke first
         if expiry is not None:
             expiry.cancel()
         self._teardown()
-        self._on_off()
 
     def stop_leftovers(self) -> None:
         """At backend startup: Remote mode is off, so close a gateway an earlier backend left up.
@@ -205,6 +211,7 @@ class RemoteGateway:
             if generation == self._generation:
                 self._state, self._step, self._reason = FAILED, None, reason
                 self._failed_at = self._clock()
+                self._on_off()
 
     # ------------------------------------------------------------ steps
 

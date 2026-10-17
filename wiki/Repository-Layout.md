@@ -44,9 +44,8 @@ of what a capability is required to do, ahead of inferring intent from the code 
 
 ## Other repo files
 
-- `api/.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see [Data layer](Backend-Data-Layer.md))
-  and the LAN access token (`token`, see [Security](Backend-Security.md)); both are recreated as needed and
-  never committed. `api/.history/` (gitignored) holds the durable `history.db*` — see [History store](Backend-History-Store.md) — which, unlike `.ledger/`, is never recreated or wiped; it's built up over time by
+- `api/.ledger/` (gitignored) holds the SQLite snapshot (`ledger.db*` — see [Data layer](Backend-Data-Layer.md));
+  it is recreated as needed and never committed. `api/.history/` (gitignored) holds the durable `history.db*` — see [History store](Backend-History-Store.md) — which, unlike `.ledger/`, is never recreated or wiped; it's built up over time by
   `api/backup_history.py`. `.gitignore` also excludes `web/node_modules/`, `web/dist/`, and root
   `.env`.
 - Root `.env.example` (committed) documents `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` in one

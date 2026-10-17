@@ -9,9 +9,9 @@ pointing at the gateway (`gateway/`) instead of binding `0.0.0.0`; the gateway c
 thing that ever grants LAN access (see [Setup and run](Setup-And-Run.md)). `--reload` (dev only, no
 env var) restarts the process on any saved change under `api/`; it works by handing uvicorn the
 import string `"app.main:app"` instead of the already-built `app` object, since only the string form
-lets uvicorn re-import the module fresh per restart — which is also why `main()`'s own token
-provisioning (see `lifespan` below) is duplicated, guarded, in `lifespan` itself: the reload
-subprocess re-imports the module without ever calling `main()`. Run it as a module from `api/` (`python -m app`) so `app` is importable. A route handler only parses the request, calls a
+lets uvicorn re-import the module fresh per restart — which is also why `lifespan` builds Remote
+mode's lifecycle when `main()` hasn't: the reload subprocess re-imports the module without ever
+calling `main()`. Run it as a module from `api/` (`python -m app`) so `app` is importable. A route handler only parses the request, calls a
 function in `api/app/services/` and shapes the response with `api/app/schemas/`; the services raise the domain
 errors in `api/app/services/errors.py` and `api/app/routers/errors.py` turns them into 403/404/409/422/500/503/507. Its `lifespan` calls `snapshot.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
@@ -22,8 +22,8 @@ frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Lay
 | Endpoint | Notes |
 |---|---|
 | `GET /api/meta` | `{refreshed_at, is_local, remote_mode: {enabled, expires_at, state, step, reason}, relay_hook_seen}` (`state` is `off`, `starting`, `ready` or `failed`; `relay_hook_seen` is true once any prompt has been relayed since the backend started, and auto-approve controls wait for it) — `is_local` is `security.is_local(request)` for *this* request, so the frontend can hide controls a remote device can't use |
-| `POST /api/remote-mode` | Body `{enabled}`; **local requests only** (403 otherwise, token or not). Starts or stops the whole of Remote mode (Docker, frontend, gateway); returns at once with the new `remote_mode`, which clients follow in `/api/meta` while it is `starting` |
-| `GET /api/remote-mode/qr` | `{svg, display_url, expires_at}` — the sign-in QR (it encodes the token; `display_url` doesn't). **Local only**, 409 unless Remote mode is `ready` |
+| `POST /api/remote-mode` | Body `{enabled}`; **local requests only** (403 otherwise, token or not). Starts or stops the whole of Remote mode (Docker, frontend, gateway); turning it on makes this session's access token and turning it off discards it; returns at once with the new `remote_mode`, which clients follow in `/api/meta` while it is `starting` |
+| `GET /api/remote-mode/qr` | `{svg, display_url, expires_at}` — the sign-in QR (it encodes this Remote session's token; `display_url` doesn't). **Local only**, 409 unless Remote mode is `ready` |
 | `POST /api/refresh` | Forces a `locked_refresh()`, returns the new `refreshed_at` |
 | `GET /api/live` | `{sessions: [...]}` from the shared `LiveSnapshot` (see `live_snapshot.py`); each session carries `git_branch` (from `ledger.db`, `""` when unknown) and gains `pending_decision: {id, tool_name, tool_input} \| null` (its oldest pending prompt), always `null` for a non-local request while Remote mode is off, plus `auto_approve: bool` and `last_auto_approved: {tool_name, at} \| null` (visible to every client). Sweeps stale prompts first |
 | `POST /api/sessions/{id}/auto-approve` | Body `{enabled}`; **local requests only** (403 otherwise, token or not); 404 unless the session is live. Returns `{auto_approve}`. Turning it on also approves the session's already-pending plain prompts; see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md) |
@@ -63,6 +63,5 @@ never receives a legitimate cross-origin request to allow (`test_main.py` assert
   resolution, filtered by `usable_ipv4` to drop loopback/link-local/unspecified addresses) and
   `render_qr()` (ASCII QR via `qrcode`; `None` if the package or the terminal's encoding can't render
   it) are still here and still exercised by `test_banner.py`, but are no longer called from the
-  backend's own startup path — `api/gateway_signin.py` reuses them instead (see [Gateway](Gateway.md)) to
-  build the gateway's own sign-in banner/QR from the gateway side, once the gateway container starts.
-  `render_qr_svg()` is the same code as an SVG for `GET /api/remote-mode/qr`.
+  backend's own startup path. `render_qr_svg()` is the same code as an SVG for `GET /api/remote-mode/qr`,
+  and `discover_ipv4()` feeds the sign-in address (see [Gateway](Gateway.md)).

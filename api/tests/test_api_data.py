@@ -552,14 +552,16 @@ class _EverythingUp:
 def _use_remote(monkeypatch, store, system=None):
     """Remote mode wired to `store` with a synchronous worker, so a toggle is done by the time it returns."""
     system = system or _EverythingUp()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", None)  # restored afterwards; the gateway's hooks set it
     gateway = RemoteGateway(
         system,
+        on_start=deps.issue_token,
         on_ready=lambda: store.set_remote_mode(True),
-        on_off=lambda: store.set_remote_mode(False),
+        on_off=deps.end_remote_session,
         spawn=lambda work: work(),
         schedule=lambda delay, work: type("Handle", (), {"cancel": lambda self: None})(),
     )
-    monkeypatch.setattr(deps, "decisions", store)
     monkeypatch.setattr(deps, "remote", gateway)
     return gateway, system
 
@@ -1164,7 +1166,7 @@ def test_deleting_a_project_without_a_path_is_422(with_projects):
 def _ready_remote(monkeypatch):
     store = PendingDecisions()
     gateway, _ = _use_remote(monkeypatch, store)
-    monkeypatch.setattr(deps, "access_token", TOKEN)
+    monkeypatch.setattr(deps.security, "new_token", lambda: TOKEN)  # the session token the gateway issues
     monkeypatch.setattr(deps, "gateway_port", 8080)
     monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20", "10.0.0.5"])
     return gateway
@@ -1190,6 +1192,15 @@ def test_the_qr_for_a_local_request_carries_the_svg_and_a_token_free_address(iso
     assert body["display_url"] == "https://192.168.1.20:8080"
     assert TOKEN not in body["display_url"]
     assert body["expires_at"]
+
+
+def test_the_qr_is_refused_when_no_token_exists_even_if_the_gateway_reads_ready(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    gateway.start()
+    monkeypatch.setattr(deps, "access_token", None)
+    response = _client().get("/api/remote-mode/qr")
+    assert response.status_code == 409
+    assert "not ready" in response.json()["detail"]
 
 
 def test_the_qr_is_refused_to_another_device_even_with_the_token(isolated_db, monkeypatch):
@@ -1226,8 +1237,52 @@ def test_startup_closes_a_gateway_an_earlier_backend_left_running(isolated_db, m
             calls.append("stop_leftovers")
 
     monkeypatch.setattr(deps, "remote", Stub())
-    # lifespan() provisions a token when none is set: stub it so no real api/.ledger/token is touched.
-    monkeypatch.setattr(deps, "access_token", "tok-123")
     with TestClient(app_main.app):
         pass
     assert calls == ["stop_leftovers"]
+
+
+# ---------------------------------------------------------------- the session token
+
+
+def test_each_remote_session_has_its_own_token_and_the_old_one_stops_working(isolated_db, monkeypatch):
+    gateway, _ = _use_remote(monkeypatch, PendingDecisions())
+    monkeypatch.setattr(deps, "gateway_port", 8080)
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20"])
+    codes = []
+    monkeypatch.setattr(banner, "render_qr_svg", lambda text: codes.append(text) or "<svg/>")
+
+    def phone(token):
+        return TestClient(
+            app_main.app,
+            base_url="http://192.168.1.20:8501",
+            client=("192.168.1.50", 5000),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert phone("anything").get("/api/meta").status_code == 401  # off: no token exists
+    gateway.start()
+    first = deps.access_token
+    _client().get("/api/remote-mode/qr")
+    assert phone(first).get("/api/meta").status_code == 200
+
+    gateway.stop()
+    assert deps.access_token is None
+    assert phone(first).get("/api/meta").status_code == 401
+
+    gateway.start()
+    second = deps.access_token
+    _client().get("/api/remote-mode/qr")
+    assert second and second != first
+    assert phone(first).get("/api/meta").status_code == 401
+    assert phone(second).get("/api/meta").status_code == 200
+    assert codes == [f"https://192.168.1.20:8080/?token={first}", f"https://192.168.1.20:8080/?token={second}"]
+
+
+def test_switching_remote_mode_on_twice_keeps_the_same_token(isolated_db, monkeypatch):
+    _use_remote(monkeypatch, PendingDecisions())
+    client = _client()
+    client.post("/api/remote-mode", json={"enabled": True})
+    token = deps.access_token
+    client.post("/api/remote-mode", json={"enabled": True})
+    assert deps.access_token == token

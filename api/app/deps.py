@@ -9,6 +9,7 @@ from __future__ import annotations
 import pathlib
 from typing import Optional
 
+from app.core import security
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
 from app.infra import file_drop, remote_system
@@ -27,8 +28,8 @@ decisions = PendingDecisions()
 remote: Optional[RemoteGateway] = None
 gateway_port: int = remote_system.DEFAULT_GATEWAY_PORT
 
-# Set by main() on every start. While None (tests that never call main()), no token
-# exists, so every request that isn't plain local is refused.
+# The current Remote mode session's token: made when Remote mode turns on, cleared when it turns
+# off (see make_remote). While None, every request that isn't plain local is refused.
 access_token: Optional[str] = None
 
 # Single-use links for downloading drop-folder files; see file_drop.DownloadTickets.
@@ -36,8 +37,9 @@ download_tickets = file_drop.DownloadTickets()
 
 
 def make_remote(backend_port: int, frontend_port: int) -> RemoteGateway:
-    """Remote mode's lifecycle for these ports. Reaching `ready` opens the prompt gate for other
-    devices and starts its 8 hour window; turning off closes the gate again."""
+    """Remote mode's lifecycle for these ports. Starting makes this session's access token; reaching
+    `ready` opens the prompt gate for other devices and starts its 8 hour window; turning off closes
+    the gate again and discards the token."""
     global gateway_port
     gateway_port = remote_system.gateway_port(REPO_ROOT)
     system = remote_system.RealSystem(
@@ -45,6 +47,18 @@ def make_remote(backend_port: int, frontend_port: int) -> RemoteGateway:
     )
     return RemoteGateway(
         system,
+        on_start=issue_token,
         on_ready=lambda: decisions.set_remote_mode(True),
-        on_off=lambda: decisions.set_remote_mode(False),
+        on_off=end_remote_session,
     )
+
+
+def issue_token() -> None:
+    global access_token
+    access_token = security.new_token()
+
+
+def end_remote_session() -> None:
+    global access_token
+    access_token = None
+    decisions.set_remote_mode(False)

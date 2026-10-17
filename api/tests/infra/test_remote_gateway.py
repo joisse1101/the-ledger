@@ -85,6 +85,9 @@ class Hooks:
         self.events: list[str] = []
         self.scheduled: list[tuple[float, object]] = []
 
+    def on_start(self):
+        self.events.append("start")
+
     def on_ready(self):
         self.events.append("ready")
 
@@ -100,6 +103,7 @@ def _gateway(system, hooks=None, **kwargs):
     hooks = hooks or Hooks()
     gateway = RemoteGateway(
         system,
+        on_start=hooks.on_start,
         on_ready=hooks.on_ready,
         on_off=hooks.on_off,
         clock=lambda: system.now,
@@ -122,7 +126,7 @@ def test_everything_already_running_goes_straight_to_ready():
     gateway.start()
     assert gateway.status()["state"] == "ready"
     assert gateway.is_ready()
-    assert hooks.events == ["ready"]
+    assert hooks.events == ["start", "ready"]
     assert system.calls == ["compose_up"]  # docker and the frontend were skipped
 
 
@@ -148,7 +152,7 @@ def test_expiry_turns_it_off_and_closes_the_gateway():
     expire()
     assert gateway.status()["state"] == "off"
     assert "compose_down" in system.calls
-    assert hooks.events[-1] == "off"
+    assert "off" in hooks.events
 
 
 def test_starting_while_ready_does_nothing():
@@ -157,7 +161,7 @@ def test_starting_while_ready_does_nothing():
     gateway.start()
     gateway.start()
     assert system.calls == ["compose_up"]
-    assert hooks.events == ["ready"]
+    assert hooks.events == ["start", "ready"]
 
 
 def test_docker_not_installed_fails_with_the_reason():
@@ -216,7 +220,7 @@ def test_turning_off_closes_the_gateway_and_the_frontend_it_started():
     gateway.stop()
     assert gateway.status()["state"] == "off"
     assert system.calls[-2:] == ["compose_down", "stop_frontend:frontend-handle"]
-    assert hooks.events[-2:] == ["expiry-cancelled", "off"]
+    assert hooks.events[-2:] == ["off", "expiry-cancelled"]  # revoked before the expiry timer is cancelled
 
 
 def test_turning_off_leaves_a_frontend_that_was_already_running():
@@ -235,7 +239,7 @@ def test_stop_is_idempotent():
     gateway.stop()
     gateway.stop()
     assert gateway.status()["state"] == "off"
-    assert hooks.events == ["off", "off"]
+    assert hooks.events == ["off", "off"]  # nothing started, so no "start"
 
 
 def test_turning_off_while_starting_cancels_and_tears_down():
@@ -296,3 +300,61 @@ def test_startup_cleanup_leaves_a_running_frontend_alone():
     system.gateway_running = True
     _gateway(system)[0].stop_leftovers()
     assert system.frontend_running and not any(c.startswith("stop_frontend") for c in system.calls)
+
+
+# ------------------------------------------------ the session token's hooks
+
+
+def test_on_start_fires_once_per_turning_on():
+    gateway, hooks = _gateway(FakeSystem())
+    gateway.start()
+    gateway.start()  # already ready: no second start
+    assert hooks.events.count("start") == 1
+
+
+def test_on_start_fires_before_the_gateway_comes_up():
+    system = FakeSystem()
+    gateway, hooks = _gateway(system)
+    seen = []
+    original = system.compose_up
+
+    def compose_up():
+        seen.append(list(hooks.events))
+        return original()
+
+    system.compose_up = compose_up
+    gateway.start()
+    assert seen == [["start"]]
+
+
+def test_on_start_does_not_fire_while_starting():
+    system = FakeSystem(docker=False, docker_after=10)
+    gateway, hooks = _gateway(system)
+    system.on_sleep = gateway.start  # a second request arrives during every wait
+    gateway.start()
+    assert hooks.events.count("start") == 1
+
+
+def test_off_fires_on_a_manual_stop_the_expiry_and_a_failed_start():
+    stopped, stopped_hooks = _gateway(FakeSystem())
+    stopped.start()
+    stopped.stop()
+    assert stopped_hooks.events[-2:] == ["off", "expiry-cancelled"]
+
+    expired_system = FakeSystem()
+    expired, expired_hooks = _gateway(expired_system)
+    expired.start()
+    expired_hooks.scheduled[0][1]()
+    assert expired_hooks.events.count("off") == 1
+
+    failed, failed_hooks = _gateway(FakeSystem(docker=False, installed=False))
+    failed.start()
+    assert failed_hooks.events == ["start", "off"]
+
+
+def test_a_start_after_a_stop_is_not_followed_by_a_stale_off():
+    gateway, hooks = _gateway(FakeSystem())
+    gateway.start()
+    gateway.stop()
+    gateway.start()
+    assert hooks.events[-2:] == ["start", "ready"]

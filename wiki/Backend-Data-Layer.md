@@ -21,8 +21,7 @@ testable and readable independent of the web framework wrapping it.
   automatically via `startup()` on process start, plus a periodic 10-minute `asyncio` loop task (see
   `api/app/refresh.py`). `startup()` treats the database as a pure derived cache: it deletes any leftover
   db file from a previous run, calls `refresh()` to rebuild it from disk, and registers an `atexit`
-  handler to delete it again on exit (best-effort). `db_path()` returns `api/.ledger/ledger.db` (gitignored;
-  that `.ledger/` is also where the LAN access token lives — see [Security](Backend-Security.md)).
+  handler to delete it again on exit (best-effort). `db_path()` returns `api/.ledger/ledger.db` (gitignored).
   `_connect()` sets `PRAGMA journal_mode=WAL` and a busy timeout, for the FastAPI server's
   concurrent-request model (multiple browsers/phones reading while a background `refresh()` writes);
   `startup()`/its `atexit` hook also clean up the `-wal`/`-shm` files. `load_projects()` /
