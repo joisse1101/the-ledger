@@ -13,8 +13,8 @@ touching any other window you have open.
 The gateway is no longer part of the default start. It comes up through Remote mode (the switch in
 the dashboard or the desktop widget), which starts Docker if needed and the gateway and shuts them
 down again after 8 hours. -Remote does the same from here: it asks the backend to turn Remote mode
-on, waits until it is ready, and prints the sign-in link/QR the same way gateway\Start-Gateway.ps1
-does. The backend, not this script, owns the gateway: it is started and stopped by Remote mode.
+on and waits until it is ready; the sign-in QR for other devices is then in the dashboard's
+"Open on another device" dialog. The backend, not this script, owns the gateway: it is started and stopped by Remote mode.
 
 -Mode picks how the backend and frontend run - it has no effect on the gateway, which always starts
 the same way either way. `build` (the default, matching normal local use) runs `npm run build` once
@@ -22,7 +22,7 @@ and then serves the built app via `vite preview`, which doesn't rebuild on save,
 backend without `--reload`. `dev` runs `vite`'s hot-reloading dev server instead, and starts the
 backend with uvicorn's `--reload` (restarts on saved changes under `api/`) - for actively working on
 either side. `--reload` re-imports the app fresh per restart, so the backend's own startup
-banner/token print (see `app/cli.py`'s `main()`) is only ever accurate for the first start of a
+banner (see `app/cli.py`'s `main()`) is only ever accurate for the first start of a
 `-Mode dev` session.
 
 Port precedence per BackendPort/FrontendPort/GatewayPort (highest wins): an explicit -*Port
@@ -46,8 +46,8 @@ backend/frontend/gateway from still starting normally. The paired Stop-Ledger.ps
 --reload. 'dev': hot-reloading vite dev server; backend with --reload.
 
 .PARAMETER Remote
-Also turn Remote mode on: start Docker if needed and the gateway, wait until it is ready, and print
-the sign-in link/QR. Switch it off from the dashboard or the widget (or run Stop-Ledger.ps1).
+Also turn Remote mode on: start Docker if needed and the gateway, and wait until it is ready. Scan
+the sign-in QR from the dashboard. Switch it off from the dashboard or the widget (or run Stop-Ledger.ps1).
 
 .PARAMETER NoGateway
 Accepted for old command lines and does nothing: the gateway is no longer started by default.
@@ -229,5 +229,4 @@ if (-not $status -or $status.state -ne 'ready') {
     exit 1
 }
 
-& $python (Join-Path $PSScriptRoot 'api\gateway_signin.py') --gateway-port $GatewayPort
-exit $LASTEXITCODE
+Write-Host "Remote mode is ready. Open the dashboard on this machine and use 'Open on another device' to show the sign-in QR."

@@ -60,9 +60,8 @@ without `--reload`; `dev` runs `npm run dev` and starts the backend with `python
 `python -m app --reload` (also usable directly, outside `Start-Ledger.ps1`) only works because uvicorn
 is given `"app.main:app"` as an import string rather than the already-constructed `app` object — that
 lets it re-import the module fresh in a new subprocess on every change, which is also why the
-backend's startup banner and access-token print in the terminal are only accurate for the very
-first start of a `--reload` session (each subsequent restart re-provisions the same stored token
-silently in `lifespan()`, since the freshly re-imported module never runs `main()` again).
+backend's startup banner in the terminal is only printed for the very first start of a `--reload`
+session (the freshly re-imported module never runs `main()` again).
 
 **One place to see every port at a glance**: copy root `.env.example` to `.env` (gitignored) and
 edit `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` there. `Start-Gateway.ps1`/

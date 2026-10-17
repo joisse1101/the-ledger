@@ -24,12 +24,14 @@ cd gateway
 ```
 
 This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `8080`) and
-then prints the sign-in link/QR for every address this machine is reachable at — e.g.
-`https://<address>:8080/?token=<token>` — via `api/gateway_signin.py`. The gateway serves **HTTPS
+nothing else: it signs no device in, and without Remote mode every request from another device is
+refused. Devices sign in with the QR Remote mode shows, which encodes
+`https://<address>:8080/?token=<token>`. The token is made when Remote mode turns on and discarded
+when it turns off, so each Remote session has its own and a device signed in with an earlier one is
+refused until it scans the new code. The gateway serves **HTTPS
 only**, with a self-signed certificate (there's no plain-HTTP listener to fall back to), so each
 new device's browser shows a one-time certificate warning on first visit — expected, not a
-misconfiguration; accept it once. An old `http://` sign-in link no longer works: re-run
-`Start-Gateway.ps1` and use the freshly printed `https://` one. Opening that link on another
+misconfiguration; accept it once. Opening that link on another
 device signs it in (the token is stored in that browser's `localStorage` and stripped from the
 address bar) and every subsequent request from it carries `Authorization: Bearer <token>`. A local
 request (from this machine, via `localhost`/`127.0.0.1`) needs no token at all; every other request
@@ -47,10 +49,6 @@ mobile browser, silently refuses to even attempt a connection to those ports (`E
 with nothing to see server-side: `curl`/`Test-NetConnection` and the like still succeed, only actual
 browsers fail, which makes this easy to misdiagnose as a firewall or Docker networking problem. Pick
 an ordinary high port instead (`8080`, or anything else not on Chromium's list).
-
-To rotate the access token (e.g. after sharing it), delete `api/.ledger/token` and restart the
-backend; a fresh one is generated on next start (token provisioning is unconditional now, not tied
-to any LAN flag). Setting `LEDGER_TOKEN` in the environment overrides the stored file entirely.
 
 The backend's `--host`/`--port`/`--frontend-port` (or `LEDGER_HOST`/`LEDGER_PORT`/
 `LEDGER_FRONTEND_PORT` env vars) still override its own bind address/port and the port it prints a
@@ -89,10 +87,7 @@ remote" rule gates gateway traffic exactly like it always gated the old `--lan` 
 adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-8080}`
 and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment variables (defaults
 8501/4173). `Start-Gateway.ps1` loads the root `.env` (see [Setup and run](Setup-And-Run.md)), runs
-`docker compose up -d --build`, then calls `api/gateway_signin.py` to print the sign-in banner/QR;
-`Stop-Gateway.ps1` runs `docker compose down` and touches nothing else. `api/gateway_signin.py`
-prints an "Open on this device" `http://localhost:<frontend port>` line (`--frontend-port`, env
-`FRONTEND_PORT`, default 4173), then `https://` links for the other devices, encoding the QR with the
-first HTTPS address, with a note that the self-signed certificate will draw a one-time browser
-warning; it reads the already-provisioned token from `api/.ledger/token` and reuses `banner.discover_ipv4()`/
-`banner.render_qr()` (not its own copy) so address-discovery logic still lives in exactly one place.
+`docker compose up -d --build`; `Stop-Gateway.ps1` runs `docker compose down` and touches nothing
+else. The sign-in link the QR encodes and the address shown beside it are built by
+`api/app/infra/gateway_signin.py` (`signin_url`/`display_url`), called from `remote_service.sign_in_code`,
+which takes the addresses from `banner.discover_ipv4()` so address-discovery logic lives in exactly one place.
