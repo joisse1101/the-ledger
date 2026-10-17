@@ -22,13 +22,13 @@ Python tests, one file per module under test:
   `CORSMiddleware` is registered), `test_security.py` (the auth middleware — local vs. remote,
   bearer-token matching, CSRF header, Host rebinding-guard), `test_banner.py` (address discovery,
   QR rendering, the backend's now-simpler local-only startup banner), `test_cli.py`
-  (`parse_settings`/`main` — host/port/frontend-port precedence, token provisioning on launch,
+  (`parse_settings`/`main` — host/port/frontend-port precedence, no token at launch,
   `--lan` rejected with a message pointing at the gateway),
   `test_live_snapshot.py` (`LiveSnapshot`'s TTL coalescing and per-session failure isolation),
   `test_overview_stats.py` and `test_transcript_query.py` (the pure aggregation/filter/sort logic
   behind Overview and the All list), `test_api_data.py` (the `/api/live`, `/api/transcripts`,
   `/api/sessions/{id}`, `/api/projects`, `/api/overview` routes end to end via `TestClient`),
-  `test_gateway_signin.py` (`gateway_signin.py`'s sign-in banner/QR building and its own CLI),
+  `test_gateway_signin.py` (the sign-in and display address helpers),
   `test_pending_decisions.py` (the pending-prompt store, transcript-based clearing, Remote mode),
   `test_relay_hook.py` (runs the real `hooks/ledgerScripts/Relay-PermissionRequest.ps1` as a subprocess
   against a real uvicorn server: answers become decisions, and every no-answer path prints nothing),

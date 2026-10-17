@@ -6,8 +6,9 @@ loopback). Local requests need no token but must name a loopback host, so a web
 page can't reach the app by rebinding its own DNS name to 127.0.0.1. Everything
 else must present the access token as `Authorization: Bearer <token>` — the
 frontend (always same-origin with the API, via its own dev/preview proxy or the
-gateway) is what turns a printed link's `?token=` into that header; the API itself
-has no query or cookie handling for it. State-changing requests must also carry a
+gateway) is what turns a sign-in link's `?token=` into that header; the API itself
+has no query or cookie handling for it. The token exists only while Remote mode is
+on (see `deps.make_remote`); with none, every non-local request is refused. State-changing requests must also carry a
 custom header, which a page on another site can't add without a CORS preflight —
 and with no `CORSMiddleware` registered at all, every such preflight fails.
 """
@@ -15,18 +16,13 @@ and with no `CORSMiddleware` registered at all, every such preflight fails.
 from __future__ import annotations
 
 import hmac
-import os
 import re
 import secrets
-from pathlib import Path
-from typing import Callable, Mapping, Optional
+from typing import Callable, Optional
 
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
-
-LEDGER_DIR = Path(__file__).resolve().parents[2] / ".ledger"
-TOKEN_ENV = "LEDGER_TOKEN"
 
 CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "ledger"
@@ -46,24 +42,9 @@ UNAUTHORIZED_MESSAGE = (
 )
 
 
-def provision_token(directory: Path = LEDGER_DIR, environ: Mapping[str, str] = os.environ) -> str:
-    """The access token: LEDGER_TOKEN if set, else the stored one, else a new one that is stored."""
-    configured = environ.get(TOKEN_ENV, "").strip()
-    if configured:
-        return configured
-    path = directory / "token"
-    try:
-        stored = path.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        stored = ""
-    if stored:
-        return stored
-    token = secrets.token_urlsafe(32)  # 256 bits
-    directory.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(token + "\n")
-    return token
+def new_token() -> str:
+    """A fresh access token (256 bits). Held in memory for one Remote mode session, never stored."""
+    return secrets.token_urlsafe(32)
 
 
 def is_local(request: Request) -> bool:
@@ -91,7 +72,7 @@ def _bearer(request: Request) -> Optional[str]:
 class SecurityMiddleware:
     def __init__(self, app: ASGIApp, token: Callable[[], Optional[str]]) -> None:
         self.app = app
-        # Looked up per request: the token is only known once the CLI has parsed its options.
+        # Looked up per request: the token changes each time Remote mode turns on or off.
         self._token = token
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

@@ -85,21 +85,18 @@ def launched(monkeypatch):
     """Run main() without starting a server; report what uvicorn was asked to do."""
     calls = []
     monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kwargs: calls.append((app, kwargs)))
-    monkeypatch.setattr(deps, "access_token", None)  # restored afterwards; main() assigns it
-    monkeypatch.setattr(cli, "provision_token", lambda: "tok-123")
-    monkeypatch.delenv("LEDGER_TOKEN", raising=False)
+    monkeypatch.setattr(deps, "access_token", None)  # restored afterwards
     yield calls
 
 
-def test_default_launch_is_local_with_no_access_log_and_provisions_a_token(launched, capsys):
+def test_default_launch_is_local_with_no_access_log_and_no_token(launched, capsys):
     cli.main([])
 
     (app, kwargs), = launched
     assert app is app_main.app
     assert kwargs == {"host": "127.0.0.1", "port": 8501, "access_log": False, "proxy_headers": False}
-    # Token provisioning is unconditional now: the gateway, not this bind address,
-    # decides who can ever present it.
-    assert deps.access_token == "tok-123"
+    # The token belongs to a Remote mode session, so none exists at launch.
+    assert deps.access_token is None
     out = capsys.readouterr().out
     assert "http://localhost:4173/" in out  # the frontend's default port, not the API's
     assert "token" not in out.lower()  # nothing about network sign-in is printed here anymore
@@ -113,16 +110,10 @@ def test_a_custom_port_and_frontend_port_are_passed_through(launched, capsys):
     assert "http://localhost:5000/" in capsys.readouterr().out
 
 
-def test_a_configured_token_is_used_even_when_local_only(launched, monkeypatch):
-    monkeypatch.setenv("LEDGER_TOKEN", "from-env")
-    cli.main([])
-    assert deps.access_token == "tok-123"  # via provision_token, which honours the env var
-
-
 def test_reload_passes_an_import_string_not_the_app_object(launched):
-    # uvicorn only actually reloads when given an import string (see lifespan()'s docstring for
-    # why the app object path can't be reused here) - the app object branch is exercised by
-    # test_default_launch_is_local_with_no_access_log_and_provisions_a_token above.
+    # uvicorn only actually reloads when given an import string, so the reload branch can't reuse
+    # the app object - that branch is exercised by
+    # test_default_launch_is_local_with_no_access_log_and_no_token above.
     cli.main(["--reload"])
 
     (app, kwargs), = launched

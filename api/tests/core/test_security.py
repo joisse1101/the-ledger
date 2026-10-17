@@ -1,10 +1,7 @@
 """Access control: who may reach the API, and cross-origin access from the frontend."""
 
 import asyncio
-import shutil
-import subprocess
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,12 +12,11 @@ from app import main as app_main
 from app import deps
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
-from app.core.security import SecurityMiddleware, provision_token
+from app.core.security import SecurityMiddleware, new_token
 
 TOKEN = "s3cret-token-value_0123456789"
 HEADER = {"X-Requested-With": "ledger"}
 BEARER = {"Authorization": f"Bearer {TOKEN}"}
-REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(autouse=True)
@@ -212,53 +208,21 @@ def test_a_changed_token_refuses_the_old_one(monkeypatch):
     assert remote().get("/api/meta", headers={"Authorization": "Bearer new-token-value"}).status_code == 200
 
 
-# ------------------------------------------------ token provisioning
+# ------------------------------------------------ token generation
 
 
-def test_provisioning_generates_once_and_reuses_it(tmp_path):
-    directory = tmp_path / ".ledger"
-    first = provision_token(directory, environ={})
-    second = provision_token(directory, environ={})
-    assert first == second
+def test_new_tokens_differ_and_are_at_least_128_bits():
+    first, second = new_token(), new_token()
+    assert first != second
     assert len(first) >= 43  # 32 random bytes, urlsafe-base64: at least 128 bits
-    assert (directory / "token").read_text(encoding="utf-8").strip() == first
 
 
-def test_the_environment_setting_wins_and_creates_no_file(tmp_path):
-    directory = tmp_path / ".ledger"
-    assert provision_token(directory, environ={"LEDGER_TOKEN": "from-env"}) == "from-env"
-    assert not directory.exists()
-
-    provision_token(directory, environ={})  # a stored token exists now
-    assert provision_token(directory, environ={"LEDGER_TOKEN": "from-env"}) == "from-env"
-
-
-def test_a_blank_environment_setting_is_ignored(tmp_path):
-    token = provision_token(tmp_path / ".ledger", environ={"LEDGER_TOKEN": "   "})
-    assert token.strip() and token != "   "
-
-
-def test_deleting_the_stored_token_replaces_it(tmp_path):
-    directory = tmp_path / ".ledger"
-    first = provision_token(directory, environ={})
-    (directory / "token").unlink()
-    assert provision_token(directory, environ={}) != first
-
-
-def test_an_empty_token_file_is_regenerated(tmp_path):
-    directory = tmp_path / ".ledger"
-    directory.mkdir()
-    (directory / "token").write_text("\n", encoding="utf-8")
-    assert provision_token(directory, environ={}).strip()
-
-
-@pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
-def test_git_ignores_the_stored_token():
-    result = subprocess.run(
-        ["git", "check-ignore", "api/.ledger/token"], cwd=REPO, capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "api/.ledger/token"
+def test_generating_a_token_writes_no_file(tmp_path, monkeypatch):
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    monkeypatch.chdir(workdir)
+    new_token()
+    assert list(workdir.iterdir()) == []
 
 
 # ------------------------------------------------ cross-site and rebinding guards

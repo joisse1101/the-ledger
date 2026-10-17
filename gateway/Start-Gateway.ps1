@@ -1,13 +1,12 @@
 <#
 .SYNOPSIS
-Starts the gateway container and prints the sign-in link/QR for other devices on this network.
+Starts the gateway container.
 
 .DESCRIPTION
-Starts the gateway container (building it if needed) and then prints the sign-in link/QR for every
-device on this network, via api\gateway_signin.py.
-
-The backend (`python -m app`) must already be running so a token exists to print - if it isn't,
-gateway_signin.py says so and this script's exit code reflects that.
+Starts the gateway container (building it if needed). It does not sign devices in: the access token
+exists only while Remote mode is on, so turn Remote mode on from the dashboard (or run
+Start-Ledger.ps1 -Remote) and scan the QR shown there. Without Remote mode, every request from
+another device is refused.
 
 Precedence per port (highest wins): an explicit -GatewayPort/-BackendPort/-FrontendPort, then the
 repo root's .env (see .env.example) - so that file is the one place to look/set these regardless of
@@ -82,9 +81,3 @@ try {
 } finally {
     Pop-Location
 }
-
-$venvPython = Join-Path $PSScriptRoot '..\api\.venv\Scripts\python.exe'
-$python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
-
-& $python (Join-Path $PSScriptRoot '..\api\gateway_signin.py') --gateway-port $GatewayPort
-exit $LASTEXITCODE

@@ -19,7 +19,7 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 - Layers in `app/`: `routers` (HTTP only) -> `services` (rules, raise `api/app/services/errors.py`) -> `repositories` / `domain` -> `core`; `schemas` shape JSON,
   `infra` wraps the OS, Docker and QR; `deps.py` holds the shared singletons. Imports point downward only;
   `api/tests/test_layers.py` fails the build when one doesn't.
-- Run the server with `python -m app` from `api/`. `backup_history.py`, `gateway_signin.py` and
+- Run the server with `python -m app` from `api/`. `backup_history.py` and
   `check_docs.py` stay at the `api/` root: scheduled tasks and scripts run them by path.
 - Delete routes and Remote-mode switching check `is_local` in the route.
 - No `CORSMiddleware`; the frontend only calls relative `/api` paths.
