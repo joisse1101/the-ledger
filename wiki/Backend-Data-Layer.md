@@ -6,7 +6,10 @@ These modules live in `api/` alongside the server (their only consumer), but are
 no FastAPI/Starlette dependency of their own — keeping them framework-free keeps the pure data layer
 testable and readable independent of the web framework wrapping it.
 
-- `claude_db.py` is the single SQLite-backed store that `claude_projects.py` and
+- `api/app/repositories/db/` is split by job: `paths.py` (where files live), `connection.py` (connections and
+  schemas), `scanner.py` (disk parsing), `snapshot.py` (`refresh`/`startup`), `queries.py` (reads and deletes)
+  and `history.py` (the durable `history.db`).
+- `api/app/repositories/db/` is the single SQLite-backed store that `claude_projects.py` and
   `claude_transcripts.py` both read from, rather than each independently scanning and mtime-caching
   its own file(s) on disk as they used to. All of that disk-reading — `~/.claude.json` and
   `~/.claude/projects/*/*.jsonl` parsing, the `_MODEL_PRICING` table, `sanitize_project_path()`, etc.
@@ -35,25 +38,25 @@ testable and readable independent of the web framework wrapping it.
   directory Claude Code has been run/trusted in, reflecting only that project's *last* session:
   trust status, last session ID, CLI version, cost, start time, lines added/removed, any
   project-scoped MCP servers). `delete_project(project_path)` edits `~/.claude.json` directly (the
-  real source of truth) then removes the matching row from SQLite via `claude_db.delete_project_row()`.
+  real source of truth) then removes the matching row from SQLite via `queries.delete_project_row()`.
 - `claude_transcripts.py` holds the `ClaudeTranscript` dataclass and query/delete functions for
   session transcript data (originally parsed line-by-line from
   `~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl` — every session that has ever run,
-  including exited ones; the parsing itself lives in `claude_db.py`'s `refresh()`). That parsing
+  including exited ones; the parsing itself lives in `snapshot.refresh()`). That parsing
   derives `started_at`/`updated_at` (min/max line timestamp), `message_count` (non-meta `user`/
   `assistant` lines), `context` (the same latest-real-main-thread-turn figure `claude_context.py`
-  shows live, via `claude_db._context_tokens`), `cost` (per-turn `message.usage` priced via
+  shows live, via `scanner._context_tokens`), `cost` (per-turn `message.usage` priced via
   `_MODEL_PRICING`, counted once per unique `message.id`; an *estimate* — unrecognized models are
   silently skipped), `model` (the model with the most main-thread responses, once per
   `message.id`, ignoring `<synthetic>`; ties go to the first seen), `used_openspec` (a `/opsx:*` slash command or an
   `openspec-*`/`opsx:*` Skill call anywhere in the session), and `project` (matching the on-disk parent folder against each project's
   `sanitize_project_path()`, falling back to a cwd/folder-derived guess). `delete_project_transcripts(cwd)`
-  and `delete_transcript(session_id)` look up the affected path(s) via `claude_db`, remove the real
+  and `delete_transcript(session_id)` look up the affected path(s) via `queries`, remove the real
   file(s) (tolerating one already gone — see [History store](Backend-History-Store.md)), then
   delete just those rows from both `ledger.db` and `history.db`.
 - `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`
   (one file per process) directly from disk on every call — unlike projects/transcripts this isn't
-  routed through `claude_db.py`, since the Live views poll it every ~2s and a snapshot refreshed only
+  routed through `app/repositories/db/`, since the Live views poll it every ~2s and a snapshot refreshed only
   on demand would defeat that. `load_sessions()` returns `ClaudeSession` dataclasses sorted by
   `updated_at` descending, with its own module-level cache keyed by each file's mtime. Dead PIDs'
   files may linger, so entries aren't guaranteed to reflect live processes. Each session's `project`
@@ -61,7 +64,7 @@ testable and readable independent of the web framework wrapping it.
   that transcript's `project`, falling back to a `cwd`-derived guess for a brand-new session with
   nothing written to disk yet.
 - `claude_context.py` reads a live session's token usage straight from its transcript, outside
-  `claude_db.py`/SQLite for the same reason `claude_sessions.py` is. The transcript is located from
+  `app/repositories/db/` (SQLite) for the same reason `claude_sessions.py` is. The transcript is located from
   the registry's `cwd` and session ID, falling back to one memoized `*/<session-id>.jsonl` glob.
   **Context** is the latest real main-thread assistant turn's `input + cache_read + cache_creation`
   tokens ("real" = not `isSidechain`, model not `<synthetic>`, non-zero usage, de-duplicated by

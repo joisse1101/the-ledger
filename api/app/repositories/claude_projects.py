@@ -1,4 +1,4 @@
-"""Claude Code project data, read from the SQLite snapshot claude_db.py maintains."""
+"""Claude Code project data, read from the SQLite snapshot `app/repositories/db/` maintains."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.repositories import claude_db
+from app.repositories.db import paths, queries
 
 
 @dataclass
@@ -51,12 +51,12 @@ def _row_to_project(row: sqlite3.Row) -> ClaudeProject:
 
 def load_projects() -> list[ClaudeProject]:
     """Every project entry from the SQLite snapshot, newest-started first."""
-    return [_row_to_project(row) for row in claude_db.fetch_projects()]
+    return [_row_to_project(row) for row in queries.fetch_projects()]
 
 
 def delete_project(project_path: str) -> bool:
     """Remove a project from ~/.claude.json and its SQLite row; True if it was found."""
-    path = claude_db.config_path()
+    path = paths.config_path()
     if not path.is_file():
         return False
 
@@ -67,5 +67,5 @@ def delete_project(project_path: str) -> bool:
 
     del projects_data[project_path]
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    claude_db.delete_project_row(project_path)
+    queries.delete_project_row(project_path)
     return True

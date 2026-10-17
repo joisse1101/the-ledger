@@ -13,7 +13,7 @@ from `api/` puts the cwd on `sys.path`) and `testpaths = ["tests"]`.
 Python tests, one file per module under test:
 - Data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
   `test_claude_sessions.py`, `test_claude_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
-  monkeypatches `claude_db.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
+  monkeypatches `paths.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
   touches the real `~/.claude.json` or `~/.claude/projects/`.
 - API/backend: `test_main.py` (the FastAPI app's lifespan/refresh wiring, asserts no
   `CORSMiddleware` is registered), `test_security.py` (the auth middleware — local vs. remote,

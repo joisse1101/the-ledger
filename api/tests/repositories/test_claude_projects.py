@@ -1,6 +1,6 @@
 import json
 
-from app.repositories import claude_db
+from app.repositories.db import snapshot
 from app.repositories import claude_projects
 
 
@@ -22,7 +22,7 @@ def test_load_projects_maps_fields(isolated_db, write_config):
             }
         },
     )
-    claude_db.refresh()
+    snapshot.refresh()
 
     projects = claude_projects.load_projects()
     assert len(projects) == 1
@@ -41,7 +41,7 @@ def test_load_projects_maps_fields(isolated_db, write_config):
 
 def test_load_projects_empty(isolated_db, write_config):
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()
+    snapshot.refresh()
     assert claude_projects.load_projects() == []
 
 
@@ -49,7 +49,7 @@ def test_delete_project_removes_entry_and_row(isolated_db, write_config):
     tmp_path = isolated_db
     config_file = tmp_path / "claude.json"
     write_config(config_file, {"/a": {}, "/b": {}})
-    claude_db.refresh()
+    snapshot.refresh()
 
     removed = claude_projects.delete_project("/a")
     assert removed is True
@@ -63,7 +63,7 @@ def test_delete_project_removes_entry_and_row(isolated_db, write_config):
 
 def test_delete_project_returns_false_when_not_found(isolated_db, write_config):
     write_config(isolated_db / "claude.json", {"/a": {}})
-    claude_db.refresh()
+    snapshot.refresh()
     assert claude_projects.delete_project("/does-not-exist") is False
 
 

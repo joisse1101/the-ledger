@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from app.repositories import claude_db
+from app.repositories.db import history, paths, snapshot
 from app.repositories import claude_transcripts
 
 
 def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcript):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/home/x/proj")
+    folder = paths.sanitize_project_path("/home/x/proj")
     write_transcript(
         tmp_path / "projects" / folder / "s1.jsonl",
         [
@@ -31,7 +31,7 @@ def test_load_transcripts_maps_fields(isolated_db, write_config, write_transcrip
             },
         ],
     )
-    claude_db.refresh()
+    snapshot.refresh()
 
     transcripts = claude_transcripts.load_transcripts()
     assert len(transcripts) == 1
@@ -56,13 +56,13 @@ def test_delete_project_transcripts_removes_files_and_rows(
 ):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/home/x/proj")
+    folder = paths.sanitize_project_path("/home/x/proj")
     transcript_path = tmp_path / "projects" / folder / "s1.jsonl"
     write_transcript(
         transcript_path,
         [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj"}],
     )
-    claude_db.refresh()
+    snapshot.refresh()
 
     removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
     assert removed_dirs == 1
@@ -72,7 +72,7 @@ def test_delete_project_transcripts_removes_files_and_rows(
 
 def test_delete_project_transcripts_no_match_is_a_noop(isolated_db, write_config):
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()
+    snapshot.refresh()
     assert claude_transcripts.delete_project_transcripts("/nonexistent") == 0
 
 
@@ -83,13 +83,13 @@ def test_delete_project_transcripts_ignores_drifted_cwd(
     deleting the project must still remove it, matched by its on-disk folder."""
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/home/x/proj")
+    folder = paths.sanitize_project_path("/home/x/proj")
     transcript_path = tmp_path / "projects" / folder / "s1.jsonl"
     write_transcript(
         transcript_path,
         [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj/subdir"}],
     )
-    claude_db.refresh()
+    snapshot.refresh()
 
     removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
     assert removed_dirs == 1
@@ -100,13 +100,13 @@ def test_delete_project_transcripts_ignores_drifted_cwd(
 def test_delete_transcript_removes_file_and_row(isolated_db, write_config, write_transcript):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/home/x/proj")
+    folder = paths.sanitize_project_path("/home/x/proj")
     transcript_path = tmp_path / "projects" / folder / "s1.jsonl"
     write_transcript(
         transcript_path,
         [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "sessionId": "s1"}],
     )
-    claude_db.refresh()
+    snapshot.refresh()
 
     assert claude_transcripts.delete_transcript("s1") is True
     assert not transcript_path.exists()
@@ -115,7 +115,7 @@ def test_delete_transcript_removes_file_and_row(isolated_db, write_config, write
 
 def test_delete_transcript_returns_false_when_not_found(isolated_db, write_config):
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()
+    snapshot.refresh()
     assert claude_transcripts.delete_transcript("nonexistent") is False
 
 
@@ -123,9 +123,9 @@ def test_delete_transcript_purges_history_only_session(isolated_db, write_config
     """A session already pruned from disk (known only from history.db) has no file left to
     unlink - the delete still succeeds and purges the history.db row."""
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()
+    snapshot.refresh()
     pruned_path = tmp_path / "gone" / "history-only.jsonl"  # never actually written to disk
-    claude_db.upsert_history_transcripts(
+    history.upsert_history_transcripts(
         [
             {
                 "session_id": "history-only",
@@ -151,16 +151,16 @@ def test_delete_transcript_purges_history_only_session(isolated_db, write_config
 
     assert claude_transcripts.delete_transcript("history-only") is True
     assert claude_transcripts.load_transcripts() == []
-    assert claude_db.fetch_history_transcripts() == []
+    assert history.fetch_history_transcripts() == []
 
 
 def test_delete_project_transcripts_purges_history_only_sessions(isolated_db, write_config):
     """A project whose only remaining record is in history.db (already pruned from disk and
     absent from ledger.db) still has its history.db rows removed by project delete."""
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()
-    folder = claude_db.sanitize_project_path("/home/x/proj")
-    claude_db.upsert_history_transcripts(
+    snapshot.refresh()
+    folder = paths.sanitize_project_path("/home/x/proj")
+    history.upsert_history_transcripts(
         [
             {
                 "session_id": "history-only",
@@ -186,4 +186,4 @@ def test_delete_project_transcripts_purges_history_only_sessions(isolated_db, wr
 
     removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
     assert removed_dirs == 0  # nothing on disk to rmtree for a history-only session
-    assert claude_db.fetch_history_transcripts() == []
+    assert history.fetch_history_transcripts() == []

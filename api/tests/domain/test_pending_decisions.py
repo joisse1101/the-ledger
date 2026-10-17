@@ -2,6 +2,7 @@ import asyncio
 import threading
 from datetime import datetime, timedelta, timezone
 
+from app.repositories.db import paths
 from app.domain import claude_context
 from app.domain.pending_decisions import PendingDecisions
 
@@ -310,7 +311,7 @@ def test_sweep_clears_from_a_worker_thread():
 
 def test_sweep_uses_real_transcript_timestamps(isolated_db, write_transcript):
     """End to end with claude_context.latest_activity over a temporary transcript file."""
-    path = claude_context.claude_db.projects_dir() / claude_context.claude_db.sanitize_project_path("/x/proj") / "s1.jsonl"
+    path = paths.projects_dir() / paths.sanitize_project_path("/x/proj") / "s1.jsonl"
     stamp = lambda seconds: (T0 + timedelta(seconds=seconds)).isoformat()
     write_transcript(path, [{"type": "user", "timestamp": stamp(1)}, {"type": "assistant", "timestamp": stamp(2)}])
     store, clock = make_store()
@@ -341,7 +342,7 @@ def test_sweep_keeps_a_prompt_while_only_assistant_or_bookkeeping_lines_arrive(i
     """Parallel tool calls: a later call of the same batch (an assistant line), or an attachment or
     system note, can be written while the first call's dialog is still open. Only a `user` line -
     the tool result - means the dialog was answered."""
-    path = claude_context.claude_db.projects_dir() / claude_context.claude_db.sanitize_project_path("/x/proj") / "s1.jsonl"
+    path = paths.projects_dir() / paths.sanitize_project_path("/x/proj") / "s1.jsonl"
     stamp = lambda seconds: (T0 + timedelta(seconds=seconds)).isoformat()
     store, clock = make_store()
     clock.now = 10

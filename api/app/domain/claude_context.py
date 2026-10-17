@@ -1,6 +1,6 @@
 """Live context size and per-session token history, read straight from a session's transcript.
 
-Like `claude_sessions.py`, this deliberately bypasses the SQLite snapshot in `claude_db.py`: the
+Like `claude_sessions.py`, this deliberately bypasses the SQLite snapshot in `app/repositories/db/`: the
 Live table polls every 2s, and a snapshot that only refreshes on demand would leave the gauge stale
 (and blank for brand-new sessions). Everything here is absolute tokens - the transcript doesn't say
 what a model's context window is, so nothing is expressed as a percentage of a limit.
@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from app.repositories import claude_db
+from app.repositories.db import paths, scanner
 
 log = logging.getLogger("ledger")
 
@@ -294,7 +294,7 @@ def _scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction], list[Star
 
         turn = Turn(
             message_id=message_id,
-            timestamp=claude_db._parse_iso_timestamp(entry.get("timestamp")),
+            timestamp=scanner.parse_iso_timestamp(entry.get("timestamp")),
             new=_int(usage.get("input_tokens")),
             cache_read=_int(usage.get("cache_read_input_tokens")),
             cache_written=_int(usage.get("cache_creation_input_tokens")),
@@ -395,8 +395,8 @@ _located: dict[str, Path] = {}
 
 
 def transcript_path(session_id: str, cwd: str) -> Optional[Path]:
-    root = claude_db.projects_dir()
-    direct = root / claude_db.sanitize_project_path(cwd) / f"{session_id}.jsonl"
+    root = paths.projects_dir()
+    direct = root / paths.sanitize_project_path(cwd) / f"{session_id}.jsonl"
     if direct.is_file():
         return direct
 
@@ -467,7 +467,7 @@ def _read_tail_latest_timestamp(path: Path) -> Optional[datetime]:
                     continue
                 if not isinstance(entry, dict) or entry.get("type") != "user":
                     continue
-                stamp = claude_db._parse_iso_timestamp(entry.get("timestamp"))
+                stamp = scanner.parse_iso_timestamp(entry.get("timestamp"))
                 if stamp is None:
                     continue
                 if stamp.tzinfo is None:

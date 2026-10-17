@@ -1,149 +1,16 @@
-"""SQLite-backed store for Claude Code project/transcript data.
-
-refresh() is the only place that reads ~/.claude.json and
-~/.claude/projects/*/*.jsonl from disk; everything else (claude_projects,
-claude_transcripts) just queries the SQLite snapshot it writes. Live-session
-polling (claude_sessions) reads its own registry and doesn't go through here.
-"""
+"""Disk scanning: the only code that reads ~/.claude.json and ~/.claude/projects/*/*.jsonl."""
 
 from __future__ import annotations
 
-import atexit
-import json
 import re
-import sqlite3
 from collections import Counter
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Generator, Optional
+from typing import Any, Optional
 
+import json
 
-_BUSY_TIMEOUT_MS = 10_000
-
-
-def db_path() -> Path:
-    return Path(__file__).resolve().parents[2] / ".ledger" / "ledger.db"
-
-
-def history_db_path() -> Path:
-    return Path(__file__).resolve().parents[2] / ".history" / "history.db"
-
-
-def config_path() -> Path:
-    return Path.home() / ".claude.json"
-
-
-def projects_dir() -> Path:
-    return Path.home() / ".claude" / "projects"
-
-
-def sanitize_project_path(path: str) -> str:
-    """Project dir path -> its ~/.claude/projects/ folder name.
-
-    - Every non-alphanumeric character becomes a dash, e.g.
-      "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log".
-    """
-    return "".join(ch if ch.isalnum() else "-" for ch in path)
-
-
-@contextmanager
-def _connect_to(
-    path: Path, ensure_schema: Callable[[sqlite3.Connection], None]
-) -> Generator[sqlite3.Connection, None, None]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, timeout=_BUSY_TIMEOUT_MS / 1000)
-    conn.row_factory = sqlite3.Row
-    try:
-        # WAL lets the API's readers keep reading while a writer commits its
-        # own table replacement; the timeout makes the rare remaining collision wait.
-        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
-        conn.execute("PRAGMA journal_mode = WAL")
-        ensure_schema(conn)
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
-
-
-@contextmanager
-def _connect() -> Generator[sqlite3.Connection, None, None]:
-    with _connect_to(db_path(), _ensure_schema) as conn:
-        yield conn
-
-
-@contextmanager
-def _connect_history() -> Generator[sqlite3.Connection, None, None]:
-    with _connect_to(history_db_path(), _ensure_history_schema) as conn:
-        yield conn
-
-
-def _ensure_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS meta (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-        CREATE TABLE IF NOT EXISTS projects (
-            path TEXT PRIMARY KEY,
-            trust_accepted INTEGER NOT NULL,
-            last_session_id TEXT,
-            last_version TEXT NOT NULL,
-            last_cost REAL,
-            last_start_time TEXT,
-            last_duration_ms INTEGER,
-            lines_added INTEGER,
-            lines_removed INTEGER,
-            mcp_servers TEXT NOT NULL
-        );
-        """
-    )
-    _ensure_history_schema(conn)
-
-
-def _ensure_history_schema(conn: sqlite3.Connection) -> None:
-    """`transcripts` table shape shared by ledger.db (disposable) and history.db (durable)."""
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS transcripts (
-            session_id TEXT PRIMARY KEY,
-            path TEXT NOT NULL,
-            cwd TEXT NOT NULL,
-            version TEXT NOT NULL,
-            git_branch TEXT NOT NULL,
-            started_at TEXT,
-            updated_at TEXT,
-            message_count INTEGER NOT NULL,
-            cost REAL NOT NULL,
-            cost_source TEXT NOT NULL DEFAULT 'estimated',
-            unpriced_models TEXT NOT NULL DEFAULT '[]',
-            cost_state_flagged INTEGER NOT NULL DEFAULT 0,
-            model TEXT NOT NULL DEFAULT '',
-            used_openspec INTEGER NOT NULL DEFAULT 0,
-            context INTEGER,
-            project TEXT NOT NULL,
-            title TEXT NOT NULL DEFAULT '',
-            last_message TEXT NOT NULL DEFAULT '',
-            first_prompt TEXT NOT NULL DEFAULT ''
-        );
-        """
-    )
-    # history.db is never recreated, so a pre-existing file's table predates these
-    # columns - add them in place. ledger.db's CREATE TABLE above already includes
-    # them (that table is dropped and rebuilt every start), so this is a no-op
-    # there beyond the harmless "duplicate column" error being swallowed.
-    for ddl in (
-        "ALTER TABLE transcripts ADD COLUMN cost_source TEXT NOT NULL DEFAULT 'estimated'",
-        "ALTER TABLE transcripts ADD COLUMN unpriced_models TEXT NOT NULL DEFAULT '[]'",
-        "ALTER TABLE transcripts ADD COLUMN cost_state_flagged INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE transcripts ADD COLUMN model TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE transcripts ADD COLUMN used_openspec INTEGER NOT NULL DEFAULT 0",
-    ):
-        try:
-            conn.execute(ddl)
-        except sqlite3.OperationalError:
-            pass
+from app.repositories.db import paths
 
 
 # ---------------------------------------------------------------------------
@@ -158,8 +25,8 @@ def _parse_epoch_ms(value: Any) -> Optional[datetime]:
     return datetime.fromtimestamp(value / 1000)
 
 
-def _scan_projects() -> list[dict[str, Any]]:
-    path = config_path()
+def scan_projects() -> list[dict[str, Any]]:
+    path = paths.config_path()
     if not path.is_file():
         return []
     try:
@@ -232,7 +99,7 @@ def _message_cost(model: str, usage: dict[str, Any]) -> Optional[float]:
     ) / 1_000_000
 
 
-def _parse_iso_timestamp(value: Any) -> Optional[datetime]:
+def parse_iso_timestamp(value: Any) -> Optional[datetime]:
     if not isinstance(value, str):
         return None
     try:
@@ -431,7 +298,7 @@ def _scan_transcript_file(
                 except json.JSONDecodeError:
                     continue
 
-                timestamp = _parse_iso_timestamp(entry.get("timestamp"))
+                timestamp = parse_iso_timestamp(entry.get("timestamp"))
                 if timestamp is not None:
                     if started_at is None or timestamp < started_at:
                         started_at = timestamp
@@ -564,8 +431,8 @@ def _scan_transcript_file(
     }
 
 
-def _scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]:
-    directory = projects_dir()
+def scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]:
+    directory = paths.projects_dir()
     if not directory.is_dir():
         return []
     rows = []
@@ -574,269 +441,3 @@ def _scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]
         if row is not None:
             rows.append(row)
     return rows
-
-
-def _serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
-    """A `_scan_transcripts()`-shaped row (Path/datetime fields) -> one ready for SQLite binding."""
-    return {
-        **row,
-        "path": str(row["path"]),
-        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
-        "unpriced_models": json.dumps(row["unpriced_models"]),
-        "model": row.get("model", ""),
-        "used_openspec": int(row.get("used_openspec", False)),
-    }
-
-
-_TRANSCRIPT_UPSERT_SQL = """
-    INSERT INTO transcripts (
-        session_id, path, cwd, version, git_branch, started_at,
-        updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, model,
-        used_openspec, context, project, title, last_message, first_prompt
-    ) VALUES (
-        :session_id, :path, :cwd, :version, :git_branch, :started_at,
-        :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-        :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
-    )
-    ON CONFLICT(session_id) DO UPDATE SET
-        path = excluded.path,
-        cwd = excluded.cwd,
-        version = excluded.version,
-        git_branch = excluded.git_branch,
-        started_at = excluded.started_at,
-        updated_at = excluded.updated_at,
-        message_count = excluded.message_count,
-        cost = excluded.cost,
-        cost_source = excluded.cost_source,
-        unpriced_models = excluded.unpriced_models,
-        cost_state_flagged = excluded.cost_state_flagged,
-        model = excluded.model,
-        used_openspec = excluded.used_openspec,
-        context = excluded.context,
-        project = excluded.project,
-        title = excluded.title,
-        last_message = excluded.last_message,
-        first_prompt = excluded.first_prompt
-"""
-
-
-def upsert_history_transcripts(rows: list[dict[str, Any]]) -> None:
-    """Insert or update `history.db` transcript rows, keyed by `session_id`.
-
-    `rows` is `_scan_transcripts()`-shaped (Path/datetime fields, one dict per transcript).
-    A row whose `session_id` already exists is overwritten in place rather than duplicated,
-    so re-running a backup against a still-growing session never creates a second row for it.
-    """
-    if not rows:
-        return
-    with _connect_history() as conn:
-        conn.executemany(_TRANSCRIPT_UPSERT_SQL, [_serialize_transcript_row(r) for r in rows])
-
-
-def fetch_history_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row ever backed up to `history.db`, including ones since pruned from disk."""
-    with _connect_history() as conn:
-        return conn.execute("SELECT * FROM transcripts").fetchall()
-
-
-def refresh() -> datetime:
-    """Rescan disk and replace the database's contents; returns the new refreshed-at timestamp."""
-    project_rows = _scan_projects()
-    project_by_folder = {
-        sanitize_project_path(p["path"]): Path(p["path"]).name for p in project_rows
-    }
-    transcript_rows = _scan_transcripts(project_by_folder)
-    now = datetime.now()
-
-    with _connect() as conn:
-        conn.execute("DELETE FROM projects")
-        conn.executemany(
-            """
-            INSERT INTO projects (
-                path, trust_accepted, last_session_id, last_version, last_cost,
-                last_start_time, last_duration_ms, lines_added, lines_removed,
-                mcp_servers
-            ) VALUES (
-                :path, :trust_accepted, :last_session_id, :last_version, :last_cost,
-                :last_start_time, :last_duration_ms, :lines_added, :lines_removed,
-                :mcp_servers
-            )
-            """,
-            [
-                {
-                    **p,
-                    "last_start_time": (
-                        p["last_start_time"].isoformat() if p["last_start_time"] else None
-                    ),
-                    "mcp_servers": json.dumps(p["mcp_servers"]),
-                }
-                for p in project_rows
-            ],
-        )
-
-        conn.execute("DELETE FROM transcripts")
-        conn.executemany(
-            """
-            INSERT INTO transcripts (
-                session_id, path, cwd, version, git_branch, started_at,
-                updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged,
-                model, used_openspec, context, project, title, last_message, first_prompt
-            ) VALUES (
-                :session_id, :path, :cwd, :version, :git_branch, :started_at,
-                :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-                :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
-            )
-            """,
-            [_serialize_transcript_row(t) for t in transcript_rows],
-        )
-
-        conn.execute(
-            """
-            INSERT INTO meta (key, value) VALUES ('refreshed_at', ?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value
-            """,
-            (now.isoformat(),),
-        )
-
-    return now
-
-
-_started = False
-
-
-def _remove_db_files(path: Path) -> None:
-    """Delete the database and its WAL side files (best effort)."""
-    for suffix in ("", "-wal", "-shm"):
-        try:
-            Path(f"{path}{suffix}").unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
-def startup() -> None:
-    """Wipe any on-disk snapshot left over from a previous run and rebuild it fresh.
-
-    - Database is a derived cache, never a source of truth
-    - Registers a best-effort cleanup of the same files (including the WAL's
-      `-wal`/`-shm` side files) on process exit
-    """
-    global _started
-    if _started:
-        return
-    _started = True
-    path = db_path()
-    _remove_db_files(path)
-    refresh()
-    atexit.register(_remove_db_files, path)
-
-
-def refreshed_at() -> Optional[datetime]:
-    """When the database was last refreshed, or None for a brand-new db."""
-    with _connect() as conn:
-        row = conn.execute("SELECT value FROM meta WHERE key = 'refreshed_at'").fetchone()
-    return datetime.fromisoformat(row["value"]) if row else None
-
-
-def fetch_projects() -> list[sqlite3.Row]:
-    """Every project row, newest-started first (NULLs last)."""
-    with _connect() as conn:
-        return conn.execute(
-            "SELECT * FROM projects ORDER BY last_start_time IS NULL, last_start_time DESC"
-        ).fetchall()
-
-
-def fetch_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row, live `ledger.db` rows merged with `history.db`'s durable rows by
-    `session_id` (the live row wins whenever a session exists in both - it's the fresher scan),
-    newest-updated first (NULLs last)."""
-    with _connect() as conn:
-        live_rows = conn.execute("SELECT * FROM transcripts").fetchall()
-    history_rows = fetch_history_transcripts()
-
-    merged: dict[str, sqlite3.Row] = {row["session_id"]: row for row in history_rows}
-    merged.update({row["session_id"]: row for row in live_rows})
-
-    # Empty string sorts before any ISO timestamp, so `reverse=True` puts NULLs
-    # (mapped to "") last while still ordering real timestamps newest-first.
-    return sorted(merged.values(), key=lambda row: row["updated_at"] or "", reverse=True)
-
-
-def git_branches(session_ids: list[str]) -> dict[str, str]:
-    """`git_branch` per session id from `ledger.db`; ids it has no row for are left out."""
-    if not session_ids:
-        return {}
-    marks = ",".join("?" * len(session_ids))
-    with _connect() as conn:
-        rows = conn.execute(
-            f"SELECT session_id, git_branch FROM transcripts WHERE session_id IN ({marks})", session_ids
-        ).fetchall()
-    return {row["session_id"]: row["git_branch"] for row in rows}
-
-
-def delete_project_row(project_path: str) -> None:
-    with _connect() as conn:
-        conn.execute("DELETE FROM projects WHERE path = ?", (project_path,))
-
-
-def transcript_paths_for_project(project_path: str) -> list[Path]:
-    """Transcript file paths filed under `project_path`'s own `~/.claude/projects/` folder.
-
-    Matched by that on-disk folder name (`sanitize_project_path(project_path)`) rather than
-    each transcript's own recorded `cwd` - a session can `cd` partway through and leave `cwd`
-    pointing below the project root, but the folder a transcript is filed under never changes.
-    """
-    folder = sanitize_project_path(project_path)
-    with _connect() as conn:
-        rows = conn.execute("SELECT DISTINCT path FROM transcripts").fetchall()
-    return [Path(row["path"]) for row in rows if Path(row["path"]).parent.name == folder]
-
-
-def _delete_transcript_rows_by_project_in(
-    connect: Callable[[], Any], folder: str
-) -> None:
-    with connect() as conn:
-        rows = conn.execute("SELECT session_id, path FROM transcripts").fetchall()
-        session_ids = [row["session_id"] for row in rows if Path(row["path"]).parent.name == folder]
-        if session_ids:
-            conn.executemany(
-                "DELETE FROM transcripts WHERE session_id = ?",
-                [(sid,) for sid in session_ids],
-            )
-
-
-def delete_transcript_rows_by_project(project_path: str) -> None:
-    """Remove a project's transcript rows from both `ledger.db` and `history.db`.
-
-    Matched by the same on-disk folder name `transcript_paths_for_project` uses, since a
-    `history.db` row (a session already pruned from disk) carries the same `path` shape.
-    """
-    folder = sanitize_project_path(project_path)
-    _delete_transcript_rows_by_project_in(_connect, folder)
-    _delete_transcript_rows_by_project_in(_connect_history, folder)
-
-
-def transcript_path_for_session(session_id: str) -> Optional[Path]:
-    """A session's transcript path from `ledger.db`, falling back to `history.db` when the
-    session is no longer live (e.g. already pruned from disk) - so callers checking whether a
-    session is known at all (the delete route's 404 check) recognize a history-only session too.
-    """
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
-        ).fetchone()
-    if row is not None:
-        return Path(row["path"])
-    with _connect_history() as conn:
-        row = conn.execute(
-            "SELECT path FROM transcripts WHERE session_id = ?", (session_id,)
-        ).fetchone()
-    return Path(row["path"]) if row else None
-
-
-def delete_transcript_row(session_id: str) -> None:
-    """Remove one session's row from whichever of `ledger.db`/`history.db` has it."""
-    with _connect() as conn:
-        conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))
-    with _connect_history() as conn:
-        conn.execute("DELETE FROM transcripts WHERE session_id = ?", (session_id,))

@@ -1,4 +1,4 @@
-"""Claude Code session transcript data, read from the SQLite snapshot claude_db.py maintains.
+"""Claude Code session transcript data, read from the SQLite snapshot `app/repositories/db/` maintains.
 
 Covers every session that has ever run (unlike claude_sessions.py's live-only registry).
 """
@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.repositories import claude_db
+from app.repositories.db import queries
 
 
 @dataclass
@@ -77,18 +77,18 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
 
 def load_transcripts() -> list[ClaudeTranscript]:
     """Every session transcript from the SQLite snapshot, newest-updated first."""
-    return [_row_to_transcript(row) for row in claude_db.fetch_transcripts()]
+    return [_row_to_transcript(row) for row in queries.fetch_transcripts()]
 
 
 def delete_project_transcripts(project_path: str) -> int:
     """Delete a project's on-disk transcript dir(s) and their SQLite rows; returns dirs removed."""
     # Matched by the on-disk folder a transcript is filed under (see
-    # claude_db.transcript_paths_for_project), not by each transcript's own recorded `cwd` -
+    # queries.transcript_paths_for_project), not by each transcript's own recorded `cwd` -
     # that can point below the project root if a session `cd`'d partway through.
-    transcript_dirs = {path.parent for path in claude_db.transcript_paths_for_project(project_path)}
+    transcript_dirs = {path.parent for path in queries.transcript_paths_for_project(project_path)}
     for directory in transcript_dirs:
         shutil.rmtree(directory, ignore_errors=True)
-    claude_db.delete_transcript_rows_by_project(project_path)
+    queries.delete_transcript_rows_by_project(project_path)
     return len(transcript_dirs)
 
 
@@ -99,7 +99,7 @@ def delete_transcript(session_id: str) -> bool:
     file left to remove - `unlink()`'s `FileNotFoundError` is treated as "already gone" rather
     than a failure, and the row purge still runs against whichever store has it.
     """
-    path = claude_db.transcript_path_for_session(session_id)
+    path = queries.transcript_path_for_session(session_id)
     if path is None:
         return False
     try:
@@ -108,5 +108,5 @@ def delete_transcript(session_id: str) -> bool:
         pass
     except OSError:
         return False
-    claude_db.delete_transcript_row(session_id)
+    queries.delete_transcript_row(session_id)
     return True

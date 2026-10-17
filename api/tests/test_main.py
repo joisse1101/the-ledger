@@ -2,7 +2,7 @@ import pytest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from app.repositories import claude_db
+from app.repositories.db import snapshot
 from app import main as app_main
 from app import deps, refresh
 from app.domain.live_snapshot import LiveSnapshot
@@ -36,7 +36,7 @@ def test_meta_has_refreshed_at_field(client):
 
 
 def test_meta_reports_the_snapshot_timestamp(client):
-    stamp = claude_db.refresh()
+    stamp = snapshot.refresh()
     assert client.get("/api/meta").json()["refreshed_at"] == stamp.isoformat()
 
 
@@ -70,7 +70,7 @@ def test_concurrent_refreshes_run_one_after_the_other(monkeypatch):
             active -= 1
         return datetime.now()
 
-    monkeypatch.setattr(claude_db, "refresh", slow_refresh)
+    monkeypatch.setattr(snapshot, "refresh", slow_refresh)
     threads = [threading.Thread(target=refresh.locked_refresh) for _ in range(4)]
     for thread in threads:
         thread.start()
@@ -117,8 +117,8 @@ def test_refresh_loop_survives_a_failed_scan(monkeypatch):
 
 
 def test_lifespan_seeds_the_snapshot(isolated_db, monkeypatch):
-    monkeypatch.setattr(claude_db, "_started", False)
-    monkeypatch.setattr(claude_db.atexit, "register", lambda *a: None)
+    monkeypatch.setattr(snapshot, "_started", False)
+    monkeypatch.setattr(snapshot.atexit, "register", lambda *a: None)
     # lifespan() provisions a token itself when none is set (see its docstring) - stub that out so
     # this test doesn't touch the real api/.ledger/token file.
     monkeypatch.setattr(deps, "access_token", None)

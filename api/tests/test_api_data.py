@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 
 from app.domain import claude_context
 from app.infra import banner
-from app.repositories import claude_db, claude_transcripts
+from app.repositories import claude_transcripts
+from app.repositories.db import history, paths, queries, scanner, snapshot
 from app import main as app_main
 from app import deps
 from app.services import session_service
@@ -63,7 +64,7 @@ def _use_live(monkeypatch, sessions=(), context=lambda session_id, cwd: None):
 
 def _add_session(root, write_transcript, session_id, cwd, *, branch="main", version="1.0", text="hello",
                  ts="2024-01-01T10:00:00Z"):
-    folder = claude_db.sanitize_project_path(cwd)
+    folder = paths.sanitize_project_path(cwd)
     write_transcript(
         root / "projects" / folder / f"{session_id}.jsonl",
         [
@@ -82,7 +83,7 @@ def seeded(isolated_db, write_config, write_transcript):
                  ts="2024-01-02T10:00:00Z")
     _add_session(isolated_db, write_transcript, "ccc-3", "/h/beta", branch="main", version="2.0", text="third",
                  ts="2024-01-03T10:00:00Z")
-    claude_db.refresh()
+    snapshot.refresh()
     return isolated_db
 
 
@@ -731,7 +732,7 @@ def test_overview_scoped_projects_with_the_same_basename_are_not_merged(
     _add_session(isolated_db, write_transcript, "one-1", "/h/one/app", branch="main")
     _add_session(isolated_db, write_transcript, "two-1", "/h/two/app", branch="dev")
     _add_session(isolated_db, write_transcript, "two-2", "/h/two/app", branch="dev")
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
     client = _client()
 
@@ -759,12 +760,12 @@ def test_overview_scoped_call_still_applies_the_range(with_projects):
 def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
     """A session already pruned from disk - known only from history.db, never ledger.db.
 
-    Timestamps are UTC-aware, matching every real row: claude_db._parse_iso_timestamp()
+    Timestamps are UTC-aware, matching every real row: scanner.parse_iso_timestamp()
     always attaches an offset, so a real history.db row is never naive - unlike the seeded
     live rows here (parsed from "...Z" timestamps), a naive one would crash sort_transcripts()
     comparing it against them.
     """
-    folder = claude_db.sanitize_project_path(cwd)
+    folder = paths.sanitize_project_path(cwd)
     row = {
         "session_id": session_id,
         "path": Path(f"/whatever/{folder}/{session_id}.jsonl"),
@@ -789,7 +790,7 @@ def _history_only_row(session_id="pruned-1", cwd="/h/alpha", **overrides):
 
 
 def test_transcripts_lists_a_history_only_pruned_session(api):
-    claude_db.upsert_history_transcripts([_history_only_row()])
+    history.upsert_history_transcripts([_history_only_row()])
     response = api.get("/api/transcripts")
     assert response.status_code == 200
     assert "pruned-1" in _ids(response)
@@ -797,7 +798,7 @@ def test_transcripts_lists_a_history_only_pruned_session(api):
 
 
 def test_overview_counts_a_history_only_pruned_session(api):
-    claude_db.upsert_history_transcripts([_history_only_row()])
+    history.upsert_history_transcripts([_history_only_row()])
     body = api.get("/api/overview").json()
     assert body["summary"]["sessions"] == 4
     by_group = {row["group"]: row["sessions"] for row in body["groups"]}
@@ -830,7 +831,7 @@ def _assistant(message_id, *, new=0, read=0, written=0, tools=(), ts="2024-01-01
 def with_turns(isolated_db, write_config, write_transcript):
     """One session, aaa-1 in /h/alpha, with four assistant turns growing 50k -> 81k."""
     write_config(isolated_db / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/h/alpha")
+    folder = paths.sanitize_project_path("/h/alpha")
     write_transcript(
         isolated_db / "projects" / folder / "aaa-1.jsonl",
         [
@@ -842,7 +843,7 @@ def with_turns(isolated_db, write_config, write_transcript):
             _assistant("m4", read=65_000, written=16_000),
         ],
     )
-    claude_db.refresh()
+    snapshot.refresh()
     return isolated_db
 
 
@@ -885,7 +886,7 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
     isolated_db, write_config, write_transcript, monkeypatch
 ):
     write_config(isolated_db / "claude.json", {})
-    folder = claude_db.sanitize_project_path("/h/alpha")
+    folder = paths.sanitize_project_path("/h/alpha")
     skills = {"type": "attachment", "attachment": {
         "type": "skill_listing", "isInitial": True, "skillCount": 2, "names": ["a", "b"],
         "content": "- a: " + "x" * 400 + "\n- b: " + "y" * 200}}
@@ -899,13 +900,13 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
             _assistant("m2", read=12_000, tools=[("Read", {})]),
         ],
     )
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
 
     detail = _client().get("/api/sessions/aaa-1").json()["detail"]
 
-    [snapshot] = detail["breakdown"]["snapshots"]
-    [category] = snapshot["categories"]
+    [startup_snapshot] = detail["breakdown"]["snapshots"]
+    [category] = startup_snapshot["categories"]
     assert category["name"] == "Skills"
     assert category["tokens"] == sum(item["tokens"] for item in category["items"]) > 0
     for row, turn in zip(detail["breakdown"]["turns"], detail["turns"]):
@@ -965,7 +966,7 @@ def test_malformed_session_ids_are_rejected_before_any_filesystem_access(api, mo
     monkeypatch.setattr(claude_context, "load_detail", boom)
     monkeypatch.setattr(claude_context, "transcript_path", boom)
     monkeypatch.setattr(claude_transcripts, "delete_transcript", boom)
-    monkeypatch.setattr(claude_db, "transcript_path_for_session", boom)
+    monkeypatch.setattr(queries, "transcript_path_for_session", boom)
     for method in (api.get, api.delete):
         assert method(f"/api/sessions/{bad_id}").status_code in (404, 422)
 
@@ -987,11 +988,11 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
 
 def test_deleting_a_live_session_is_409_and_keeps_the_file(seeded, monkeypatch):
     _use_live(monkeypatch, [_live_session("bbb-2")])
-    path = claude_db.transcript_path_for_session("bbb-2")
+    path = queries.transcript_path_for_session("bbb-2")
     response = _client().delete("/api/sessions/bbb-2")
     assert response.status_code == 409
     assert path.exists()
-    assert claude_db.transcript_path_for_session("bbb-2") is not None
+    assert queries.transcript_path_for_session("bbb-2") is not None
 
 
 def test_liveness_for_delete_is_a_fresh_read_not_the_cached_snapshot(seeded, monkeypatch):
@@ -1006,7 +1007,7 @@ def test_liveness_for_delete_is_a_fresh_read_not_the_cached_snapshot(seeded, mon
 
 
 def test_deleting_a_finished_session_removes_the_file_and_the_row(api):
-    path = claude_db.transcript_path_for_session("bbb-2")
+    path = queries.transcript_path_for_session("bbb-2")
     response = api.delete("/api/sessions/bbb-2")
     assert response.status_code == 200
     assert not path.exists()
@@ -1030,7 +1031,7 @@ def with_projects(seeded, write_config, monkeypatch):
             "/h/beta": {},
         },
     )
-    claude_db.refresh()
+    snapshot.refresh()
     _use_live(monkeypatch)
     return _client()
 
@@ -1045,7 +1046,7 @@ def test_projects_lists_what_the_snapshot_knows(with_projects):
 
 
 def test_deleting_a_project_removes_its_entry_and_transcripts(with_projects, seeded):
-    alpha_files = [claude_db.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2")]
+    alpha_files = [queries.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2")]
     response = with_projects.delete("/api/projects", params={"path": "/h/alpha"})
     assert response.status_code == 200
     assert [p["path"] for p in with_projects.get("/api/projects").json()["projects"]] == ["/h/beta"]
@@ -1056,7 +1057,7 @@ def test_deleting_a_project_removes_its_entry_and_transcripts(with_projects, see
 
 @pytest.mark.parametrize("path", ["/h/alph", "/h/alpha/", "/h", "..", "/h/alpha/../beta", ""])
 def test_a_project_path_not_in_the_snapshot_is_rejected_and_nothing_is_deleted(with_projects, seeded, path):
-    files = [claude_db.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2", "ccc-3")]
+    files = [queries.transcript_path_for_session(s) for s in ("aaa-1", "bbb-2", "ccc-3")]
     config_before = (seeded / "claude.json").read_text(encoding="utf-8")
     response = with_projects.delete("/api/projects", params={"path": path})
     assert response.status_code == 404

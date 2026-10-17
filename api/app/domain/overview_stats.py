@@ -75,7 +75,7 @@ def filter_by_project(
 ) -> list[ClaudeTranscript]:
     """Transcripts filed under one project's on-disk folder.
 
-    Matches the transcript file's parent folder name (`claude_db.sanitize_project_path` of the
+    Matches the transcript file's parent folder name (`paths.sanitize_project_path` of the
     project path), not `transcript.project`, which is only a basename: two projects whose folders
     share a name must not be merged.
     """

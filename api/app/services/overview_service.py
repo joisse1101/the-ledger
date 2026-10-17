@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Optional
 
 from app.domain import overview_stats
-from app.repositories import claude_db, claude_projects, claude_transcripts
+from app.repositories import claude_projects, claude_transcripts
+from app.repositories.db import paths
 from app.services.errors import InvalidInput, NotFound
 
 
@@ -25,7 +26,7 @@ def get_overview(range_: str, project: Optional[str], group_by: str, bucket_minu
         # server-side, never taken from the request.
         if project not in {p.path for p in claude_projects.load_projects()}:
             raise NotFound("unknown project")
-        folder = claude_db.sanitize_project_path(project)
+        folder = paths.sanitize_project_path(project)
     return overview_stats.overview(
         claude_transcripts.load_transcripts(), range_, folder, group_by, bucket_minutes
     )

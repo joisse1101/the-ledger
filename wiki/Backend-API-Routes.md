@@ -13,7 +13,7 @@ lets uvicorn re-import the module fresh per restart — which is also why `main(
 provisioning (see `lifespan` below) is duplicated, guarded, in `lifespan` itself: the reload
 subprocess re-imports the module without ever calling `main()`. Every module it imports lives
 alongside it in `api/`, so running it directly (which puts its own directory on `sys.path`) is all
-the import setup it needs. Its `lifespan` calls `claude_db.startup()` in a worker thread on start and runs
+the import setup it needs. Its `lifespan` calls `snapshot.startup()` in a worker thread on start and runs
 a 10-minute `refresh_loop()` for as long as the process is up, both funneled through a process-wide
 `refresh.lock` (`api/app/refresh.py`) shared with `POST /api/refresh` so a scan (which can take seconds on a big history)
 is never triggered twice concurrently. It serves `/api/*` only — no HTML, no static assets; the
@@ -41,7 +41,7 @@ frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Lay
 | `POST /api/files/{name}/download-link` | `{url}` for a single-use, 60 second link to that one file (404 if it isn't there). A browser download can't send the bearer header, so the page asks here first |
 | `GET /api/files/download/{ticket}` | Redeems the link and streams the file, `no-store`; 403 for an unknown, used or expired ticket. The one request that needs no bearer token (`security.py` matches this path shape only; the ticket is the credential) |
 | `DELETE /api/files/{name}` | **Local requests only**, like the other deletes |
-| `GET /api/overview?range=&project=&group_by=` | 422 for an unknown range label or `group_by` (`project` default, or `branch`); `project` (a path from `/api/projects`) scopes it to that project's transcripts and 404s unless it exactly matches a known project (its folder is derived server-side via `claude_db.sanitize_project_path`); otherwise `overview_stats.overview()`'s payload, whose donut/bar rows are `groups` (each keyed `group`) plus `group_order`; every response (empty or not) also carries `available_ranges`, the `TIME_RANGES` labels with at least one session in scope (the project's, when scoped), which the Projects panel uses to disable empty range buttons |
+| `GET /api/overview?range=&project=&group_by=` | 422 for an unknown range label or `group_by` (`project` default, or `branch`); `project` (a path from `/api/projects`) scopes it to that project's transcripts and 404s unless it exactly matches a known project (its folder is derived server-side via `paths.sanitize_project_path`); otherwise `overview_stats.overview()`'s payload, whose donut/bar rows are `groups` (each keyed `group`) plus `group_order`; every response (empty or not) also carries `available_ranges`, the `TIME_RANGES` labels with at least one session in scope (the project's, when scoped), which the Projects panel uses to disable empty range buttons |
 
 The drop folder is `api/.ledger/transfer/` (gitignored), or `LEDGER_TRANSFER_DIR` if set; its logic lives
 in `api/app/infra/file_drop.py` (no web imports), which also holds `DownloadTickets`. The routes never accept a path,

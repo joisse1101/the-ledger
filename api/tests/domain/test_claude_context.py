@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app.repositories.db import paths
 from app.domain import claude_context
 from app.domain.claude_context import (
     Compaction,
@@ -219,7 +220,7 @@ def test_tail_reader_drops_the_first_line_of_a_window_that_starts_mid_file(tmp_p
 
 def test_transcript_path_uses_the_sanitized_cwd(isolated_db, write_transcript):
     projects = isolated_db / "projects"
-    path = projects / claude_context.claude_db.sanitize_project_path("C:\\Users\\me\\proj") / "s1.jsonl"
+    path = projects / paths.sanitize_project_path("C:\\Users\\me\\proj") / "s1.jsonl"
     write_transcript(path, [_assistant("m1", read=1)])
     assert transcript_path("s1", "C:\\Users\\me\\proj") == path
 
@@ -241,7 +242,7 @@ def test_transcript_path_missing(isolated_db):
 
 
 def _write_session(isolated_db, write_transcript, session_id="s1", cwd="/x/proj", entries=()):
-    path = isolated_db / "projects" / claude_context.claude_db.sanitize_project_path(cwd) / f"{session_id}.jsonl"
+    path = isolated_db / "projects" / paths.sanitize_project_path(cwd) / f"{session_id}.jsonl"
     write_transcript(path, list(entries))
     return path
 

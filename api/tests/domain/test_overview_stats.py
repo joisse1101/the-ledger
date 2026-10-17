@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.repositories import claude_db
+from app.repositories.db import history, snapshot
 from app.repositories import claude_transcripts
 from app.domain import overview_stats as overview
 from app.repositories.claude_transcripts import ClaudeTranscript
@@ -465,8 +465,8 @@ def _history_only_row(session_id="pruned", **overrides):
 
 def test_overview_counts_a_history_only_session_with_unmodified_code(isolated_db, write_config):
     write_config(isolated_db / "claude.json", {})
-    claude_db.refresh()  # nothing left on disk - the session only exists in history.db
-    claude_db.upsert_history_transcripts([_history_only_row()])
+    snapshot.refresh()  # nothing left on disk - the session only exists in history.db
+    history.upsert_history_transcripts([_history_only_row()])
 
     transcripts = claude_transcripts.load_transcripts()
     result = overview.overview(transcripts, "All time")

@@ -7,7 +7,7 @@ import logging
 import threading
 from datetime import datetime
 
-from app.repositories import claude_db
+from app.repositories.db import snapshot
 
 log = logging.getLogger("ledger")
 
@@ -22,12 +22,12 @@ lock = threading.Lock()
 
 def locked_refresh() -> datetime:
     with lock:
-        return claude_db.refresh()
+        return snapshot.refresh()
 
 
 def startup_snapshot() -> None:
     with lock:
-        claude_db.startup()
+        snapshot.startup()
 
 
 async def refresh_loop(interval: float = REFRESH_INTERVAL_SECONDS) -> None:

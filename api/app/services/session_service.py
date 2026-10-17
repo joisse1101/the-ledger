@@ -9,7 +9,8 @@ from urllib.parse import quote
 
 from app import deps, refresh
 from app.domain import claude_context
-from app.repositories import claude_db, claude_transcripts
+from app.repositories import claude_transcripts
+from app.repositories.db import queries
 from app.services.errors import Conflict, NotFound, OperationFailed
 
 # Invoked, unmodified, by POST /api/sessions/{id}/open-repo - this repo's own copy, not any
@@ -54,7 +55,7 @@ def delete_session(session_id: str) -> None:
     if deps.live.is_live_now(session_id):
         raise Conflict("session is live and cannot be deleted")
     with refresh.lock:  # a concurrent rescan could otherwise re-add the row
-        if claude_db.transcript_path_for_session(session_id) is None:
+        if queries.transcript_path_for_session(session_id) is None:
             raise NotFound("unknown session")
         if not claude_transcripts.delete_transcript(session_id):
             raise OperationFailed("could not delete the transcript file")

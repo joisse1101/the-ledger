@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from app.domain import claude_context
-from app.repositories import claude_db
+from app.repositories.db import queries
 from app.repositories import claude_sessions
 
 LIVE_TTL_SECONDS = 1.0
@@ -42,7 +42,7 @@ class LiveSnapshot:
         self._latest_activity = latest_activity or (
             lambda session_id, cwd: claude_context.latest_activity(session_id, cwd)
         )
-        self._git_branches = git_branches or (lambda ids: claude_db.git_branches(ids))
+        self._git_branches = git_branches or (lambda ids: queries.git_branches(ids))
         self._ttl = ttl
         self._clock = clock
         self._lock = threading.Lock()

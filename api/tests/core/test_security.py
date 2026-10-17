@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.repositories import claude_db
+from app.repositories.db import snapshot
 from app import main as app_main
 from app import deps
 from app.domain.live_snapshot import LiveSnapshot
@@ -163,7 +163,7 @@ def _seed_finished_session(isolated_db, write_config, write_transcript):
         [{"type": "user", "timestamp": "2024-01-01T00:00:00Z", "cwd": "/h/alpha", "sessionId": "aaa-1",
           "message": {"content": "hi"}}],
     )
-    claude_db.refresh()
+    snapshot.refresh()
     return transcript
 
 
