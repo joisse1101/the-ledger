@@ -8,7 +8,7 @@ from typing import Optional
 from urllib.parse import quote
 
 from app import deps, refresh
-from app.domain import claude_context
+from app.domain.context import detail, models
 from app.repositories import claude_transcripts
 from app.repositories.db import queries
 from app.services.errors import Conflict, NotFound, OperationFailed
@@ -24,7 +24,7 @@ class SessionView:
     live: bool
     transcript: Optional[claude_transcripts.ClaudeTranscript]
     live_item: Optional[dict]
-    detail: Optional[claude_context.SessionDetail]
+    detail: Optional[models.SessionDetail]
 
 
 def _find_transcript(session_id: str) -> Optional[claude_transcripts.ClaudeTranscript]:
@@ -45,7 +45,7 @@ def get_session(session_id: str) -> SessionView:
         live=session_id in live_ids,
         transcript=transcript,
         live_item=live_item,
-        detail=claude_context.load_detail(session_id, cwd),
+        detail=detail.load_detail(session_id, cwd),
     )
 
 

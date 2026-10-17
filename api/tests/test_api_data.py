@@ -9,14 +9,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain import claude_context
 from app.infra import banner
 from app.repositories import claude_transcripts
 from app.repositories.db import history, paths, queries, scanner, snapshot
 from app import main as app_main
 from app import deps
 from app.services import session_service
-from app.domain.claude_context import LiveContext
+from app.domain.context import breakdown as context_breakdown, detail as context_detail, tail as context_tail
+from app.domain.context.models import LiveContext
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
 from app.domain.pending_decisions import PendingDecisions
@@ -915,8 +915,8 @@ def test_session_detail_breakdown_carries_startup_categories_that_sum_to_each_co
 
 def test_session_detail_breakdown_failure_drops_only_the_breakdown(with_turns, monkeypatch):
     _use_live(monkeypatch)
-    monkeypatch.setattr(claude_context, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
-    claude_context._detail_cache.clear()
+    monkeypatch.setattr(context_breakdown, "build_breakdown", lambda *_a: (_ for _ in ()).throw(KeyError("odd")))
+    context_detail._detail_cache.clear()
 
     detail = _client().get("/api/sessions/aaa-1").json()["detail"]
 
@@ -943,7 +943,7 @@ def test_session_only_known_to_the_registry_gets_a_recap_from_it(isolated_db, mo
 
 
 def test_unreadable_transcript_is_readable_false_not_an_error(api, monkeypatch):
-    monkeypatch.setattr(claude_context, "load_detail", lambda session_id, cwd: None)
+    monkeypatch.setattr(context_detail, "load_detail", lambda session_id, cwd: None)
     response = api.get("/api/sessions/aaa-1")
     assert response.status_code == 200
     body = response.json()
@@ -963,8 +963,8 @@ def test_malformed_session_ids_are_rejected_before_any_filesystem_access(api, mo
     def boom(*args, **kwargs):
         raise AssertionError("the filesystem was touched")
 
-    monkeypatch.setattr(claude_context, "load_detail", boom)
-    monkeypatch.setattr(claude_context, "transcript_path", boom)
+    monkeypatch.setattr(context_detail, "load_detail", boom)
+    monkeypatch.setattr(context_tail, "transcript_path", boom)
     monkeypatch.setattr(claude_transcripts, "delete_transcript", boom)
     monkeypatch.setattr(queries, "transcript_path_for_session", boom)
     for method in (api.get, api.delete):
@@ -978,7 +978,7 @@ def test_a_client_supplied_cwd_is_ignored(api, monkeypatch):
         seen.append(cwd)
         return None
 
-    monkeypatch.setattr(claude_context, "load_detail", spy)
+    monkeypatch.setattr(context_detail, "load_detail", spy)
     api.get("/api/sessions/aaa-1", params={"cwd": "/etc"})
     assert seen == ["/h/alpha"]
 

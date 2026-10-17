@@ -3,7 +3,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from app.repositories.db import paths
-from app.domain import claude_context
+from app.domain.context import tail
 from app.domain.pending_decisions import PendingDecisions
 
 T0 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -310,13 +310,13 @@ def test_sweep_clears_from_a_worker_thread():
 
 
 def test_sweep_uses_real_transcript_timestamps(isolated_db, write_transcript):
-    """End to end with claude_context.latest_activity over a temporary transcript file."""
+    """End to end with tail.latest_activity over a temporary transcript file."""
     path = paths.projects_dir() / paths.sanitize_project_path("/x/proj") / "s1.jsonl"
     stamp = lambda seconds: (T0 + timedelta(seconds=seconds)).isoformat()
     write_transcript(path, [{"type": "user", "timestamp": stamp(1)}, {"type": "assistant", "timestamp": stamp(2)}])
     store, clock = make_store()
     clock.now = 10
-    lookup = lambda sid: claude_context.latest_activity(sid, "/x/proj")
+    lookup = lambda sid: tail.latest_activity(sid, "/x/proj")
 
     async def run():
         task = asyncio.create_task(store.request_decision("s1", "Bash", {}))
@@ -346,7 +346,7 @@ def test_sweep_keeps_a_prompt_while_only_assistant_or_bookkeeping_lines_arrive(i
     stamp = lambda seconds: (T0 + timedelta(seconds=seconds)).isoformat()
     store, clock = make_store()
     clock.now = 10
-    lookup = lambda sid: claude_context.latest_activity(sid, "/x/proj")
+    lookup = lambda sid: tail.latest_activity(sid, "/x/proj")
     earlier = [{"type": "user", "timestamp": stamp(1)}]
     write_transcript(path, earlier)
 

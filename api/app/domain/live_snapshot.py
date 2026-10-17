@@ -1,7 +1,7 @@
 """Coalesced, thread-safe view of the live session registry for the API.
 
 Every connected browser polls /api/live every ~2s. `claude_sessions` and
-`claude_context` keep module-level caches written for a single script thread, so
+`app/domain/context/` keep module-level caches written for a single script thread, so
 all reads of them go through one lock, and a result younger than the TTL is
 served as is - N devices cost about one recompute per TTL, not N.
 """
@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from typing import Any, Callable, Optional
 
-from app.domain import claude_context
+from app.domain.context import formatting, tail
 from app.repositories.db import queries
 from app.repositories import claude_sessions
 
@@ -37,10 +37,10 @@ class LiveSnapshot:
         # Resolved late so tests (and callers) can patch the underlying modules.
         self._load_sessions = load_sessions or (lambda: claude_sessions.load_sessions())
         self._live_context = live_context or (
-            lambda session_id, cwd: claude_context.live_context(session_id, cwd)
+            lambda session_id, cwd: tail.live_context(session_id, cwd)
         )
         self._latest_activity = latest_activity or (
-            lambda session_id, cwd: claude_context.latest_activity(session_id, cwd)
+            lambda session_id, cwd: tail.latest_activity(session_id, cwd)
         )
         self._git_branches = git_branches or (lambda ids: queries.git_branches(ids))
         self._ttl = ttl
@@ -78,7 +78,7 @@ class LiveSnapshot:
     def latest_activity(self, session_id: str) -> Optional[datetime]:
         """When the live session's transcript last got a line, or None (unknown session included).
 
-        Goes through this lock like every other read of claude_context's caches. Feeds the
+        Goes through this lock like every other read of the context modules' caches. Feeds the
         pending-prompt store's sweep, which uses it to tell a prompt was answered elsewhere.
         """
         with self._lock:
@@ -103,7 +103,7 @@ class LiveSnapshot:
             "size": context.size,
             "growth": context.growth,
             "history": list(context.history),
-            "label": claude_context.format_context(context),
+            "label": formatting.format_context(context),
         }
 
     def _branches(self, session_ids: list[str]) -> dict[str, str]:

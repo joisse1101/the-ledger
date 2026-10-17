@@ -44,7 +44,7 @@ testable and readable independent of the web framework wrapping it.
   `~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl` — every session that has ever run,
   including exited ones; the parsing itself lives in `snapshot.refresh()`). That parsing
   derives `started_at`/`updated_at` (min/max line timestamp), `message_count` (non-meta `user`/
-  `assistant` lines), `context` (the same latest-real-main-thread-turn figure `claude_context.py`
+  `assistant` lines), `context` (the same latest-real-main-thread-turn figure `api/app/domain/context/`
   shows live, via `scanner._context_tokens`), `cost` (per-turn `message.usage` priced via
   `_MODEL_PRICING`, counted once per unique `message.id`; an *estimate* — unrecognized models are
   silently skipped), `model` (the model with the most main-thread responses, once per
@@ -63,7 +63,10 @@ testable and readable independent of the web framework wrapping it.
   is resolved by looking up its `session_id` in `claude_transcripts.load_transcripts()` and reusing
   that transcript's `project`, falling back to a `cwd`-derived guess for a brand-new session with
   nothing written to disk yet.
-- `claude_context.py` reads a live session's token usage straight from its transcript, outside
+- `api/app/domain/context/` is split by job: `models.py` (dataclasses), `parsing.py` (transcript lines to turns),
+  `tail.py` (live context and latest activity from the file's tail), `detail.py` (the full per-session detail),
+  `attribution.py`, `breakdown.py` and `formatting.py`.
+- `api/app/domain/context/` reads a live session's token usage straight from its transcript, outside
   `app/repositories/db/` (SQLite) for the same reason `claude_sessions.py` is. The transcript is located from
   the registry's `cwd` and session ID, falling back to one memoized `*/<session-id>.jsonl` glob.
   **Context** is the latest real main-thread assistant turn's `input + cache_read + cache_creation`

@@ -241,7 +241,7 @@ def _context_tokens(entry: dict[str, Any]) -> Optional[int]:
 
     None for lines that aren't a real main-thread response - sidechains, `<synthetic>`
     API-error placeholders, missing usage/id, or zero usage. Must stay in step with
-    `claude_context._scan`, so a finished session's stored value is the same number the
+    `parsing.scan`, so a finished session's stored value is the same number the
     Live table's gauge showed for it.
     """
     message = entry.get("message")

@@ -32,7 +32,7 @@ class ClaudeTranscript:
     title: str
     last_message: str
     first_prompt: str
-    # Context size at the last real main-thread response (see claude_context); None if there wasn't one.
+    # Context size at the last real main-thread response (see app/domain/context/); None if there wasn't one.
     context: Optional[int] = None
     # Model ids this app's own pricing table didn't recognize during the per-message fallback scan -
     # empty whenever every turn's model was priced (including every `exact` session).

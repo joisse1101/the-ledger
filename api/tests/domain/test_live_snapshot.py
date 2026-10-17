@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.domain.claude_context import LiveContext
+from app.domain.context.models import LiveContext
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
 

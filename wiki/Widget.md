@@ -26,7 +26,7 @@ Electron main process                      renderer (sandboxed)
   clicks through the preload bridge (`widget/src/preload/index.ts`). The channel names live in
   `widget/src/shared/ipc.ts`; the sandboxed preload cannot import them, so a test keeps both in step.
 - **Context text is the server's.** A row shows `context.label` verbatim (for example
-  `394k ▲ +2.1k ▁▂▃▅`), the string `claude_context.format_context` builds for the Live table and the
+  `394k ▲ +2.1k ▁▂▃▅`), the string `formatting.format_context` builds for the Live table and the
   toast, or `--` when `context` is null. The widget has no token formatter of its own.
 - **Pending tint.** A row gets the `pending` class (warm background) when `pending_decision` is set,
   with no badge text. The prompt itself is never read or shown, and nothing can be approved here; answer in the terminal or the Ledger.

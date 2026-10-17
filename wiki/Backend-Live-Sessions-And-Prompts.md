@@ -3,7 +3,7 @@
 > Requirements live in `openspec/specs/remote-session-control/spec.md`. This page describes how the code meets them, not what it must do.
 
 - `api/app/domain/live_snapshot.py` — `LiveSnapshot`, a lock-guarded, TTL-coalesced (`LIVE_TTL_SECONDS = 1.0`)
-  wrapper around `claude_sessions.load_sessions()` + `claude_context.live_context()` per session, so
+  wrapper around `claude_sessions.load_sessions()` + `tail.live_context()` per session, so
   N browsers/phones polling `/api/live` every ~2s cost about one recompute per second rather than N —
   those two modules' own caches assume a single caller, so every read of them from the API goes
   through this one lock. One session's `live_context()` raising leaves the others populated

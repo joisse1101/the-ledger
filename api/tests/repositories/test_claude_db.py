@@ -450,7 +450,7 @@ def test_scan_transcript_file_context_is_none_without_a_real_turn(tmp_path, writ
 
 
 def test_scan_transcript_file_context_matches_the_live_gauge(tmp_path, write_transcript):
-    from app.domain import claude_context
+    from app.domain.context import parsing
 
     path = tmp_path / "projects" / "f" / "abc.jsonl"
     write_transcript(
@@ -463,7 +463,7 @@ def test_scan_transcript_file_context_matches_the_live_gauge(tmp_path, write_tra
         ],
     )
     stored = scanner._scan_transcript_file(path, project_by_folder={})["context"]
-    live = claude_context.extract_turns(path.read_text(encoding="utf-8").splitlines())[-1].context
+    live = parsing.extract_turns(path.read_text(encoding="utf-8").splitlines())[-1].context
     assert stored == live == 4 + 9_500 + 120
 
 

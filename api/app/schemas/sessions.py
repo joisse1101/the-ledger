@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from app.domain import claude_context
+from app.domain.context import models
 from app.repositories import claude_transcripts
 from app.schemas.common import iso
 
-def breakdown_json(breakdown: Optional[claude_context.Breakdown]) -> Optional[dict]:
+def breakdown_json(breakdown: Optional[models.Breakdown]) -> Optional[dict]:
     if breakdown is None:
         return None
     return {
@@ -37,7 +37,7 @@ def breakdown_json(breakdown: Optional[claude_context.Breakdown]) -> Optional[di
     }
 
 
-def detail_json(detail: claude_context.SessionDetail) -> dict:
+def detail_json(detail: models.SessionDetail) -> dict:
     attribution = detail.attribution
     return {
         "turns": [
