@@ -1,7 +1,7 @@
 """Process-wide paths the routers rely on."""
 
 from app import deps
-from app.routers import sessions
+from app.services import session_service
 
 
 def test_repo_root_is_the_folder_holding_api_and_hooks():
@@ -10,4 +10,4 @@ def test_repo_root_is_the_folder_holding_api_and_hooks():
 
 
 def test_open_repo_script_exists():
-    assert sessions.OPEN_REPO_SCRIPT.is_file()
+    assert session_service.OPEN_REPO_SCRIPT.is_file()

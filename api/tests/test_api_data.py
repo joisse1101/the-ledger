@@ -14,7 +14,7 @@ from app.infra import banner
 from app.repositories import claude_db, claude_transcripts
 from app import main as app_main
 from app import deps
-from app.routers import sessions as sessions_router
+from app.services import session_service
 from app.domain.claude_context import LiveContext
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
@@ -574,7 +574,7 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
     assert len(calls) == 1
     (command,), kwargs = calls[0]
     assert command[0] == "powershell.exe"
-    assert command[-2] == str(sessions_router.OPEN_REPO_SCRIPT)
+    assert command[-2] == str(session_service.OPEN_REPO_SCRIPT)
     assert command[-1] == "claudecode://open?path=%2Fh%2Falpha"
     assert kwargs == {"check": False}
 

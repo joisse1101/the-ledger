@@ -21,3 +21,7 @@ class Forbidden(ServiceError):
 
 class NotFound(ServiceError):
     """The thing asked for doesn't exist (HTTP 404)."""
+
+
+class OperationFailed(ServiceError):
+    """The server could not carry the request out (HTTP 500)."""
