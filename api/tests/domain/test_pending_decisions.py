@@ -426,3 +426,112 @@ def test_a_new_store_starts_off_like_a_restart():
     first.set_remote_mode(True)
 
     assert make_store()[0].remote_mode_enabled() is False
+
+
+# ---------------------------------------------------------------- auto-approve
+
+
+def test_auto_approve_and_relay_hook_start_off():
+    store, _ = make_store()
+    assert store.auto_approve_enabled("s1") is False
+    assert store.last_auto_approved("s1") is None
+    assert store.relay_hook_seen() is False
+
+
+def test_the_first_register_marks_the_relay_hook_seen():
+    store, _ = make_store()
+    store.register("s1", "Bash", {"command": "ls"})
+    assert store.relay_hook_seen() is True
+    assert make_store()[0].relay_hook_seen() is False  # a new store is a restarted backend
+
+
+def test_auto_approve_can_be_switched_per_session():
+    store, _ = make_store()
+    store.set_auto_approve("s1", True)
+    assert store.auto_approve_enabled("s1") is True
+    assert store.auto_approve_enabled("s2") is False
+    store.set_auto_approve("s1", False)
+    assert store.auto_approve_enabled("s1") is False
+
+
+def test_auto_approve_expires_after_eight_hours():
+    store, clock = make_store()
+    store.set_auto_approve("s1", True)
+    clock.now = 8 * 60 * 60 - 1
+    assert store.auto_approve_enabled("s1") is True
+    clock.now = 8 * 60 * 60
+    assert store.auto_approve_enabled("s1") is False
+
+
+def test_prune_drops_sessions_that_are_no_longer_live():
+    store, _ = make_store()
+    store.set_auto_approve("live", True)
+    store.set_auto_approve("gone", True)
+    store.register("gone", "Edit", {})
+    store.approve_pending("gone")
+    store.prune_auto_approve(["live"])
+    assert store.auto_approve_enabled("live") is True
+    assert store.auto_approve_enabled("gone") is False
+    assert store.last_auto_approved("gone") is None
+
+
+def test_a_plain_prompt_registered_while_on_is_answered_at_once():
+    store, _ = make_store()
+    store.set_auto_approve("s1", True)
+
+    async def run():
+        return await asyncio.wait_for(store.request_decision("s1", "Edit", {"file_path": "x"}), timeout=1)
+
+    assert asyncio.run(run()) == {"decision": "allow"}
+    assert store.peek("s1") is None
+    assert store.last_auto_approved("s1") == {"tool_name": "Edit", "at": T0.isoformat()}
+
+
+def test_a_prompt_is_not_answered_while_off():
+    store, _ = make_store(max_age=0.05)
+    assert asyncio.run(store.request_decision("s1", "Edit", {})) == {"decision": None}
+    assert store.last_auto_approved("s1") is None
+
+
+def test_questions_plans_and_dangerous_commands_stay_pending_while_on():
+    store, _ = make_store()
+    store.set_auto_approve("s1", True)
+
+    async def run():
+        tasks = [
+            asyncio.create_task(store.request_decision("s1", "AskUserQuestion", {"questions": []})),
+            asyncio.create_task(store.request_decision("s1", "ExitPlanMode", {})),
+            asyncio.create_task(store.request_decision("s1", "Bash", {"command": "sudo rm x"})),
+        ]
+        await asyncio.sleep(0.01)
+        pending = [p["tool_name"] for p in store.for_session("s1")]
+        for prompt in store.for_session("s1"):
+            store.answer("s1", prompt["id"], {"decision": "deny", "reason": None})
+        await asyncio.gather(*tasks)
+        return pending
+
+    assert asyncio.run(run()) == ["AskUserQuestion", "ExitPlanMode", "Bash"]
+    assert store.last_auto_approved("s1") is None
+
+
+def test_another_session_is_unaffected():
+    store, _ = make_store(max_age=0.05)
+    store.set_auto_approve("s1", True)
+    assert asyncio.run(store.request_decision("s2", "Edit", {})) == {"decision": None}
+
+
+def test_approve_pending_answers_only_the_approvable_ones_once():
+    store, _ = make_store()
+    store.register("s1", "Edit", {})
+    store.register("s1", "AskUserQuestion", {"questions": []})
+    assert store.approve_pending("s1") == 1
+    assert store.approve_pending("s1") == 0  # a second pass finds nothing left to approve
+    assert [p["tool_name"] for p in store.for_session("s1")] == ["AskUserQuestion"]
+
+
+def test_a_toggle_racing_a_register_answers_the_prompt_once():
+    store, _ = make_store()
+    prompt_id = store.register("s1", "Edit", {})
+    # Both sides saw the flag and the prompt: the one that loses finds it gone.
+    assert store.answer("s1", prompt_id, {"decision": "allow"}) is True
+    assert store.approve_pending("s1") == 0

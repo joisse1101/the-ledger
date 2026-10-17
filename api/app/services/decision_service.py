@@ -5,10 +5,9 @@ from __future__ import annotations
 from typing import Any, Literal, Optional, Union
 
 from app import deps
+from app.domain.auto_approve_policy import QUESTION_TOOL
 from app.services import prompt_service
 from app.services.errors import Conflict, InvalidInput
-
-QUESTION_TOOL = "AskUserQuestion"
 
 Answers = dict[str, Union[str, list[str]]]
 

@@ -6,20 +6,30 @@ on it; whichever surface answers first wins. A dashboard answer resolves the wai
 terminal answer is never heard directly, so sweep() notices it from the session's transcript (a line
 written after the prompt was registered) and releases the hook with no answer. A maximum age is the
 backstop for anything else. Remote mode is only state here - the routes apply it as an access gate.
+
+Auto-approve is per-session state kept beside the prompts: while it is on, a prompt that
+auto_approve_policy allows is answered `allow` the moment it registers (and, when it is switched on,
+the ones already waiting). Like Remote mode it is memory only and expires on its own.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
+
+from app.domain.auto_approve_policy import is_auto_approvable
+
+log = logging.getLogger("ledger")
 
 PROMPT_MAX_AGE_SECONDS = 30 * 60.0
 REMOTE_MODE_TTL_SECONDS = 8 * 60 * 60.0
+AUTO_APPROVE_TTL_SECONDS = 8 * 60 * 60.0
 
 
 def _utcnow() -> datetime:
@@ -44,17 +54,22 @@ class PendingDecisions:
         self,
         max_age: float = PROMPT_MAX_AGE_SECONDS,
         remote_mode_ttl: float = REMOTE_MODE_TTL_SECONDS,
+        auto_approve_ttl: float = AUTO_APPROVE_TTL_SECONDS,
         clock: Callable[[], float] = time.monotonic,
         wall_clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         self._max_age = max_age
         self._remote_mode_ttl = remote_mode_ttl
+        self._auto_approve_ttl = auto_approve_ttl
         self._clock = clock
         self._wall_clock = wall_clock
         self._lock = threading.Lock()
         self._prompts: dict[str, list[_Prompt]] = {}
         self._remote_expires: Optional[float] = None  # None = off
         self._remote_expires_at: Optional[datetime] = None
+        self._auto_approve: dict[str, float] = {}  # session id -> monotonic expiry
+        self._last_auto_approved: dict[str, dict[str, str]] = {}
+        self._relay_hook_seen = False
 
     # ------------------------------------------------------------ Remote mode
 
@@ -84,6 +99,64 @@ class PendingDecisions:
         with self._lock:
             return self._remote_enabled()
 
+    # ------------------------------------------------------------ auto-approve
+
+    def set_auto_approve(self, session_id: str, enabled: bool) -> None:
+        with self._lock:
+            if enabled:
+                self._auto_approve[session_id] = self._clock() + self._auto_approve_ttl
+            else:
+                self._auto_approve.pop(session_id, None)
+
+    def auto_approve_enabled(self, session_id: str) -> bool:
+        """Whether the session auto-approves right now, switching it off if it has expired."""
+        with self._lock:
+            expires = self._auto_approve.get(session_id)
+            if expires is not None and self._clock() >= expires:
+                del self._auto_approve[session_id]
+                return False
+            return expires is not None
+
+    def last_auto_approved(self, session_id: str) -> Optional[dict[str, str]]:
+        """`{tool_name, at}` of the latest prompt approved for the session, if any."""
+        with self._lock:
+            return self._last_auto_approved.get(session_id)
+
+    def relay_hook_seen(self) -> bool:
+        """True once any prompt has registered since this store was made (a restart resets it)."""
+        with self._lock:
+            return self._relay_hook_seen
+
+    def prune_auto_approve(self, live_session_ids: Iterable[str]) -> None:
+        """Forget the flag and last approval of every session that is no longer live."""
+        live = set(live_session_ids)
+        with self._lock:
+            for state in (self._auto_approve, self._last_auto_approved):
+                for session_id in [sid for sid in state if sid not in live]:
+                    del state[session_id]
+
+    def approve_pending(self, session_id: str) -> int:
+        """Answer `allow` to each of the session's pending prompts that auto-approve may; returns how many.
+
+        Safe to run more than once or from two places at once: answer() is False for a prompt that
+        is already gone, so a prompt is only ever approved (and counted) once.
+        """
+        approved = 0
+        for prompt in self.for_session(session_id):
+            if not is_auto_approvable(prompt["tool_name"], prompt["tool_input"]):
+                continue
+            if not self.answer(session_id, prompt["id"], {"decision": "allow"}):
+                continue
+            with self._lock:
+                self._last_auto_approved[session_id] = {
+                    "tool_name": prompt["tool_name"],
+                    "at": self._wall_clock().isoformat(),
+                }
+            # The prompt's tool_input can hold secrets, so only the tool name is logged.
+            log.info("auto_approved session_id=%s tool_name=%s", session_id, prompt["tool_name"])
+            approved += 1
+        return approved
+
     # ------------------------------------------------------------ prompts
 
     def register(self, session_id: str, tool_name: str, tool_input: dict) -> str:
@@ -107,6 +180,7 @@ class PendingDecisions:
         )
         with self._lock:
             self._prompts.setdefault(session_id, []).append(prompt)
+            self._relay_hook_seen = True
         return prompt.id
 
     def _find(self, session_id: str, prompt_id: str) -> Optional[_Prompt]:
@@ -222,6 +296,11 @@ class PendingDecisions:
         with self._lock:
             prompt = self._find(session_id, prompt_id)
         assert prompt is not None
+
+        # Check the flag after registering: pairs with set_enabled() setting the flag before it
+        # scans what is pending, so a prompt racing the switch is caught by one side or the other.
+        if self.auto_approve_enabled(session_id):
+            self.approve_pending(session_id)
 
         try:
             await asyncio.wait_for(prompt.event.wait(), timeout=self._max_age)
