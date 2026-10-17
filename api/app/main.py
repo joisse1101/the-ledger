@@ -12,6 +12,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from app import deps, refresh
 from app.core.config import parse_settings
 from app.core.security import SecurityMiddleware, provision_token
+from app.routers.errors import register_error_handlers
 from app.routers import decisions, files, live, meta, overview, projects, remote_mode, sessions, transcripts
 
 log = logging.getLogger("ledger")
@@ -52,5 +53,6 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityMiddleware, token=lambda: deps.access_token)
 
+register_error_handlers(app)
 for module in (meta, remote_mode, live, transcripts, sessions, decisions, files, projects, overview):
     app.include_router(module.router)

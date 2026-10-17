@@ -16,7 +16,7 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 
 - General standards: toolkit rules (`toolkit/install/Install-Toolkit.ps1`, `-Scope project` works).
 - Tests use the `isolated_db` fixture (`~/.claude.json`, `~/.claude/projects/`).
-- Layers in `app/`: `routers` (HTTP only) -> `repositories` / `domain` -> `core`; `schemas` shape JSON,
+- Layers in `app/`: `routers` (HTTP only) -> `services` (rules, raise `api/app/services/errors.py`) -> `repositories` / `domain` -> `core`; `schemas` shape JSON,
   `infra` wraps the OS, Docker and QR; `deps.py` holds the shared singletons. Imports point downward only.
 - Run the server with `python -m app` from `api/`. `backup_history.py`, `gateway_signin.py` and
   `check_docs.py` stay at the `api/` root: scheduled tasks and scripts run them by path.
