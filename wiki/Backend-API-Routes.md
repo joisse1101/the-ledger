@@ -34,7 +34,17 @@ frontend is a wholly separate process (see [Frontend API layer](Frontend-Api-Lay
 | `DELETE /api/sessions/{id}` | **Local requests only** (403 otherwise — a valid token doesn't authorize a delete); 409 if `live.is_live_now(id)` (a *fresh* registry read, not the ≤1s snapshot — a session that just started can't be deleted on stale data), 404 if unknown, else `claude_transcripts.delete_transcript` under the refresh lock |
 | `GET /api/projects` | `{projects: [...]}` |
 | `DELETE /api/projects?path=` | **Local requests only**, like the session delete; 404 unless `path` exactly matches a known project; then `delete_project` + `delete_project_transcripts` |
+| `GET /api/files` | `{files: [{name, size, modified}]}` for the drop folder, newest first. Every `/api/files*` route is **403 while Remote mode is off, local requests included** (`_require_file_drop`) |
+| `PUT /api/files?name=` | Raw request body streamed to disk (`file_drop.save_async_stream`); never overwrites (` (1)`, ` (2)` suffix), no partial file after a failure; 507 when the disk is full |
+| `GET /api/files/{name}` | The file as an attachment (range requests); bearer token like any other non-local request |
+| `POST /api/files/{name}/download-link` | `{url}` for a single-use, 60 second link to that one file (404 if it isn't there). A browser download can't send the bearer header, so the page asks here first |
+| `GET /api/files/download/{ticket}` | Redeems the link and streams the file, `no-store`; 403 for an unknown, used or expired ticket. The one request that needs no bearer token (`security.py` matches this path shape only; the ticket is the credential) |
+| `DELETE /api/files/{name}` | **Local requests only**, like the other deletes |
 | `GET /api/overview?range=&project=&group_by=` | 422 for an unknown range label or `group_by` (`project` default, or `branch`); `project` (a path from `/api/projects`) scopes it to that project's transcripts and 404s unless it exactly matches a known project (its folder is derived server-side via `claude_db.sanitize_project_path`); otherwise `overview_stats.overview()`'s payload, whose donut/bar rows are `groups` (each keyed `group`) plus `group_order`; every response (empty or not) also carries `available_ranges`, the `TIME_RANGES` labels with at least one session in scope (the project's, when scoped), which the Projects panel uses to disable empty range buttons |
+
+The drop folder is `api/.ledger/transfer/` (gitignored), or `LEDGER_TRANSFER_DIR` if set; its logic lives
+in `api/file_drop.py` (no web imports), which also holds `DownloadTickets`. The routes never accept a path,
+only a bare file name, and log `file_drop op=... name=...` lines without contents or tickets.
 
 There's no static-file serving or SPA fallback here; that's `vite preview`'s job in `web/`.
 `GZipMiddleware` and `SecurityMiddleware` (added first so it's outermost — nothing else runs for a

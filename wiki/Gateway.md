@@ -58,6 +58,11 @@ frontend link for — `--frontend-port` is cosmetic only now (CORS is gone entir
 frontend never calls the backend cross-origin any more). Passing `--lan` is a removed no-op: it
 exits with an error pointing at the gateway instead.
 
+`location /api/files` (more specific than `/api/`) turns off the 1 MB body limit and request/response
+buffering and allows hour-long transfers, so a large file streams straight to the backend instead of
+failing with a 413 or spooling to the container's disk. See [API routes](Backend-API-Routes.md) for the
+file-drop routes.
+
 The only thing that ever grants LAN access (see [Setup and run](Setup-And-Run.md)); the backend and
 frontend stay loopback-only always. It **terminates TLS and serves HTTPS only**: the `Dockerfile`
 installs `openssl` at image build time to generate a self-signed EC certificate/key

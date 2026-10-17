@@ -31,6 +31,7 @@ Requirements live in `openspec/specs/`, not here. Docs conventions are in [Codin
 - [Sessions](Frontend-Sessions.md): Live and All pages, dialogs, prompts
 - [Overview](Frontend-Overview.md): charts and summary stats
 - [Projects](Frontend-Projects.md): project list, detail panel, delete
+- [Files](Frontend-Files.md): file-drop page, upload, single-use download links
 - [Shared components](Frontend-Shared-Components.md): responsive list, ButtonSelector, ConfirmDialog, formatting
 
 **Services**

@@ -72,6 +72,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 | Live and All session pages | [Frontend-Sessions](wiki/Frontend-Sessions.md) |
 | Overview page and charts | [Frontend-Overview](wiki/Frontend-Overview.md) |
 | Projects page | [Frontend-Projects](wiki/Frontend-Projects.md) |
+| Files page, file-drop routes | [Frontend-Files](wiki/Frontend-Files.md), [Backend-API-Routes](wiki/Backend-API-Routes.md) |
 | `ButtonSelector`, `ConfirmDialog`, formatting | [Frontend-Shared-Components](wiki/Frontend-Shared-Components.md) |
 | Nginx gateway, HTTPS, LAN access | [Gateway](wiki/Gateway.md) |
 | Toast hooks, relay hook | [Hooks](wiki/Hooks.md) |
