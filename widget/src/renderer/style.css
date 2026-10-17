@@ -23,6 +23,8 @@
   --warn-text: #5c3d00;
   --done-bg: #ddf3e4;
   --done-text: #0f4a25;
+  --error-bg: #fbe0dc;
+  --error-text: #6b1a10;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,6 +42,8 @@
     --warn-text: #ffe29a;
     --done-bg: #12361f;
     --done-text: #b3ecc4;
+    --error-bg: #461a14;
+    --error-text: #ffc9c0;
   }
 }
 
@@ -149,6 +153,10 @@ button:hover { background: var(--bg-surface-hover); }
 /* A session that has finished running tints its row green. */
 .row.done, .row.done:hover { background: var(--done-bg); color: var(--done-text); }
 .row.done .branch { color: inherit; opacity: 0.75; }
+
+/* Any status other than busy, idle or none tints the row red. */
+.row.error, .row.error:hover { background: var(--error-bg); color: var(--error-text); }
+.row.error .branch { color: inherit; opacity: 0.75; }
 
 .empty { margin: 0; padding: 14px 10px; color: var(--text-muted); }
 

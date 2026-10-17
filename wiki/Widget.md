@@ -36,8 +36,9 @@ Electron main process                      renderer (sandboxed)
   (the repo window) and `.auto-approve`, because a button cannot nest in a button; pressing the second
   never opens the repo. It calls `POST /api/sessions/{id}/auto-approve` through the `setAutoApprove`
   bridge method; the state follows the next poll, and a refusal shows a brief note.
-- **Finished tint.** A row gets the `done` class (green background) when the session's `status` is
-  `idle` or `stopped`, i.e. it is no longer running. A pending decision wins over it.
+- **Status tint.** A row's tint follows its `status`; a pending decision always wins. `idle` gets the
+  `done` class (green background); `busy`, `unknown` or an empty status keeps the default look; any
+  other status gets the `error` class (red background). The rule is `rowTint` in `widget/src/renderer/view.ts`.
 - **Row click** calls `POST /api/sessions/{id}/open-repo` (the toast-click action). A 404 shows a
   brief "Session ended" note and refreshes the list.
 - **Branch.** `/api/live` items carry `git_branch`, looked up from `ledger.db` in `LiveSnapshot`
