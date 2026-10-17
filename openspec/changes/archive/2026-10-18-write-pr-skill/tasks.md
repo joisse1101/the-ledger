@@ -7,9 +7,9 @@
 
 - [x] 2.1 Add `toolkit/skills/write-pr/pr-template.md` (the agreed template without the visual-proof section, with Related Issues marked optional) and `guidelines.md` (the four rules, hard rules and best practices), and verify both resolve from `SKILL.md`
 - [x] 2.2 Write `toolkit/skills/write-pr/SKILL.md` with `name`, `description`, `disable-model-invocation: true`, `allowed-tools` (no merge), the hook from 1.1, and a `metadata:` block with `version` and `last_updated`; cover the refusal on `main`, commit reading, grouping and confirmation, branches for later groups, title and body rules, the OpenSpec `tasks.md` lookup, the diff scan, the confirmation word, and the merge-order summary; verify it stays within the size budget
-- [ ] 2.3 Dry-run the skill on a sample branch with two unrelated commits and verify it proposes two PRs, creates nothing before the word, and ends with an ordered merge list and `gh pr merge <n> -s -d` lines
-- [ ] 2.4 Dry-run on a branch with a `.env` file and a `console.log` and verify the file blocks that PR while the print only warns
-- [ ] 2.5 Attempt `gh pr merge` after invoking the skill and verify the hook blocks it
+- [x] 2.3 Dry-run the skill on a sample branch with two unrelated commits and verify it proposes two PRs, creates nothing before the word, and ends with an ordered merge list and `gh pr merge <n> -s -d` lines
+- [x] 2.4 Dry-run on a branch with a `.env` file and a `console.log` and verify the file blocks that PR while the print only warns
+- [x] 2.5 Attempt `gh pr merge` after invoking the skill and verify the hook blocks it
 
 ## 3. Docs and checks
 
