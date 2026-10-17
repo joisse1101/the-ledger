@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from app import refresh
 from app.core.security import is_local
-from app.repositories.db import snapshot
 from app.schemas.common import iso
-from app.services import remote_service
+from app.services import remote_service, snapshot_service
 
 router = APIRouter()
 
@@ -16,7 +14,7 @@ router = APIRouter()
 @router.get("/api/meta")
 def get_meta(request: Request) -> dict:
     return {
-        "refreshed_at": iso(snapshot.refreshed_at()),
+        "refreshed_at": iso(snapshot_service.refreshed_at()),
         "is_local": is_local(request),
         "remote_mode": remote_service.remote_mode_status(),
     }
@@ -24,4 +22,4 @@ def get_meta(request: Request) -> dict:
 
 @router.post("/api/refresh")
 def post_refresh() -> dict:
-    return {"refreshed_at": iso(refresh.locked_refresh())}
+    return {"refreshed_at": iso(snapshot_service.rescan())}

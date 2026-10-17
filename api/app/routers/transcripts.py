@@ -6,10 +6,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 
-from app import deps
-from app.domain import transcript_query
-from app.repositories import claude_transcripts
 from app.schemas.transcripts import transcript_item
+from app.services import transcript_service
 
 router = APIRouter()
 
@@ -28,23 +26,14 @@ def get_transcripts(
     branch: Annotated[list[str], Query()] = [],
     sort: SortField = "updated_at",
     dir: Literal["asc", "desc"] = "desc",
-    limit: Annotated[int, Query(ge=1, le=200)] = transcript_query.DEFAULT_PAGE_SIZE,
+    limit: Annotated[int, Query(ge=1, le=200)] = transcript_service.DEFAULT_PAGE_SIZE,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict:
-    page = transcript_query.query(
-        claude_transcripts.load_transcripts(),
-        search=q,
-        projects=project,
-        versions=version,
-        branches=branch,
-        sort=sort,
-        ascending=dir == "asc",
-        limit=limit,
-        offset=offset,
+    result = transcript_service.list_transcripts(
+        q, project, version, branch, sort, dir == "asc", limit, offset
     )
-    live_ids = deps.live.live_ids()
     return {
-        "items": [transcript_item(t, live_ids) for t in page.items],
-        "total": page.total,
-        "options": page.options,
+        "items": [transcript_item(t, result.live_ids) for t in result.page.items],
+        "total": result.page.total,
+        "options": result.page.options,
     }
