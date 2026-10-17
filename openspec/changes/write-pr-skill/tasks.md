@@ -13,6 +13,6 @@
 
 ## 3. Docs and checks
 
-- [ ] 3.1 Update `toolkit/README.md` (skills section and manual-install note) and the matching `wiki/` page for the new skill, linking pages as `[text](Page-Name.md)`
-- [ ] 3.2 Extend `api/check_docs.py` and `api/tests/test_check_docs.py` if needed so the new skill folder, its version block and its support-file links are covered; run `cd api; pytest` and `python check_docs.py` and verify both pass
-- [ ] 3.3 Run `Install-Toolkit.ps1 -Skill write-pr -Scope project -Path <temp>` and verify the whole folder, including its support files, is copied and `-List` shows it up to date
+- [x] 3.1 Update `toolkit/README.md` (skills section and manual-install note) and the matching `wiki/` page for the new skill, linking pages as `[text](Page-Name.md)`
+- [x] 3.2 Extend `api/check_docs.py` and `api/tests/test_check_docs.py` if needed so the new skill folder, its version block and its support-file links are covered; run `cd api; pytest` and `python check_docs.py` and verify both pass (result: no code change needed, `check_docs.py` already globs `skills/*/SKILL.md` for the version block; 29 tests pass)
+- [x] 3.3 Run `Install-Toolkit.ps1 -Skill write-pr -Scope project -Path <temp>` and verify the whole folder, including its support files, is copied and `-List` shows it up to date (result: three files copied, up to date at 1.0.0)

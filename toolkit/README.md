@@ -40,6 +40,22 @@ differs from the toolkit's copy is never overwritten unless you pass `-Force`; `
 Each skill is a folder `toolkit/skills/<name>/` with a `SKILL.md` (`name` and `description`
 frontmatter, then instructions) and any support files it needs. A folder is self-contained.
 
+### The `write-pr` skill
+
+`/write-pr` opens GitHub pull requests for the commits on the current branch. It declares
+`disable-model-invocation: true`, so it runs only when you type it and stays out of the session
+context. It reads the commits since the default branch, proposes groups of commits that each form one
+concern (a refactor never shares a PR with a feature), and waits for a confirmation word before it
+pushes or runs `gh pr create`. Each body follows `pr-template.md`: the test files the group adds, and
+any manual steps recorded in the OpenSpec change's `tasks.md`. It blocks a group whose diff holds a
+secret, an `.env` file or build output, and warns on debug prints.
+
+It never merges. A hook in the skill's frontmatter blocks `gh pr merge`, `--auto` and merge calls
+through `gh api`, and stays active for the rest of the session once the skill has been invoked. When
+it finishes it lists every PR it opened in the order to merge, with the `gh pr merge <n> -s -d`
+command for each, for you to run. A PR based on another PR's branch needs a rebase after the earlier
+one merges, and the list says so. `guidelines.md` and `pr-template.md` sit beside `SKILL.md`.
+
 ## Commands
 
 Each entry directly under `toolkit/commands/` is one command item: a `.md` file (becomes `/name`) or
