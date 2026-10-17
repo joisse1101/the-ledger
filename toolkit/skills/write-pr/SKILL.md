@@ -11,14 +11,15 @@ hooks:
           command: >-
             powershell -NoProfile -Command "if ([Console]::In.ReadToEnd() -match 'gh\s+(pr\s+(merge|.*--auto)|api\b.*merge)') { [Console]::Error.WriteLine('write-pr never merges: the user runs gh pr merge'); exit 2 }"
 metadata:
-  version: "1.0.0"
-  last_updated: "2026-10-17"
+  version: "1.1.0"
+  last_updated: "2026-10-18"
 ---
 
 # Write PRs
 
-Turn the commits on this branch into one or more PRs. Read `guidelines.md` for the rules and
-`pr-template.md` for the body and ticking rules, both next to this file.
+Turn the commits on this branch into one or more PRs. Read `guidelines.md` for the rules,
+`pr-template.md` for the body and ticking rules, and `verification.md` for the testing section, all
+next to this file.
 
 ## Never
 
@@ -48,12 +49,16 @@ Turn the commits on this branch into one or more PRs. Read `guidelines.md` for t
    - Summary leads with why. Related Issues only from `#n` or ticket ids in commit messages or the
      branch name; otherwise omit the section.
    - Changes Made: the group's commit subjects from `git log`.
-   - Tests: test files the group adds or changes, and their names. For manual steps, find the
-     OpenSpec change whose files the group's commits touch, in `openspec/changes/<name>/` or
-     `openspec/changes/archive/*-<name>/`, and copy the manual steps or results `tasks.md` records.
+   - Tests: test files the group adds or changes, and their names. Fill Author Verification and How
+     to Test This PR as `verification.md` says. Find the OpenSpec change whose files the group's
+     commits touch, in `openspec/changes/<name>/` or `openspec/changes/archive/*-<name>/`, and read
+     its `tasks.md`. Never state a result no source records.
+   - If any group lacks verification, ask the user once for all of them, in plain text, and end the
+     turn. Compose from the reply, then continue to step 6.
    - End with the PR attribution line the session gives, if any.
 6. **Present and stop.** Show the groups with their commits, then for each PR the title, base, head,
-   body, size, and any warning or block. Name a common confirmation word that differs from your
+   body, size, and any warning or block. Tag each verification bullet and reviewer step with its
+   source (`verification.md`). Name a common confirmation word that differs from your
    previous prompt's and say: "Reply with <word> to open these PRs, or tell me what to change."
    Then end the turn and call no tool. "Yes" or "looks good" is not the word. After any change
    request, present again with a new word.
@@ -62,7 +67,7 @@ Turn the commits on this branch into one or more PRs. Read `guidelines.md` for t
      commits in order. On a conflict, run `git cherry-pick --abort`, retry on the branch of the group
      it depends on, and base that PR on that branch.
    - `git push -u origin <branch>`, then `gh pr create --base <base> --head <branch> --title "<title>"
-     --body-file -` with the body on stdin. Record the number and URL.
+     --body-file -` with the body on stdin, without the source tags. Record the number and URL.
    - Return to the original branch when done.
 8. **Summarize** (below).
 

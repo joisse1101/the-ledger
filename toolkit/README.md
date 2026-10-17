@@ -46,15 +46,18 @@ frontmatter, then instructions) and any support files it needs. A folder is self
 `disable-model-invocation: true`, so it runs only when you type it and stays out of the session
 context. It reads the commits since the default branch, proposes groups of commits that each form one
 concern (a refactor never shares a PR with a feature), and waits for a confirmation word before it
-pushes or runs `gh pr create`. Each body follows `pr-template.md`: the test files the group adds, and
-any manual steps recorded in the OpenSpec change's `tasks.md`. It blocks a group whose diff holds a
+pushes or runs `gh pr create`. Each body follows `pr-template.md`: the test files the group adds, an
+Author Verification list drafted from the OpenSpec change's `tasks.md`, and suggested steps for a
+reviewer. It states no result that `tasks.md` or you did not record, and asks you once, for all
+groups, when verification is missing. Steps use only commands the repo's own documents state, and
+the source of each line is shown to you before you confirm, never in the PR. It blocks a group whose diff holds a
 secret, an `.env` file or build output, and warns on debug prints.
 
 It never merges. A hook in the skill's frontmatter blocks `gh pr merge`, `--auto` and merge calls
 through `gh api`, and stays active for the rest of the session once the skill has been invoked. When
 it finishes it lists every PR it opened in the order to merge, with the `gh pr merge <n> -s -d`
 command for each, for you to run. A PR based on another PR's branch needs a rebase after the earlier
-one merges, and the list says so. `guidelines.md` and `pr-template.md` sit beside `SKILL.md`.
+one merges, and the list says so. `guidelines.md`, `pr-template.md` and `verification.md` sit beside `SKILL.md`.
 
 ## Commands
 

@@ -24,12 +24,17 @@ emoji headings exactly as written.
 -
 
 ## 🧪 How Has This Been Tested?
-<!-- List the tests this PR adds or changes. Manual steps only from the OpenSpec tasks.md. -->
+<!-- List the tests this PR adds or changes under the first box. -->
 - [ ] Automated Unit / Integration Tests passed
-- [ ] Manual testing completed (describe steps below)
+- [ ] Manual testing completed
 
-**Manual Test Steps:**
-1.
+### Author Verification
+<!-- What the author ran and saw, one bullet per check. Never state a result no source records. -->
+- **Label:** command or input, then the observed result
+
+### How to Test This PR
+<!-- Steps for a reviewer, numbered, each command in a fenced block. See verification.md. -->
+1. Fetch and check out this branch.
 ```
 
 ## Ticking rules
@@ -40,6 +45,10 @@ emoji headings exactly as written.
   `!` after the type or any commit body has a `BREAKING CHANGE` footer. Several boxes may be ticked.
 - **Automated**: tick when the group adds or changes a test file, and list those files and the test
   names under the box. The user has said to assume the tests were run.
-- **Manual**: tick only when the matching OpenSpec `tasks.md` records a manual step or result for this
-  group, and copy it into Manual Test Steps. Otherwise leave it unticked and delete the steps list.
+- **Author Verification**: bullets come from the matching OpenSpec `tasks.md` and, where it has none,
+  from the user's answer; `verification.md` says how. A bullet reports no result its source lacks.
+  Quote a count only when a source records it. With no bullets, write `- None recorded.`
+- **Manual**: tick only when at least one Author Verification bullet is a manual check: a command run
+  or behavior observed by hand, not the repository's test command. Otherwise leave it unticked.
+- **How to Test This PR**: steps follow `verification.md`. Delete the subsection if none survive.
 - No visual-proof section. Do not add one.
