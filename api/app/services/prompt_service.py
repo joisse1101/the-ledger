@@ -30,10 +30,22 @@ def pending_for(session_id: str, local: bool) -> Optional[dict]:
 def live_with_prompts(local: bool) -> list[dict]:
     sweep()
     visible = can_see(local)
+    live = deps.live.get()
+    deps.decisions.prune_auto_approve(item["session_id"] for item in live)
     return [
-        {**item, "pending_decision": deps.decisions.peek(item["session_id"]) if visible else None}
-        for item in deps.live.get()
+        {
+            **item,
+            "pending_decision": deps.decisions.peek(item["session_id"]) if visible else None,
+            "auto_approve": deps.decisions.auto_approve_enabled(item["session_id"]),
+            "last_auto_approved": deps.decisions.last_auto_approved(item["session_id"]),
+        }
+        for item in live
     ]
+
+
+def relay_hook_seen() -> bool:
+    """Whether any prompt has been relayed since the backend started."""
+    return deps.decisions.relay_hook_seen()
 
 
 async def register(session_id: str, tool_name: str, tool_input: dict) -> dict:

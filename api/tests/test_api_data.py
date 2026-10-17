@@ -261,6 +261,94 @@ def test_decisions_are_only_registered_by_a_local_request(isolated_db, monkeypat
     assert store.for_session("live-1") == []
 
 
+# ---------------------------------------------------------------- auto-approve: POST /api/sessions/{id}/auto-approve
+
+
+def test_live_rows_carry_the_auto_approve_state(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1"), _live_session("live-2")])
+    store.set_auto_approve("live-1", True)
+    store.register("live-1", "Edit", {})
+    store.approve_pending("live-1")
+
+    rows = {s["session_id"]: s for s in _client().get("/api/live").json()["sessions"]}
+
+    assert rows["live-1"]["auto_approve"] is True
+    assert rows["live-1"]["last_auto_approved"]["tool_name"] == "Edit"
+    assert rows["live-2"]["auto_approve"] is False
+    assert rows["live-2"]["last_auto_approved"] is None
+
+
+def test_live_rows_show_auto_approve_to_another_device(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    store.set_auto_approve("live-1", True)
+
+    assert _remote_client().get("/api/live").json()["sessions"][0]["auto_approve"] is True
+
+
+def test_live_drops_auto_approve_for_a_session_that_left(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch)
+    store.set_auto_approve("live-1", True)
+
+    _client().get("/api/live")
+
+    assert store.auto_approve_enabled("live-1") is False
+
+
+def test_auto_approve_route_switches_it_for_a_local_request(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    _use_live(monkeypatch, [_live_session("live-1")])
+    prompt_id = store.register("live-1", "Edit", {})
+
+    on = _client().post("/api/sessions/live-1/auto-approve", json={"enabled": True})
+    assert on.status_code == 200
+    assert on.json() == {"auto_approve": True}
+    assert store.get("live-1", prompt_id) is None  # the pending prompt was approved
+
+    off = _client().post("/api/sessions/live-1/auto-approve", json={"enabled": False})
+    assert off.json() == {"auto_approve": False}
+
+
+def test_auto_approve_cannot_be_switched_from_another_device(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+    _use_live(monkeypatch, [_live_session("live-1")])
+
+    response = _remote_client().post("/api/sessions/live-1/auto-approve", json={"enabled": True})
+
+    assert response.status_code == 403
+    assert store.auto_approve_enabled("live-1") is False
+
+
+def test_auto_approve_for_an_unknown_session_is_404(isolated_db, monkeypatch):
+    monkeypatch.setattr(deps, "decisions", PendingDecisions())
+    _use_live(monkeypatch)
+
+    response = _client().post("/api/sessions/nope/auto-approve", json={"enabled": True})
+
+    assert response.status_code == 404
+
+
+def test_meta_reports_when_the_relay_hook_has_been_seen(isolated_db, monkeypatch):
+    store = PendingDecisions()
+    monkeypatch.setattr(deps, "decisions", store)
+    monkeypatch.setattr(deps, "access_token", TOKEN)
+
+    assert _client().get("/api/meta").json()["relay_hook_seen"] is False
+    store.register("live-1", "Bash", {"command": "ls"})
+
+    assert _client().get("/api/meta").json()["relay_hook_seen"] is True
+    assert _remote_client().get("/api/meta").json()["relay_hook_seen"] is True
+
+
 # ---------------------------------------------------------------- GET /api/sessions/{id}/pending-decision
 
 
