@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { startDownload } from "../lib/download";
 import { apiFetch, withQuery } from "./client";
 import { uploadFile } from "./upload";
 import type {
@@ -281,6 +282,19 @@ export function useDeleteFile() {
       apiFetch<{ deleted: string }>(`/api/files/${encodeURIComponent(name)}`, { method: "DELETE" }),
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.files });
+    },
+  });
+}
+
+/** Asks for a single-use link to one file and hands it to the browser to save. The link needs no
+ *  token but dies after one use or about a minute, so it is fetched at click time, never kept. */
+export function useDownloadFile() {
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const { url } = await apiFetch<{ url: string }>(`/api/files/${encodeURIComponent(name)}/download-link`, {
+        method: "POST",
+      });
+      startDownload(url);
     },
   });
 }

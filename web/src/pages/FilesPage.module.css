@@ -1,0 +1,78 @@
+.hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* Visually hidden but still focusable, so the label stays the button and the keyboard works. */
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.uploads,
+.list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.upload + .upload,
+.row + .row {
+  margin-top: 0.5rem;
+}
+
+.meta {
+  display: flex;
+  min-width: 0; /* let a long file name wrap instead of widening the row */
+  flex-direction: column;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.detail {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ok {
+  color: var(--text-muted);
+}
+
+.failed {
+  color: var(--color-danger);
+}
+
+.empty {
+  margin-top: 1rem;
+  color: var(--text-muted);
+}
