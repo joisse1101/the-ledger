@@ -29,6 +29,21 @@
   *other devices* — the hook always registers prompts and never hides the terminal dialog — so while
   it's off a non-local request sees no pending prompt and can't answer one, while the PC's own
   browser always can (`prompt_service.can_see`).
+- **Auto-approve** is per-session state in the same `PendingDecisions` (memory only, off after a backend
+  restart, **8 hours** like Remote mode, forgotten once the session leaves `/api/live`:
+  `set_auto_approve`/`auto_approve_enabled`/`last_auto_approved`/`prune_auto_approve`). While it is on,
+  `request_decision()` answers `allow` the moment a prompt registers, and
+  `auto_approve_service.set_enabled` (`POST /api/sessions/{id}/auto-approve`, local requests only, 404
+  unless the session is live) also approves what is already pending (`approve_pending`). The flag is set
+  before the pending prompts are scanned, and a prompt is registered before the flag is read, so a
+  prompt racing the switch is caught by one side; `answer()` is False for a prompt already gone, so it
+  is answered once. `api/app/domain/auto_approve_policy.py`'s `is_auto_approvable` decides what
+  qualifies: never `AskUserQuestion` or `ExitPlanMode`, and for `Bash`/`PowerShell` never an unreadable
+  command or one matching `DANGEROUS_COMMAND_PATTERNS` (`sudo`, `rm -rf`, forced pushes, `curl | sh`,
+  disk formatting, shutdown, and similar). That list is a best-effort regex guard, **not a security
+  boundary**: obfuscation or a script file can slip past it. Each approval logs the session id and tool
+  name (never `tool_input`). `relay_hook_seen` (first `register()` since the backend started, reported in
+  `/api/meta`) is what the UIs wait for before offering the switch.
 - `api/app/infra/remote_gateway.py` — `RemoteGateway`, the lifecycle behind Remote mode. `POST /api/remote-mode`
   calls `start()`/`stop()`, which return at once; a state machine runs off, `starting` (with a `step`:
   `docker`, `frontend`, `gateway`), then `ready` or `failed` (with a `reason`, shown for 30 s), and

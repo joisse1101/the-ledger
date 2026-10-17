@@ -3,10 +3,10 @@
 > Requirements live in `openspec/specs/desktop-widget/spec.md`. This page describes how the code meets them, not what it must do.
 
 `widget/` is a small Electron app: a frameless, always-on-top window that lists the live Claude Code
-sessions with each one's context size, so the Ledger is useful without opening it. It is read-only
-and Windows-only, like `hooks/`. It has its own `package.json`, imports nothing from `web/`, and is
-is the only part of the repo that is not a service, a hook or a skill. Its one write is the Remote
-mode switch described below.
+sessions with each one's context size, so the Ledger is useful without opening it. It only reads
+sessions (apart from two switches) and is Windows-only, like `hooks/`. It has its own `package.json`, imports nothing from `web/`, and is
+is the only part of the repo that is not a service, a hook or a skill. Its writes are the Remote
+mode switch and the per-row auto-approve button, both described below.
 
 ## How it works
 
@@ -29,7 +29,13 @@ Electron main process                      renderer (sandboxed)
   `394k ▲ +2.1k ▁▂▃▅`), the string `formatting.format_context` builds for the Live table and the
   toast, or `--` when `context` is null. The widget has no token formatter of its own.
 - **Pending tint.** A row gets the `pending` class (warm background) when `pending_decision` is set,
-  with no badge text. The prompt itself is never read or shown, and nothing can be approved here; answer in the terminal or the Ledger.
+  with no badge text. The prompt itself is never read or shown, and no individual prompt can be approved here; answer in the terminal or the Ledger.
+- **Auto-approve button.** Once `/api/meta.relay_hook_seen` is true (read right after each `/api/live`
+  poll; anything unreadable counts as not seen), each row gets a small "Auto" button at its right end,
+  outlined when off and filled when on. A row is a `div.row` holding two sibling buttons, `.row-open`
+  (the repo window) and `.auto-approve`, because a button cannot nest in a button; pressing the second
+  never opens the repo. It calls `POST /api/sessions/{id}/auto-approve` through the `setAutoApprove`
+  bridge method; the state follows the next poll, and a refusal shows a brief note.
 - **Finished tint.** A row gets the `done` class (green background) when the session's `status` is
   `idle` or `stopped`, i.e. it is no longer running. A pending decision wins over it.
 - **Row click** calls `POST /api/sessions/{id}/open-repo` (the toast-click action). A 404 shows a
