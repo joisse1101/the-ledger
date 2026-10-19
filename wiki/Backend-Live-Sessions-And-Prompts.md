@@ -11,7 +11,8 @@
   `DELETE /api/sessions/{id}` route in [API routes](Backend-API-Routes.md)); `cwd_for()` is used server-side only, never sent to a
   client. `latest_activity()` (through the same lock) feeds the pending-prompt sweep below. Each item's `compact` grade
   comes from `latest_compaction()` (the newest `compact_boundary` line's timestamp, falling back to the
-  session's `started_at`) and the pure `compact_grade.grade_compact`; the 45/55-minute limits are constants there.
+  session's `started_at`, which is the conversation's first transcript timestamp, so reopening a session
+  doesn't restart it) and the pure `compact_grade.grade_compact`; the 45/55-minute limits are constants there.
 - `api/app/domain/pending_decisions.py` — `PendingDecisions`, the in-memory, lock-guarded store (same spirit as
   `LiveSnapshot`; nothing touches disk) behind answering a live session's blocking prompts from the
   dashboard, plus the **Remote mode** switch. The prompts come from the optional relay hook (see [Hooks](Hooks.md)): a `PermissionRequest` hook fires only when Claude Code is about to show a dialog

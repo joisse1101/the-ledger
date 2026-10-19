@@ -61,7 +61,9 @@ testable and readable independent of the web framework wrapping it.
   files may linger, so entries aren't guaranteed to reflect live processes. Each session's `project`
   is resolved by looking up its `session_id` in `claude_transcripts.load_transcripts()` and reusing
   that transcript's `project`, falling back to a `cwd`-derived guess for a brand-new session with
-  nothing written to disk yet.
+  nothing written to disk yet. The same lookup replaces `started_at` with the transcript's earliest
+  timestamp: the registry's `startedAt` is per process, so closing and reopening a session resets it,
+  and it stays only as the fallback until the transcript has a timestamped line.
 - `api/app/domain/context/` is split by job: `models.py` (dataclasses), `parsing.py` (transcript lines to turns),
   `tail.py` (live context and latest activity from the file's tail), `detail.py` (the full per-session detail),
   `attribution.py`, `breakdown.py` and `formatting.py`.

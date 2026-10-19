@@ -1,6 +1,8 @@
+import json
 from datetime import datetime, timezone
 
 from app.domain.context.models import LiveContext
+from app.repositories import claude_sessions
 from app.repositories.claude_sessions import ClaudeSession
 from app.domain.live_snapshot import LiveSnapshot
 
@@ -154,6 +156,35 @@ def test_compact_grade_runs_from_the_start_and_carries_the_anchor():
     compact = snapshot.get()[0]["compact"]
     assert compact["state"] == "should"
     assert compact["since"] == datetime(2026, 1, 1, 9).astimezone().astimezone(timezone.utc).isoformat()
+
+
+def test_a_reopened_session_is_graded_from_its_conversations_start(tmp_path, monkeypatch):
+    now = datetime(2026, 1, 1, 10, 50, tzinfo=timezone.utc)
+    conversation_start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    reopened_at = datetime(2026, 1, 1, 10, 48, tzinfo=timezone.utc)
+
+    class Transcript:
+        session_id = "s1"
+        project = title = last_message = first_prompt = ""
+        started_at = conversation_start
+
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [Transcript()])
+    (tmp_path / "1.json").write_text(
+        json.dumps({"pid": 1, "sessionId": "s1", "startedAt": reopened_at.timestamp() * 1000}),
+        encoding="utf-8",
+    )
+    snapshot = LiveSnapshot(
+        load_sessions=lambda: claude_sessions.load_sessions(tmp_path),
+        live_context=lambda sid, cwd: None,
+        latest_compaction=lambda sid, cwd: None,
+        ttl=1.0,
+        clock=Clock(),
+        now=lambda: now,
+    )
+
+    item = snapshot.get()[0]
+    assert item["started_at"] == conversation_start.isoformat()
+    assert item["compact"]["state"] == "should"
 
 
 def test_a_compaction_after_the_start_restarts_the_clock():

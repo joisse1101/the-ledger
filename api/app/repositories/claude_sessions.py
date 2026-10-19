@@ -117,6 +117,10 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
         session.title = transcript.title
         session.last_message = transcript.last_message
         session.first_prompt = transcript.first_prompt
+        # The registry's startedAt is per process, so reopening a session resets it; the
+        # transcript's first line is when the conversation really began.
+        if transcript.started_at:
+            session.started_at = transcript.started_at
 
     sessions.sort(
         key=lambda session: session.updated_at or datetime.min,
