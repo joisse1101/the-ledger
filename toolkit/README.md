@@ -54,7 +54,8 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
   named. It has no commit authority of its own.
 - `/jois:write-pr` opens GitHub pull requests for the commits on the current branch. It is one file:
   the steps, the PR guidelines, the body template and the verification rules all sit inside it. It
-  reads the commits since the default branch, proposes groups of commits that each form one concern (a
+  reads the commits since the default branch on the remote, so a local branch that is behind does not
+  matter, proposes groups of commits that each form one concern (a
   refactor never shares a PR with a feature), and waits for a confirmation word before it pushes or
   runs `gh pr create`. Each body lists the test files the group adds, an Author Verification list and
   suggested steps for a reviewer. The verification comes from the OpenSpec change's `tasks.md` and from
@@ -69,9 +70,13 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
 
   It never merges. A hook in the command's frontmatter blocks `gh pr merge`, `--auto` and merge calls
   through `gh api`, and stays active for the rest of the session once the command has been invoked.
-  When it finishes it lists every PR it opened in the order to merge, with the `gh pr merge <n> -s -d`
-  command for each, for you to run. A PR based on another PR's branch needs a rebase after the earlier
-  one merges, and the list says so.
+  The hook looks for those words anywhere in a shell command's text, so text that merely mentions them
+  is refused too; the command passes each PR body from a file for that reason. When it finishes it
+  lists every PR it opened in the order to merge, with a merge command for each, for you to run. A PR
+  that nothing is stacked on gets `gh pr merge <n> -s -d`. A PR that another PR is based on gets it
+  without `-d`, because deleting its branch closes the PR above it and GitHub cannot reopen that one.
+  For each PR above it the list gives the follow-up in order: rebase, push with `--force-with-lease`,
+  retarget to the default branch, delete the earlier branch.
 
   It replaces the old `/write-pr` skill. If you installed that, delete `~/.claude/skills/write-pr` (the
   installer only manages items the toolkit still holds), then run

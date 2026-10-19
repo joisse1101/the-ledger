@@ -11,7 +11,7 @@ hooks:
           command: >-
             powershell -NoProfile -Command "if ([Console]::In.ReadToEnd() -match 'gh\s+(pr\s+(merge|.*--auto)|api\b.*merge)') { [Console]::Error.WriteLine('write-pr never merges: the user runs gh pr merge'); exit 2 }"
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   last_updated: "2026-10-19"
 ---
 
@@ -27,6 +27,7 @@ list of steps: Guidelines, PR body template and Author Verification.
 - Never push or create anything before the user types the confirmation word. Never force-push.
 - Never open a PR from the default branch.
 - Never run a command the user has not agreed to, and never edit code to make a run pass.
+- Never put a PR body inline in a shell command. Pass it from a file (step 8).
 
 ## Steps
 
@@ -34,8 +35,10 @@ list of steps: Guidelines, PR body template and Author Verification.
    -q .defaultBranchRef.name`. On the base branch, stop and say to switch to a feature branch. If
    `gh pr list --head <branch> --state open` shows a PR, report it and stop. Note uncommitted changes
    (`git status --short`); they are not in any PR.
-2. **Read.** `git fetch`, then `git log --reverse --format="%h %s" <base>..HEAD` and `git diff
-   --numstat <base>...HEAD`. No commits: say so and stop.
+2. **Read.** `git fetch`, then `git log --reverse --format="%h %s" origin/<base>..HEAD` and `git diff
+   --numstat origin/<base>...HEAD`. Always the remote base: the local one may be behind and would
+   count merged commits as part of this branch. If `origin/<base>` does not exist, say so and stop.
+   No commits: say so and stop.
 3. **Group by concern.** One group per logical unit of work. Refactors never share a group with
    features. Test, docs and OpenSpec archive commits join the group they describe; they form their own
    group only when the whole branch is that kind of change. Flag a group over about 400 changed lines.
@@ -62,20 +65,32 @@ list of steps: Guidelines, PR body template and Author Verification.
    <word> to open these PRs, or tell me what to change." Then end the turn and call no tool. "Yes" or
    "looks good" is not the word. After any change request, present again with a new word.
 8. **Open** after the word, one group at a time, in dependency order:
-   - A group that is not the only one: `git switch -c <branch> <base>`, then `git cherry-pick` its
+   - A group that is not the only one: `git switch -c <branch> origin/<base>`, then `git cherry-pick` its
      commits in order. On a conflict, run `git cherry-pick --abort`, retry on the branch of the group
      it depends on, and base that PR on that branch.
+   - Write the body, without the source tags, to a temporary file outside the repository with the
+     file-writing tool: the session's scratch directory if it names one, otherwise the OS temp
+     directory. Never write it from a shell command and never put it inline in one; the hook refuses
+     any shell command whose text contains the merge words, and a body may contain them.
    - `git push -u origin <branch>`, then `gh pr create --base <base> --head <branch> --title "<title>"
-     --body-file -` with the body on stdin, without the source tags. Record the number and URL.
+     --body-file <path>`. Record the number and URL.
    - Return to the original branch when done.
 9. **Summarize** (below).
 
 ## Final summary
 
 List every PR opened: number, title, URL and base, in the order to merge. Dependent PRs come in
-stack order; independent ones are marked "any order". Give each as `gh pr merge <n> -s -d` for
-the user to run, and run none. For a PR based on another PR's branch, add: after the earlier PR
-merges, run `git rebase --onto <base> <earlier-branch> <branch>` and push with `--force-with-lease`.
+stack order; independent ones are marked "any order". Give each a merge command for the user to
+run, and run none:
+
+- A PR that no other opened PR is based on: `gh pr merge <n> -s -d`.
+- A PR that another opened PR is based on: `gh pr merge <n> -s`, without `-d`. Deleting its branch
+  closes the PR based on it, and GitHub can then neither retarget nor reopen that PR.
+
+For each later PR in a stack, list after its base PR merges, in this order: `git fetch`; `git rebase
+--onto origin/<base> <earlier-branch> <branch>`; push with `--force-with-lease`; `gh pr edit <n> --base
+<base>`; then delete the earlier branch with `git push origin --delete <earlier-branch>`.
+
 If no PR was opened, say so and why.
 
 ## Guidelines
