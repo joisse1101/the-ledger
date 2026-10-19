@@ -14,7 +14,7 @@ template, and compose file; see [Gateway](Gateway.md)), and `hooks/` (Claude
 Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
 installer/uninstaller — see [Hooks](Hooks.md)), `widget/` (the Electron desktop widget: a floating, read-only
 live-sessions window with its own `package.json`, tests and startup scripts; see [Widget](Widget.md)), and `toolkit/` (not a service: tool-neutral reusable
-AI-agent skills under `toolkit/skills/<name>/SKILL.md` (`coding-standards`) and slash commands under `toolkit/commands/` (`opsx`, and `jois` for an unattended apply, a working-tree stager and `write-pr`, which opens grouped pull requests from the branch's commits and never merges; all hidden from the session listing) and coding-standards rules under `toolkit/rules/`,
+AI-agent skills under `toolkit/skills/<name>/SKILL.md` (`coding-standards`) and slash commands under `toolkit/commands/` (`opsx`, and `jois` for an unattended apply, a working-tree stager and `write-pr`, which opens grouped pull requests from the branch's commits (or from commits made on the default branch, which it then resets to the remote) and never merges; all hidden from the session listing) and coding-standards rules under `toolkit/rules/`,
 plus `toolkit/install/Install-Toolkit.ps1` and its `targets.json` that copy them into Claude Code's
 global or a project's Claude Code skills, commands and rules folders without silently overwriting a
 differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,

@@ -63,7 +63,12 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
   you type the command. It states no result that a source did not record. When a group has no
   verification and the repo documents a test command for the directories it changes, it asks once, for
   all groups, whether to run them and runs only what you agree to; otherwise it asks what you ran. A
-  failing or timed-out run is reported, never fixed, and does not block the PR. Steps use only commands
+  failing or timed-out run is reported, never fixed, and does not block the PR. It also works from the
+  default branch: commits ahead of the remote go to new branches (`type/slug`, or `type/TICKET-slug`
+  when a commit references a ticket, with the type a commit type such as `feat` or `fix`), and once
+  every PR is opened the local default branch is set to the remote with `git branch -f`, which leaves
+  uncommitted changes alone. The confirmation word covers that reset, and nothing is reset if a push
+  or PR failed. Steps use only commands
   the repo's own documents state, and the source of each line is shown to you before you confirm, never
   in the PR. It blocks a group whose diff holds a secret, an `.env` file or build output, and warns on
   debug prints.
