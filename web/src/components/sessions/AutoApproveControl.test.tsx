@@ -21,6 +21,7 @@ function session(autoApprove: boolean): LiveSession {
     last_message: "",
     first_prompt: "",
     context: null,
+    compact: null,
     pending_decision: null,
     auto_approve: autoApprove,
     last_auto_approved: null,

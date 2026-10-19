@@ -20,6 +20,17 @@ function PendingBadge({ session }: { session: LiveSession }) {
   );
 }
 
+const COMPACT_LABELS = { should: "Should compact", needs: "Needs compact" } as const;
+
+/** Shown when a session has run 45+ minutes since it started or was last compacted. Muted for an
+ *  idle session, which isn't growing its context right now. */
+function CompactBadge({ session }: { session: LiveSession }) {
+  const state = session.compact?.state;
+  if (state !== "should" && state !== "needs") return null;
+  const idle = session.status === "idle" ? " compact-badge-idle" : "";
+  return <span className={`compact-badge compact-badge-${state}${idle}`}>{COMPACT_LABELS[state]}</span>;
+}
+
 /** The card-only marker for a session that auto-approves (its table column is hidden on a card). */
 function AutoApproveBadge({ session }: { session: LiveSession }) {
   return session.auto_approve ? <span className="pending-badge">Auto-approve</span> : null;
@@ -71,6 +82,13 @@ const baseColumns: ListColumn<LiveSession>[] = [
     header: "Context",
     priority: "high",
     render: (s) => s.context?.label ?? "--",
+  },
+  {
+    key: "compact",
+    header: "Compact",
+    priority: "high",
+    cardPriority: "hidden",
+    render: (s) => <CompactBadge session={s} />,
   },
   {
     key: "pending_decision",
@@ -141,6 +159,7 @@ export function LiveList({ onSelect }: LiveListProps) {
         onSelect={onSelect}
         rowBadge={(s) => (
           <>
+            <CompactBadge session={s} />
             <PendingBadge session={s} />
             {relayHookSeen && <AutoApproveBadge session={s} />}
           </>

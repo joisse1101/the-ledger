@@ -86,6 +86,15 @@ export interface AutoApproved {
   at: string;
 }
 
+/** How long ago a live session started or was last compacted: `ok` under 45 min, `should` up to
+ *  55 min, `needs` beyond. `since` is the moment that time is measured from. */
+export type CompactState = "ok" | "should" | "needs";
+
+export interface CompactGrade {
+  state: CompactState;
+  since: string;
+}
+
 export interface LiveSession {
   session_id: string;
   pid: number;
@@ -99,6 +108,7 @@ export interface LiveSession {
   last_message: string;
   first_prompt: string;
   context: LiveContext | null;
+  compact: CompactGrade | null;
   pending_decision: PendingDecision | null;
   auto_approve: boolean;
   last_auto_approved: AutoApproved | null;

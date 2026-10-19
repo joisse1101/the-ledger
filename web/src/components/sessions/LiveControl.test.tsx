@@ -21,6 +21,7 @@ function session(lastAutoApproved: LiveSession["last_auto_approved"]): LiveSessi
     last_message: "",
     first_prompt: "",
     context: null,
+    compact: null,
     pending_decision: null,
     auto_approve: true,
     last_auto_approved: lastAutoApproved,
