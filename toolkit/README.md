@@ -40,25 +40,6 @@ differs from the toolkit's copy is never overwritten unless you pass `-Force`; `
 Each skill is a folder `toolkit/skills/<name>/` with a `SKILL.md` (`name` and `description`
 frontmatter, then instructions) and any support files it needs. A folder is self-contained.
 
-### The `write-pr` skill
-
-`/write-pr` opens GitHub pull requests for the commits on the current branch. It declares
-`disable-model-invocation: true`, so it runs only when you type it and stays out of the session
-context. It reads the commits since the default branch, proposes groups of commits that each form one
-concern (a refactor never shares a PR with a feature), and waits for a confirmation word before it
-pushes or runs `gh pr create`. Each body follows `pr-template.md`: the test files the group adds, an
-Author Verification list drafted from the OpenSpec change's `tasks.md`, and suggested steps for a
-reviewer. It states no result that `tasks.md` or you did not record, and asks you once, for all
-groups, when verification is missing. Steps use only commands the repo's own documents state, and
-the source of each line is shown to you before you confirm, never in the PR. It blocks a group whose diff holds a
-secret, an `.env` file or build output, and warns on debug prints.
-
-It never merges. A hook in the skill's frontmatter blocks `gh pr merge`, `--auto` and merge calls
-through `gh api`, and stays active for the rest of the session once the skill has been invoked. When
-it finishes it lists every PR it opened in the order to merge, with the `gh pr merge <n> -s -d`
-command for each, for you to run. A PR based on another PR's branch needs a rebase after the earlier
-one merges, and the list says so. `guidelines.md`, `pr-template.md` and `verification.md` sit beside `SKILL.md`.
-
 ## Commands
 
 Each entry directly under `toolkit/commands/` is one command item: a `.md` file (becomes `/name`) or
@@ -71,6 +52,30 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
   concern at a time, shows the message and a confirmation word, and waits. Typing the word commits
   that concern and moves on, until the tree is clean. Secret files and build output are skipped and
   named. It has no commit authority of its own.
+- `/jois:write-pr` opens GitHub pull requests for the commits on the current branch. It is one file:
+  the steps, the PR guidelines, the body template and the verification rules all sit inside it. It
+  reads the commits since the default branch, proposes groups of commits that each form one concern (a
+  refactor never shares a PR with a feature), and waits for a confirmation word before it pushes or
+  runs `gh pr create`. Each body lists the test files the group adds, an Author Verification list and
+  suggested steps for a reviewer. The verification comes from the OpenSpec change's `tasks.md` and from
+  test, build or lint runs it can see earlier in the same chat, so run your tests in the chat before
+  you type the command. It states no result that a source did not record. When a group has no
+  verification and the repo documents a test command for the directories it changes, it asks once, for
+  all groups, whether to run them and runs only what you agree to; otherwise it asks what you ran. A
+  failing or timed-out run is reported, never fixed, and does not block the PR. Steps use only commands
+  the repo's own documents state, and the source of each line is shown to you before you confirm, never
+  in the PR. It blocks a group whose diff holds a secret, an `.env` file or build output, and warns on
+  debug prints.
+
+  It never merges. A hook in the command's frontmatter blocks `gh pr merge`, `--auto` and merge calls
+  through `gh api`, and stays active for the rest of the session once the command has been invoked.
+  When it finishes it lists every PR it opened in the order to merge, with the `gh pr merge <n> -s -d`
+  command for each, for you to run. A PR based on another PR's branch needs a rebase after the earlier
+  one merges, and the list says so.
+
+  It replaces the old `/write-pr` skill. If you installed that, delete `~/.claude/skills/write-pr` (the
+  installer only manages items the toolkit still holds), then run
+  `.\Install-Toolkit.ps1 -Command jois -Force`.
 
 ### Commands stay out of the session context
 
