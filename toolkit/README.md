@@ -87,6 +87,17 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
   installer only manages items the toolkit still holds), then run
   `.\Install-Toolkit.ps1 -Command jois -Force`.
 
+- `/jois:update-pr` brings the open PR of the current branch up to date. It finds the PR, then handles
+  whichever of these apply: a restack, when the PR sits on a branch whose PR has merged and that branch
+  still exists (rebase onto the default branch, retarget the PR); a push of commits the remote lacks;
+  and a refreshed body, built from the same template and verification rules as `/jois:write-pr`, shown
+  to you as a diff against the live body. One confirmation word covers everything it will do, listed
+  first. It pushes plainly, except the `--force-with-lease` push of a restack you confirmed; it never
+  uses `--force`, never renames or deletes a branch, and never merges (the same hook as write-pr). With
+  no open PR it says so and points to `/jois:write-pr`. It is also a single file, so the body template
+  and verification sections are copied from write-pr; `python check_docs.py` fails if the two copies
+  differ.
+
 ### Commands stay out of the session context
 
 Every command declares `disable-model-invocation: true`, so its description is not loaded into each
