@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 from app.repositories import claude_sessions
 
@@ -65,6 +66,7 @@ def test_load_sessions_resolves_project_from_transcripts(tmp_path, monkeypatch):
             self.title = "What we did"
             self.last_message = "All done."
             self.first_prompt = "Can you help me?"
+            self.started_at = None
 
     monkeypatch.setattr(
         claude_sessions,
@@ -78,6 +80,37 @@ def test_load_sessions_resolves_project_from_transcripts(tmp_path, monkeypatch):
     assert sessions[0].title == "What we did"
     assert sessions[0].last_message == "All done."
     assert sessions[0].first_prompt == "Can you help me?"
+
+
+def _transcript(session_id, started_at):
+    class FakeTranscript:
+        project = ""
+        title = ""
+        last_message = ""
+        first_prompt = ""
+
+    transcript = FakeTranscript()
+    transcript.session_id = session_id
+    transcript.started_at = started_at
+    return transcript
+
+
+def test_load_sessions_takes_the_start_from_the_transcript(tmp_path, monkeypatch):
+    started = datetime(2023, 11, 14, 21, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [_transcript("sess-1", started)])
+    _write_session_file(tmp_path / "1.json", sessionId="sess-1", startedAt=1_700_003_000_000)
+
+    assert claude_sessions.load_sessions(tmp_path)[0].started_at == started
+
+
+def test_load_sessions_keeps_the_registry_start_without_a_transcript_start(tmp_path, monkeypatch):
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [_transcript("sess-1", None)])
+    _write_session_file(tmp_path / "1.json", sessionId="sess-1")
+    _write_session_file(tmp_path / "2.json", sessionId="sess-2")
+
+    started = {s.session_id: s.started_at for s in claude_sessions.load_sessions(tmp_path)}
+    registry_start = datetime.fromtimestamp(1_700_000_000)
+    assert started == {"sess-1": registry_start, "sess-2": registry_start}
 
 
 def test_load_sessions_no_transcript_match_leaves_title_and_messages_blank(tmp_path, monkeypatch):
