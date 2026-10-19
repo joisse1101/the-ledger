@@ -328,6 +328,37 @@ def test_jois_commands_need_a_version_but_opsx_does_not(tmp_path):
     assert not any("jois/stage.md" in p or "opsx" in p for p in problems)
 
 
+def _pr_command(body):
+    return (
+        f"---\n{HIDDEN}\n{VERSION}\n---\n# Steps\nown steps\n\n"
+        f"## PR body template\n{body}\n\n## Author Verification\nrules\n"
+    )
+
+
+def test_shared_pr_sections_must_match_between_write_and_update_pr(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/commands/jois/write-pr.md", _pr_command("same"))
+    _write(tmp_path, "toolkit/commands/jois/update-pr.md", _pr_command("changed"))
+    problems = _problems(tmp_path)
+    assert any(
+        "PR body template" in p and "write-pr.md" in p and "update-pr.md" in p for p in problems
+    )
+    assert not any("Author Verification" in p for p in problems)
+
+
+def test_identical_shared_pr_sections_pass(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/commands/jois/write-pr.md", _pr_command("same").replace("own steps", "a"))
+    _write(tmp_path, "toolkit/commands/jois/update-pr.md", _pr_command("same").replace("own steps", "b"))
+    assert _problems(tmp_path) == []
+
+
+def test_shared_pr_check_is_skipped_when_a_command_is_absent(tmp_path):
+    _toolkit_tree(tmp_path)
+    _write(tmp_path, "toolkit/commands/jois/write-pr.md", _pr_command("same"))
+    assert _problems(tmp_path) == []
+
+
 def test_skill_may_name_the_review_output_folder(tmp_path):
     _toolkit_tree(tmp_path)
     _write(

@@ -11,6 +11,7 @@ Checks:
   4. size budgets for the root and nested CLAUDE.md files
   5. toolkit standards: always-on rules and budgets, scoped rules, review skill size and references,
      and `metadata.version` and `metadata.last_updated` on every skill, rule, agent and jois-review command
+  6. the PR body template and Author Verification sections of the write-pr and update-pr commands match
 
 Paths ignored by git (.venv, dist, .ledger...) are exempt from the inline-code check. A line
 containing IGNORE_MARKER is skipped by it too, for any other path deliberately absent from a checkout.
@@ -33,6 +34,7 @@ ALWAYS_ON_BUDGET_BYTES = 4 * 1024
 SCOPED_RULE_BUDGET_BYTES = 3 * 1024
 SKILL_BUDGET_BYTES = 6 * 1024
 ALWAYS_ON_RULES = ("core-principles.md", "architecture-boundaries.md")
+SHARED_PR_SECTIONS = ("PR body template", "Author Verification")
 # Loads in every session on purpose: a commit can contain no code (images, deletions, docs).
 UNSCOPED_RULES = ("commit-hygiene.md",)
 UNSCOPED_RULE_BUDGET_BYTES = 2 * 1024
@@ -383,6 +385,37 @@ def _check_versions(root: Path) -> list[str]:
     return problems
 
 
+def _h2_section(text: str, title: str) -> str | None:
+    """The text under `## title` up to the next `## ` heading outside a code fence, or None."""
+    body: list[str] = []
+    found = in_fence = False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            in_fence = not in_fence
+        elif line.startswith("## ") and not in_fence:
+            if found:
+                break
+            found = line[3:].strip() == title
+            continue
+        if found:
+            body.append(line)
+    return "\n".join(body).strip() if found else None
+
+
+def _check_shared_pr_sections(root: Path) -> list[str]:
+    """write-pr and update-pr each carry the PR body rules; they must not drift apart."""
+    commands = root / "toolkit" / "commands" / "jois"
+    write, update = commands / "write-pr.md", commands / "update-pr.md"
+    if not (write.is_file() and update.is_file()):
+        return []
+    write_text, update_text = write.read_text(encoding="utf-8"), update.read_text(encoding="utf-8")
+    return [
+        f"{_rel(root, write)} and {_rel(root, update)}: section '{title}' differs; keep it identical in both"
+        for title in SHARED_PR_SECTIONS
+        if _h2_section(write_text, title) != _h2_section(update_text, title)
+    ]
+
+
 def check_toolkit(root: Path) -> list[str]:
     rules = root / "toolkit" / "rules"
     if not rules.is_dir():
@@ -394,6 +427,7 @@ def check_toolkit(root: Path) -> list[str]:
         + _check_review_skill(root)
         + _check_versions(root)
         + _check_commands_hidden(root)
+        + _check_shared_pr_sections(root)
     )
 
 
