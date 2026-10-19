@@ -30,6 +30,9 @@ Electron main process                      renderer (sandboxed)
   toast, or `--` when `context` is null. The widget has no token formatter of its own.
 - **Pending tint.** A row gets the `pending` class (warm background) when `pending_decision` is set,
   with no badge text. The prompt itself is never read or shown, and no individual prompt can be approved here; answer in the terminal or the Ledger.
+- **Compact dot.** The first thing inside `.row-open` is a `compact-dot` coloured by `compact.state` (green
+  `ok`, amber `should`, red `needs`), drawn hollow while `status` is `idle`; a session with no grade gets an
+  invisible placeholder so names stay aligned. It stays fully opaque (see Status tint).
 - **Auto-approve button.** Once `/api/meta.relay_hook_seen` is true (read right after each `/api/live`
   poll; anything unreadable counts as not seen), each row gets a small "Auto" button at its right end,
   outlined when off and filled when on. A row is a `div.row` holding two sibling buttons, `.row-open`
@@ -38,7 +41,9 @@ Electron main process                      renderer (sandboxed)
   bridge method; the state follows the next poll, and a refusal shows a brief note.
 - **Status tint.** A row's tint follows its `status`; a pending decision always wins. `idle` gets the
   `done` class (green background); `busy`, `unknown` or an empty status keeps the default look; any
-  other status gets the `error` class (red background). The rule is `rowTint` in `widget/src/renderer/view.ts`.
+  other status gets the `error` class (red background). The rule is `rowTint` in `widget/src/renderer/view.ts`. The tint
+  colours are mixed with `--bg-alpha`, so they follow the transparency buttons like the window background;
+  text and the compact dot stay opaque.
 - **Row click** calls `POST /api/sessions/{id}/open-repo` (the toast-click action). A 404 shows a
   brief "Session ended" note and refreshes the list.
 - **Branch.** `/api/live` items carry `git_branch`, looked up from `ledger.db` in `LiveSnapshot`
