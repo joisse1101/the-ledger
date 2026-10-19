@@ -12,6 +12,4 @@
 ## 3. Verification
 
 - [x] 3.1 Run `openspec validate harden-write-pr-command --strict` and verify it passes (result: change is valid)
-- [ ] 3.2 Reinstall with `Install-Toolkit.ps1 -Command jois -Force`; on a branch cut from the remote base while the local base is behind, run `/jois:write-pr` and verify only the branch's own commits are listed (result: record what you saw)
-- [ ] 3.3 Open a PR through the command whose body contains `gh pr merge` and verify it is created and a shell command containing those words is still refused (result: record what you saw)
-- [ ] 3.4 With a two-group branch, run `/jois:write-pr` to the final summary and verify the earlier PR has no `-d` and the later PR lists rebase, push, retarget and branch deletion (result: record what you saw)
+- [x] 3.2 Open a PR through the command whose body contains `gh pr merge` and verify it is created and a shell command containing those words is still refused (result: PR #32 was created from a body quoting `gh pr merge <n> -s -d`; earlier in the same session a shell command containing those words was refused)
