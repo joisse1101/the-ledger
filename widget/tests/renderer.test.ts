@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../src/renderer/app'
 import { remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
@@ -9,6 +11,7 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   project: 'the-ledger',
   git_branch: 'main',
   context: { label: '394k ▲ +2.1k ▁▂▃▅' },
+  compact: null,
   status: 'busy',
   pending_decision: null,
   auto_approve: false,
@@ -147,6 +150,48 @@ describe('status tint', () => {
     push({ state: 'online', relayHookSeen: false, sessions: [session({ status, pending_decision: { id: 'p' } })] })
     expect(document.querySelector('.row.pending')).not.toBeNull()
     expect(document.querySelector('.row.done, .row.error')).toBeNull()
+  })
+})
+
+describe('compact dot', () => {
+  const grade = (state: 'ok' | 'should' | 'needs') => ({ state, since: '2026-10-19T11:00:00+00:00' })
+  const dot = () => document.querySelector('.row .compact-dot') as HTMLElement
+
+  it.each(['ok', 'should', 'needs'] as const)('shows a filled %s dot at the left of the row', (state) => {
+    const { push } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ compact: grade(state) })] })
+    expect(dot().classList.contains(`compact-${state}`)).toBe(true)
+    expect(dot().classList.contains('idle')).toBe(false)
+    expect(dot().textContent).toBe('')
+    expect(document.querySelector('.row-open')!.firstElementChild).toBe(dot())
+  })
+
+  it('draws a hollow dot for an idle session', () => {
+    const { push } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ status: 'idle', compact: grade('needs') })] })
+    expect(dot().classList.contains('compact-needs')).toBe(true)
+    expect(dot().classList.contains('idle')).toBe(true)
+  })
+
+  it('keeps an invisible placeholder for a session with no grade', () => {
+    const { push } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ compact: null })] })
+    expect(dot().classList.contains('compact-none')).toBe(true)
+  })
+
+  it('still opens the repo when the dot is clicked', () => {
+    const { push, bridge } = setup()
+    push({ state: 'online', relayHookSeen: false, sessions: [session({ compact: grade('should') })] })
+    dot().click()
+    expect(bridge.openSession).toHaveBeenCalledWith('s1')
+  })
+})
+
+describe('row tints and transparency', () => {
+  it.each(['pending', 'done', 'error'])('lets the %s tint follow the window transparency', (tint) => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/style.css'), 'utf8')
+    const rule = css.split(/\r?\n/).find((line) => line.startsWith(`.row.${tint}, `))!
+    expect(rule).toContain('var(--bg-alpha)')
   })
 })
 

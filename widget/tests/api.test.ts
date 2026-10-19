@@ -14,6 +14,7 @@ const session = {
   project: 'p',
   git_branch: 'main',
   context: { label: '394k' },
+  compact: null,
   pending_decision: null,
   auto_approve: false,
 }
