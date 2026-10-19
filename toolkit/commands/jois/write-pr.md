@@ -2,7 +2,7 @@
 name: "JOIS: Write PR"
 description: Open GitHub pull requests for the commits on the current branch, grouped by concern, from the team template. Manual only; never merges.
 disable-model-invocation: true
-allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git fetch:*), Bash(git switch:*), Bash(git cherry-pick:*), Bash(git push:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr create:*)
+allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git fetch:*), Bash(git ls-remote:*), Bash(git merge-base:*), Bash(git rev-parse:*), Bash(git switch:*), Bash(git cherry-pick:*), Bash(git push:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr create:*)
 hooks:
   PreToolUse:
     - matcher: Bash
@@ -11,7 +11,7 @@ hooks:
           command: >-
             powershell -NoProfile -Command "if ([Console]::In.ReadToEnd() -match 'gh\s+(pr\s+(merge|.*--auto)|api\b.*merge)') { [Console]::Error.WriteLine('write-pr never merges: the user runs gh pr merge'); exit 2 }"
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   last_updated: "2026-10-19"
 ---
 
@@ -25,16 +25,18 @@ list of steps: Guidelines, PR body template and Author Verification.
 - Never merge: no `gh pr merge`, no `--auto`, no auto-merge, no merge through `gh api`. A hook
   blocks it. The user merges.
 - Never push or create anything before the user types the confirmation word. Never force-push.
-- Never open a PR from the default branch.
+- Never use the default branch as a PR head. Commits made on it go to new branches (step 8).
+- Never reset the default branch with `git reset`, and never before every PR is opened (step 8).
 - Never run a command the user has not agreed to, and never edit code to make a run pass.
 - Never put a PR body inline in a shell command. Pass it from a file (step 8).
 
 ## Steps
 
 1. **Check.** `git branch --show-current` and the base from `gh repo view --json defaultBranchRef
-   -q .defaultBranchRef.name`. On the base branch, stop and say to switch to a feature branch. If
-   `gh pr list --head <branch> --state open` shows a PR, report it and stop. Note uncommitted changes
-   (`git status --short`); they are not in any PR.
+   -q .defaultBranchRef.name`. On the base branch, carry on: its commits ahead of the remote go to new
+   branches in step 8, and step 2 stops if there are none. On any other branch, if `gh pr list --head
+   <branch> --state open` shows a PR, report it and stop. Note uncommitted changes (`git status
+   --short`); they are not in any PR.
 2. **Read.** `git fetch`, then `git log --reverse --format="%h %s" origin/<base>..HEAD` and `git diff
    --numstat origin/<base>...HEAD`. Always the remote base: the local one may be behind and would
    count merged commits as part of this branch. If `origin/<base>` does not exist, say so and stop.
@@ -42,7 +44,9 @@ list of steps: Guidelines, PR body template and Author Verification.
 3. **Group by concern.** One group per logical unit of work. Refactors never share a group with
    features. Test, docs and OpenSpec archive commits join the group they describe; they form their own
    group only when the whole branch is that kind of change. Flag a group over about 400 changed lines.
-   Name each group's branch `type/short-description`; one group uses the current branch.
+   Name each new branch as Branch names below says. On a feature branch with one group, the PR head
+   is the current branch under its existing name; it is never renamed. On the base branch every
+   group, even one, gets a new branch.
 4. **Scan each group's added lines.** Block that group, naming the file, on a secret or credential, an
    `.env*` file, `*.pem`/`*.key`, or build output. Warn, without blocking, on `console.log`, `print` or
    `debugger` calls and commented-out code.
@@ -60,21 +64,32 @@ list of steps: Guidelines, PR body template and Author Verification.
    - End with the PR attribution line the session gives, if any.
 7. **Present and stop.** Show the groups with their commits, then for each PR the title, base, head,
    body, size, and any warning or block, including any run reported as failed, timed out or out of
-   date. Tag each verification bullet and reviewer step with its source (Author Verification, Sources).
+   date. On the base branch, also state: "After the PRs are pushed, local `<base>` is set to
+   `origin/<base>`; your commits stay on the new branches." Tag each verification bullet and reviewer
+   step with its source (Author Verification, Sources).
    Name a common confirmation word that differs from your previous prompt's and say: "Reply with
    <word> to open these PRs, or tell me what to change." Then end the turn and call no tool. "Yes" or
    "looks good" is not the word. After any change request, present again with a new word.
 8. **Open** after the word, one group at a time, in dependency order:
-   - A group that is not the only one: `git switch -c <branch> origin/<base>`, then `git cherry-pick` its
-     commits in order. On a conflict, run `git cherry-pick --abort`, retry on the branch of the group
-     it depends on, and base that PR on that branch.
+   - On the base branch with one group, when `git merge-base --is-ancestor origin/<base> <base>`
+     succeeds: `git switch -c <branch>`. The commits and any uncommitted changes come along.
+   - Any other group, including every group on a base branch that has diverged from the remote or has
+     several groups: `git switch -c <branch> origin/<base>`, then `git cherry-pick` its commits in
+     order. On a conflict, run `git cherry-pick --abort`, retry on the branch of the group it depends
+     on, and base that PR on that branch. A group that is the only one on a feature branch needs
+     neither.
    - Write the body, without the source tags, to a temporary file outside the repository with the
      file-writing tool: the session's scratch directory if it names one, otherwise the OS temp
      directory. Never write it from a shell command and never put it inline in one; the hook refuses
      any shell command whose text contains the merge words, and a body may contain them.
    - `git push -u origin <branch>`, then `gh pr create --base <base> --head <branch> --title "<title>"
      --body-file <path>`. Record the number and URL.
-   - Return to the original branch when done.
+   - Started on a feature branch: return to it when done.
+   - Started on the base branch: reset it last, and only when every push and `gh pr create` succeeded
+     and every commit from step 2 belongs to a group whose PR was created. Note `git rev-parse
+     <base>`, switch to the last PR branch opened, then `git branch -f <base> origin/<base>`. Never
+     `git reset`: `branch -f` leaves the working tree and uncommitted changes alone. If anything
+     failed, leave `<base>` as it is and say so.
 9. **Summarize** (below).
 
 ## Final summary
@@ -90,6 +105,9 @@ run, and run none:
 For each later PR in a stack, list after its base PR merges, in this order: `git fetch`; `git rebase
 --onto origin/<base> <earlier-branch> <branch>`; push with `--force-with-lease`; `gh pr edit <n> --base
 <base>`; then delete the earlier branch with `git push origin --delete <earlier-branch>`.
+
+If the command reset the base branch, say so and give the old tip hash, which the reflog also keeps.
+Say which branch you are on now.
 
 If no PR was opened, say so and why.
 
@@ -129,9 +147,23 @@ Read this while grouping commits and writing titles and bodies.
 - No direct commits to `main` or production branches: every change goes through a feature or bugfix
   branch and a PR with at least one human approval.
 
+### Branch names
+
+For a branch this command creates:
+
+- Format: `<type>/<ticket>-<slug>` when a commit message in the group or the current branch name
+  references a ticket, otherwise `<type>/<slug>`. Never invent a ticket.
+- Type: the commit type of the group's title: `feat`, `fix`, `refactor`, `style`, `docs`, `test` or
+  `chore`. Not `feature/` or `bugfix/`.
+- Ticket: keeps the case the tracker writes (`PROJ-456`). A GitHub issue `#123` becomes `123`.
+- Slug: lowercase kebab-case of letters, digits and hyphens, two to four words, imperative
+  (`add-oauth-login`). Never a bare `fix`, `update` or `test`.
+- Collision: check `git branch --list <name>` and `git ls-remote --heads origin <name>`. If the name
+  exists in either, propose another and never reuse it.
+- Examples: `feat/add-oauth-login`, `fix/PROJ-456-prevent-negative-quantity`, `fix/123-checkout-crash`.
+
 ### Best practices
 
-- Branch names are `type/short-description` (`feat/add-user-auth`, `fix/checkout-crash`).
 - Read your own diff on the platform before asking for review: debug logging, commented-out code,
   unintended files.
 - Give the reasoning behind architectural decisions in the description.
