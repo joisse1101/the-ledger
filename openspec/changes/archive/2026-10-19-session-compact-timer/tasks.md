@@ -10,13 +10,13 @@
 
 - [x] 2.1 Add `compact` to `LiveSession` in `web/src/api/types.ts`
 - [x] 2.2 Add a `CompactBadge` to `LiveList.tsx` (amber "Should compact", red "Needs compact", nothing for `ok`/null, muted when `status` is `idle`) in the card badge slot and as a table cell, with token-based colours in the stylesheet; verify with `LiveList.test.tsx` cases for each state, the idle variant, and the pill disappearing when the next poll returns `ok`
-- [ ] 2.3 Run `cd web; npm test; npm run build` and confirm both pass; check the table and card layouts by resizing a real browser
+- [x] 2.3 Run `cd web; npm test; npm run build` and confirm both pass; check the table and card layouts by resizing a real browser
 
 ## 3. Widget: dot and opacity-following tints
 
 - [x] 3.1 Add `compact` to `LiveSession` in `widget/src/shared/types.ts`
 - [x] 3.2 Render a leading `compact-dot` in `renderRow` (state class, hollow when idle, empty aligned placeholder when no grade); verify with `widget` Vitest cases for the three states, idle ring, no-grade alignment and that clicking the row still opens the repo
-- [ ] 3.3 Rewrite the `.pending`, `.done` and `.error` tints in `style.css` to follow `--bg-alpha`, and style the dot at full opacity with the existing status colour variables; verify with a test that the tint classes are still applied and by viewing the widget at low and full opacity
+- [x] 3.3 Rewrite the `.pending`, `.done` and `.error` tints in `style.css` to follow `--bg-alpha`, and style the dot at full opacity with the existing status colour variables; verify with a test that the tint classes are still applied and by viewing the widget at low and full opacity
 - [x] 3.4 Run `cd widget; npm test; npm run build` and confirm both pass
 
 ## 4. Docs
