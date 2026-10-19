@@ -50,6 +50,16 @@ export function rowTint(session: LiveSession): RowTint | null {
   return UNTINTED_STATUSES.has(session.status) ? null : 'error'
 }
 
+/** The dot left of a row: green, amber or red by the session's compact grade, hollow while the
+ *  session is idle. A session with no grade gets an invisible placeholder so names stay aligned. */
+function compactDot(doc: Document, session: LiveSession): HTMLElement {
+  const dot = el(doc, 'span', 'compact-dot')
+  const state = session.compact?.state
+  dot.classList.add(state ? `compact-${state}` : 'compact-none')
+  if (state && session.status === 'idle') dot.classList.add('idle')
+  return dot
+}
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   doc: Document,
   tag: K,
@@ -89,7 +99,7 @@ function renderRow(doc: Document, session: LiveSession, showAutoApprove: boolean
   // The server's own label (size, growth marker, sparkline); only the sparkline is shortened. `--` when unknown.
   const context = el(doc, 'span', 'ctx', trimSparkline(session.context?.label || '--'))
 
-  open.append(name, context)
+  open.append(compactDot(doc, session), name, context)
   open.addEventListener('click', () => actions.onOpen(session.session_id))
   row.append(open)
   if (showAutoApprove) {

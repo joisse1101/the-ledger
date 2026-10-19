@@ -15,7 +15,7 @@ from app.domain.context.tail import live_context, transcript_path
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    for cache in (tail._located, tail._live_cache, detail_module._detail_cache):
+    for cache in (tail._located, tail._live_cache, tail._compaction_cache, detail_module._detail_cache):
         cache.clear()
 
 
@@ -44,6 +44,13 @@ def _assistant(message_id, *, new=2, read=0, written=0, output=10, tools=(), mod
 def _compact_boundary(pre_tokens=191736, trigger="manual"):
     return {"type": "system", "subtype": "compact_boundary",
             "compactMetadata": {"trigger": trigger, "preTokens": pre_tokens, "postTokens": 12681}}
+
+
+def test_compaction_keeps_the_boundary_lines_timestamp():
+    boundary = {**_compact_boundary(), "timestamp": "2026-09-18T04:12:10.124Z"}
+    _, compactions, _ = parsing.scan(_lines(boundary, _compact_boundary()))
+    assert compactions[0].timestamp == datetime(2026, 9, 18, 4, 12, 10, 124000, tzinfo=timezone.utc)
+    assert compactions[1].timestamp is None
 
 
 def _lines(*entries):
@@ -203,6 +210,44 @@ def test_tail_reader_drops_the_first_line_of_a_window_that_starts_mid_file(tmp_p
     monkeypatch.setattr(tail, "_TAIL_WINDOW", 700)
     turns = tail._read_tail_turns(path, limit=3)
     assert [t.context for t in turns] == [1047, 1048, 1049]
+
+
+# ---------------------------------------------------------------- latest compaction
+
+
+def _boundary_at(timestamp):
+    return {**_compact_boundary(), "timestamp": timestamp}
+
+
+def _transcript_with(isolated_db, write_transcript, entries):
+    path = isolated_db / "projects" / paths.sanitize_project_path("/x/proj") / "s1.jsonl"
+    write_transcript(path, entries)
+    return path
+
+
+def test_latest_compaction_is_none_without_a_boundary(isolated_db, write_transcript):
+    _transcript_with(isolated_db, write_transcript, [_assistant("m1", read=1)])
+    assert tail.latest_compaction("s1", "/x/proj") is None
+
+
+def test_latest_compaction_returns_the_newest_boundary(isolated_db, write_transcript):
+    _transcript_with(isolated_db, write_transcript, [
+        _boundary_at("2026-09-18T04:00:00Z"), _assistant("m1", read=1), _boundary_at("2026-09-18T05:30:00Z"),
+        _assistant("m2", read=2),
+    ])
+    assert tail.latest_compaction("s1", "/x/proj") == datetime(2026, 9, 18, 5, 30, tzinfo=timezone.utc)
+
+
+def test_latest_compaction_finds_a_boundary_beyond_the_first_window(isolated_db, write_transcript, monkeypatch):
+    monkeypatch.setattr(tail, "_TAIL_WINDOW", 700)
+    _transcript_with(isolated_db, write_transcript, [
+        _boundary_at("2026-09-18T04:00:00Z"), *[_assistant(f"m{i}", read=i + 1) for i in range(50)],
+    ])
+    assert tail.latest_compaction("s1", "/x/proj") == datetime(2026, 9, 18, 4, tzinfo=timezone.utc)
+
+
+def test_latest_compaction_is_none_for_an_unreadable_session(isolated_db):
+    assert tail.latest_compaction("nope", "/x/proj") is None
 
 
 # ---------------------------------------------------------------- transcript location

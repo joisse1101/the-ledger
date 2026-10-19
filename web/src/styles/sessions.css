@@ -359,6 +359,31 @@
   white-space: nowrap;
 }
 
+.compact-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.25rem;
+  padding: 0 0.5rem;
+  border-radius: 62.4375rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compact-badge-should {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.compact-badge-needs {
+  background: rgb(var(--color-danger-rgb) / 0.15);
+  color: var(--color-danger);
+}
+
+.compact-badge-idle {
+  opacity: 0.55;
+}
+
 .pending-badge {
   display: inline-flex;
   align-items: center;

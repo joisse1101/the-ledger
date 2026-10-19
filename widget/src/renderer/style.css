@@ -146,17 +146,29 @@ button:hover { background: var(--bg-surface-hover); }
   flex-shrink: 0;
 }
 
+/* Row tints follow the transparency setting like the window background; text and the dot stay opaque. */
 /* A session waiting on a decision tints its whole row instead of showing a badge. */
-.row.pending, .row.pending:hover { background: var(--warn-bg); color: var(--warn-text); }
+.row.pending, .row.pending:hover { background: color-mix(in srgb, var(--warn-bg) calc(var(--bg-alpha) * 100%), transparent); color: var(--warn-text); }
 .row.pending .branch { color: inherit; opacity: 0.75; }
 
 /* A session that has finished running tints its row green. */
-.row.done, .row.done:hover { background: var(--done-bg); color: var(--done-text); }
+.row.done, .row.done:hover { background: color-mix(in srgb, var(--done-bg) calc(var(--bg-alpha) * 100%), transparent); color: var(--done-text); }
 .row.done .branch { color: inherit; opacity: 0.75; }
 
 /* Any status other than busy, idle or none tints the row red. */
-.row.error, .row.error:hover { background: var(--error-bg); color: var(--error-text); }
+.row.error, .row.error:hover { background: color-mix(in srgb, var(--error-bg) calc(var(--bg-alpha) * 100%), transparent); color: var(--error-text); }
 .row.error .branch { color: inherit; opacity: 0.75; }
+
+/* Compact state: how long since the session started or was last compacted. Hollow while idle. */
+.compact-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; }
+.compact-none { visibility: hidden; }
+.compact-ok { background: var(--status-ok); }
+.compact-should { background: var(--status-busy); }
+.compact-needs { background: var(--status-bad); }
+.compact-dot.idle { background: transparent; border: 2px solid; }
+.compact-ok.idle { border-color: var(--status-ok); }
+.compact-should.idle { border-color: var(--status-busy); }
+.compact-needs.idle { border-color: var(--status-bad); }
 
 .empty { margin: 0; padding: 14px 10px; color: var(--text-muted); }
 

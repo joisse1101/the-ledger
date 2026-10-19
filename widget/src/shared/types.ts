@@ -2,12 +2,17 @@
 
 /** The subset of `GET /api/live`'s per-session payload the widget uses. `LiveState` adds
  *  `relayHookSeen`, read from `/api/meta`: auto-approve is offered only once it is true. */
+/** Time since the session started or was last compacted: `ok` under 45 min, `should` up to 55, `needs` beyond. */
+export type CompactState = 'ok' | 'should' | 'needs'
+
 export interface LiveSession {
   session_id: string
   project: string
   git_branch: string
   /** `label` is built by the server (`claude_context.format_context`) and shown verbatim. */
   context: { label: string } | null
+  /** The server's compact grade; null when the session has no known start time. */
+  compact: { state: CompactState; since: string } | null
   /** The session registry's state: `busy` while running, `idle` once the turn has finished. */
   status: string
   /** Only its presence matters; the widget never reads or shows the prompt itself. */

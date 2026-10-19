@@ -19,7 +19,8 @@
   `usePendingDecision` polls while it's mounted; a prompt that vanishes without this view having
   answered it says the session already moved on (as does a 409) instead of going blank, and it shows
   nothing on a non-local device while Remote mode is off. `LiveList` badges a row (`pending-badge`)
-  from `/api/live`'s `pending_decision`, and carries `RemoteModeControl`: a switch on the machine
+  from `/api/live`'s `pending_decision`, shows a **Should compact** (amber) or **Needs compact** (red) pill
+  (`compact-badge`, muted while the session is `idle`) from its `compact.state`, and carries `RemoteModeControl`: a switch on the machine
   running the app (`is_local`), read-only "Remote mode: on, 7h left" text elsewhere. The switch drives
   the whole of Remote mode through `POST /api/remote-mode`, shows the starting step ("Starting
   Docker…") or the failure reason from `/api/meta.remote_mode`, and stays checked while starting so
