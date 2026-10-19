@@ -131,6 +131,7 @@ def scan(lines: Iterable[str]) -> tuple[list[Turn], list[Compaction], list[Start
                     position=len(turns),
                     trigger=trigger,
                     pre_tokens=pre_tokens if isinstance(pre_tokens, int) else None,
+                    timestamp=scanner.parse_iso_timestamp(entry.get("timestamp")),
                 )
             )
             continue

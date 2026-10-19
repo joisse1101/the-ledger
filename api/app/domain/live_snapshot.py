@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
+from app.domain.compact_grade import grade_compact
 from app.domain.context import formatting, tail
 from app.repositories.db import queries
 from app.repositories import claude_sessions
@@ -31,8 +32,10 @@ class LiveSnapshot:
         live_context: Optional[Callable[[str, str], Any]] = None,
         latest_activity: Optional[Callable[[str, str], Optional[datetime]]] = None,
         git_branches: Optional[Callable[[list[str]], dict[str, str]]] = None,
+        latest_compaction: Optional[Callable[[str, str], Optional[datetime]]] = None,
         ttl: float = LIVE_TTL_SECONDS,
         clock: Callable[[], float] = time.monotonic,
+        now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         # Resolved late so tests (and callers) can patch the underlying modules.
         self._load_sessions = load_sessions or (lambda: claude_sessions.load_sessions())
@@ -43,8 +46,12 @@ class LiveSnapshot:
             lambda session_id, cwd: tail.latest_activity(session_id, cwd)
         )
         self._git_branches = git_branches or (lambda ids: queries.git_branches(ids))
+        self._latest_compaction = latest_compaction or (
+            lambda session_id, cwd: tail.latest_compaction(session_id, cwd)
+        )
         self._ttl = ttl
         self._clock = clock
+        self._now = now
         self._lock = threading.Lock()
         self._computed_at: Optional[float] = None
         self._items: list[dict[str, Any]] = []
@@ -106,6 +113,15 @@ class LiveSnapshot:
             "label": formatting.format_context(context),
         }
 
+    def _compact(self, session) -> Optional[dict[str, str]]:
+        # A failing lookup just means the grade runs from the session's start alone.
+        try:
+            last_compaction = self._latest_compaction(session.session_id, session.cwd)
+        except Exception:
+            last_compaction = None
+        grade = grade_compact(session.started_at, last_compaction, self._now())
+        return {"state": grade.state, "since": grade.since.isoformat()} if grade else None
+
     def _branches(self, session_ids: list[str]) -> dict[str, str]:
         # A missing or unreadable snapshot just means no branch shown, never a failed list.
         try:
@@ -128,4 +144,5 @@ class LiveSnapshot:
             "last_message": s.last_message,
             "first_prompt": s.first_prompt,
             "context": self._context(s),
+            "compact": self._compact(s),
         }

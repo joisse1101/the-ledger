@@ -38,6 +38,7 @@ class Compaction:
     position: int  # number of real turns that precede it
     trigger: str = ""
     pre_tokens: Optional[int] = None
+    timestamp: Optional[datetime] = None
 
 
 @dataclass(frozen=True)

@@ -151,3 +151,57 @@ def latest_activity(session_id: str, cwd: str) -> Optional[datetime]:
         return latest
     except (OSError, ValueError):
         return None
+
+
+def _read_tail_latest_compaction(path: Path) -> Optional[datetime]:
+    """The newest `compact_boundary` line's timestamp, reading backwards in a window that doubles.
+
+    The search stops at the first window that holds a boundary: transcripts are append-only, so
+    the last boundary in the window is the newest one in the file.
+    """
+    window = _TAIL_WINDOW
+    with path.open("rb") as f:
+        size = f.seek(0, os.SEEK_END)
+        while True:
+            start = max(0, size - window)
+            f.seek(start)
+            lines = f.read(size - start).split(b"\n")
+            if start > 0:
+                lines = lines[1:]  # the window probably began mid-record
+            latest: Optional[datetime] = None
+            for line in lines:
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(entry, dict) or entry.get("subtype") != "compact_boundary":
+                    continue
+                stamp = scanner.parse_iso_timestamp(entry.get("timestamp"))
+                if stamp is None:
+                    continue
+                latest = stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+            if latest is not None or start == 0:
+                return latest
+            window *= 2
+
+
+# path -> (stat key at last read, newest compaction timestamp)
+_compaction_cache: dict[Path, tuple[tuple[int, int], Optional[datetime]]] = {}
+
+
+def latest_compaction(session_id: str, cwd: str) -> Optional[datetime]:
+    """When the session was last compacted (by the boundary line's own timestamp), or None. Never raises."""
+    try:
+        path = transcript_path(session_id, cwd)
+        if path is None:
+            return None
+        key = stat_key(path)
+        cached = _compaction_cache.get(path)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+
+        latest = _read_tail_latest_compaction(path)
+        _compaction_cache[path] = (key, latest)
+        return latest
+    except (OSError, ValueError):
+        return None
