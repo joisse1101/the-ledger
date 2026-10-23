@@ -13,7 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.repositories.db import queries
+from app.core.worktrees import parse_worktree
+from app.repositories.db import paths, queries
 
 
 @dataclass
@@ -45,6 +46,27 @@ class ClaudeTranscript:
     model: str = ""
     # True if the session ran an OpenSpec (`/opsx:*` or `openspec-*`) command or skill.
     used_openspec: bool = False
+    # Name of the Claude Code worktree the session ran in; "" when it did not run in one.
+    worktree: str = ""
+
+    @property
+    def project_folder(self) -> str:
+        """The ~/.claude/projects/ folder name of the project this session belongs to.
+
+        That is the transcript's own folder, except for a worktree session, which belongs to the
+        repo the worktree was split from. A worktree transcript's folder is the repo's folder plus
+        the sanitized worktree path, so the repo's folder is what is left after stripping it. The
+        stored `cwd` is only the fallback: it is the last directory seen, which a `cd` may have
+        moved out of the worktree.
+        """
+        folder = self.path.parent.name
+        if not self.worktree:
+            return folder
+        suffix = paths.sanitize_project_path(f"/.claude/worktrees/{self.worktree}")
+        if folder.endswith(suffix) and folder != suffix:
+            return folder.removesuffix(suffix)
+        worktree = parse_worktree(self.cwd)
+        return paths.sanitize_project_path(worktree.repo_root) if worktree else folder
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -72,6 +94,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         cost_state_flagged=bool(row["cost_state_flagged"]),
         model=row["model"],
         used_openspec=bool(row["used_openspec"]),
+        worktree=row["worktree"],
     )
 
 

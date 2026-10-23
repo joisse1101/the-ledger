@@ -187,3 +187,37 @@ def test_delete_project_transcripts_purges_history_only_sessions(isolated_db, wr
     removed_dirs = claude_transcripts.delete_project_transcripts("/home/x/proj")
     assert removed_dirs == 0  # nothing on disk to rmtree for a history-only session
     assert history.fetch_history_transcripts() == []
+
+
+def _scan_and_load(isolated_db, write_config, write_transcript, started_in: str, cwds: list[str]):
+    write_config(isolated_db / "claude.json", {})
+    lines = [
+        {"type": "user", "timestamp": f"2024-01-01T10:0{i}:00Z", "cwd": cwd, "sessionId": "s1"}
+        for i, cwd in enumerate(cwds)
+    ]
+    write_transcript(isolated_db / "projects" / paths.sanitize_project_path(started_in) / "s1.jsonl", lines)
+    snapshot.refresh()
+    (transcript,) = claude_transcripts.load_transcripts()
+    return transcript
+
+
+def test_worktree_session_belongs_to_its_repo_folder(isolated_db, write_config, write_transcript):
+    worktree = "/home/x/the-ledger/.claude/worktrees/add-wiki-docs"
+    t = _scan_and_load(isolated_db, write_config, write_transcript, worktree, [worktree])
+    assert t.worktree == "add-wiki-docs"
+    assert t.project == "the-ledger"
+    assert t.project_folder == paths.sanitize_project_path("/home/x/the-ledger")
+
+
+def test_worktree_session_that_left_the_worktree_keeps_its_repo_folder(
+    isolated_db, write_config, write_transcript
+):
+    worktree = "/home/x/the-ledger/.claude/worktrees/add-wiki-docs"
+    t = _scan_and_load(isolated_db, write_config, write_transcript, worktree, [worktree, "/home/x/elsewhere"])
+    assert t.project_folder == paths.sanitize_project_path("/home/x/the-ledger")
+
+
+def test_plain_session_belongs_to_its_own_folder(isolated_db, write_config, write_transcript):
+    t = _scan_and_load(isolated_db, write_config, write_transcript, "/home/x/proj", ["/home/x/proj"])
+    assert t.worktree == ""
+    assert t.project_folder == paths.sanitize_project_path("/home/x/proj")
