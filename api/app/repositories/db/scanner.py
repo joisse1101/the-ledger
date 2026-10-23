@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 import json
 
+from app.core.worktrees import parse_worktree
 from app.repositories.db import paths
 
 
@@ -270,6 +271,7 @@ def _scan_transcript_file(
 ) -> Optional[dict[str, Any]]:
     session_id = path.stem
     cwd = ""
+    first_cwd = ""
     version = ""
     git_branch = ""
     started_at: Optional[datetime] = None
@@ -306,6 +308,7 @@ def _scan_transcript_file(
                         updated_at = timestamp
 
                 cwd = entry.get("cwd", cwd)
+                first_cwd = first_cwd or cwd
                 version = entry.get("version", version)
                 git_branch = entry.get("gitBranch", git_branch)
                 session_id = entry.get("sessionId", session_id)
@@ -407,6 +410,12 @@ def _scan_transcript_file(
         Path(cwd).name if cwd else path.parent.name
     )
 
+    # A worktree session belongs to the repo it was split from. It is detected from where the
+    # session started, so a later `cd` out of (or within) the worktree doesn't change it.
+    worktree = parse_worktree(first_cwd)
+    if worktree is not None:
+        project = Path(worktree.repo_root).name
+
     return {
         "session_id": session_id,
         "path": path,
@@ -425,6 +434,7 @@ def _scan_transcript_file(
         "used_openspec": used_openspec,
         "context": context,
         "project": project,
+        "worktree": worktree.name if worktree else "",
         "title": title,
         "last_message": last_message,
         "first_prompt": first_prompt,
