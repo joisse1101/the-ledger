@@ -6,7 +6,13 @@
 export const OTHER = "Other";
 
 /** What a grouped chart's rows are; it words the headings, aria labels and tooltips. */
-export type GroupLabel = "project" | "branch";
+export type GroupLabel = "project" | "branch" | "worktree";
+
+/** The word for what a row is in headings, aria labels and tooltips: a worktree chart's rows are
+ *  `wt <name>` worktrees or plain git branches. */
+export function groupNoun(label: GroupLabel): string {
+  return label === "worktree" ? "branch / worktree" : label;
+}
 
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
