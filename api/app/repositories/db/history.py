@@ -19,6 +19,7 @@ def serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
         "unpriced_models": json.dumps(row["unpriced_models"]),
         "model": row.get("model", ""),
         "used_openspec": int(row.get("used_openspec", False)),
+        "worktree": row.get("worktree", ""),
     }
 
 
@@ -26,11 +27,11 @@ _TRANSCRIPT_UPSERT_SQL = """
     INSERT INTO transcripts (
         session_id, path, cwd, version, git_branch, started_at,
         updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged, model,
-        used_openspec, context, project, title, last_message, first_prompt
+        used_openspec, context, project, worktree, title, last_message, first_prompt
     ) VALUES (
         :session_id, :path, :cwd, :version, :git_branch, :started_at,
         :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-        :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
+        :model, :used_openspec, :context, :project, :worktree, :title, :last_message, :first_prompt
     )
     ON CONFLICT(session_id) DO UPDATE SET
         path = excluded.path,
@@ -48,6 +49,7 @@ _TRANSCRIPT_UPSERT_SQL = """
         used_openspec = excluded.used_openspec,
         context = excluded.context,
         project = excluded.project,
+        worktree = excluded.worktree,
         title = excluded.title,
         last_message = excluded.last_message,
         first_prompt = excluded.first_prompt

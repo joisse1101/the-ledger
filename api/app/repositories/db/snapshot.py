@@ -52,11 +52,11 @@ def refresh() -> datetime:
             INSERT INTO transcripts (
                 session_id, path, cwd, version, git_branch, started_at,
                 updated_at, message_count, cost, cost_source, unpriced_models, cost_state_flagged,
-                model, used_openspec, context, project, title, last_message, first_prompt
+                model, used_openspec, context, project, worktree, title, last_message, first_prompt
             ) VALUES (
                 :session_id, :path, :cwd, :version, :git_branch, :started_at,
                 :updated_at, :message_count, :cost, :cost_source, :unpriced_models, :cost_state_flagged,
-                :model, :used_openspec, :context, :project, :title, :last_message, :first_prompt
+                :model, :used_openspec, :context, :project, :worktree, :title, :last_message, :first_prompt
             )
             """,
             [history.serialize_transcript_row(t) for t in transcript_rows],

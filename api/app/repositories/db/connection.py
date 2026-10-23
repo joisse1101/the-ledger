@@ -89,6 +89,7 @@ def ensure_history_schema(conn: sqlite3.Connection) -> None:
             used_openspec INTEGER NOT NULL DEFAULT 0,
             context INTEGER,
             project TEXT NOT NULL,
+            worktree TEXT NOT NULL DEFAULT '',
             title TEXT NOT NULL DEFAULT '',
             last_message TEXT NOT NULL DEFAULT '',
             first_prompt TEXT NOT NULL DEFAULT ''
@@ -105,6 +106,7 @@ def ensure_history_schema(conn: sqlite3.Connection) -> None:
         "ALTER TABLE transcripts ADD COLUMN cost_state_flagged INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE transcripts ADD COLUMN model TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE transcripts ADD COLUMN used_openspec INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE transcripts ADD COLUMN worktree TEXT NOT NULL DEFAULT ''",
     ):
         try:
             conn.execute(ddl)
