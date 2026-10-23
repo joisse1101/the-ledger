@@ -125,6 +125,7 @@ def test_filter_by_project_with_no_match_is_empty():
 
 by_project = overview.GROUP_KEYS["project"]
 by_branch = overview.GROUP_KEYS["branch"]
+by_worktree = overview.GROUP_KEYS["worktree"]
 
 
 def test_group_totals_empty_returns_empty_list():
@@ -236,6 +237,40 @@ def test_group_totals_by_branch_folds_the_tail_into_other():
     rows = overview.group_totals(transcripts, by_branch)
     assert [row["group"] for row in rows] == [f"b{i}" for i in range(7)] + ["Other"]
     assert rows[-1]["sessions"] == 3 + 2 + 1
+
+
+def test_group_totals_by_worktree_puts_a_worktree_session_over_its_branch():
+    transcripts = [
+        _transcript(branch="worktree-fix", worktree="fix"),
+        _transcript(branch="main"),
+        _transcript(branch=""),
+    ]
+    groups = {row["group"] for row in overview.group_totals(transcripts, by_worktree)}
+    assert groups == {"wt fix", "main", "(no branch)"}
+
+
+def test_group_totals_by_worktree_ignores_a_branch_switch_inside_the_worktree():
+    transcripts = [
+        _transcript(branch="feat/x", worktree="fix"),
+        _transcript(branch="worktree-fix", worktree="fix"),
+    ]
+    rows = overview.group_totals(transcripts, by_worktree)
+    assert [(row["group"], row["sessions"]) for row in rows] == [("wt fix", 2)]
+
+
+def test_group_totals_by_worktree_keeps_a_branch_and_a_worktree_of_one_name_apart():
+    transcripts = [_transcript(branch="fix"), _transcript(branch="other", worktree="fix")]
+    groups = {row["group"] for row in overview.group_totals(transcripts, by_worktree)}
+    assert groups == {"fix", "wt fix"}
+
+
+def test_group_totals_by_worktree_folds_mixed_streams_into_other():
+    transcripts = [
+        _transcript(branch=f"b{i}") for i in range(5) for _ in range(10 - i)
+    ] + [_transcript(worktree=f"w{i}") for i in range(5) for _ in range(5 - i)]
+    rows = overview.group_totals(transcripts, by_worktree)
+    assert len(rows) == 8 and rows[-1]["group"] == "Other"
+    assert rows[-1]["sessions"] == 3 + 2 + 1  # w2, w3, w4
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +453,18 @@ def test_overview_group_order_matches_group_rows():
     result = overview.overview(transcripts, "All time")
     assert result["empty"] is False
     assert result["group_order"] == [row["group"] for row in result["groups"]] == ["a", "b"]
+
+
+def test_summary_counts_worktrees_apart_from_branches():
+    transcripts = [
+        _transcript(branch="worktree-a", worktree="a"),
+        _transcript(branch="worktree-a", worktree="a"),
+        _transcript(branch="worktree-b", worktree="b"),
+        _transcript(branch="main"),
+    ]
+    result = overview.summary(transcripts)
+    assert result["worktrees"] == 2
+    assert result["branches"] == 3
 
 
 def test_overview_can_group_by_branch():

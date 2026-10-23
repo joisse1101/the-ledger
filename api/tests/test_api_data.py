@@ -1286,3 +1286,22 @@ def test_switching_remote_mode_on_twice_keeps_the_same_token(isolated_db, monkey
     token = deps.access_token
     client.post("/api/remote-mode", json={"enabled": True})
     assert deps.access_token == token
+
+
+def test_overview_group_by_worktree_leaves_group_by_branch_alone(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    write_config(isolated_db / "claude.json", {"/h/app": {}})
+    worktree = "/h/app/.claude/worktrees/fix"
+    _add_session(isolated_db, write_transcript, "main-1", "/h/app", branch="main")
+    _add_session(isolated_db, write_transcript, "wt-1", worktree, branch="worktree-fix")
+    snapshot.refresh()
+    _use_live(monkeypatch)
+    client = _client()
+
+    by_worktree = client.get("/api/overview", params={"project": "/h/app", "group_by": "worktree"}).json()
+    by_branch = client.get("/api/overview", params={"project": "/h/app", "group_by": "branch"}).json()
+
+    assert set(by_worktree["group_order"]) == {"main", "wt fix"}
+    assert by_worktree["summary"]["worktrees"] == 1
+    assert set(by_branch["group_order"]) == {"main", "worktree-fix"}

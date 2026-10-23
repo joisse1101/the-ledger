@@ -33,6 +33,10 @@ NO_BRANCH = "(no branch)"
 GROUP_KEYS: dict[str, Callable[[ClaudeTranscript], str]] = {
     "project": lambda transcript: transcript.project,
     "branch": lambda transcript: transcript.git_branch or NO_BRANCH,
+    # A worktree supersedes the branch; the prefix keeps its label from colliding with a branch's.
+    "worktree": lambda transcript: (
+        f"wt {transcript.worktree}" if transcript.worktree else transcript.git_branch or NO_BRANCH
+    ),
 }
 
 
@@ -251,6 +255,7 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     return {
         "projects": len({t.project for t in transcripts}),
         "branches": len({GROUP_KEYS["branch"](t) for t in transcripts}),
+        "worktrees": len({t.worktree for t in transcripts if t.worktree}),
         "sessions": num_sessions,
         "messages": total_messages,
         "avg_messages_per_session": total_messages / num_sessions if num_sessions else None,
