@@ -49,7 +49,12 @@ testable and readable independent of the web framework wrapping it.
   silently skipped), `model` (the model with the most main-thread responses, once per
   `message.id`, ignoring `<synthetic>`; ties go to the first seen), `used_openspec` (a `/opsx:*` slash command or an
   `openspec-*`/`opsx:*` Skill call anywhere in the session), and `project` (matching the on-disk parent folder against each project's
-  `sanitize_project_path()`, falling back to a cwd/folder-derived guess). `delete_project_transcripts(cwd)`
+  `sanitize_project_path()`, falling back to a cwd/folder-derived guess), and `worktree`. A session whose *first* `cwd` is under
+  `<repo>/.claude/worktrees/<name>` (recognised by `api/app/core/worktrees.py`'s `parse_worktree`) stores that `<name>` and belongs to
+  its repo's project instead of showing up as a project named after the worktree. `ClaudeTranscript.project_folder` is the
+  `~/.claude/projects/` folder a transcript counts under: its own, or for a worktree session the repo's (the worktree's
+  sanitized `/.claude/worktrees/<name>` suffix stripped off, via `paths.project_folder`). `delete_project_transcripts(cwd)`
+  (which removes every folder holding a member transcript, and skips a folder that also holds non-members)
   and `delete_transcript(session_id)` look up the affected path(s) via `queries`, remove the real
   file(s) (tolerating one already gone — see [History store](Backend-History-Store.md)), then
   delete just those rows from both `ledger.db` and `history.db`.

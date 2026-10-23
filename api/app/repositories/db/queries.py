@@ -50,25 +50,43 @@ def delete_project_row(project_path: str) -> None:
         conn.execute("DELETE FROM projects WHERE path = ?", (project_path,))
 
 
-def transcript_paths_for_project(project_path: str) -> list[Path]:
-    """Transcript file paths filed under `project_path`'s own `~/.claude/projects/` folder.
+def _is_member(row: sqlite3.Row, folder: str) -> bool:
+    return paths.project_folder(Path(row["path"]), row["cwd"], row["worktree"]) == folder
 
-    Matched by that on-disk folder name (`sanitize_project_path(project_path)`) rather than
-    each transcript's own recorded `cwd` - a session can `cd` partway through and leave `cwd`
-    pointing below the project root, but the folder a transcript is filed under never changes.
-    """
-    folder = paths.sanitize_project_path(project_path)
+
+def _member_rows(folder: str) -> tuple[list[sqlite3.Row], list[sqlite3.Row]]:
+    """`ledger.db`'s transcript rows split into (members of the project, everything else)."""
     with connection.connect() as conn:
-        rows = conn.execute("SELECT DISTINCT path FROM transcripts").fetchall()
-    return [Path(row["path"]) for row in rows if Path(row["path"]).parent.name == folder]
+        rows = conn.execute("SELECT session_id, path, cwd, worktree FROM transcripts").fetchall()
+    members = [row for row in rows if _is_member(row, folder)]
+    return members, [row for row in rows if not _is_member(row, folder)]
+
+
+def transcript_paths_for_project(project_path: str) -> list[Path]:
+    """Transcript file paths belonging to `project_path`: those filed under its own
+    `~/.claude/projects/` folder, and those of sessions that ran in its Claude Code worktrees.
+
+    Matched by on-disk folder name (see `paths.project_folder`) rather than each transcript's own
+    recorded `cwd` - a session can `cd` partway through and leave `cwd` pointing below the
+    project root, but the folder a transcript is filed under never changes.
+    """
+    members, _ = _member_rows(paths.sanitize_project_path(project_path))
+    return list(dict.fromkeys(Path(row["path"]) for row in members))
+
+
+def transcript_dirs_for_project(project_path: str) -> set[Path]:
+    """Folders holding the project's transcripts, leaving out any that also hold another project's."""
+    members, others = _member_rows(paths.sanitize_project_path(project_path))
+    shared = {Path(row["path"]).parent for row in others}
+    return {Path(row["path"]).parent for row in members} - shared
 
 
 def _delete_transcript_rows_by_project_in(
     connect: Callable[[], Any], folder: str
 ) -> None:
     with connect() as conn:
-        rows = conn.execute("SELECT session_id, path FROM transcripts").fetchall()
-        session_ids = [row["session_id"] for row in rows if Path(row["path"]).parent.name == folder]
+        rows = conn.execute("SELECT session_id, path, cwd, worktree FROM transcripts").fetchall()
+        session_ids = [row["session_id"] for row in rows if _is_member(row, folder)]
         if session_ids:
             conn.executemany(
                 "DELETE FROM transcripts WHERE session_id = ?",

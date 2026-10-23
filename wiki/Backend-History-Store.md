@@ -4,7 +4,9 @@
 
   `api/app/repositories/db/` also owns a second, durable store at `history_db_path()` (`api/.history/history.db`,
   gitignored) holding the same `transcripts` table shape as `ledger.db`'s (shared via
-  `_ensure_history_schema()`) — unlike `ledger.db`, nothing ever wipes this file or its rows: no
+  `_ensure_history_schema()`, which also adds the `worktree` column to an older file; `correct_worktree_rows()` then runs once per
+  start from `startup()` and fixes `worktree`/`project` on rows with `worktree = ''` from their stored `cwd`, pruned sessions included, and is
+  idempotent) — unlike `ledger.db`, nothing ever wipes this file or its rows: no
   `atexit` hook, no delete-and-reinsert in `refresh()`. `upsert_history_transcripts()` writes rows into
   it with `INSERT ... ON CONFLICT(session_id) DO UPDATE SET ...`, so re-backing-up a still-growing
   session overwrites its row in place rather than duplicating it; `fetch_history_transcripts()` reads

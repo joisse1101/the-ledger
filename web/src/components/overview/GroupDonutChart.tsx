@@ -5,7 +5,7 @@ import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import { humanizeTokens } from "../../lib/tokens";
 import type { Scaled } from "../../lib/uiScale";
-import { capitalize, chartColors, FONT_STACK, groupColorMap, groupColorScale, type GroupLabel } from "./chartTheme";
+import { capitalize, chartColors, FONT_STACK, groupColorMap, groupColorScale, groupNoun, type GroupLabel } from "./chartTheme";
 
 /** Which measure sizes the arcs and the center total: session count, or summed context tokens. */
 export type DonutMetric = "sessions" | "tokens";
@@ -44,7 +44,7 @@ export function buildSpec(
           // instead of a chart-internal legend grid clipping or overflowing its container.
           color: { field: "group", type: "nominal", scale: { domain, range }, legend: null },
           tooltip: [
-            { field: "group", type: "nominal", title: capitalize(groupLabel) },
+            { field: "group", type: "nominal", title: capitalize(groupNoun(groupLabel)) },
             { field: metric, type: "quantitative", title: capitalize(metric), format: "," },
             { field: "_share", type: "quantitative", title: "Share %", format: ".1f" },
           ],
@@ -112,7 +112,7 @@ export function GroupDonutChart({ groups, groupOrder, groupLabel, metric = "sess
         ref={containerRef}
         className="donut-chart"
         role="img"
-        aria-label={`${capitalize(metric)} by ${groupLabel}`}
+        aria-label={`${capitalize(metric)} by ${groupNoun(groupLabel)}`}
       />
       <GroupLegend groups={groups} groupOrder={groupOrder} />
     </div>

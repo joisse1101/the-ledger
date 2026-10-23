@@ -37,6 +37,13 @@ describe("GroupDonutChart spec", () => {
     expect(values.find((row) => row.group === "dev")!._share).toBeCloseTo(75); // 3000 / 4000
   });
 
+  it("words the tooltip for a worktree chart as branch / worktree", () => {
+    const spec = buildSpec(groups, order, "worktree", "sessions", (n) => n);
+    const arcLayer = spec.layer[0] as unknown as { encoding: { tooltip: { field: string; title: string }[] } };
+    const groupTooltip = arcLayer.encoding.tooltip.find((entry) => entry.field === "group");
+    expect(groupTooltip?.title).toBe("Branch / worktree");
+  });
+
   it("labels the center total in humanized token units", () => {
     const spec = buildSpec(groups, order, "branch", "tokens", (n) => n);
     const centerValueLayer = spec.layer[1] as TextLayer;

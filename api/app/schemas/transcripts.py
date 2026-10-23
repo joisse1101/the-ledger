@@ -22,5 +22,6 @@ def transcript_item(transcript: claude_transcripts.ClaudeTranscript, live_ids: s
         "used_openspec": transcript.used_openspec,
         "version": transcript.version,
         "git_branch": transcript.git_branch,
+        "worktree": transcript.worktree,
         "live": transcript.session_id in live_ids,
     }

@@ -93,6 +93,14 @@ const columns: ListColumn<TranscriptItem>[] = [
     render: (t) => formatText(t.git_branch),
   },
   {
+    key: "worktree",
+    header: "Worktree",
+    priority: "low",
+    cardPriority: "secondary",
+    sortKey: "worktree",
+    render: (t) => formatText(t.worktree),
+  },
+  {
     key: "session_id",
     header: "Session ID",
     priority: "low",
@@ -115,7 +123,7 @@ export interface AllListProps {
   onSelect: (session: TranscriptItem) => void;
 }
 
-/** The Sessions page's "All" list: debounced search, Project/Version/Branch filters, sortable
+/** The Sessions page's "All" list: debounced search, Project/Version/Branch/Worktree filters, sortable
  *  columns (a "Sort by" select on narrow screens, since cards have no headers), and 50-at-a-time
  *  paging via "Load more". */
 export function AllList({ onSelect }: AllListProps) {
@@ -125,6 +133,7 @@ export function AllList({ onSelect }: AllListProps) {
   const [projects, setProjects] = useState<string[]>([]);
   const [versions, setVersions] = useState<string[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
+  const [worktrees, setWorktrees] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("updated_at");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
 
@@ -134,10 +143,11 @@ export function AllList({ onSelect }: AllListProps) {
       project: projects.length ? projects : undefined,
       version: versions.length ? versions : undefined,
       branch: branches.length ? branches : undefined,
+      worktree: worktrees.length ? worktrees : undefined,
       sort: sortField,
       dir: sortDir,
     }),
-    [debouncedSearch, projects, versions, branches, sortField, sortDir],
+    [debouncedSearch, projects, versions, branches, worktrees, sortField, sortDir],
   );
 
   const transcripts = useTranscripts(query);
@@ -145,7 +155,7 @@ export function AllList({ onSelect }: AllListProps) {
   const pages = transcripts.data?.pages ?? [];
   const rows = pages.flatMap((page) => page.items);
   const total = pages[0]?.total ?? 0;
-  const options = pages[0]?.options ?? { projects: [], versions: [], branches: [] };
+  const options = pages[0]?.options ?? { projects: [], versions: [], branches: [], worktrees: [] };
 
   const handleSortChange = (field: string) => {
     if (field === sortField) {
@@ -171,6 +181,7 @@ export function AllList({ onSelect }: AllListProps) {
           <FilterMultiselect label="Project" options={options.projects} selected={projects} onChange={setProjects} />
           <FilterMultiselect label="Version" options={options.versions} selected={versions} onChange={setVersions} />
           <FilterMultiselect label="Branch" options={options.branches} selected={branches} onChange={setBranches} />
+          <FilterMultiselect label="Worktree" options={options.worktrees} selected={worktrees} onChange={setWorktrees} />
         </div>
       </div>
 

@@ -95,7 +95,34 @@ def test_filter_options_are_distinct_sorted_and_skip_blanks():
         "projects": ["a", "b"],
         "versions": ["2"],
         "branches": ["dev", "main"],
+        "worktrees": [],
     }
+
+
+def test_filter_by_worktree_matches_only_sessions_in_it_and_combines_with_other_filters():
+    rows = [
+        _transcript(session_id="1", worktree="fix", git_branch="worktree-fix"),
+        _transcript(session_id="2", worktree="docs", git_branch="worktree-docs"),
+        _transcript(session_id="3", worktree="", git_branch="main"),
+    ]
+    assert _ids(tq.filter_transcripts(rows, worktrees=["fix"])) == ["1"]
+    assert _ids(tq.filter_transcripts(rows, worktrees=["fix", "docs"])) == ["1", "2"]
+    assert _ids(tq.filter_transcripts(rows, worktrees=["fix"], branches=["main"])) == []
+
+
+def test_worktree_options_list_only_names_some_session_has():
+    rows = [_transcript(worktree="b"), _transcript(worktree=""), _transcript(worktree="a")]
+    assert tq.filter_options(rows)["worktrees"] == ["a", "b"]
+
+
+def test_sort_by_worktree_puts_sessions_outside_a_worktree_last_in_both_directions():
+    rows = [
+        _transcript(session_id="a", worktree=""),
+        _transcript(session_id="b", worktree="zed"),
+        _transcript(session_id="c", worktree="alpha"),
+    ]
+    assert _ids(tq.sort_transcripts(rows, "worktree", ascending=True)) == ["c", "b", "a"]
+    assert _ids(tq.sort_transcripts(rows, "worktree", ascending=False)) == ["b", "c", "a"]
 
 
 # ---------------------------------------------------------------- sort

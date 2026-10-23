@@ -20,14 +20,14 @@ export interface ProjectDetailPanelProps {
 const BUCKET_MINUTES = 60;
 
 /** One project's panel, shown inline beneath its row in the Projects list: the Overview time range
- *  plus that project's charts grouped by git branch, and (on the machine running the app only) a
+ *  plus that project's charts grouped by work stream (worktree, else git branch), and (on the machine running the app only) a
  *  "Delete project" button that opens a confirmation modal. The page renders it with
  *  `key={project.path}`, so the range starts at "All time" for every newly opened project and a
  *  fresh query never shows a previous project's charts. */
 export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelProps) {
   const [range, setRange] = useState<TimeRange>("All time");
   const [confirming, setConfirming] = useState(false);
-  const overview = useOverview(range, { project: project.path, groupBy: "branch", bucketMinutes: BUCKET_MINUTES });
+  const overview = useOverview(range, { project: project.path, groupBy: "worktree", bucketMinutes: BUCKET_MINUTES });
   const deleteProject = useDeleteProject();
   // Deletes are local-only server-side, so no other device is even shown the button.
   const isLocal = useMeta().data?.is_local === true;
@@ -69,12 +69,12 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
             <GroupDonutChart
               groups={data.groups}
               groupOrder={data.group_order}
-              groupLabel="branch"
+              groupLabel="worktree"
               metric="tokens"
             />
             <ProjectSummaryStats summary={data.summary} />
           </div>
-          <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="branch" />
+          <GroupBarChart groups={data.groups} groupOrder={data.group_order} groupLabel="worktree" />
           <ActivityLineChart activity={data.activity} bucketMinutes={BUCKET_MINUTES} />
         </>
       )}

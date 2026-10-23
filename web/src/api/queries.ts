@@ -98,6 +98,7 @@ export function useTranscripts(query: TranscriptQuery) {
           project: query.project,
           version: query.version,
           branch: query.branch,
+          worktree: query.worktree,
           sort: query.sort,
           dir: query.dir,
           limit,

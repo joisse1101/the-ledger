@@ -5,7 +5,7 @@ import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import type { Scaled } from "../../lib/uiScale";
 import { formatCost, formatCount } from "../../lib/format";
-import { capitalize, chartColors, FONT_STACK, type GroupLabel } from "./chartTheme";
+import { capitalize, chartColors, FONT_STACK, groupNoun, type GroupLabel } from "./chartTheme";
 
 const METRICS = ["Messages", "Cost"] as const;
 
@@ -25,7 +25,7 @@ function records(groups: GroupTotals[]): Record_[] {
   return rows;
 }
 
-function buildSpec(groups: GroupTotals[], order: string[], groupLabel: GroupLabel, scaled: Scaled) {
+export function buildSpec(groups: GroupTotals[], order: string[], groupLabel: GroupLabel, scaled: Scaled) {
   const { hues, text2, grid } = chartColors();
   // "Messages" stays on categorical slot 0 everywhere it appears on this page (also the hourly
   // chart below), so that measure's color is consistent across both charts.
@@ -62,7 +62,7 @@ function buildSpec(groups: GroupTotals[], order: string[], groupLabel: GroupLabe
       y: {
         field: "pct",
         type: "quantitative",
-        title: `% of top ${groupLabel}`,
+        title: `% of top ${groupNoun(groupLabel)}`,
         scale: { domain: [0, 115] },
         axis: {
           domain: false,
@@ -80,7 +80,7 @@ function buildSpec(groups: GroupTotals[], order: string[], groupLabel: GroupLabe
         legend: { title: null, orient: "top" },
       },
       tooltip: [
-        { field: "group", type: "nominal", title: capitalize(groupLabel) },
+        { field: "group", type: "nominal", title: capitalize(groupNoun(groupLabel)) },
         { field: "metric", type: "nominal", title: "Metric" },
         { field: "formatted", type: "nominal", title: "Value" },
       ],
@@ -95,13 +95,14 @@ export interface GroupBarChartProps {
   groupLabel: GroupLabel;
 }
 
-/** Messages and cost per group (a project, or a git branch) as grouped bars, each normalized to %
+/** Messages and cost per group (a project, or a git branch / worktree) as grouped bars, each normalized to %
  *  of its own top group so the two independently-scaled measures can share one axis instead of a
  *  dual-axis chart. */
 export function GroupBarChart({ groups, groupOrder, groupLabel }: GroupBarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const scaled = useScaled();
+  const noun = groupNoun(groupLabel);
   const spec = useMemo(
     () => buildSpec(groups, groupOrder, groupLabel, scaled),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theme drives a rebuild for new colors
@@ -113,13 +114,13 @@ export function GroupBarChart({ groups, groupOrder, groupLabel }: GroupBarChartP
 
   return (
     <div className="overview-chart">
-      <h2 className="chart-heading">Messages &amp; Cost by {capitalize(groupLabel)}</h2>
+      <h2 className="chart-heading">Messages &amp; Cost by {capitalize(noun)}</h2>
       <p className="chart-caption">
-        Each metric is shown as a % of its own top {groupLabel} (e.g. a Cost bar at 50% means that{" "}
-        {groupLabel} cost half as much as the priciest {groupLabel}) — Messages and Cost are scaled
+        Each metric is shown as a % of its own top {noun} (e.g. a Cost bar at 50% means that{" "}
+        {noun} cost half as much as the priciest {noun}) — Messages and Cost are scaled
         independently.
       </p>
-      <div ref={containerRef} className="bar-chart" role="img" aria-label={`Messages and cost by ${groupLabel}`} />
+      <div ref={containerRef} className="bar-chart" role="img" aria-label={`Messages and cost by ${noun}`} />
     </div>
   );
 }

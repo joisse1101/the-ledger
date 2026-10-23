@@ -6,6 +6,7 @@ import { StatGrid, type StatTile } from "../StatGrid";
 function tiles(summary: OverviewSummary): StatTile[] {
   return [
     { label: "Branches", value: formatCount(summary.branches) },
+    { label: "Worktrees", value: formatCount(summary.worktrees) },
     { label: "Sessions", value: formatCount(summary.sessions) },
     { label: "Messages", value: formatCount(summary.messages) },
     {
@@ -56,7 +57,7 @@ export interface ProjectSummaryStatsProps {
   summary: OverviewSummary;
 }
 
-/** The Projects panel's KPI grid: like Overview's `SummaryStats`, but a branch count instead of a
+/** The Projects panel's KPI grid: like Overview's `SummaryStats`, but a branch and worktree count instead of a
  *  project count (the panel is already scoped to one project, so that count would always read 1)
  *  and adds context-token totals/extremes alongside the existing cost ones. The four extreme tiles
  *  carry a tooltip naming the branch's session (project is fixed here, so it's mostly the session

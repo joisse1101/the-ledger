@@ -38,6 +38,7 @@ const project: Project = {
 const summary = {
   projects: 1,
   branches: 1,
+  worktrees: 0,
   sessions: 2,
   messages: 4,
   avg_messages_per_session: 2,
@@ -114,20 +115,30 @@ afterEach(() => {
 });
 
 describe("ProjectDetailPanel charts", () => {
-  it("renders the three charts, grouped by branch, for that project", async () => {
+  it("renders the three charts, grouped by worktree or branch, for that project", async () => {
     stubApi();
     const { client } = renderPanel();
 
-    expect(await screen.findByTestId("donut")).toHaveTextContent("branch:main");
-    expect(screen.getByTestId("bars")).toHaveTextContent("branch");
+    expect(await screen.findByTestId("donut")).toHaveTextContent("worktree:main");
+    expect(screen.getByTestId("bars")).toHaveTextContent("worktree");
     expect(screen.getByTestId("activity")).toBeInTheDocument();
 
     const url = calls("/api/overview")[0][0] as string;
     const params = new URL(url, "http://x").searchParams;
     expect(params.get("project")).toBe(project.path);
-    expect(params.get("group_by")).toBe("branch");
+    expect(params.get("group_by")).toBe("worktree");
     expect(params.get("bucket_minutes")).toBe("60");
     expect(params.get("range")).toBe("All time");
+    client.clear();
+  });
+
+  it("shows the branch and worktree counts side by side", async () => {
+    stubApi({ overview: { ...populated, summary: { ...summary, branches: 3, worktrees: 2 } } });
+    const { client } = renderPanel();
+    await screen.findByTestId("donut");
+
+    expect(screen.getByText("Branches").nextElementSibling).toHaveTextContent("3");
+    expect(screen.getByText("Worktrees").nextElementSibling).toHaveTextContent("2");
     client.clear();
   });
 

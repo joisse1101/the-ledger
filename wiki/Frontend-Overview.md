@@ -7,10 +7,10 @@
   `chartTheme.ts`'s `chartColors()`/`groupColorScale()`/`groupColorMap()` centralize reading the
   CSS-variable palette and turning the API's `group_order` into a Vega-Lite domain/range (`"Other"`
   always the muted ink) shared by `GroupDonutChart` and `GroupBarChart`; both take `groups`,
-  `groupOrder` and a `groupLabel` (`"project"` on Overview, `"branch"` in the Projects panel) that
+  `groupOrder` and a `groupLabel` (`"project"` on Overview, `"worktree"` in the Projects panel, worded "branch / worktree") that
   drives their headings, aria labels, tooltip titles and captions. `GroupDonutChart` draws
   its own color key as a plain HTML list (`GroupLegend`) instead of a Vega-Lite legend so long
-  group names wrap instead of clipping. `GroupBarChart` ("Messages & Cost by Project"/"…by Branch")
+  group names wrap instead of clipping. `GroupBarChart` ("Messages & Cost by Project"/"…by Branch / Worktree")
   normalizes each measure to % of its own peak (a non-dual-axis choice so two differently-scaled
   measures can share one axis). `ActivityLineChart` ("Activity by Hour of Day", in 30-minute blocks, smoothed lines, plus a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`: each measure as a share of its own peak, averaged, then a 3-block moving average, on its own hidden 0-100 scale, with the calculation explained in a caption note) instead is a layered
   dual-axis line chart of absolute counts — Sessions on the left axis, Messages on the right

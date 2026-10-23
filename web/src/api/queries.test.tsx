@@ -16,6 +16,7 @@ import {
   useRemoteQr,
   useSetAutoApprove,
   useSetRemoteMode,
+  useTranscripts,
 } from "./queries";
 import type { DecisionAnswer, LiveResponse } from "./types";
 
@@ -289,6 +290,24 @@ describe("the overview query", () => {
     expect(params.get("range")).toBe("Past week");
     expect(params.get("project")).toBe("C:\\code\\app");
     expect(params.get("group_by")).toBe("branch");
+    client.clear();
+  });
+
+  it("sends the worktree filter and sort to the sessions list", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ items: [], total: 0, options: { projects: [], versions: [], branches: [], worktrees: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useTranscripts({ worktree: ["fix", "docs"], sort: "worktree" }), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const params = new URL(fetchMock.mock.calls[0][0], "http://x").searchParams;
+    expect(params.getAll("worktree")).toEqual(["fix", "docs"]);
+    expect(params.get("sort")).toBe("worktree");
     client.clear();
   });
 

@@ -725,6 +725,7 @@ def test_transcripts_options_cover_the_unfiltered_list(api):
         "projects": ["alpha", "beta"],
         "versions": ["1.0", "2.0"],
         "branches": ["dev", "main"],
+        "worktrees": [],
     }
 
 
@@ -1286,3 +1287,49 @@ def test_switching_remote_mode_on_twice_keeps_the_same_token(isolated_db, monkey
     token = deps.access_token
     client.post("/api/remote-mode", json={"enabled": True})
     assert deps.access_token == token
+
+
+def test_overview_group_by_worktree_leaves_group_by_branch_alone(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    write_config(isolated_db / "claude.json", {"/h/app": {}})
+    worktree = "/h/app/.claude/worktrees/fix"
+    _add_session(isolated_db, write_transcript, "main-1", "/h/app", branch="main")
+    _add_session(isolated_db, write_transcript, "wt-1", worktree, branch="worktree-fix")
+    snapshot.refresh()
+    _use_live(monkeypatch)
+    client = _client()
+
+    by_worktree = client.get("/api/overview", params={"project": "/h/app", "group_by": "worktree"}).json()
+    by_branch = client.get("/api/overview", params={"project": "/h/app", "group_by": "branch"}).json()
+
+    assert set(by_worktree["group_order"]) == {"main", "wt fix"}
+    assert by_worktree["summary"]["worktrees"] == 1
+    assert set(by_branch["group_order"]) == {"main", "worktree-fix"}
+
+
+def test_transcripts_worktree_filter_sort_and_options(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    write_config(isolated_db / "claude.json", {})
+    _add_session(isolated_db, write_transcript, "plain", "/h/app", branch="main", ts="2024-01-01T10:00:00Z")
+    _add_session(isolated_db, write_transcript, "in-fix", "/h/app/.claude/worktrees/fix",
+                 branch="worktree-fix", ts="2024-01-02T10:00:00Z")
+    _add_session(isolated_db, write_transcript, "in-docs", "/h/app/.claude/worktrees/docs",
+                 branch="worktree-docs", ts="2024-01-03T10:00:00Z")
+    snapshot.refresh()
+    _use_live(monkeypatch)
+    client = _client()
+
+    filtered = client.get("/api/transcripts", params={"worktree": "fix", "branch": "worktree-fix"}).json()
+    assert [i["session_id"] for i in filtered["items"]] == ["in-fix"]
+    assert filtered["items"][0]["worktree"] == "fix"
+    assert filtered["items"][0]["git_branch"] == "worktree-fix"
+    assert filtered["options"]["worktrees"] == ["docs", "fix"]
+
+    assert client.get("/api/transcripts", params={"worktree": "fix", "branch": "main"}).json()["total"] == 0
+
+    for direction, expected in (("asc", ["in-docs", "in-fix", "plain"]), ("desc", ["in-fix", "in-docs", "plain"])):
+        rows = client.get("/api/transcripts", params={"sort": "worktree", "dir": direction}).json()["items"]
+        assert [i["session_id"] for i in rows] == expected
+        assert rows[-1]["worktree"] == ""

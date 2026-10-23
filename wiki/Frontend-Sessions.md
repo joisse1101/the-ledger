@@ -27,9 +27,9 @@
   it can cancel. Once `ready`, a **Show QR** button opens `RemoteQrDialog` (`useRemoteQr`, which
   fetches `/api/remote-mode/qr` only while open): the code, the address, never the token. **All**
   (`SessionsPage`): `AllList` debounces its search box (`useDebouncedValue`, 300ms), drives
-  `Project`/`Version`/`Branch` `FilterMultiselect`s (`<details>`-based checkbox lists — no
+  `Project`/`Version`/`Branch`/`Worktree` `FilterMultiselect`s (`<details>`-based checkbox lists — no
   popover/portal machinery needed) off the API's option lists, and pages 50-at-a-time via
-  `useTranscripts`'s "Load more". Its columns include `Model` and `OpenSpec` (Yes/No), both sortable. A row opens `SessionDialog`, a native `<dialog>` (`showModal()`, so
+  `useTranscripts`'s "Load more". Its columns include `Model`, `OpenSpec` (Yes/No) and `Worktree` (`--` when none), all sortable. A row opens `SessionDialog`, a native `<dialog>` (`showModal()`, so
   Esc/focus-trapping/inert background come for free; CSS turns it into a full-screen sheet under
   640px) kept mounted across selections so a poll updates it in place without losing scroll position.
   It shows the session ID under the title (the list's Session ID column is wide-layout only), the recap block, its `Detail` section (current-context figure, `TokensChart`, the pinned

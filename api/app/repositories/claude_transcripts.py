@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.repositories.db import queries
+from app.repositories.db import paths, queries
 
 
 @dataclass
@@ -45,6 +45,13 @@ class ClaudeTranscript:
     model: str = ""
     # True if the session ran an OpenSpec (`/opsx:*` or `openspec-*`) command or skill.
     used_openspec: bool = False
+    # Name of the Claude Code worktree the session ran in; "" when it did not run in one.
+    worktree: str = ""
+
+    @property
+    def project_folder(self) -> str:
+        """The ~/.claude/projects/ folder name of the project this session belongs to."""
+        return paths.project_folder(self.path, self.cwd, self.worktree)
 
 
 def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
@@ -72,6 +79,7 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
         cost_state_flagged=bool(row["cost_state_flagged"]),
         model=row["model"],
         used_openspec=bool(row["used_openspec"]),
+        worktree=row["worktree"],
     )
 
 
@@ -84,8 +92,9 @@ def delete_project_transcripts(project_path: str) -> int:
     """Delete a project's on-disk transcript dir(s) and their SQLite rows; returns dirs removed."""
     # Matched by the on-disk folder a transcript is filed under (see
     # queries.transcript_paths_for_project), not by each transcript's own recorded `cwd` -
-    # that can point below the project root if a session `cd`'d partway through.
-    transcript_dirs = {path.parent for path in queries.transcript_paths_for_project(project_path)}
+    # that can point below the project root if a session `cd`'d partway through. The project's
+    # worktree sessions are filed under folders of their own and go with it.
+    transcript_dirs = queries.transcript_dirs_for_project(project_path)
     for directory in transcript_dirs:
         shutil.rmtree(directory, ignore_errors=True)
     queries.delete_transcript_rows_by_project(project_path)

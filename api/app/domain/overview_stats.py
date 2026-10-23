@@ -33,6 +33,10 @@ NO_BRANCH = "(no branch)"
 GROUP_KEYS: dict[str, Callable[[ClaudeTranscript], str]] = {
     "project": lambda transcript: transcript.project,
     "branch": lambda transcript: transcript.git_branch or NO_BRANCH,
+    # A worktree supersedes the branch; the prefix keeps its label from colliding with a branch's.
+    "worktree": lambda transcript: (
+        f"wt {transcript.worktree}" if transcript.worktree else transcript.git_branch or NO_BRANCH
+    ),
 }
 
 
@@ -73,13 +77,13 @@ def available_ranges(transcripts: Sequence[ClaudeTranscript]) -> list[str]:
 def filter_by_project(
     transcripts: Sequence[ClaudeTranscript], folder: str
 ) -> list[ClaudeTranscript]:
-    """Transcripts filed under one project's on-disk folder.
+    """Transcripts belonging to one project's on-disk folder.
 
-    Matches the transcript file's parent folder name (`paths.sanitize_project_path` of the
-    project path), not `transcript.project`, which is only a basename: two projects whose folders
-    share a name must not be merged.
+    Matches `transcript.project_folder` (the folder a transcript is filed under, or the parent
+    repo's folder for a worktree session), not `transcript.project`, which is only a basename: two
+    projects whose folders share a name must not be merged.
     """
-    return [t for t in transcripts if t.path.parent.name == folder]
+    return [t for t in transcripts if t.project_folder == folder]
 
 
 def group_totals(
@@ -251,6 +255,7 @@ def summary(transcripts: Sequence[ClaudeTranscript]) -> dict[str, Any]:
     return {
         "projects": len({t.project for t in transcripts}),
         "branches": len({GROUP_KEYS["branch"](t) for t in transcripts}),
+        "worktrees": len({t.worktree for t in transcripts if t.worktree}),
         "sessions": num_sessions,
         "messages": total_messages,
         "avg_messages_per_session": total_messages / num_sessions if num_sessions else None,
