@@ -12,10 +12,10 @@
   once the list has loaded. The page renders `ProjectDetailPanel` under the list with
   `key={project.path}`, so its time range (`TimeRangeSelector`, default "All time") resets on every
   newly selected project and a fresh query never shows the previous project's charts; selecting
-  scrolls the panel into view. The panel feeds `useOverview(range, {project, groupBy: "branch"})` into
-  `GroupDonutChart`, `GroupBarChart` (both `groupLabel="branch"`) and `ActivityLineChart`, or says
-  no sessions were found for an empty range. A session counts under the last branch recorded in its
-  transcript. The panel also owns delete: a "Delete project" button, shown only when
+  scrolls the panel into view. The panel feeds `useOverview(range, {project, groupBy: "worktree"})` into
+  `GroupDonutChart`, `GroupBarChart` (both `groupLabel="worktree"`) and `ActivityLineChart`, or says
+  no sessions were found for an empty range. A session counts under its worktree (`wt <name>`) when it ran in a Claude Code
+  worktree, else the last branch recorded in its transcript. The stat grid shows Branches and Worktrees counts. The panel also owns delete: a "Delete project" button, shown only when
   `useMeta().is_local` (the API refuses remote deletes anyway), opens a `ConfirmDialog` naming the
   exact path and that it can't be undone. Confirming calls `useDeleteProject`, whose `onSuccess`
   already invalidates the `projects`, `transcripts`, and `overview` queries (the panel's
