@@ -145,6 +145,8 @@ export interface TranscriptItem {
   used_openspec: boolean;
   version: string;
   git_branch: string;
+  /** The Claude Code worktree the session ran in; empty when it did not run in one. */
+  worktree: string;
   live: boolean;
 }
 
@@ -152,6 +154,7 @@ export interface FilterOptions {
   projects: string[];
   versions: string[];
   branches: string[];
+  worktrees: string[];
 }
 
 export interface TranscriptsResponse {
@@ -173,7 +176,8 @@ export type SortField =
   | "model"
   | "used_openspec"
   | "version"
-  | "git_branch";
+  | "git_branch"
+  | "worktree";
 
 export type SortDirection = "asc" | "desc";
 
@@ -182,6 +186,7 @@ export interface TranscriptQuery {
   project?: string[];
   version?: string[];
   branch?: string[];
+  worktree?: string[];
   sort?: SortField;
   dir?: SortDirection;
   limit?: number;
@@ -354,6 +359,8 @@ export interface OverviewSummary {
   projects: number;
   /** Distinct git branches among these transcripts (the same key `group_by: "branch"` uses). */
   branches: number;
+  /** Distinct Claude Code worktrees among these transcripts. */
+  worktrees: number;
   sessions: number;
   messages: number;
   avg_messages_per_session: number | null;
@@ -377,7 +384,7 @@ export interface OverviewSummary {
   };
 }
 
-/** One donut/bar row: a project on Overview, a git branch on a project's own charts. */
+/** One donut/bar row: a project on Overview, a work stream (`wt <name>` for a worktree, else the git branch) on a project's own charts. */
 export interface GroupTotals {
   group: string;
   sessions: number;
@@ -397,7 +404,7 @@ export interface ActivityBucket {
   messages: number;
 }
 
-export type OverviewGroupBy = "project" | "branch";
+export type OverviewGroupBy = "project" | "branch" | "worktree";
 
 export type OverviewResponse =
   | { range: string; empty: true; available_ranges: string[] }

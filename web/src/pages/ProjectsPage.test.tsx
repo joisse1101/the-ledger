@@ -31,6 +31,7 @@ const beta = make("beta");
 const summary = {
   projects: 1,
   branches: 1,
+  worktrees: 0,
   sessions: 1,
   messages: 1,
   avg_messages_per_session: 1,

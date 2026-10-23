@@ -145,7 +145,7 @@ export function AllList({ onSelect }: AllListProps) {
   const pages = transcripts.data?.pages ?? [];
   const rows = pages.flatMap((page) => page.items);
   const total = pages[0]?.total ?? 0;
-  const options = pages[0]?.options ?? { projects: [], versions: [], branches: [] };
+  const options = pages[0]?.options ?? { projects: [], versions: [], branches: [], worktrees: [] };
 
   const handleSortChange = (field: string) => {
     if (field === sortField) {
