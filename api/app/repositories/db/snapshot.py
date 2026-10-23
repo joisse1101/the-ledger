@@ -98,6 +98,7 @@ def startup() -> None:
     _started = True
     path = paths.db_path()
     _remove_db_files(path)
+    history.correct_worktree_rows()
     refresh()
     atexit.register(_remove_db_files, path)
 
