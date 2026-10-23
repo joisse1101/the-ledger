@@ -73,13 +73,13 @@ def available_ranges(transcripts: Sequence[ClaudeTranscript]) -> list[str]:
 def filter_by_project(
     transcripts: Sequence[ClaudeTranscript], folder: str
 ) -> list[ClaudeTranscript]:
-    """Transcripts filed under one project's on-disk folder.
+    """Transcripts belonging to one project's on-disk folder.
 
-    Matches the transcript file's parent folder name (`paths.sanitize_project_path` of the
-    project path), not `transcript.project`, which is only a basename: two projects whose folders
-    share a name must not be merged.
+    Matches `transcript.project_folder` (the folder a transcript is filed under, or the parent
+    repo's folder for a worktree session), not `transcript.project`, which is only a basename: two
+    projects whose folders share a name must not be merged.
     """
-    return [t for t in transcripts if t.path.parent.name == folder]
+    return [t for t in transcripts if t.project_folder == folder]
 
 
 def group_totals(

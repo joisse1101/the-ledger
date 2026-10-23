@@ -24,12 +24,12 @@ def frozen_now(monkeypatch):
 
 def _transcript(
     started_at=None, updated_at=None, message_count=0, cost=0.0, project="proj", session_id="s",
-    branch="main", path="x.jsonl", context=None, cost_source="estimated",
+    branch="main", path="x.jsonl", context=None, cost_source="estimated", cwd="/x", worktree="",
 ):
     return ClaudeTranscript(
         session_id=session_id,
         path=Path(path),
-        cwd="/x",
+        cwd=cwd,
         version="1.0",
         git_branch=branch,
         started_at=started_at,
@@ -42,6 +42,7 @@ def _transcript(
         last_message="",
         first_prompt="",
         context=context,
+        worktree=worktree,
     )
 
 
@@ -94,6 +95,24 @@ def test_filter_by_project_matches_the_folder_not_the_project_name():
     other = _transcript(project="app", path="projects/-h-other-app/s2.jsonl")
     assert overview.filter_by_project([one, other], "-h-one-app") == [one]
     assert overview.filter_by_project([one, other], "-h-other-app") == [other]
+
+
+def test_filter_by_project_counts_a_worktree_session_for_its_repo():
+    repo = "/h/ledger"
+    own = _transcript(path="projects/-h-ledger/s1.jsonl", cwd=repo)
+    worktree = _transcript(
+        project="ledger", path="projects/-h-ledger--claude-worktrees-fix/s2.jsonl",
+        cwd=f"{repo}/.claude/worktrees/fix", worktree="fix",
+    )
+    same_named_elsewhere = _transcript(
+        project="ledger", path="projects/-o-ledger--claude-worktrees-fix/s3.jsonl",
+        cwd="/o/ledger/.claude/worktrees/fix", worktree="fix",
+    )
+    plain = [own, worktree, same_named_elsewhere]
+    assert overview.filter_by_project(plain, "-h-ledger") == [own, worktree]
+    assert overview.filter_by_project(plain, "-o-ledger") == [same_named_elsewhere]
+    # The worktree's own folder is not a project.
+    assert overview.filter_by_project(plain, "-h-ledger--claude-worktrees-fix") == []
 
 
 def test_filter_by_project_with_no_match_is_empty():
