@@ -39,4 +39,4 @@
 ## 8. Integration
 
 - [x] 8.1 Run `cd api; pytest`, `cd web; npm test` and `cd web; npm run build`; verify all pass
-- [ ] 8.2 Start the app (`.\Start-Ledger.ps1`) against the real `~/.claude` data and verify in the browser: The Ledger's panel shows `wt add-wiki-docs` and `wt skills-and-agents` entries, no `add-wiki-docs` or `api` project appears on Overview or in the All list's Project filter, and the Worktree filter lists both
+- [x] 8.2 Start the app (`.\Start-Ledger.ps1`) against the real `~/.claude` data and verify in the browser: The Ledger's panel shows `wt add-wiki-docs` and `wt skills-and-agents` entries, no `add-wiki-docs` or `api` project appears on Overview or in the All list's Project filter, and the Worktree filter lists both
