@@ -15,6 +15,7 @@ router = APIRouter()
 SortField = Literal[
     "project", "title", "session_id", "started_at", "updated_at",
     "message_count", "cost", "context", "model", "used_openspec", "version", "git_branch",
+    "worktree",
 ]
 
 
@@ -24,13 +25,14 @@ def get_transcripts(
     project: Annotated[list[str], Query()] = [],
     version: Annotated[list[str], Query()] = [],
     branch: Annotated[list[str], Query()] = [],
+    worktree: Annotated[list[str], Query()] = [],
     sort: SortField = "updated_at",
     dir: Literal["asc", "desc"] = "desc",
     limit: Annotated[int, Query(ge=1, le=200)] = transcript_service.DEFAULT_PAGE_SIZE,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict:
     result = transcript_service.list_transcripts(
-        q, project, version, branch, sort, dir == "asc", limit, offset
+        q, project, version, branch, worktree, sort, dir == "asc", limit, offset
     )
     return {
         "items": [transcript_item(t, result.live_ids) for t in result.page.items],

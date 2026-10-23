@@ -25,6 +25,7 @@ SORT_FIELDS = (
     "used_openspec",
     "version",
     "git_branch",
+    "worktree",
 )
 DEFAULT_SORT = "updated_at"
 DEFAULT_PAGE_SIZE = 50
@@ -48,15 +49,17 @@ def filter_transcripts(
     projects: Sequence[str] = (),
     versions: Sequence[str] = (),
     branches: Sequence[str] = (),
+    worktrees: Sequence[str] = (),
 ) -> list[ClaudeTranscript]:
     """Sessions matching every given filter.
 
     - `search` is a case-insensitive *literal* substring (no regex/wildcards) of the
       session ID, last message or first prompt.
-    - Each selected list matches any of its values; the four conditions combine with AND.
+    - Each selected list matches any of its values; the five conditions combine with AND.
     """
     needle = search.casefold()
     project_set, version_set, branch_set = set(projects), set(versions), set(branches)
+    worktree_set = set(worktrees)
     result = []
     for transcript in transcripts:
         if needle and not (
@@ -70,6 +73,8 @@ def filter_transcripts(
         if version_set and transcript.version not in version_set:
             continue
         if branch_set and transcript.git_branch not in branch_set:
+            continue
+        if worktree_set and transcript.worktree not in worktree_set:
             continue
         result.append(transcript)
     return result
@@ -98,11 +103,12 @@ def _distinct(values: Sequence[Optional[str]]) -> list[str]:
 
 
 def filter_options(transcripts: Sequence[ClaudeTranscript]) -> dict[str, list[str]]:
-    """Distinct, non-blank projects/versions/branches, for the filter pickers."""
+    """Distinct, non-blank projects/versions/branches/worktrees, for the filter pickers."""
     return {
         "projects": _distinct([t.project for t in transcripts]),
         "versions": _distinct([t.version for t in transcripts]),
         "branches": _distinct([t.git_branch for t in transcripts]),
+        "worktrees": _distinct([t.worktree for t in transcripts]),
     }
 
 
@@ -113,13 +119,19 @@ def query(
     projects: Sequence[str] = (),
     versions: Sequence[str] = (),
     branches: Sequence[str] = (),
+    worktrees: Sequence[str] = (),
     sort: str = DEFAULT_SORT,
     ascending: bool = False,
     limit: int = DEFAULT_PAGE_SIZE,
     offset: int = 0,
 ) -> Page:
     matched = filter_transcripts(
-        transcripts, search=search, projects=projects, versions=versions, branches=branches
+        transcripts,
+        search=search,
+        projects=projects,
+        versions=versions,
+        branches=branches,
+        worktrees=worktrees,
     )
     ordered = sort_transcripts(matched, sort, ascending)
     return Page(
