@@ -18,7 +18,7 @@ AI-agent skills under `toolkit/skills/<name>/SKILL.md` (`coding-standards`) and 
 plus `toolkit/install/Install-Toolkit.ps1` and its `targets.json` that copy them into Claude Code's
 global or a project's Claude Code skills, commands and rules folders without silently overwriting a
 differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
-`.gitignore`, `.env.example`, `openspec/`, `.claude/`) plus a pair of scripts, `Start-Ledger.ps1`/
+`.gitignore`, `.env.example`, `openspec/`, `.claude/`, `.github/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all
 three services (see [Setup and run](Setup-And-Run.md)) — otherwise nothing at root runs on its own.
@@ -53,6 +53,8 @@ of what a capability is required to do, ahead of inferring intent from the code 
   each one is actually consumed.
 - `api/requirements.txt`: `fastapi`, `uvicorn`, `qrcode` — unpinned. `requirements-dev.txt` adds
   `pytest`, `httpx` (for FastAPI's `TestClient`).
+- `.github/dependabot.yml`: weekly (Monday) npm update PRs for `web/` and `widget/`, minor and patch
+  bumps grouped into one PR. `api/` is left out because its requirements are unpinned.
 - `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom`, `vega-embed`
   (dependencies); Vite, TypeScript, Vitest, Testing Library, jsdom (devDependencies). `npm run build`
   is `tsc --noEmit && vite build` — a type error fails the build, not just lint.
