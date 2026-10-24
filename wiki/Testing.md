@@ -12,7 +12,11 @@ from `api/` puts the cwd on `sys.path`) and `testpaths = ["tests"]`.
 
 Python tests, one file per module under test:
 - Worktrees: `api/tests/core/test_worktrees.py` (path rule), `api/tests/repositories/test_scanner_worktrees.py`,
-  `test_worktree_schema.py` (column and correction pass) and `test_worktree_membership.py` (project folder, delete).
+  `test_worktree_schema.py` (column and two-way reconcile) and `test_worktree_membership.py` (project folder, delete).
+- Settings: `api/tests/repositories/test_settings_store.py` (the JSON file), `api/tests/services/test_settings_service.py`
+  (a save re-files both stores, refusals change nothing) and `api/tests/test_settings_routes.py` (local-only, even with a
+  valid token). An autouse fixture in `conftest.py` points `LEDGER_SETTINGS_PATH` at a `tmp_path`, so no test reads or
+  writes the real `api/.ledger/settings.json`.
 - Data layer: `test_claude_db.py`, `test_claude_projects.py`, `test_claude_transcripts.py`,
   `test_claude_sessions.py`, `test_context.py`. `api/tests/conftest.py`'s `isolated_db` fixture
   monkeypatches `paths.db_path`/`config_path`/`projects_dir` to a `tmp_path`, so the suite never
@@ -51,6 +55,8 @@ npm test          # Vitest (jsdom, see web/src/test-setup.ts): api/client, api/q
                    # (shares of a response's own context), hooks/useDebouncedValue,
                    # hooks/useViewportClass, lib/format, lib/tokens, lib/activityTrend,
                    # components/overview/ActivityLineChart (compiles the chart spec: one shared legend)
+                   # components/Nav (Settings only on the local machine), pages/SettingsPage (add, remove,
+                   # refused folder, built-in row, pending state, non-local redirect)
 npm run build      # tsc --noEmit, then vite build -> web/dist
 ```
 
