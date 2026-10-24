@@ -1,7 +1,7 @@
 ## 1. Configurable worktree path rule (core)
 
-- [ ] 1.1 In `api/app/core/worktrees.py`, add `BUILT_IN_FOLDER`, a `folder` field on `Worktree`, and `parse_worktree(cwd, folders)` building one longest-first alternation from the built-in plus the given folders (design: "The folder list is passed into `parse_worktree`"); extend `api/tests/core/test_worktrees.py` with a `.trees` session, a nested folder (`tools/wt`), a session `cd`'d deeper, a folder not in the list (`None`), `wt` vs `wt/inner` picking the longer, and the existing `.claude/worktrees` cases still passing with no folders; verify `pytest tests/core/test_worktrees.py` passes
-- [ ] 1.2 Add `normalize_folder(raw)` beside it: backslashes to `/`, trim slashes, reject empty, absolute (drive letter, leading `/` or `\`), and `.`/`..` segments with a reason; verify tests for `tools\wt\` -> `tools/wt`, `../shared`, `C:/trees`, `/trees`, `a/./b`, and blank input
+- [x] 1.1 In `api/app/core/worktrees.py`, add `BUILT_IN_FOLDER`, a `folder` field on `Worktree`, and `parse_worktree(cwd, folders)` building one longest-first alternation from the built-in plus the given folders (design: "The folder list is passed into `parse_worktree`"); extend `api/tests/core/test_worktrees.py` with a `.trees` session, a nested folder (`tools/wt`), a session `cd`'d deeper, a folder not in the list (`None`), `wt` vs `wt/inner` picking the longer, and the existing `.claude/worktrees` cases still passing with no folders; verify `pytest tests/core/test_worktrees.py` passes
+- [x] 1.2 Add `normalize_folder(raw)` beside it: backslashes to `/`, trim slashes, reject empty, absolute (drive letter, leading `/` or `\`), and `.`/`..` segments with a reason; verify tests for `tools\wt\` -> `tools/wt`, `../shared`, `C:/trees`, `/trees`, `a/./b`, and blank input
 
 ## 2. Settings store and the scans that use it (repositories)
 
