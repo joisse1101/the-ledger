@@ -26,7 +26,7 @@
 
 ## 5. End-to-end check
 
-- [ ] 5.1 With `.\Start-Ledger.ps1` running, open the dashboard on `localhost`, add `.trees`, and confirm this repo's `.trees/config-worktree-path` sessions appear under `the-ledger` with worktree `config-worktree-path` on Overview, Projects and Manage Sessions; remove it and confirm they return to a `config-worktree-path` project; open through the gateway from another device and confirm there is no Settings entry and `/api/settings` is refused
+- [x] 5.1 With `.\Start-Ledger.ps1` running, open the dashboard on `localhost`, add `.trees`, and confirm this repo's `.trees/config-worktree-path` sessions appear under `the-ledger` with worktree `config-worktree-path` on Overview, Projects and Manage Sessions; remove it and confirm they return to a `config-worktree-path` project; open through the gateway from another device and confirm there is no Settings entry and `/api/settings` is refused
 
 ## Workflow follow-up
 
