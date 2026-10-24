@@ -63,7 +63,7 @@ testable and readable independent of the web framework wrapping it.
   overrides it, and the test suite points it at a temp file). Only user folders are stored; `.claude/worktrees` is built in.
   `load_worktree_folders()` re-reads the file only when its mtime or size changes, treats a missing or unreadable file as no
   folders, and skips (with a warning) entries that fail `normalize_folder`. `save_worktree_folders()` writes a temp file and
-  `os.replace`s it. The scanner and `paths.project_folder` read it, so
+  `os.replace`s it. The scanner, `paths.project_folder` and `history.correct_worktree_rows` all read it, so
   `backup_history.py` follows the same list with no wiring of its own.
 - `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`
   (one file per process) directly from disk on every call — unlike projects/transcripts this isn't

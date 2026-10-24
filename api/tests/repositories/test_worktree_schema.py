@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from app.repositories import settings_store
 from app.repositories.db import connection, history, paths, snapshot
 
 LEGACY_HISTORY_TABLE = """
@@ -64,3 +65,49 @@ def test_correction_pass_fixes_legacy_rows_and_is_idempotent(isolated_db):
 
     history.correct_worktree_rows()
     assert snapshot_of_rows() == first
+
+
+TREES_CWD = "C:/repos/the-ledger/.trees/fix-nav"
+
+
+def _worktrees_and_projects():
+    return {r["session_id"]: (r["worktree"], r["project"]) for r in history.fetch_history_transcripts()}
+
+
+def test_pruned_row_gains_and_loses_a_configured_worktree(isolated_db):
+    history.upsert_history_transcripts([_legacy_row("trees", TREES_CWD, "fix-nav")])
+
+    settings_store.save_worktree_folders([".trees"])
+    history.correct_worktree_rows()
+    assert _worktrees_and_projects() == {"trees": ("fix-nav", "the-ledger")}
+
+    settings_store.save_worktree_folders([])
+    history.correct_worktree_rows()
+    assert _worktrees_and_projects() == {"trees": ("", "fix-nav")}
+
+
+def test_built_in_rows_never_revert(isolated_db):
+    filed = paths.sanitize_project_path(WORKTREE_CWD)
+    moved_out = {**_legacy_row("moved", "/home/x/elsewhere", "the-ledger"), "path": f"/p/{filed}/moved.jsonl"}
+    history.upsert_history_transcripts([_legacy_row("wt", WORKTREE_CWD, "add-wiki-docs"), moved_out])
+    with connection.connect_history() as conn:
+        conn.execute("UPDATE transcripts SET worktree = 'add-wiki-docs' WHERE session_id = 'moved'")
+
+    for folders in ([".trees"], []):
+        settings_store.save_worktree_folders(folders)
+        history.correct_worktree_rows()
+        assert _worktrees_and_projects() == {
+            "wt": ("add-wiki-docs", "the-ledger"),
+            "moved": ("add-wiki-docs", "the-ledger"),
+        }
+
+
+def test_reconcile_with_an_unchanged_list_changes_nothing(isolated_db):
+    history.upsert_history_transcripts(
+        [_legacy_row("trees", TREES_CWD, "fix-nav"), _legacy_row("wt", WORKTREE_CWD, "add-wiki-docs")]
+    )
+    settings_store.save_worktree_folders([".trees"])
+    history.correct_worktree_rows()
+    first = _worktrees_and_projects()
+    history.correct_worktree_rows()
+    assert _worktrees_and_projects() == first

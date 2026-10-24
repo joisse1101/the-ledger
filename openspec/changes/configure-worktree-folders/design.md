@@ -57,8 +57,11 @@ same repository code, it picks the list up with no extra wiring.
 transcript store, and that store's schema is migrated in place, which is heavier than a JSON file.
 
 ### `correct_worktree_rows` becomes a two-way reconcile
-It selects every row (not only `worktree = ''`) and, for each, compares `parse_worktree(cwd, folders)`
-with the stored worktree:
+It selects every row (not only `worktree = ''`). A row with a stored worktree whose transcript folder
+name still ends in a listed folder's sanitized `/<folder>/<worktree>` is kept as is: that folder is
+fixed from where the session started, while the stored `cwd` is the last directory seen and may have
+moved out of the worktree. Every other row compares `parse_worktree(cwd, folders)` with the stored
+worktree:
 
 ```
 match now?   stored worktree?   action
