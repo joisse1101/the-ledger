@@ -37,7 +37,7 @@ def test_wrong_shape_means_no_folders(isolated_settings):
 
 def test_hand_edited_entries_are_normalised_and_bad_ones_skipped(isolated_settings):
     isolated_settings.write_text(
-        json.dumps({"worktree_folders": ["tools\wt\\", "../x", 3, ".trees", ".trees/"]}), encoding="utf-8"
+        json.dumps({"worktree_folders": ["tools\\wt\\", "../x", 3, ".trees", ".trees/"]}), encoding="utf-8"
     )
     assert settings_store.load_worktree_folders() == ("tools/wt", ".trees")
 
