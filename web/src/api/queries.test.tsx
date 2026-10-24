@@ -13,6 +13,7 @@ import {
   useOpenRepo,
   useOverview,
   usePendingDecision,
+  useRefresh,
   useRemoteQr,
   useSaveSettings,
   useSetAutoApprove,
@@ -178,6 +179,25 @@ describe("the session control hooks", () => {
     expect(JSON.parse(init.body)).toEqual({ enabled: true });
     expect(init.headers.get("X-Requested-With")).toBe("ledger");
     expect(client.getQueryData<{ remote_mode: unknown }>(keys.meta)?.remote_mode).toEqual(remoteMode);
+    client.clear();
+  });
+
+  it("refreshing updates only the timestamp and keeps the rest of the cached meta", async () => {
+    // The server answers a refresh with just the new timestamp, not a whole meta.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ refreshed_at: "2026-10-24T22:00:00" })));
+    const client = createQueryClient();
+    const cached = {
+      refreshed_at: "2026-10-24T21:00:00",
+      is_local: true,
+      remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null },
+      relay_hook_seen: false,
+    };
+    client.setQueryData(keys.meta, cached);
+
+    const { result } = renderHook(() => useRefresh(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync());
+
+    expect(client.getQueryData(keys.meta)).toEqual({ ...cached, refreshed_at: "2026-10-24T22:00:00" });
     client.clear();
   });
 
