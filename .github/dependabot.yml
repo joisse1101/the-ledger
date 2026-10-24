@@ -1,0 +1,13 @@
+version: 2
+
+# api/ is left out: its requirements files are unpinned, so Dependabot has no versions to bump.
+updates:
+  - package-ecosystem: "npm"
+    directories: ["/web", "/widget"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # One PR for all minor/patch bumps; majors still arrive one per package.
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
