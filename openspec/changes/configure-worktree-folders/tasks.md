@@ -14,8 +14,8 @@
 ## 3. Settings API (services, routers)
 
 - [x] 3.1 Add `services/settings_service.py`: `get()` returns built-in plus user folders; `save(folders)` normalizes, rejects invalid or duplicate folders with the reason, writes, reconciles history, then rescans (design: "Saving runs validate, write, reconcile, rescan in order"); verify service tests that a save moves a `.trees` session under its repo and a later removal moves it back, without a restart
-- [ ] 3.2 Add `routers/settings.py` with `GET` and `PUT /api/settings`, both 403 unless `is_local(request)`, and register it in `main.py`; verify API tests: local read and save succeed without a token, a non-local request with a valid token is refused for both and the file is unchanged, and an invalid folder returns 400 with its reason
-- [ ] 3.3 Document the routes in `wiki/Backend-API-Routes.md` and the local-only rule in `wiki/Backend-Security.md`; verify `python check_docs.py` passes
+- [x] 3.2 Add `routers/settings.py` with `GET` and `PUT /api/settings`, both 403 unless `is_local(request)`, and register it in `main.py`; verify API tests: local read and save succeed without a token, a non-local request with a valid token is refused for both and the file is unchanged, and an invalid folder returns 422 (the codebase's `InvalidInput` status) with its reason
+- [x] 3.3 Document the routes in `wiki/Backend-API-Routes.md` and the local-only rule in `wiki/Backend-Security.md`; verify `python check_docs.py` passes
 
 ## 4. Settings page (web)
 

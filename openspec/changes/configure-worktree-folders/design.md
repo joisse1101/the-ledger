@@ -82,7 +82,7 @@ cheap at this app's history sizes.
 ```
 PUT /api/settings  {worktree_folders: [...]}
    router: is_local? else 403
-   service: normalize + validate each (400 with the reason on the first bad one; dedupe = 400)
+   service: normalize + validate each (InvalidInput -> 422 with the reason on the first bad one, duplicates too)
             -> settings_store.write
             -> history.correct_worktree_rows()      (history.db, both directions)
             -> refresh.locked_refresh()             (rebuild ledger.db from disk)

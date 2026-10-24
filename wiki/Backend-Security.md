@@ -22,10 +22,10 @@
   or ready keeps the same token. While it is `None` (Remote mode off, or the backend just started)
   every non-local request gets a 401, even if the gateway container were left running.
   The middleware's locality test is also exported as `is_local(request)`, which is what makes some
-  things stricter than "has the token": both `DELETE` routes, `POST /api/remote-mode` and
-  `POST /api/sessions/{id}/decisions` call it and refuse a non-local request with 403 regardless of
+  things stricter than "has the token": both `DELETE` routes, `POST /api/remote-mode`,
+  `POST /api/sessions/{id}/decisions` and both `/api/settings` routes (read and save) call it and refuse a non-local request with 403 regardless of
   any token (so a remote device can read, and — with Remote mode on — answer prompts, but never
-  delete or flip Remote mode), and `GET /api/meta` reports it back as `is_local` so the frontend can
+  delete, flip Remote mode or see settings), and `GET /api/meta` reports it back as `is_local` so the frontend can
   hide those controls up front. The one request a non-local device may make without the token is a **file-drop download link**:
 `GET /api/files/download/<ticket>`. `security.py` only matches that path shape (`_DOWNLOAD_LINK`, GET
 only); the route redeems the ticket (single-use, 60 seconds, one file) and still refuses while Remote
