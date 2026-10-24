@@ -20,6 +20,7 @@ import type {
   RemoteMode,
   RemoteQr,
   SessionResponse,
+  Settings,
   TimeRange,
   TranscriptQuery,
   TranscriptsResponse,
@@ -45,6 +46,7 @@ export const keys = {
     ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? DEFAULT_BUCKET_MINUTES] as const,
   projects: ["projects"] as const,
   files: ["files"] as const,
+  settings: ["settings"] as const,
 };
 
 export function useMeta() {
@@ -319,6 +321,39 @@ export function useDownloadFile() {
         method: "POST",
       });
       startDownload(url);
+    },
+  });
+}
+
+/** The settings, for the machine running the app only: another device gets a 403, so ask only while
+ *  `enabled` (this device is local). */
+export function useSettings(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.settings,
+    queryFn: () => apiFetch<Settings>("/api/settings"),
+    enabled,
+    retry: false,
+  });
+}
+
+/** Saves the user's worktree folders. The server re-files every session before it answers, so on
+ *  success everything derived from sessions is reloaded. Rejects with an ApiError carrying the
+ *  server's reason (422 for a folder it won't accept). */
+export function useSaveSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (worktreeFolders: string[]) =>
+      apiFetch<Settings>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ worktree_folders: worktreeFolders }),
+      }),
+    onSuccess: (settings) => {
+      client.setQueryData(keys.settings, settings);
+      // Transcripts also hold the filter options (projects, worktrees).
+      for (const key of [keys.transcripts, ["session"], ["overview"], keys.projects, keys.live]) {
+        void client.invalidateQueries({ queryKey: key });
+      }
     },
   });
 }

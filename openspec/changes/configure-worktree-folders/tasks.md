@@ -19,7 +19,7 @@
 
 ## 4. Settings page (web)
 
-- [ ] 4.1 Add the settings types, `useSettings` query and `useSaveSettings` mutation in `web/src/api/`, invalidating the sessions, projects, overview and options queries on success; verify `queries.test.tsx` covers the `PUT` body and the invalidation
+- [x] 4.1 Add the settings types, `useSettings` query and `useSaveSettings` mutation in `web/src/api/`, invalidating the sessions, projects, overview and options queries on success; verify `queries.test.tsx` covers the `PUT` body and the invalidation
 - [ ] 4.2 Add a `localOnly` Settings entry to `Nav.tsx` (filtered on `useMeta().data?.is_local`) with an icon, and the `settings` route in `App.tsx`; verify `Nav.test.tsx` shows the entry for a local meta and hides it for a non-local one, with or without Remote mode
 - [ ] 4.3 Add `pages/SettingsPage.tsx`: redirect non-local devices to `/`; list `.claude/worktrees` as built in with no remove control; user folders each with Remove; an Add input that saves at once, shows a pending state, and shows server validation errors inline; verify `SettingsPage.test.tsx` covers add, remove, a rejected folder, the built-in row, and the non-local redirect
 - [ ] 4.4 Document the page in `wiki/Frontend-Shell-And-Theme.md` (nav entry, local-only) and link it from `wiki/Home.md`; verify `npm test`, `npm run build` and `python check_docs.py` pass

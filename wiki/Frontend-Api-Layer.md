@@ -25,7 +25,7 @@ any unknown path) rendered inside `AppShell`.
   `NetworkError` (fetch itself failed/threw). `queries.ts` has one TanStack Query hook per endpoint
   (`useMeta`, `useRefresh`, `useLive`, `useTranscripts` — an `useInfiniteQuery` for "Load more"
   paging, `useSession`, `useOverview`, `useProjects`, `useDeleteSession`, `useDeleteProject`,
-  `usePendingDecision`, `useAnswerDecision`, `useSetRemoteMode`, `useOpenRepo`);
+  `usePendingDecision`, `useAnswerDecision`, `useSetRemoteMode`, `useOpenRepo`, `useSettings`, `useSaveSettings`);
   `useLive({auto})` sets `refetchInterval` to `2000` or `false` and disables background polling so a
   hidden tab stops hitting the server. `queryClient.ts` retries a dropped connection once
   (`NetworkError`) but never retries a real API error. `serverStatus.ts`'s `useServerProblem()` scans

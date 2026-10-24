@@ -50,6 +50,19 @@ export interface FilesResponse {
   files: FileEntry[];
 }
 
+/** One entry of the worktree-folder list: a path inside a repo, relative to its root. */
+export interface WorktreeFolder {
+  path: string;
+  /** Claude Code's own folder: always listed, never removable. */
+  built_in: boolean;
+}
+
+/** Local requests only; the server refuses any other device. */
+export interface Settings {
+  /** The built-in folder first, then the user's in the order they were added. */
+  worktree_folders: WorktreeFolder[];
+}
+
 export interface LiveContext {
   size: number;
   growth: number | null;
