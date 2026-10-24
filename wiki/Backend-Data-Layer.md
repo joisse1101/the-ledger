@@ -50,14 +50,21 @@ testable and readable independent of the web framework wrapping it.
   `message.id`, ignoring `<synthetic>`; ties go to the first seen), `used_openspec` (a `/opsx:*` slash command or an
   `openspec-*`/`opsx:*` Skill call anywhere in the session), and `project` (matching the on-disk parent folder against each project's
   `sanitize_project_path()`, falling back to a cwd/folder-derived guess), and `worktree`. A session whose *first* `cwd` is under
-  `<repo>/.claude/worktrees/<name>` (recognised by `api/app/core/worktrees.py`'s `parse_worktree`) stores that `<name>` and belongs to
+  `<repo>/<folder>/<name>`, for `.claude/worktrees` or any folder listed in the Settings page (recognised by
+  `api/app/core/worktrees.py`'s `parse_worktree`, which tries the longest folder first), stores that `<name>` and belongs to
   its repo's project instead of showing up as a project named after the worktree. `ClaudeTranscript.project_folder` is the
-  `~/.claude/projects/` folder a transcript counts under: its own, or for a worktree session the repo's (the worktree's
-  sanitized `/.claude/worktrees/<name>` suffix stripped off, via `paths.project_folder`). `delete_project_transcripts(cwd)`
+  `~/.claude/projects/` folder a transcript counts under: its own, or for a worktree session the repo's (the sanitized
+  `/<folder>/<name>` suffix stripped off, via `paths.repo_folder_of_worktree`). `delete_project_transcripts(cwd)`
   (which removes every folder holding a member transcript, and skips a folder that also holds non-members)
   and `delete_transcript(session_id)` look up the affected path(s) via `queries`, remove the real
   file(s) (tolerating one already gone — see [History store](Backend-History-Store.md)), then
   delete just those rows from both `ledger.db` and `history.db`.
+- `settings_store.py` keeps the user's worktree folders in `api/.ledger/settings.json` (gitignored; `LEDGER_SETTINGS_PATH`
+  overrides it, and the test suite points it at a temp file). Only user folders are stored; `.claude/worktrees` is built in.
+  `load_worktree_folders()` re-reads the file only when its mtime or size changes, treats a missing or unreadable file as no
+  folders, and skips (with a warning) entries that fail `normalize_folder`. `save_worktree_folders()` writes a temp file and
+  `os.replace`s it. The scanner and `paths.project_folder` read it, so
+  `backup_history.py` follows the same list with no wiring of its own.
 - `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`
   (one file per process) directly from disk on every call — unlike projects/transcripts this isn't
   routed through `app/repositories/db/`, since the Live views poll it every ~2s and a snapshot refreshed only

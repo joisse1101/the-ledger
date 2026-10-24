@@ -11,6 +11,7 @@ from typing import Any, Optional
 import json
 
 from app.core.worktrees import parse_worktree
+from app.repositories import settings_store
 from app.repositories.db import paths
 
 
@@ -267,7 +268,7 @@ def _context_tokens(entry: dict[str, Any]) -> Optional[int]:
 
 
 def _scan_transcript_file(
-    path: Path, project_by_folder: dict[str, str]
+    path: Path, project_by_folder: dict[str, str], worktree_folders: tuple[str, ...] = ()
 ) -> Optional[dict[str, Any]]:
     session_id = path.stem
     cwd = ""
@@ -412,7 +413,7 @@ def _scan_transcript_file(
 
     # A worktree session belongs to the repo it was split from. It is detected from where the
     # session started, so a later `cd` out of (or within) the worktree doesn't change it.
-    worktree = parse_worktree(first_cwd)
+    worktree = parse_worktree(first_cwd, worktree_folders)
     if worktree is not None:
         project = Path(worktree.repo_root).name
 
@@ -445,9 +446,10 @@ def scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]:
     directory = paths.projects_dir()
     if not directory.is_dir():
         return []
+    worktree_folders = settings_store.load_worktree_folders()
     rows = []
     for path in directory.glob("*/*.jsonl"):
-        row = _scan_transcript_file(path, project_by_folder)
+        row = _scan_transcript_file(path, project_by_folder, worktree_folders)
         if row is not None:
             rows.append(row)
     return rows

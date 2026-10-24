@@ -1,9 +1,11 @@
 """The scan attributes a Claude Code worktree session to the repo the worktree was split from."""
 
+from app.repositories import settings_store
 from app.repositories.db import paths, scanner
 
 REPO = "/home/x/the-ledger"
 WORKTREE = f"{REPO}/.claude/worktrees/add-wiki-docs"
+TREES_WORKTREE = f"{REPO}/.trees/fix-nav"
 
 
 def _scan_one(isolated_db, write_config, write_transcript, cwds: list[str], folder_cwd: str):
@@ -40,3 +42,16 @@ def test_ordinary_session_has_no_worktree(isolated_db, write_config, write_trans
     row = _scan_one(isolated_db, write_config, write_transcript, [REPO], REPO)
     assert row["worktree"] == ""
     assert row["project"] == "the-ledger"
+
+
+def test_session_in_a_configured_folder_belongs_to_the_repo(isolated_db, write_config, write_transcript):
+    settings_store.save_worktree_folders([".trees"])
+    row = _scan_one(isolated_db, write_config, write_transcript, [TREES_WORKTREE], TREES_WORKTREE)
+    assert row["worktree"] == "fix-nav"
+    assert row["project"] == "the-ledger"
+
+
+def test_session_in_an_unlisted_folder_is_its_own_project(isolated_db, write_config, write_transcript):
+    row = _scan_one(isolated_db, write_config, write_transcript, [TREES_WORKTREE], TREES_WORKTREE)
+    assert row["worktree"] == ""
+    assert row["project"] == "fix-nav"

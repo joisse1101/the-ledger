@@ -5,10 +5,10 @@
 
 ## 2. Settings store and the scans that use it (repositories)
 
-- [ ] 2.1 Add `api/app/repositories/settings_store.py` reading and writing `api/.ledger/settings.json` (override `LEDGER_SETTINGS_PATH`), user folders only, atomic write, missing or invalid file = no folders (design: "Settings live in a small JSON store"); verify tests with `tmp_path` for round-trip, missing file, and corrupt JSON
-- [ ] 2.2 Load the list at the start of each scan in `repositories/db/scanner.py` and pass it to `parse_worktree`; make `paths.project_folder` strip the suffix of whichever folder matched; verify `tests/repositories/test_scanner_worktrees.py` and `test_worktree_membership.py` gain `.trees` cases (session attributed to its repo, project delete removes `.trees` worktree sessions) and still pass with no settings file
+- [x] 2.1 Add `api/app/repositories/settings_store.py` reading and writing `api/.ledger/settings.json` (override `LEDGER_SETTINGS_PATH`), user folders only, atomic write, missing or invalid file = no folders (design: "Settings live in a small JSON store"); verify tests with `tmp_path` for round-trip, missing file, and corrupt JSON
+- [x] 2.2 Load the list at the start of each scan in `repositories/db/scanner.py` and pass it to `parse_worktree`; make `paths.project_folder` strip the suffix of whichever folder matched; verify `tests/repositories/test_scanner_worktrees.py` and `test_worktree_membership.py` gain `.trees` cases (session attributed to its repo, project delete removes `.trees` worktree sessions) and still pass with no settings file
 - [ ] 2.3 Turn `history.correct_worktree_rows` into the two-way reconcile from the design's table, using the stored list; verify tests: a pruned `.trees` row gains its worktree when `.trees` is listed, loses it (project = worktree name) when removed, `.claude/worktrees` rows never revert, and a second pass changes nothing
-- [ ] 2.4 Verify `pytest tests/test_layers.py tests/test_backup_history.py` pass and that `backup_history.py` attributes a `.trees` session when the settings file lists `.trees`
+- [x] 2.4 Verify `pytest tests/test_layers.py tests/test_backup_history.py` pass and that `backup_history.py` attributes a `.trees` session when the settings file lists `.trees`
 - [ ] 2.5 Update `wiki/Backend-Data-Layer.md` and `wiki/Backend-History-Store.md` for configured folders and the two-way reconcile; verify `python check_docs.py` passes
 
 ## 3. Settings API (services, routers)

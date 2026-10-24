@@ -72,3 +72,11 @@ def no_real_remote_mode(monkeypatch):
     for name in ("LEDGER_PORT", "LEDGER_FRONTEND_PORT"):
         monkeypatch.setenv(name, "0")
         monkeypatch.delenv(name)
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(tmp_path, monkeypatch):
+    """Point the settings file at tmp_path, so no test reads or writes the real api/.ledger/settings.json."""
+    path = tmp_path / "settings.json"
+    monkeypatch.setenv("LEDGER_SETTINGS_PATH", str(path))
+    return path
