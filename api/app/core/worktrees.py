@@ -20,6 +20,14 @@ class Worktree:
     folder: str = BUILT_IN_FOLDER
 
 
+@dataclass(frozen=True)
+class WorktreeFolder:
+    """One entry of the configured worktree-folder list."""
+
+    path: str
+    built_in: bool
+
+
 @lru_cache(maxsize=32)
 def _worktree_path(folders: tuple[str, ...]) -> re.Pattern[str]:
     # Longest first, so `wt/inner` wins over `wt`; the lazy repo group keeps the outermost repo.
