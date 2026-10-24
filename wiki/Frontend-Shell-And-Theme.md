@@ -11,6 +11,15 @@
   shows a dismissible-by-retry notice above the page when a query is failing but keeps the page's
   last data visible underneath; `unauthorized` instead swaps the whole `<Outlet/>` for `SignInNeeded`
   (pointing back at the printed URL/QR).
+- **Settings** (`web/src/pages/SettingsPage.tsx`, route `/settings`): the worktree-folder list. `Nav` entries can be
+  `remoteOnly` (Files) or `localOnly`; Settings is `localOnly`, so it shows only while `useMeta().data.is_local`
+  is true (a browser on the machine running the app, with or without Remote mode), and the page renders
+  `<Navigate to="/">` for any other device without asking for the settings. The server refuses the routes
+  regardless, so hiding is only UX. The built-in `.claude/worktrees` is listed with a "Built in" label and no
+  Remove button; user folders each have Remove, and an input adds one. Every add or remove sends the whole user list
+  to `PUT /api/settings` (`useSaveSettings`) at once, disables the controls and shows "Saving..." while the server
+  re-files sessions, shows its reason inline if a folder is refused (input and list stay as they were), and on success
+  reloads the transcripts, session, overview, projects and live queries.
 - **Theme** (`web/src/theme/theme.ts`): `data-theme` on `<html>`, seeded from `localStorage` (guarded
   try/catch — private windows etc.) else `prefers-color-scheme`, applied *before* React even mounts.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button

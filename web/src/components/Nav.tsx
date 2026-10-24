@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useMeta } from "../api/queries";
 import type { ViewportClass } from "../hooks/useViewportClass";
-import { FilesIcon, OverviewIcon, ProjectsIcon, SessionsIcon, LiveIcon } from "./icons";
+import { FilesIcon, OverviewIcon, ProjectsIcon, SessionsIcon, LiveIcon, SettingsIcon } from "./icons";
 
 const PAGES = [
   { to: "/", label: "Sessions", labelMobile: "Live", icon: <LiveIcon />, end: true },
@@ -9,14 +9,17 @@ const PAGES = [
   { to: "/projects", label: "Manage Projects", labelMobile: "Projects", icon: <ProjectsIcon />, end: false },
   { to: "/sessions", label: "Manage Sessions", labelMobile: "Sessions", icon: <SessionsIcon />, end: false },
   { to: "/files", label: "Files", icon: <FilesIcon />, end: false, remoteOnly: true },
+  { to: "/settings", label: "Settings", icon: <SettingsIcon />, end: false, localOnly: true },
 ];
 
 /** The same links either way: inline in the top bar (medium, wide) or a tab
  *  bar fixed to the bottom of the screen where a thumb can reach it (narrow). */
 export function Nav({ viewport }: { viewport: ViewportClass }) {
   const bottom = viewport === "narrow";
-  const remoteOn = useMeta().data?.remote_mode.enabled === true;
-  const pages = PAGES.filter((page) => !page.remoteOnly || remoteOn);
+  const meta = useMeta();
+  const remoteOn = meta.data?.remote_mode.enabled === true;
+  const isLocal = meta.data?.is_local === true;
+  const pages = PAGES.filter((page) => (!page.remoteOnly || remoteOn) && (!page.localOnly || isLocal));
   return (
     <nav className={bottom ? "nav nav--bottom" : "nav nav--top"} aria-label="Pages">
       {pages.map(({ to, label, labelMobile, icon, end }) => (

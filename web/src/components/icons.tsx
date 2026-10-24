@@ -98,3 +98,12 @@ export function FilesIcon() {
     </svg>
   );
 }
+
+export function SettingsIcon() {
+  return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3m0 14v3M4.9 4.9 7 7m10 10 2.1 2.1M2 12h3m14 0h3M4.9 19.1 7 17M17 7l2.1-2.1" />
+    </svg>
+  );
+}
