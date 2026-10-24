@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from app.core.worktrees import parse_worktree
-from app.repositories.db import connection
+from app.repositories import settings_store
+from app.repositories.db import connection, paths
 
 
 def serialize_transcript_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -72,19 +73,35 @@ def upsert_history_transcripts(rows: list[dict[str, Any]]) -> None:
 
 
 def correct_worktree_rows() -> None:
-    """Give rows recorded before worktrees were tracked their worktree and parent project.
+    """Reconcile every row's worktree and project with the configured worktree folders, both ways.
 
-    Works from the stored `cwd`, so rows whose transcript was pruned from disk are corrected too.
-    Idempotent: a corrected row has a worktree and is not selected again.
+    - A row filed under a listed worktree folder (its transcript's folder name, fixed from where the
+      session started) keeps its worktree, even if a later `cd` moved its `cwd` away.
+    - Otherwise a row whose stored `cwd` is in a worktree gains that worktree and its repo's project,
+      which corrects rows recorded before worktrees were tracked.
+    - Otherwise a row that still has a worktree, whose folder is no longer listed, loses it and takes
+      the worktree's name as its project, as it had before.
+
+    Works from stored columns only, so rows whose transcript was pruned from disk follow too.
+    Idempotent: a second pass with the same folders changes nothing.
     """
+    folders = settings_store.load_worktree_folders()
     with connection.connect_history() as conn:
-        rows = conn.execute("SELECT session_id, cwd FROM transcripts WHERE worktree = ''").fetchall()
+        rows = conn.execute("SELECT session_id, path, cwd, worktree FROM transcripts").fetchall()
         for row in rows:
-            worktree = parse_worktree(row["cwd"])
-            if worktree is not None:
+            stored = row["worktree"]
+            folder = Path(row["path"]).parent.name
+            if stored and paths.repo_folder_of_worktree(folder, stored, folders) is not None:
+                continue
+            match = parse_worktree(row["cwd"], folders)
+            if match is not None:
+                update = (match.name, Path(match.repo_root).name) if match.name != stored else None
+            else:
+                update = ("", stored) if stored else None
+            if update is not None:
                 conn.execute(
                     "UPDATE transcripts SET worktree = ?, project = ? WHERE session_id = ?",
-                    (worktree.name, Path(worktree.repo_root).name, row["session_id"]),
+                    (*update, row["session_id"]),
                 )
 
 

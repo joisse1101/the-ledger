@@ -4,6 +4,7 @@ import { FilesPage } from "./pages/FilesPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SessionsPage } from "./pages/SessionsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { LiveSessionsPage } from "./pages/LiveSessionsPage";
 
 export function App() {
@@ -15,6 +16,7 @@ export function App() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="sessions" element={<SessionsPage />} />
         <Route path="files" element={<FilesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         {/* `vite preview` serves this app for any unknown path, so send those home. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

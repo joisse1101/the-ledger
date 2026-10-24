@@ -27,7 +27,7 @@ Requirements live in `openspec/specs/`, not here. Docs conventions are in [Codin
 
 **Frontend**
 - [API layer](Frontend-Api-Layer.md): stack, sign-in token, fetch client, query hooks
-- [Shell and theme](Frontend-Shell-And-Theme.md): app shell, viewport classes, theme tokens
+- [Shell and theme](Frontend-Shell-And-Theme.md): app shell, viewport classes, theme tokens, local-only Settings page
 - [Sessions](Frontend-Sessions.md): Live and All pages, dialogs, prompts
 - [Overview](Frontend-Overview.md): charts and summary stats
 - [Projects](Frontend-Projects.md): project list, detail panel, delete

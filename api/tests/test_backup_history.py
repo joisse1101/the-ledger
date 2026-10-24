@@ -3,6 +3,7 @@ without any server process running (mirrors the isolated_db fixture the rest of 
 db suite uses, so this never touches the real ~/.claude.json or ~/.claude/projects/)."""
 
 import backup_history
+from app.repositories import settings_store
 from app.repositories.db import history, paths
 
 
@@ -95,3 +96,20 @@ def test_main_prints_row_count_and_returns_zero(isolated_db, write_config, write
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "Backed up 1 transcript row(s)" in out
+
+
+def test_backup_attributes_a_session_in_a_configured_worktree_folder(
+    isolated_db, write_config, write_transcript
+):
+    settings_store.save_worktree_folders([".trees"])
+    write_config(isolated_db / "claude.json", {})
+    worktree = "/home/x/the-ledger/.trees/fix-nav"
+    write_transcript(
+        isolated_db / "projects" / paths.sanitize_project_path(worktree) / "s1.jsonl",
+        [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": worktree, "sessionId": "s1"}],
+    )
+
+    backup_history.backup()
+
+    (row,) = history.fetch_history_transcripts()
+    assert (row["worktree"], row["project"]) == ("fix-nav", "the-ledger")

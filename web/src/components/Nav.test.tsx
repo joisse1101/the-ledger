@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../api/queryClient";
 import { Nav } from "./Nav";
 
-function stubMeta(enabled: boolean) {
+function stubMeta(enabled: boolean, isLocal = true) {
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -13,7 +13,7 @@ function stubMeta(enabled: boolean) {
         new Response(
           JSON.stringify({
             refreshed_at: null,
-            is_local: true,
+            is_local: isLocal,
             remote_mode: { enabled, expires_at: null, state: enabled ? "ready" : "off", step: null, reason: null },
           }),
           { status: 200, headers: { "content-type": "application/json" } },
@@ -48,5 +48,26 @@ describe("Nav", () => {
     renderNav();
 
     expect(await screen.findByRole("link", { name: "Files" })).toHaveAttribute("href", "/files");
+  });
+
+  it("shows Settings to a browser on the machine running the app, with or without Remote mode", async () => {
+    for (const remote of [false, true]) {
+      stubMeta(remote, true);
+      const { unmount } = renderNav();
+
+      expect(await screen.findByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+      unmount();
+    }
+  });
+
+  it("hides Settings from any other device, with or without Remote mode", async () => {
+    for (const remote of [false, true]) {
+      stubMeta(remote, false);
+      const { unmount } = renderNav();
+
+      await screen.findByRole("link", { name: "Overview" });
+      expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
+      unmount();
+    }
   });
 });

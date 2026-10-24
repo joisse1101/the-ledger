@@ -1,6 +1,6 @@
 """A project's sessions include the ones that ran in its Claude Code worktrees."""
 
-from app.repositories import claude_transcripts
+from app.repositories import claude_transcripts, settings_store
 from app.repositories.db import history, paths, queries, scanner, snapshot
 
 REPO = "/home/x/the-ledger"
@@ -69,3 +69,35 @@ def test_delete_project_keeps_a_folder_that_also_holds_another_projects_session(
     assert queries.transcript_dirs_for_project(REPO) == set()
     assert inside.exists() and stray.exists()
 
+
+def test_configured_folder_sessions_belong_to_the_repo(isolated_db, write_config, write_transcript):
+    settings_store.save_worktree_folders([".trees"])
+    write_config(isolated_db / "claude.json", {})
+    worktree = f"{REPO}/.trees/fix-nav"
+    _write_session(isolated_db, write_transcript, worktree, "inside", [worktree, f"{worktree}/web"])
+    snapshot.refresh()
+
+    (transcript,) = claude_transcripts.load_transcripts()
+    assert (transcript.project, transcript.worktree) == ("the-ledger", "fix-nav")
+    assert transcript.project_folder == paths.sanitize_project_path(REPO)
+
+
+def test_delete_project_removes_configured_folder_worktree_sessions(isolated_db, write_config, write_transcript):
+    settings_store.save_worktree_folders([".trees"])
+    write_config(isolated_db / "claude.json", {})
+    worktree = f"{REPO}/.trees/fix-nav"
+    own = _write_session(isolated_db, write_transcript, REPO, "own", [REPO])
+    inside = _write_session(isolated_db, write_transcript, worktree, "inside", [worktree])
+    foreign = _write_session(isolated_db, write_transcript, f"{OTHER}/.trees/fix", "foreign", [f"{OTHER}/.trees/fix"])
+    snapshot.refresh()
+    history.upsert_history_transcripts(scanner.scan_transcripts({}))
+
+    assert claude_transcripts.delete_project_transcripts(REPO) == 2
+    assert not own.parent.exists() and not inside.parent.exists()
+    assert foreign.exists()
+    assert [r["session_id"] for r in history.fetch_history_transcripts()] == ["foreign"]
+
+
+def test_longer_configured_folder_strips_its_own_suffix(isolated_db):
+    folder = paths.sanitize_project_path(f"{REPO}/wt/inner/spike")
+    assert paths.repo_folder_of_worktree(folder, "spike", ["wt", "wt/inner"]) == paths.sanitize_project_path(REPO)

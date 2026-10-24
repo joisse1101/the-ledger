@@ -14,8 +14,10 @@ import {
   useOverview,
   usePendingDecision,
   useRemoteQr,
+  useSaveSettings,
   useSetAutoApprove,
   useSetRemoteMode,
+  useSettings,
   useTranscripts,
 } from "./queries";
 import type { DecisionAnswer, LiveResponse } from "./types";
@@ -398,6 +400,85 @@ describe("Remote mode queries", () => {
     // Closing the dialog unmounts the hook; the token-bearing code must not linger in the cache.
     unmount();
     await waitFor(() => expect(client.getQueryCache().find({ queryKey: ["remote-qr"] })).toBeUndefined());
+    client.clear();
+  });
+});
+
+describe("the settings", () => {
+  function wrapper(client: ReturnType<typeof createQueryClient>) {
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  const saved = {
+    worktree_folders: [
+      { path: ".claude/worktrees", built_in: true },
+      { path: ".trees", built_in: false },
+    ],
+  };
+
+  it("reads the settings from the server", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(saved)));
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useSettings(true), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual(saved);
+    client.clear();
+  });
+
+  it("does not ask while disabled, as on a device that isn't local", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    renderHook(() => useSettings(false), { wrapper: wrapper(client) });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("saves the folders with a JSON PUT and reloads what is derived from sessions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(saved));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    const { result } = renderHook(() => useSaveSettings(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync([".trees"]));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/settings");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual({ worktree_folders: [".trees"] });
+    expect(init.headers.get("X-Requested-With")).toBe("ledger");
+    expect(client.getQueryData(keys.settings)).toEqual(saved);
+    const reloaded = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(reloaded).toEqual(
+      expect.arrayContaining([keys.transcripts, ["session"], ["overview"], keys.projects, keys.live]),
+    );
+    client.clear();
+  });
+
+  it("surfaces the server's reason when a folder is refused", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "'../x': Must be a path inside the repo." }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useSaveSettings(), { wrapper: wrapper(client) });
+    await expect(act(() => result.current.mutateAsync(["../x"]))).rejects.toMatchObject({
+      status: 422,
+      message: "'../x': Must be a path inside the repo.",
+    });
     client.clear();
   });
 });
