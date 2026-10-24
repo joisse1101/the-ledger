@@ -61,9 +61,11 @@ export function useMeta() {
 export function useRefresh() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => apiFetch<Meta>("/api/refresh", { method: "POST" }),
-    onSuccess: (meta) => {
-      client.setQueryData(keys.meta, meta);
+    mutationFn: () => apiFetch<Pick<Meta, "refreshed_at">>("/api/refresh", { method: "POST" }),
+    onSuccess: ({ refreshed_at }) => {
+      // The reply is only the new timestamp; the rest of the cached meta (Remote mode, is_local)
+      // stays as it was.
+      client.setQueryData<Meta>(keys.meta, (meta) => (meta ? { ...meta, refreshed_at } : meta));
       // Not "live": the registry isn't part of the scan.
       for (const key of [keys.transcripts, ["session"], ["overview"], keys.projects]) {
         void client.invalidateQueries({ queryKey: key });
