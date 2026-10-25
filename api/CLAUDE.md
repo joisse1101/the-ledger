@@ -14,7 +14,7 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 
 ## Local rules
 
-- General standards: toolkit rules (`toolkit/install/Install-Toolkit.ps1`, `-Scope project` works).
+- General standards: the toolkit rules in [the-toolbox](https://github.com/joisse1101/the-toolbox) (its installer takes `-Scope project`).
 - Tests use the `isolated_db` fixture (`~/.claude.json`, `~/.claude/projects/`).
 - Layers in `app/`: `routers` (HTTP only) -> `services` (rules, raise `api/app/services/errors.py`) -> `repositories` / `domain` -> `core`; `schemas` shape JSON,
   `infra` wraps the OS, Docker and QR; `deps.py` holds the shared singletons. Imports point downward only;
