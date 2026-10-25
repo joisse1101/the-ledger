@@ -43,6 +43,7 @@ cd web; npm run build           # tsc --noEmit, then vite build; a type error fa
 cd widget; npm test; npm run build   # widget: Vitest, then tsc
 .\widget\Start-Widget.ps1       # widget + the backend it needs (no frontend, no Docker)
 cd api; python check_docs.py    # docs check: links, code paths, size budgets
+python toolkit/checks/check_toolkit.py   # toolkit standards check (tests: pytest toolkit/checks)
 ```
 
 ## Conventions

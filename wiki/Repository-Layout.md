@@ -37,7 +37,7 @@ ever scanned, so a session survives in Overview/Projects/the All list after Clau
 
 The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
 capabilities: `web-dashboard`, `responsive-layout`, `network-access`, `live-context-gauge`,
-`toast-context-line`, `remote-session-control`, `toolkit-skills`, `toolkit-coding-standards`. `openspec/changes/` holds proposals in flight (each with
+`toast-context-line`, `remote-session-control`. The toolkit's own specs live in `toolkit/specs/`. `openspec/changes/` holds proposals in flight (each with
 `proposal.md`/`design.md`/`tasks.md` plus a spec delta); completed ones move to
 `openspec/changes/archive/` and aren't tracked further. Treat the specs as the authoritative record
 of what a capability is required to do, ahead of inferring intent from the code alone.
