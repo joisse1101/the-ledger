@@ -74,7 +74,8 @@ script, so a cold start and the tray's "Start backend" share one code path.
 - Otherwise the widget spawns `api\.venv\Scripts\python.exe -m app --port <p> --frontend-port <f>`
   hidden, with `api/` as its working directory.
 - **Open Ledger** (tray or the header button) starts the frontend only if it is not already up:
-  `npm run build` first if `web/dist` is missing, then `npm run preview -- --port <f>` hidden, then
+  `npm run build` first if `web/dist` is missing or older than `web/src`, `web/index.html` or
+  `web/package.json`, then `npm run preview -- --port <f>` hidden, then
   opens the browser. The widget never starts Docker or the gateway itself.
 - **Quit** (tray) first turns Remote mode off if the widget started the backend (otherwise the
   gateway container would outlive it), then tree-kills (`taskkill /T /F`) only the processes the widget started. If the widget
