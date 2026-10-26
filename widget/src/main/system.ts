@@ -24,6 +24,16 @@ const launch = (spec: SpawnSpec) =>
     stdio: 'ignore',
   })
 
+/** The newest modification time (ms) of any file under `target`, or 0 if it does not exist. */
+const newestMtime = (target: string): number => {
+  if (!fs.existsSync(target)) return 0
+  const stat = fs.statSync(target)
+  if (!stat.isDirectory()) return stat.mtimeMs
+  return fs
+    .readdirSync(target)
+    .reduce((newest, name) => Math.max(newest, newestMtime(path.join(target, name))), 0)
+}
+
 /** The real OS-facing dependencies for the Supervisor. */
 export function createDeps(config: Config): Deps {
   const apiDir = path.join(config.repoRoot, 'api')
@@ -43,7 +53,12 @@ export function createDeps(config: Config): Deps {
       }),
     backendUp: () => api.backendUp(),
     frontendUp: () => isUp(config.frontendPort),
-    webDistExists: () => fs.existsSync(path.join(webDir, 'dist', 'index.html')),
+    webBuildStale() {
+      const builtAt = newestMtime(path.join(webDir, 'dist', 'index.html'))
+      if (builtAt === 0) return true
+      const sources = ['src', 'index.html', 'package.json'].map((name) => path.join(webDir, name))
+      return Math.max(...sources.map(newestMtime)) > builtAt
+    },
     killTree(pid) {
       spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
     },

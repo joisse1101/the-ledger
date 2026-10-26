@@ -25,7 +25,8 @@ export interface Deps {
   run(spec: SpawnSpec): Promise<boolean>
   backendUp(): Promise<boolean>
   frontendUp(): Promise<boolean>
-  webDistExists(): boolean
+  /** True when web/dist is missing or older than the web sources, so it needs a rebuild. */
+  webBuildStale(): boolean
   /** Kills a pid and its whole process tree. */
   killTree(pid: number): void
   openBrowser(url: string): void
@@ -66,7 +67,7 @@ export class Supervisor {
     return 'started'
   }
 
-  /** Makes sure the frontend answers, building first only if there is no build, then opens it. */
+  /** Makes sure the frontend answers, building first if there is no build or it is stale, then opens it. */
   async openLedger(): Promise<EnsureResult> {
     const { deps } = this
     const url = `http://localhost:${deps.frontendPort}`
@@ -76,7 +77,7 @@ export class Supervisor {
     }
     if (!this.owned.has('frontend')) {
       const env = { BACKEND_PORT: String(deps.backendPort) }
-      if (!deps.webDistExists()) {
+      if (deps.webBuildStale()) {
         const built = await deps.run({ command: 'npm', args: ['run', 'build'], cwd: deps.paths.webDir, env, shell: true })
         if (!built) return 'failed'
       }

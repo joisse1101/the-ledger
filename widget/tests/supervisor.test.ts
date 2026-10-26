@@ -22,7 +22,7 @@ function fake(overrides: Partial<Deps> = {}) {
     },
     backendUp: async () => false,
     frontendUp: async () => false,
-    webDistExists: () => true,
+    webBuildStale: () => false,
     killTree: (pid) => void log.killed.push(pid),
     openBrowser: (url) => void log.opened.push(url),
     sleep: async () => {},
@@ -102,15 +102,15 @@ describe('openLedger', () => {
     expect(log.killed).toEqual([100])
   })
 
-  it('builds first only when web/dist is missing', async () => {
+  it('builds first when web/dist is missing or older than the web sources', async () => {
     let calls = 0
-    const { deps, log } = fake({ webDistExists: () => false, frontendUp: async () => ++calls > 1 })
+    const { deps, log } = fake({ webBuildStale: () => true, frontendUp: async () => ++calls > 1 })
     await new Supervisor(deps).openLedger()
     expect(log.ran.map((s) => s.args)).toEqual([['run', 'build']])
   })
 
   it('does not start the frontend when the build fails', async () => {
-    const { deps, log } = fake({ webDistExists: () => false, run: async () => false })
+    const { deps, log } = fake({ webBuildStale: () => true, run: async () => false })
     expect(await new Supervisor(deps).openLedger()).toBe('failed')
     expect(log.spawned).toEqual([])
     expect(log.opened).toEqual([])
@@ -118,7 +118,7 @@ describe('openLedger', () => {
 
   it('never issues a gateway or docker command', async () => {
     let calls = 0
-    const { deps, log } = fake({ webDistExists: () => false, frontendUp: async () => ++calls > 1 })
+    const { deps, log } = fake({ webBuildStale: () => true, frontendUp: async () => ++calls > 1 })
     const sup = new Supervisor(deps)
     await sup.ensureBackend()
     await sup.openLedger()
