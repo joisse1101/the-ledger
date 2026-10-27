@@ -11,7 +11,7 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 
 ## Layout
 
-Exactly six top-level folders, each self-contained (four services, `toolkit/` and `widget/`):
+Exactly five top-level folders, each self-contained (four services and `widget/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
   its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
@@ -21,9 +21,6 @@ Exactly six top-level folders, each self-contained (four services, `toolkit/` an
 - `widget/` — the Electron desktop widget: an always-on-top, read-only live-sessions window with its own
   `package.json`, startup scripts and tests. Talks to the backend on loopback only; imports nothing
   from `web/`.
-- `toolkit/` — not a service: reusable AI-agent skills (`toolkit/skills/<name>/SKILL.md`), slash
-  commands (`toolkit/commands/`) and an installer (`toolkit/install/Install-Toolkit.ps1`). Independent of the dashboard; see
-  `toolkit/README.md`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
 `.env.example`) and `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
