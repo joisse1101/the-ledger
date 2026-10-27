@@ -3,8 +3,8 @@ name: coding-standards
 description: Review checklist for code quality - code smells, naming, comments and test structure. Use when asked to review code, check a change for quality, or clean up a diff. Not needed while writing code; the always-on and per-language rules cover that.
 license: MIT
 metadata:
-  version: "1.1.0"
-  last_updated: "2026-10-14"
+  version: "1.1.1"
+  last_updated: "2026-10-27"
 ---
 
 # Code quality review
@@ -86,7 +86,7 @@ Then the body, in this order:
    ```markdown
    ### 3. open-repo reports success when it fails
    - **Category**: Defect
-   - **Files**: `api/routes.py:120-134` (`open_repo`)
+   - **Files**: `src/routes.py:120-134` (`open_repo`)
    - **Problem**: what is wrong and why it matters.
    - **Fix**: the concrete change to make.
    - [ ] Done

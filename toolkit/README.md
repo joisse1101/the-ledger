@@ -8,7 +8,7 @@ Claude Code is the only supported tool today.
 
 ## Quick start
 
-1. Get the toolkit: clone this repo, or download just the `toolkit/` folder.
+1. Get the toolkit: copy the `toolkit/` folder into the repo or onto the machine you want to use it from.
 2. Install everything globally (Windows PowerShell):
 
    ```powershell
@@ -95,14 +95,14 @@ each such entry as a unit, so `-Command opsx` installs the whole `opsx` set.
   first. It pushes plainly, except the `--force-with-lease` push of a restack you confirmed; it never
   uses `--force`, never renames or deletes a branch, and never merges (the same hook as write-pr). With
   no open PR it says so and points to `/jois:write-pr`. It is also a single file, so the body template
-  and verification sections are copied from write-pr; `python check_docs.py` fails if the two copies
+  and verification sections are copied from write-pr; `python check_toolkit.py` fails if the two copies
   differ.
 
 ### Commands stay out of the session context
 
 Every command declares `disable-model-invocation: true`, so its description is not loaded into each
 new session's skill listing (about 300 tokens for a typical set) while you can still type
-`/jois:stage`. `python check_docs.py` fails on a command without the flag. Skills such as
+`/jois:stage`. `python check_toolkit.py` fails on a command without the flag. Skills such as
 `coding-standards` stay discoverable on purpose. `openspec update` does not touch the installed
 commands; it writes copies into the project's `.claude/commands/opsx` and `.claude/skills/openspec-*`,
 which carry no flag. In a project where you do not want them listed, delete the project's
@@ -146,7 +146,7 @@ metadata:
 
 A rule's frontmatter holds the same `metadata:` block next to its `paths:`; an unscoped rule such
 as `commit-hygiene` has only the `metadata:` block and still loads in every session. A top-level
-`version:` key is not accepted. `python check_docs.py` (run from `api/`) fails on a missing or
+`version:` key is not accepted. `python check_toolkit.py` (run from `toolkit/`) fails on a missing or
 malformed version.
 
 `-List` shows each item's version and date, and for an item that differs it shows both the
@@ -161,6 +161,23 @@ computed. The installer dot-sources it, and you can run it on any skill folder, 
 ```powershell
 .\toolkit\skills\coding-standards\scripts\Get-ItemHash.ps1 -ItemPath ~\.claude\rules\python.md
 ```
+
+## Checks
+
+`check_toolkit.py` verifies the toolkit against its own standards: rule and skill size budgets, rule
+scoping, versions, the `disable-model-invocation` flag, and the write-pr/update-pr shared sections. It
+uses only the Python standard library. Run both from this folder:
+
+```powershell
+python check_toolkit.py
+python -m pytest        # tests/ covers the checker; needs pytest
+```
+
+## Specs and history
+
+`openspec/` holds the OpenSpec specs for the toolkit's skills, commands and rules, and the changes that
+shaped them. It is documentation only: the installer never copies it. The `opsx` commands need the
+`openspec` CLI, and the `jois` commands need `git` and `gh`.
 
 ## Installing by hand
 
