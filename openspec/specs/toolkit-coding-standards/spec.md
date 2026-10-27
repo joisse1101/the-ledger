@@ -150,7 +150,7 @@ The commit-hygiene rule SHALL require that each commit contain exactly one logic
 - **THEN** the update to that page or spec SHALL be in the same commit as the feature
 
 ### Requirement: Commits are staged deliberately
-The commit-hygiene rule SHALL require staging files by explicit path, SHALL forbid staging with `git add .`, `git add -A` or `git commit -a`, and SHALL require reviewing `git status` and the staged diff before proposing a commit. It SHALL require partial staging of a file, when a file mixes concerns, to use a non-interactive method. It SHALL forbid committing while the project's build, type-check or tests fail. It SHALL require the message format `type(scope): subject`, with a lowercase imperative subject and no trailing period, and a `type` of `feat`, `fix`, `refactor`, `style`, `docs`, `test` or `chore`.
+The commit-hygiene rule SHALL require staging files by explicit path, SHALL forbid staging with `git add .`, `git add -A` or `git commit -a`, and SHALL require reviewing `git status` and the staged diff before proposing a commit. It SHALL require partial staging of a file, when a file mixes concerns, to use a non-interactive method. It SHALL forbid committing while the project's build, type-check or tests fail. It SHALL require the message format `type(scope): subject`, with a lowercase imperative subject and no trailing period, and a `type` of `feat`, `fix`, `refactor`, `perf`, `style`, `docs`, `test`, `build`, `ci`, `chore` or `revert`.
 
 #### Scenario: Blind staging forbidden
 - **WHEN** Claude stages files for a commit

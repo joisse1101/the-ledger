@@ -153,8 +153,8 @@ For a branch this command creates:
 
 - Format: `<type>/<ticket>-<slug>` when a commit message in the group or the current branch name
   references a ticket, otherwise `<type>/<slug>`. Never invent a ticket.
-- Type: the commit type of the group's title: `feat`, `fix`, `refactor`, `style`, `docs`, `test` or
-  `chore`. Not `feature/` or `bugfix/`.
+- Type: the commit type of the group's title: `feat`, `fix`, `refactor`, `perf`, `style`, `docs`, `test`,
+  `build`, `ci`, `chore` or `revert`. Not `feature/` or `bugfix/`.
 - Ticket: keeps the case the tracker writes (`PROJ-456`). A GitHub issue `#123` becomes `123`.
 - Slug: lowercase kebab-case of letters, digits and hyphens, two to four words, imperative
   (`add-oauth-login`). Never a bare `fix`, `update` or `test`.
@@ -210,7 +210,7 @@ emoji headings exactly as written.
 ### Ticking rules
 
 - **Type of Change**: `feat` ticks New feature; `fix` ticks Bug fix; `refactor`, `perf` and `style`
-  tick Refactoring; `docs` ticks Documentation; `test` ticks Tests. A `chore` group touching only docs
+  tick Refactoring; `docs` ticks Documentation; `test` ticks Tests. A `chore`, `build`, `ci` or `revert` group touching only docs
   or specs ticks Documentation, otherwise nothing. Tick Breaking change when any commit subject has
   `!` after the type or any commit body has a `BREAKING CHANGE` footer. Several boxes may be ticked.
 - **Automated**: tick when the group adds or changes a test file, and list those files and the test

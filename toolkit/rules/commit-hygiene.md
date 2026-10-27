@@ -33,5 +33,5 @@ Applies only when you are about to commit.
 - `git add -p` does not work here. To split a file, apply a prepared patch to the index or split
   the edit.
 - Do not commit while the build, type-check or tests fail, unless the commit is the fix.
-- Message: `type(scope): subject`. Type is feat, fix, refactor, style, docs, test or chore. The
-  subject is lowercase, imperative, with no trailing period.
+- Message: `type(scope): subject`. Type is feat, fix, refactor, perf, style, docs, test, build, ci,
+  chore or revert. The subject is lowercase, imperative, with no trailing period.

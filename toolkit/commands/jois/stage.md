@@ -4,8 +4,8 @@ description: "Clear a messy working tree one concern at a time: stage, propose a
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git restore --staged:*), Bash(git apply --cached:*), Bash(git commit:*)
 disable-model-invocation: true
 metadata:
-  version: "1.0.0"
-  last_updated: "2026-10-15"
+  version: "1.0.1"
+  last_updated: "2026-10-27"
 ---
 
 <!-- The pause below follows the commit block of the generated `commands/opsx/apply.md`, in a loop.
@@ -44,7 +44,7 @@ not need an OpenSpec change. Follow the commit-hygiene rule throughout.
    fix, do not present it; report the failure and stop.
 6. **Present and end the turn.** Run `git diff --staged --stat`, then print as plain text, not in a
    question tool: the staged file summary, the proposed message (`type(scope): subject`, type feat,
-   fix, refactor, style, docs, test or chore, lowercase imperative subject with no trailing period,
+   fix, refactor, perf, style, docs, test, build, ci, chore or revert, lowercase imperative subject with no trailing period,
    the session's `Co-Authored-By` line last), the list of concerns still waiting, and the skipped
    files. Name a common confirmation word that differs from the word in your previous prompt, and
    say: "Staged. Reply with <word> to commit, or tell me what to change."
