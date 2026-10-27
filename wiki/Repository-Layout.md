@@ -6,18 +6,14 @@ built so a phone or other device on the same network can read it too, behind a s
 The backend and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 [Setup and run](Setup-And-Run.md)).
 
-The repo has exactly six top-level folders, each self-contained: `api/` (the
+The repo has exactly five top-level folders, each self-contained: `api/` (the
 backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
 gitignored `.venv`/`.ledger`/`.history`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config
 template, and compose file; see [Gateway](Gateway.md)), and `hooks/` (Claude
 Code toast hooks, plus dashboard-coupled scripts — a relay hook and the history-backup scheduled-task
 installer/uninstaller — see [Hooks](Hooks.md)), `widget/` (the Electron desktop widget: a floating, read-only
-live-sessions window with its own `package.json`, tests and startup scripts; see [Widget](Widget.md)), and `toolkit/` (not a service: tool-neutral reusable
-AI-agent skills under `toolkit/skills/<name>/SKILL.md` (`coding-standards`) and slash commands under `toolkit/commands/` (`opsx`, and `jois` for an unattended apply, a working-tree stager and `write-pr`, which opens grouped pull requests from the branch's commits (or from commits made on the default branch, which it then resets to the remote) and never merges, and `update-pr`, which restacks, pushes and refreshes the body of an open PR; all hidden from the session listing) and coding-standards rules under `toolkit/rules/`,
-plus `toolkit/install/Install-Toolkit.ps1` and its `targets.json` that copy them into Claude Code's
-global or a project's Claude Code skills, commands and rules folders without silently overwriting a
-differing copy; independent of the dashboard, see `toolkit/README.md`). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
+live-sessions window with its own `package.json`, tests and startup scripts; see [Widget](Widget.md)). The root holds only cross-cutting docs/tooling (`README.md`, `CLAUDE.md`,
 `.gitignore`, `.env.example`, `openspec/`, `.claude/`, `.github/`) plus a pair of scripts, `Start-Ledger.ps1`/
 `Stop-Ledger.ps1` (and that pair's own gitignored state file, `.ledger-run.json`), kept at root
 rather than inside any one service folder since they're the one piece of tooling that spans all
@@ -37,7 +33,7 @@ ever scanned, so a session survives in Overview/Projects/the All list after Clau
 
 The OpenSpec workflow directory. `openspec/specs/` holds the current, agreed specs for shipped
 capabilities: `web-dashboard`, `responsive-layout`, `network-access`, `live-context-gauge`,
-`toast-context-line`, `remote-session-control`, `toolkit-skills`, `toolkit-coding-standards`. `openspec/changes/` holds proposals in flight (each with
+`toast-context-line`, `remote-session-control`. `openspec/changes/` holds proposals in flight (each with
 `proposal.md`/`design.md`/`tasks.md` plus a spec delta); completed ones move to
 `openspec/changes/archive/` and aren't tracked further. Treat the specs as the authoritative record
 of what a capability is required to do, ahead of inferring intent from the code alone.

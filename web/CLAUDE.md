@@ -14,7 +14,6 @@
 ## Local rules
 
 - `npm run build` type-checks (`tsc --noEmit`); run it before calling a change done.
-- General standards: toolkit rules (`toolkit/install/Install-Toolkit.ps1`, `-Scope project` works).
 - Colours come from `tokens.css` variables. Migrate an old component when touching it; don't
   rewrite `src/styles/` wholesale.
 - Breakpoints live in `web/src/lib/breakpoints.ts`; stylesheets use `@media (--narrow)` and friends.
