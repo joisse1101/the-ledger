@@ -345,8 +345,8 @@ finish on a branch other than the default branch.
 ### Requirement: Branch names follow a convention
 A branch the skill creates SHALL be named `<type>/<ticket>-<slug>` when a commit message in the group
 or the current branch name references a ticket, and `<type>/<slug>` otherwise. The skill SHALL NOT
-invent a ticket. The type SHALL be a commit type: `feat`, `fix`, `refactor`, `style`, `docs`, `test` or
-`chore`. The slug SHALL be lowercase kebab-case made of letters, digits and hyphens, two to four words,
+invent a ticket. The type SHALL be a commit type: `feat`, `fix`, `refactor`, `perf`, `style`, `docs`, `test`,
+`build`, `ci`, `chore` or `revert`. The slug SHALL be lowercase kebab-case made of letters, digits and hyphens, two to four words,
 imperative, and SHALL NOT be a bare `fix`, `update` or `test`. A ticket id SHALL keep the case the
 tracker writes it, and a GitHub issue `#123` SHALL appear as `123`. If the name already exists
 locally or on `origin`, the skill SHALL propose another name and SHALL NOT reuse or overwrite it. It
