@@ -32,6 +32,14 @@ schema: spec-driven
 #         - Summarize the archive outcome before finishing
 
 operations:
+  apply:
+    guidance:
+      # jois-init:opsx begin (managed by /jois-init:opsx; edits here are overwritten)
+      - "At the end of each concern, stop and follow the jois-git-commit-hygiene rule: stage by explicit path, show the summary and message, name a confirmation word, and end the turn. Never commit in the turn you stage."
+      # jois-init:opsx end
   archive:
     guidance:
       - If the change alters documented behavior, update the affected page in wiki/ before archiving (the routing tables in CLAUDE.md name the page for each area)
+      # jois-init:opsx begin (managed by /jois-init:opsx; edits here are overwritten)
+      - "Follow the jois-git-commit-hygiene rule for the archive commit: stage by explicit path, show the summary and message, name a confirmation word, and end the turn. Never commit in the turn you stage."
+      # jois-init:opsx end
