@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 
 from app.core.security import is_local
 from app.schemas.common import iso
-from app.services import prompt_service, remote_service, snapshot_service
+from app.services import project_repo_service, prompt_service, remote_service, snapshot_service
 
 router = APIRouter()
 
@@ -23,4 +23,7 @@ def get_meta(request: Request) -> dict:
 
 @router.post("/api/refresh")
 def post_refresh() -> dict:
+    # Repo counts are fetched lazily by GET /api/projects/repos; dropping the cache makes the next
+    # read hit git and gh, and keeps a failing gh from failing the rescan.
+    project_repo_service.clear_cache()
     return {"refreshed_at": iso(snapshot_service.rescan())}
