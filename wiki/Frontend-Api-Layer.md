@@ -27,7 +27,10 @@ any unknown path) rendered inside `AppShell`.
   paging, `useSession`, `useOverview`, `useProjects`, `useDeleteSession`, `useDeleteProject`,
   `usePendingDecision`, `useAnswerDecision`, `useSetRemoteMode`, `useOpenRepo`, `useSettings`, `useSaveSettings`);
   `useLive({auto})` sets `refetchInterval` to `2000` or `false` and disables background polling so a
-  hidden tab stops hitting the server. `queryClient.ts` retries a dropped connection once
+  hidden tab stops hitting the server. `useRefresh` also invalidates `keys.projectRepos` and returns that promise from
+  `onSuccess`, so the refresh stays pending until a mounted repos query has refetched (the server drops its repo cache on
+  `POST /api/refresh`, so `gh` is asked again); a failed count read still ends in success, and with no repos query mounted
+  nothing waits on `gh`. `queryClient.ts` retries a dropped connection once
   (`NetworkError`) but never retries a real API error. `serverStatus.ts`'s `useServerProblem()` scans
   the query cache for failing *observed* queries (ones a mounted component is still watching) to
   decide what banner, if any, `AppShell` should show (`unauthorized` beats `error` beats

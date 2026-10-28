@@ -22,7 +22,7 @@ The Projects list SHALL show, for each project, a Source column naming the host 
 - **THEN** its Source cell shows a neutral host label, and its Issues and PRs cells show `--`
 
 ### Requirement: Counts never block or break the Projects page
-The Projects list SHALL render without waiting for the issue and pull request counts, and SHALL show `--` for them until they arrive. When the counts cannot be read, whether the GitHub CLI is missing, signed out, offline or rate-limited, the affected cells SHALL show `--` and nothing else on the page SHALL change. Counts SHALL be cached for a few minutes so that reloading the page does not query the host again.
+The Projects list SHALL render without waiting for the issue and pull request counts, and SHALL show `--` for them until they arrive. When the counts cannot be read, whether the GitHub CLI is missing, signed out, offline or rate-limited, the affected cells SHALL show `--` and nothing else on the page SHALL change. Counts SHALL be cached for a few minutes so that reloading the page does not query the host again, except that a manual refresh SHALL discard the cached counts so the next read queries the host.
 
 #### Scenario: Table renders before counts
 - **WHEN** the user opens the Projects page
@@ -35,6 +35,10 @@ The Projects list SHALL render without waiting for the issue and pull request co
 #### Scenario: Recent counts are reused
 - **WHEN** the user reloads the Projects page shortly after the counts were read
 - **THEN** the same counts are shown without a new query to the host
+
+#### Scenario: Manual refresh bypasses the cache
+- **WHEN** the user activates the refresh control shortly after the counts were read
+- **THEN** the counts are read from the host again rather than reused
 
 ### Requirement: Source and Open project link to the remote's web page
 The Source cell SHALL link to the web page of the project's git remote, and the selected project's panel SHALL offer an "Open project" control, placed to the left of "Delete project", that opens the same page in a new tab. A project without a resolvable remote SHALL have no link and no "Open project" control. Unlike "Delete project", the control SHALL be shown on every device, local or remote.

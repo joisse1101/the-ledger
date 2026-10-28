@@ -51,6 +51,17 @@ def test_refresh_endpoint_advances_refreshed_at(client):
     assert client.get("/api/meta").json()["refreshed_at"] == second
 
 
+def test_refresh_endpoint_drops_the_cached_repo_lookups(client, monkeypatch):
+    from app.services import project_repo_service
+
+    cleared = []
+    monkeypatch.setattr(project_repo_service, "clear_cache", lambda: cleared.append(True))
+
+    client.post("/api/refresh")
+
+    assert cleared == [True]
+
+
 def test_concurrent_refreshes_run_one_after_the_other(monkeypatch):
     import threading
     import time

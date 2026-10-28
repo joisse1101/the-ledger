@@ -2,7 +2,8 @@ import { useMeta, useRefresh } from "../api/queries";
 import { formatTime } from "../lib/format";
 import { RefreshIcon } from "./icons";
 
-/** The one refresh control: rescans Claude Code's files and shows when that last happened. */
+/** The one refresh control: rescans Claude Code's files, re-reads each project's issue and PR counts,
+ *  and shows when that last happened. */
 export function RefreshControl() {
   const meta = useMeta();
   const refresh = useRefresh();
@@ -25,7 +26,7 @@ export function RefreshControl() {
         onClick={() => refresh.mutate()}
         disabled={refresh.isPending}
         aria-label="Refresh data"
-        title="Rescan Claude Code's files"
+        title="Rescan Claude Code's files and refresh issue and PR counts"
       >
         <span className={refresh.isPending ? "icon-wrap spin" : "icon-wrap"}>
           <RefreshIcon />

@@ -114,6 +114,17 @@ def test_an_expired_lookup_is_read_again():
     assert cli.remote_calls == ["/app", "/app"]
 
 
+def test_clearing_the_cache_reads_a_fresh_lookup_at_once():
+    cli = FakeCli({"/app": "https://github.com/acme/app"}, {"/app": OpenCounts(1, 1)})
+    lookup = _lookup(cli)
+    lookup.lookup_all(["/app"])
+    cli.counts["/app"] = OpenCounts(issues=5, prs=2)
+
+    lookup.clear()
+
+    assert lookup.lookup_all(["/app"])[0].issues == 5
+
+
 def test_an_incomplete_lookup_is_retried_sooner_and_picks_up_the_fix():
     clock = Clock()
     cli = FakeCli({"/app": "https://github.com/acme/app"})

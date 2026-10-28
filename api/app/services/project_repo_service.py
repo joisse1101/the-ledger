@@ -44,6 +44,11 @@ class ProjectRepoLookup:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
             return list(pool.map(self._lookup, paths))
 
+    def clear(self) -> None:
+        """Forget every cached lookup, so the next call reads git and `gh` again."""
+        with self._lock:
+            self._cache.clear()
+
     def _lookup(self, path: str) -> ProjectRepo:
         with self._lock:
             cached = self._cache.get(path)
@@ -72,6 +77,10 @@ class ProjectRepoLookup:
 
 
 lookup = ProjectRepoLookup(RepoCli())
+
+
+def clear_cache() -> None:
+    lookup.clear()
 
 
 def list_project_repos() -> list[ProjectRepo]:
