@@ -15,7 +15,11 @@
   scrolls the panel into view. The panel feeds `useOverview(range, {project, groupBy: "worktree"})` into
   `GroupDonutChart`, `GroupBarChart` (both `groupLabel="worktree"`) and `ActivityLineChart`, or says
   no sessions were found for an empty range. A session counts under its worktree (`wt <name>`) when it ran in a Claude Code
-  worktree, else the last branch recorded in its transcript. The stat grid shows Branches and Worktrees counts. The panel also owns delete: a "Delete project" button, shown only when
+  worktree, else the last branch recorded in its transcript. The stat grid shows Branches and Worktrees counts. `ProjectsList` also joins in `useProjectRepos()` (`GET /api/projects/repos`, its own query so the table never waits
+  on `git`/`gh`) by path for the Source, Issues and PRs columns: Source is a new-tab link to the repo's web page (its click
+  stops propagation so it doesn't toggle the row; on a narrow card, itself a button, it is plain text via the column's
+  `renderCard`), and anything unknown is `--`. The panel's "Open project" link uses the same URL, sits left of Delete,
+  and, unlike Delete, shows on every device. The panel also owns delete: a "Delete project" button, shown only when
   `useMeta().is_local` (the API refuses remote deletes anyway), opens a `ConfirmDialog` naming the
   exact path and that it can't be undone. Confirming calls `useDeleteProject`, whose `onSuccess`
   already invalidates the `projects`, `transcripts`, and `overview` queries (the panel's
