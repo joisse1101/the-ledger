@@ -330,6 +330,20 @@ export interface ProjectsResponse {
   projects: Project[];
 }
 
+/** A project's repo on its host. Everything but `path` is null when unknown: no remote, a host other
+ *  than GitHub (no counts), or the GitHub CLI missing or signed out. */
+export interface ProjectRepo {
+  path: string;
+  host: string | null;
+  url: string | null;
+  issues: number | null;
+  prs: number | null;
+}
+
+export interface ProjectReposResponse {
+  repos: ProjectRepo[];
+}
+
 export const TIME_RANGES = [
   "All time",
   "Today",

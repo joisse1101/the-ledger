@@ -41,7 +41,7 @@ export function ListCards<T>({
               <div className="list-card-primary">
                 {primary.map((column) => (
                   <span key={column.key} className="list-card-field">
-                    {column.render(row)}
+                    {(column.renderCard ?? column.render)(row)}
                   </span>
                 ))}
                 {rowBadge?.(row)}
@@ -51,7 +51,7 @@ export function ListCards<T>({
                   {secondary.map((column) => (
                     <span key={column.key} className="list-card-chip">
                       <span className="list-card-chip-label">{column.header}</span>
-                      <span>{column.render(row)}</span>
+                      <span>{(column.renderCard ?? column.render)(row)}</span>
                     </span>
                   ))}
                 </div>

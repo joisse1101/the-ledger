@@ -1,6 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { useProjects } from "../../api/queries";
-import type { Project } from "../../api/types";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useProjectRepos, useProjects } from "../../api/queries";
+import type { Project, ProjectRepo } from "../../api/types";
 import { formatCost, formatCount, formatDateTime, formatText } from "../../lib/format";
 import { ResponsiveList } from "../list/ResponsiveList";
 import type { ListColumn } from "../list/types";
@@ -10,9 +10,58 @@ function linesChanged(project: Project): string {
   return `+${formatCount(project.lines_added ?? 0)}/-${formatCount(project.lines_removed ?? 0)}`;
 }
 
-const columns: ListColumn<Project>[] = [
-  { key: "name", header: "Name", priority: "high", render: (p) => formatText(p.name) },
-  { key: "path", header: "Path", priority: "high", cardPriority: "secondary", render: (p) => <code>{p.path}</code> },
+type RepoByPath = ReadonlyMap<string, ProjectRepo>;
+
+/** Issue and PR counts, or `--` while they load and whenever they can't be known. */
+function repoCount(count: number | null | undefined): string {
+  return count == null ? "--" : formatCount(count);
+}
+
+function sourceLabel(repo: ProjectRepo | undefined): string {
+  return repo?.host ?? "--";
+}
+
+/** The host name as a link to the repo's page. Clicking it must not also toggle the row. */
+function sourceLink(repo: ProjectRepo | undefined): ReactNode {
+  if (!repo?.url || !repo.host) return "--";
+  return (
+    <a href={repo.url} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+      {repo.host}
+    </a>
+  );
+}
+
+function buildColumns(repoByPath: RepoByPath): ListColumn<Project>[] {
+  return [
+    { key: "name", header: "Name", priority: "high", render: (p) => formatText(p.name) },
+    { key: "path", header: "Path", priority: "high", cardPriority: "secondary", render: (p) => <code>{p.path}</code> },
+    {
+      key: "source",
+      header: "Source",
+      priority: "low",
+      render: (p) => sourceLink(repoByPath.get(p.path)),
+      // A card is one button, so the link is plain text there; the panel's "Open project" is the link.
+      renderCard: (p) => sourceLabel(repoByPath.get(p.path)),
+    },
+    {
+      key: "issues",
+      header: "Issues",
+      priority: "low",
+      align: "end",
+      render: (p) => repoCount(repoByPath.get(p.path)?.issues),
+    },
+    {
+      key: "prs",
+      header: "PRs",
+      priority: "low",
+      align: "end",
+      render: (p) => repoCount(repoByPath.get(p.path)?.prs),
+    },
+    ...otherColumns,
+  ];
+}
+
+const otherColumns: ListColumn<Project>[] = [
   {
     key: "trust_accepted",
     header: "Trusted",
@@ -69,6 +118,8 @@ export interface ProjectsListProps {
 export function ProjectsList({ expandedPaths, onToggle, renderExpanded }: ProjectsListProps) {
   const projects = useProjects();
   const rows = projects.data?.projects ?? [];
+  const repos = useProjectRepos().data?.repos;
+  const columns = useMemo(() => buildColumns(new Map((repos ?? []).map((repo) => [repo.path, repo]))), [repos]);
   const sectionRef = useRef<HTMLElement>(null);
   // The path a click just opened, so the effect below knows which row to scroll to once its panel
   // has actually rendered - closing a row, or a re-render for any other reason, scrolls nothing.

@@ -16,6 +16,7 @@ import type {
   OverviewGroupBy,
   OverviewResponse,
   PendingDecisionResponse,
+  ProjectReposResponse,
   ProjectsResponse,
   RemoteMode,
   RemoteQr,
@@ -30,6 +31,8 @@ export const LIVE_POLL_MS = 2000;
 export const DECISION_POLL_MS = 1500;
 const META_POLL_MS = 60_000; // the server rescans on its own every 10 minutes
 const REMOTE_STARTING_POLL_MS = 1000; // Remote mode takes a while to start; watch it closely
+// Matches the server's cache (project_repo_service.CACHE_TTL_SECONDS): asking sooner only hits it.
+export const PROJECT_REPOS_STALE_MS = 300_000;
 export const PAGE_SIZE = 50;
 // Matches the server's own default (overview_stats.BUCKET_MINUTES), so an unscoped cache key
 // collides with one that named it explicitly.
@@ -45,6 +48,7 @@ export const keys = {
   overview: (range: TimeRange, project?: string, groupBy?: OverviewGroupBy, bucketMinutes?: number) =>
     ["overview", range, project ?? null, groupBy ?? "project", bucketMinutes ?? DEFAULT_BUCKET_MINUTES] as const,
   projects: ["projects"] as const,
+  projectRepos: ["project-repos"] as const,
   files: ["files"] as const,
   settings: ["settings"] as const,
 };
@@ -154,6 +158,16 @@ export function useProjects() {
   return useQuery({
     queryKey: keys.projects,
     queryFn: () => apiFetch<ProjectsResponse>("/api/projects"),
+  });
+}
+
+/** Each project's repo link and open issue / PR counts. Slow on the server (it runs git and gh), so
+ *  it is its own query: the projects table renders from `useProjects` without waiting on it. */
+export function useProjectRepos() {
+  return useQuery({
+    queryKey: keys.projectRepos,
+    queryFn: () => apiFetch<ProjectReposResponse>("/api/projects/repos"),
+    staleTime: PROJECT_REPOS_STALE_MS,
   });
 }
 

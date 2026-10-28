@@ -18,6 +18,9 @@ export interface ListColumn<T> {
   /** Present and truthy enables a clickable, sortable header for this column. */
   sortKey?: string;
   render: (row: T) => ReactNode;
+  /** The card's version of `render`. A card is one button, so a cell that is a link or a button of
+   *  its own in the table must be plain content here. */
+  renderCard?: (row: T) => ReactNode;
 }
 
 export interface ResponsiveListSort {
