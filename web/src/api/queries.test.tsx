@@ -202,6 +202,89 @@ describe("the session control hooks", () => {
     client.clear();
   });
 
+  it("refreshing marks the project repos stale so issue and PR counts are fetched again", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ refreshed_at: "2026-10-24T22:00:00" })));
+    const client = createQueryClient();
+    client.setQueryData(keys.projectRepos, { repos: [] });
+
+    const { result } = renderHook(() => useRefresh(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync());
+
+    expect(client.getQueryState(keys.projectRepos)?.isInvalidated).toBe(true);
+    client.clear();
+  });
+
+  describe("with the project repos on screen", () => {
+    const repoCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
+      fetchMock.mock.calls.filter(([url]) => String(url).startsWith("/api/projects/repos"));
+
+    function watchRepos(client: ReturnType<typeof createQueryClient>) {
+      const observer = new QueryObserver(client, {
+        queryKey: keys.projectRepos,
+        queryFn: () => apiFetch("/api/projects/repos"),
+      });
+      return observer.subscribe(() => {});
+    }
+
+    it("refreshing stays pending until the repos refetch settles", async () => {
+      let releaseRepos: () => void = () => {};
+      let reposRequests = 0;
+      const fetchMock = vi.fn(async (url: string) => {
+        if (!url.startsWith("/api/projects/repos")) return jsonResponse({ refreshed_at: "2026-10-24T22:00:00" });
+        reposRequests += 1;
+        if (reposRequests > 1) await new Promise<void>((resolve) => (releaseRepos = resolve));
+        return jsonResponse({ repos: [] });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const client = createQueryClient();
+      const unsubscribe = watchRepos(client);
+      await waitFor(() => expect(reposRequests).toBe(1));
+
+      const { result } = renderHook(() => useRefresh(), { wrapper: wrapper(client) });
+      act(() => result.current.mutate());
+      await waitFor(() => expect(reposRequests).toBe(2));
+      expect(result.current.isPending).toBe(true);
+
+      releaseRepos();
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      unsubscribe();
+      client.clear();
+    });
+
+    it("refreshing still succeeds when the counts could not be read", async () => {
+      const fetchMock = vi.fn(async (url: string) =>
+        url.startsWith("/api/projects/repos")
+          ? jsonResponse({ repos: [{ path: "/app", url: "https://github.com/acme/app", issues: null, prs: null }] })
+          : jsonResponse({ refreshed_at: "2026-10-24T22:00:00" }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const client = createQueryClient();
+      const unsubscribe = watchRepos(client);
+      await waitFor(() => expect(repoCalls(fetchMock)).toHaveLength(1));
+
+      const { result } = renderHook(() => useRefresh(), { wrapper: wrapper(client) });
+      await act(() => result.current.mutateAsync());
+
+      expect(result.current.isError).toBe(false);
+      expect(repoCalls(fetchMock)).toHaveLength(2);
+      unsubscribe();
+      client.clear();
+    });
+
+    it("refreshing does not request the repos when none are on screen", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ refreshed_at: "2026-10-24T22:00:00" }));
+      vi.stubGlobal("fetch", fetchMock);
+      const client = createQueryClient();
+      client.setQueryData(keys.projectRepos, { repos: [] });
+
+      const { result } = renderHook(() => useRefresh(), { wrapper: wrapper(client) });
+      await act(() => result.current.mutateAsync());
+
+      expect(repoCalls(fetchMock)).toHaveLength(0);
+      client.clear();
+    });
+  });
+
   it("surfaces a 403 when another device tries to set Remote mode", async () => {
     vi.stubGlobal(
       "fetch",

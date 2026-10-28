@@ -76,6 +76,10 @@ export function useRefresh() {
       for (const key of [keys.transcripts, ["session"], ["overview"], keys.projects]) {
         void client.invalidateQueries({ queryKey: key });
       }
+      // The server dropped its repo cache, so this refetch re-reads issue and PR counts from gh.
+      // Returned, so the refresh stays pending until it settles; it never rejects, so a gh failure
+      // (null counts) doesn't fail the refresh. Only a mounted repos query is refetched.
+      return client.invalidateQueries({ queryKey: keys.projectRepos });
     },
   });
 }
