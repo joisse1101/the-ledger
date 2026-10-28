@@ -13,6 +13,7 @@ import {
   useOpenRepo,
   useOverview,
   usePendingDecision,
+  useProjectRepos,
   useRefresh,
   useRemoteQr,
   useSaveSettings,
@@ -499,6 +500,46 @@ describe("the settings", () => {
       status: 422,
       message: "'../x': Must be a path inside the repo.",
     });
+    client.clear();
+  });
+});
+
+describe("the project repos query", () => {
+  function wrapper(client: ReturnType<typeof createQueryClient>) {
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  const repos = {
+    repos: [{ path: "/h/alpha", host: "GitHub", url: "https://github.com/acme/alpha", issues: 7, prs: 2 }],
+  };
+
+  it("reads each project's repo info from the server", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(repos));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useProjectRepos(), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual(repos);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/projects/repos");
+    client.clear();
+  });
+
+  it("is not read again by a second mount while it is fresh", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => jsonResponse(repos));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const first = renderHook(() => useProjectRepos(), { wrapper: wrapper(client) });
+    await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
+    first.unmount();
+    const second = renderHook(() => useProjectRepos(), { wrapper: wrapper(client) });
+    await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     client.clear();
   });
 });

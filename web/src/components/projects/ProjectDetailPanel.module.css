@@ -14,6 +14,12 @@
   margin-bottom: 1rem;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .heading {
   min-width: 0; /* let a long path wrap instead of widening the panel */
 }

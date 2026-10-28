@@ -10,11 +10,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.infra import banner
+from app.infra.repo_cli import OpenCounts
 from app.repositories import claude_transcripts
 from app.repositories.db import history, paths, queries, scanner, snapshot
 from app import main as app_main
 from app import deps
-from app.services import session_service
+from app.services import project_repo_service, session_service
 from app.domain.context import breakdown as context_breakdown, detail as context_detail, tail as context_tail
 from app.domain.context.models import LiveContext
 from app.repositories.claude_sessions import ClaudeSession
@@ -1159,6 +1160,46 @@ def test_a_project_path_not_in_the_snapshot_is_rejected_and_nothing_is_deleted(w
 
 def test_deleting_a_project_without_a_path_is_422(with_projects):
     assert with_projects.delete("/api/projects").status_code == 422
+
+
+class _FakeRepoCli:
+    def __init__(self, remotes, counts):
+        self.remotes, self.counts = remotes, counts
+        self.paths_run_in: list[str] = []
+
+    def remote_url(self, path):
+        self.paths_run_in.append(path)
+        return self.remotes.get(path)
+
+    def open_counts(self, path):
+        self.paths_run_in.append(path)
+        return self.counts.get(path)
+
+
+@pytest.fixture
+def repo_cli(monkeypatch):
+    cli = _FakeRepoCli(
+        remotes={"/h/alpha": "git@github.com:acme/alpha.git"},
+        counts={"/h/alpha": OpenCounts(issues=7, prs=2)},
+    )
+    monkeypatch.setattr(project_repo_service, "lookup", project_repo_service.ProjectRepoLookup(cli))
+    return cli
+
+
+def test_project_repos_lists_each_known_project_with_its_repo_info(with_projects, repo_cli):
+    body = with_projects.get("/api/projects/repos").json()
+
+    by_path = {r["path"]: r for r in body["repos"]}
+    assert by_path["/h/alpha"] == {
+        "path": "/h/alpha", "host": "GitHub", "url": "https://github.com/acme/alpha", "issues": 7, "prs": 2,
+    }
+    assert by_path["/h/beta"] == {"path": "/h/beta", "host": None, "url": None, "issues": None, "prs": None}
+
+
+def test_project_repos_only_run_git_in_known_projects(with_projects, repo_cli):
+    with_projects.get("/api/projects/repos", params={"path": "/etc"})
+
+    assert set(repo_cli.paths_run_in) == {"/h/alpha", "/h/beta"}
 
 
 # ---------------------------------------------------------------- GET /api/remote-mode/qr

@@ -18,6 +18,11 @@ and then served by `vite preview`, which serves only the already-built `web/dist
 rebuild on save. `npm run dev` (hot-reloading, proxies `/api` to the backend) is available instead
 while actively working on the frontend, but isn't what's used for normal local use.
 
+The Projects page's Source, Issues and PRs columns need `git` and, for the counts, the
+[GitHub CLI](https://cli.github.com/) (`gh`) signed in on the machine running the backend
+(`gh auth login`). `gh` is optional: without it, or while signed out or offline, the counts show `--`
+and nothing else changes.
+
 **Two processes, two ports, every time** — the API only ever serves `/api/*`; the frontend is
 always its own separate process:
 

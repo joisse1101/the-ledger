@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDeleteProject, useMeta, useOverview } from "../../api/queries";
+import { useDeleteProject, useMeta, useOverview, useProjectRepos } from "../../api/queries";
 import type { Project, TimeRange } from "../../api/types";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { ActivityLineChart } from "../overview/ActivityLineChart";
@@ -20,7 +20,8 @@ export interface ProjectDetailPanelProps {
 const BUCKET_MINUTES = 60;
 
 /** One project's panel, shown inline beneath its row in the Projects list: the Overview time range
- *  plus that project's charts grouped by work stream (worktree, else git branch), and (on the machine running the app only) a
+ *  plus that project's charts grouped by work stream (worktree, else git branch), an "Open project"
+ *  link to its repo's web page (when it has a remote), and (on the machine running the app only) a
  *  "Delete project" button that opens a confirmation modal. The page renders it with
  *  `key={project.path}`, so the range starts at "All time" for every newly opened project and a
  *  fresh query never shows a previous project's charts. */
@@ -31,6 +32,7 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
   const deleteProject = useDeleteProject();
   // Deletes are local-only server-side, so no other device is even shown the button.
   const isLocal = useMeta().data?.is_local === true;
+  const repoUrl = useProjectRepos().data?.repos.find((repo) => repo.path === project.path)?.url;
   const data = overview.data;
 
   const closeConfirm = () => {
@@ -54,11 +56,18 @@ export function ProjectDetailPanel({ project, onDeleted }: ProjectDetailPanelPro
           <h2 className={styles.title}>{project.name}</h2>
           <code className={styles.path}>{project.path}</code>
         </div>
-        {isLocal && (
-          <button type="button" className="button button-danger" onClick={() => setConfirming(true)}>
-            Delete project
-          </button>
-        )}
+        <div className={styles.actions}>
+          {repoUrl && (
+            <a className="button" href={repoUrl} target="_blank" rel="noopener noreferrer">
+              Open project
+            </a>
+          )}
+          {isLocal && (
+            <button type="button" className="button button-danger" onClick={() => setConfirming(true)}>
+              Delete project
+            </button>
+          )}
+        </div>
       </header>
 
       <TimeRangeSelector value={range} onChange={setRange} availableRanges={data?.available_ranges} />

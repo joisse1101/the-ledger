@@ -130,6 +130,7 @@ textarea {
 
 .button {
   padding: 0 1rem;
+  text-decoration: none; /* a link styled as a button */
 }
 
 .icon-button {

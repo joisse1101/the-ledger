@@ -2,7 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../api/queryClient";
-import type { Project } from "../../api/types";
+import type { Project, ProjectRepo } from "../../api/types";
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 
 // The real charts lazy-load vega-embed, which has nothing to draw on in jsdom; what matters here is
@@ -75,6 +75,8 @@ const populated = {
 interface ApiOptions {
   isLocal?: boolean;
   overview?: unknown;
+  /** The project's repo info; the default is a GitHub repo. */
+  repo?: ProjectRepo;
   /** Answers `DELETE /api/projects`; the default succeeds. */
   deleteResponse?: () => Response | Promise<Response>;
 }
@@ -82,12 +84,21 @@ interface ApiOptions {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-function stubApi({ isLocal = true, overview = populated, deleteResponse }: ApiOptions = {}) {
+const githubRepo: ProjectRepo = {
+  path: project.path,
+  host: "GitHub",
+  url: "https://github.com/acme/demo",
+  issues: 7,
+  prs: 2,
+};
+
+function stubApi({ isLocal = true, overview = populated, repo = githubRepo, deleteResponse }: ApiOptions = {}) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url.startsWith("/api/meta")) return json({ refreshed_at: null, is_local: isLocal, remote_mode: { enabled: false, expires_at: null, state: "off", step: null, reason: null } });
       if (url.startsWith("/api/overview")) return json(overview);
+      if (url.startsWith("/api/projects/repos")) return json({ repos: [repo] });
       if (url.startsWith("/api/projects") && init?.method === "DELETE") {
         return deleteResponse ? deleteResponse() : json({ deleted: project.path });
       }
@@ -278,6 +289,51 @@ describe("ProjectDetailPanel delete", () => {
 
     finish(json({ deleted: project.path }));
     await waitFor(() => expect(dialog.open).toBe(false));
+    client.clear();
+  });
+});
+
+describe("ProjectDetailPanel Open project", () => {
+  it("links to the repo's web page in a new tab", async () => {
+    stubApi();
+    const { client } = renderPanel();
+
+    const link = await screen.findByRole("link", { name: "Open project" });
+
+    expect(link).toHaveAttribute("href", "https://github.com/acme/demo");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    client.clear();
+  });
+
+  it("sits immediately to the left of Delete project", async () => {
+    stubApi({ isLocal: true });
+    const { client } = renderPanel();
+
+    const open = await screen.findByRole("link", { name: "Open project" });
+    const del = await screen.findByRole("button", { name: "Delete project" });
+
+    expect(open.nextElementSibling).toBe(del);
+    client.clear();
+  });
+
+  it("is shown on another device too, which has no Delete project", async () => {
+    stubApi({ isLocal: false });
+    const { client } = renderPanel();
+
+    expect(await screen.findByRole("link", { name: "Open project" })).toBeInTheDocument();
+    await waitFor(() => expect(calls("/api/meta").length).toBeGreaterThan(0));
+    expect(screen.queryByRole("button", { name: "Delete project" })).not.toBeInTheDocument();
+    client.clear();
+  });
+
+  it("is not shown for a project without a remote", async () => {
+    stubApi({ repo: { path: project.path, host: null, url: null, issues: null, prs: null } });
+    const { client } = renderPanel();
+    await screen.findByTestId("donut");
+    await waitFor(() => expect(calls("/api/projects/repos").length).toBeGreaterThan(0));
+
+    expect(screen.queryByRole("link", { name: "Open project" })).not.toBeInTheDocument();
     client.clear();
   });
 });
