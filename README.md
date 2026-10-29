@@ -35,19 +35,21 @@ another device" below — and each device remembers its own light/dark theme pre
 
 ## Quick start
 
-Create the venv and install dependencies (Windows PowerShell), then start everything from the
-repo root. You'll also need [Node.js](https://nodejs.org/).
+You need [Python](https://www.python.org/downloads/) and [Node.js](https://nodejs.org/en/download)
+installed; the scripts check for them and print where to get them if one is missing. From the repo
+root, in Windows PowerShell:
 
 ```powershell
-cd api
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-cd ..
-.\Start-Ledger.ps1      # API + frontend (+ gateway); .\Stop-Ledger.ps1 stops them
+.\Install-Ledger.ps1    # once, optional: widget shortcut, toast hooks, relay hook, backup task
+.\Start-Ledger.ps1      # backend + frontend + desktop widget; .\Stop-Ledger.ps1 stops them
 ```
 
-Open the URL the frontend prints (http://localhost:4173 by default), not the API's address.
+`Start-Ledger.ps1` installs whatever dependency is missing or out of date, picks free ports in
+8501-8599 (and remembers them), starts everything, then prints each address and exits non-zero if
+anything did not come up. `Install-Ledger.ps1` explains each extra before it changes anything and
+installs only what you accept.
+
+Open the frontend address the summary prints (http://localhost:8502 by default), not the API's.
 
 ## Documentation
 

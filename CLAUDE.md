@@ -26,15 +26,17 @@ Exactly six top-level folders (four services, `widget/` and the shared `scripts/
   `api/tests/test_ledger_common.py`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
-`.env.example`) and `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
+`.env.example`) and `Install-Ledger.ps1` / `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
 
 ## Commands
 
 The venv already exists at `api/.venv`; use `api\.venv\Scripts\python.exe` rather than recreating it.
-The API and the frontend are two processes on two ports (8501 and 4173).
+The API and the frontend are two processes on two ports, chosen from 8501-8599 and saved (8501 and
+8502 are the first picks).
 
 ```powershell
-.\Start-Ledger.ps1              # backend + frontend; -Mode dev for hot reload, -Remote adds the gateway
+.\Install-Ledger.ps1            # setup, once: widget shortcut, toast hooks, relay hook, backup task
+.\Start-Ledger.ps1              # backend + frontend + widget; -Mode dev, -NoWidget, -Remote adds the gateway
 .\Stop-Ledger.ps1
 
 cd api; pytest                  # Python tests, run from api/ (that's where pyproject.toml is)

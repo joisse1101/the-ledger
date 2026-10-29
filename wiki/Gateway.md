@@ -23,10 +23,11 @@ cd gateway
 .\Start-Gateway.ps1
 ```
 
-This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `8080`) and
-nothing else: it signs no device in, and without Remote mode every request from another device is
+This builds/starts the gateway container (Nginx, published on `GATEWAY_PORT`, default `8503`; with
+`Start-Ledger.ps1`, which saves its own choice, it's the configured or saved port, else the next free one
+in 8501-8599) and nothing else: it signs no device in, and without Remote mode every request from another device is
 refused. Devices sign in with the QR Remote mode shows, which encodes
-`https://<address>:8080/?token=<token>`. The token is made when Remote mode turns on and discarded
+`https://<address>:8503/?token=<token>`. The token is made when Remote mode turns on and discarded
 when it turns off, so each Remote session has its own and a device signed in with an earlier one is
 refused until it scans the new code. The gateway serves **HTTPS
 only**, with a self-signed certificate (there's no plain-HTTP listener to fall back to), so each
@@ -48,7 +49,7 @@ project's own original default and broke exactly this way) — Chrome, and every
 mobile browser, silently refuses to even attempt a connection to those ports (`ERR_UNSAFE_PORT`),
 with nothing to see server-side: `curl`/`Test-NetConnection` and the like still succeed, only actual
 browsers fail, which makes this easy to misdiagnose as a firewall or Docker networking problem. Pick
-an ordinary high port instead (`8080`, or anything else not on Chromium's list).
+an ordinary high port instead (`8503`, or anything else not on Chromium's list).
 
 The backend's `--host`/`--port`/`--frontend-port` (or `LEDGER_HOST`/`LEDGER_PORT`/
 `LEDGER_FRONTEND_PORT` env vars) still override its own bind address/port and the port it prints a
@@ -68,7 +69,7 @@ installs `openssl` at image build time to generate a self-signed EC certificate/
 `localhost`/`127.0.0.1`), then removes it again; Docker's layer cache keeps the same certificate
 across rebuilds, so a device that accepted it once isn't warned again until that layer is rebuilt.
 The template has a single `listen 443 ssl;` server (TLS 1.2/1.3) — no plain-HTTP listener at all, so
-nothing can be downgraded — and `docker-compose.yml` maps `${GATEWAY_PORT:-8080}` to container port
+nothing can be downgraded — and `docker-compose.yml` maps `${GATEWAY_PORT:-8503}` to container port
 443. The hop behind it (gateway → `host.docker.internal` → backend/frontend) stays plain HTTP: it's
 loopback-only on the host, so the gateway-to-device hop is the only one that's on the network at
 all. A LAN address has no stable hostname to get a real CA certificate for, hence self-signed and
@@ -84,9 +85,9 @@ mechanism for a container to reach a host process bound to loopback only (Window
 why the gateway needs Docker Desktop specifically). Both locations forward
 `X-Real-IP`/`X-Forwarded-For`/`Host`, so `api/app/core/security.py`'s existing "relayed by a proxy = treat as
 remote" rule gates gateway traffic exactly like it always gated the old `--lan` mode — the gateway
-adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-8080}`
+adds no auth of its own. `docker-compose.yml` publishes the container on `${GATEWAY_PORT:-8503}`
 and passes `BACKEND_PORT`/`FRONTEND_PORT` through as container environment variables (defaults
-8501/4173). `Start-Gateway.ps1` loads the root `.env` (see [Setup and run](Setup-And-Run.md)), runs
+8501/8502). `Start-Gateway.ps1` loads the root `.env` (see [Setup and run](Setup-And-Run.md)), runs
 `docker compose up -d --build`; `Stop-Gateway.ps1` runs `docker compose down` and touches nothing
 else. The sign-in link the QR encodes and the address shown beside it are built by
 `api/app/infra/gateway_signin.py` (`signin_url`/`display_url`), called from `remote_service.sign_in_code`,
