@@ -433,3 +433,34 @@ def test_relay_hook_that_is_not_installed_is_not_mentioned_or_installed(tmp_path
 
 def test_relay_hook_on_the_current_port_is_left_alone_silently(tmp_path):
     assert _update(_settings_with_relay(tmp_path, 8520), 8520, interactive="$true") == ["current"]
+
+
+# --- install choices ---------------------------------------------------------------------------
+
+def _choice(mode: str, interactive: str, answer: str = "$true") -> list[str]:
+    """Resolve-InstallChoice with a fake prompt; returns what it printed, the choice, whether it asked."""
+    output = _ps(
+        f"$script:asked = $false; Resolve-InstallChoice -Mode {mode} -Question 'Do it?' -Interactive {interactive} "
+        f"-Ask {{ param($q) $script:asked = $true; {answer} }} 6>&1; \"asked=$script:asked\""
+    )
+    return output.splitlines()
+
+
+def test_install_choice_yes_is_pre_answered_without_asking():
+    assert _choice("yes", "$true") == ["True", "asked=False"]
+
+
+def test_install_choice_no_is_pre_answered_without_asking():
+    assert _choice("no", "$true") == ["False", "asked=False"]
+
+
+def test_install_choice_asks_on_a_console_and_follows_the_answer():
+    assert _choice("ask", "$true", answer="$true") == ["True", "asked=True"]
+    assert _choice("ask", "$true", answer="$false") == ["False", "asked=True"]
+
+
+def test_install_choice_ask_without_a_console_is_a_no_with_a_notice():
+    lines = _choice("ask", "$false")
+
+    assert lines[0].startswith("No console to ask on, so not installing: Do it?")
+    assert lines[1:] == ["False", "asked=False"]

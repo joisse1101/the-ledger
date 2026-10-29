@@ -331,6 +331,30 @@ function Write-StartSummary {
     return (@($Result | Where-Object { $_.State -eq 'failed' }).Count -eq 0)
 }
 
+function Read-YesNo {
+    # Asks on the console; anything but y or yes is a no.
+    param([string]$Question)
+    return ((Read-Host "$Question [y/N]") -match '^(y|yes)$')
+}
+
+function Resolve-InstallChoice {
+    # Whether to go ahead with an extra: 'yes' and 'no' are pre-answered, 'ask' asks on a console. With
+    # no console to ask on, 'ask' is a no, so nothing is installed without the user's say-so.
+    param(
+        [ValidateSet('ask', 'yes', 'no')][string]$Mode,
+        [string]$Question,
+        [bool]$Interactive = (Test-InteractiveConsole),
+        [scriptblock]$Ask = { param($question) Read-YesNo -Question $question }
+    )
+    if ($Mode -eq 'yes') { return $true }
+    if ($Mode -eq 'no') { return $false }
+    if (-not $Interactive) {
+        Write-Host "No console to ask on, so not installing: $Question (pass the extra's switch, or -Yes, to install it)"
+        return $false
+    }
+    return [bool](& $Ask $Question)
+}
+
 function Resolve-BackendPort {
     # The backend port by the shared rules (parameter, .env, saved, first free); a scanned port is saved.
     param([string]$RepoRoot, [int]$Explicit)
@@ -372,7 +396,7 @@ function Update-StaleRelayHook {
         [string]$SettingsPath = (Join-Path $env:USERPROFILE '.claude\settings.json'),
         [switch]$Yes,
         [bool]$Interactive = (Test-InteractiveConsole),
-        [scriptblock]$Ask = { param($question) (Read-Host "$question [y/N]") -match '^(y|yes)$' }
+        [scriptblock]$Ask = { param($question) Read-YesNo -Question $question }
     )
     $installedPort = Get-RelayHookPort -SettingsPath $SettingsPath
     if (($null -eq $installedPort) -or ($installedPort -eq $BackendPort)) { return 'current' }
