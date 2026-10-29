@@ -11,3 +11,4 @@ web/node_modules/
 web/dist/
 widget/node_modules/
 widget/dist/
+.ledger-ports.json

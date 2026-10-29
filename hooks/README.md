@@ -181,8 +181,9 @@ skips the toast scripts and the `claudecode://` protocol handler.
 
 **Port.** The hook has to know which port the backend is on, so the install writes it into the hook's
 command as `-Port <n>`. It's resolved the way `Start-Ledger.ps1` does (highest wins): `-BackendPort`,
-then `BACKEND_PORT` in the repo root's `.env`, then an already-set `BACKEND_PORT` environment
-variable, then `8501`. **Re-run the install after changing `BACKEND_PORT`**, then start a new Claude
+then `BACKEND_PORT` in the repo root's `.env`, then the port saved by an earlier start, then the first
+free port in 8501-8599 (which is saved). **Re-run the install after the backend port changes**
+(`Start-Ledger.ps1` offers to), then start a new Claude
 Code session: the hook reads it from `settings.json` when a session starts. If a hook is run without
 `-Port` (e.g. an entry edited by hand), it falls back to the `LEDGER_PORT` environment variable, then
 `8501`.
@@ -193,7 +194,7 @@ Code session: the hook reads it from `settings.json` when a session starts. If a
 |---|---|---|
 | `matcher` | empty (every `PermissionRequest`) | The event only fires when a dialog is about to be shown, so there is nothing to narrow. |
 | `timeout` | `1810` (seconds) | Must stay above the script's own wait (`-TimeoutSeconds`, default `1805`, itself just above the API's 30-minute prompt lifetime), or Claude Code kills the hook mid-wait. |
-| `-Port` (in `command`) | from `.env`, else `8501` | Written by the install; see "Port" above. Without it the hook uses the `LEDGER_PORT` environment variable, then `8501`. |
+| `-Port` (in `command`) | from `.env`, else the saved port, else the first free one in 8501-8599 | Written by the install; see "Port" above. Without it the hook uses the `LEDGER_PORT` environment variable, then `8501`. |
 
 The hook is machine-wide, so it fires for every session's dialogs, not only ones shown in the
 dashboard. While waiting it costs one idle PowerShell process per open dialog.

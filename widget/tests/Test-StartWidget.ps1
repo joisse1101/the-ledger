@@ -7,7 +7,8 @@ brings no second widget.
 .DESCRIPTION
 Stands up a throwaway loopback server that answers /api/meta and /api/live like the backend, runs
 Start-Widget.ps1 against it, and inspects the process list. Needs the widget built and its
-dependencies installed. Exits 0 when every check passes, 1 otherwise. Run from anywhere:
+dependencies installed (the empty node_modules case swaps the folder aside for a real reinstall).
+Exits 0 when every check passes, 1 otherwise. Run from anywhere:
     powershell -File widget\tests\Test-StartWidget.ps1
 #>
 
@@ -25,6 +26,21 @@ function Get-WidgetMainProcesses {
     # The Electron main process (no --type= switch) whose command line points at this widget folder.
     Get-CimInstance Win32_Process -Filter "Name = 'electron.exe'" |
         Where-Object { $_.CommandLine -like "*$widgetDir*" -and $_.CommandLine -notmatch '--type=' }
+}
+
+function Get-FrontendProcesses {
+    @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'vite' -and $_.CommandLine -match 'preview' })
+}
+
+function Stop-Widgets {
+    # Every Electron process of this widget folder (main and children), until none holds the folder.
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+        $running = @(Get-CimInstance Win32_Process -Filter "Name = 'electron.exe'" |
+            Where-Object { $_.CommandLine -like "*$widgetDir*" })
+        if ($running.Count -eq 0) { return }
+        foreach ($proc in $running) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Seconds 1
+    }
 }
 
 # 1. -Help
@@ -55,6 +71,7 @@ try {
     $before = @(Get-WidgetMainProcesses).Count
     Check ($before -eq 0) 'no widget is running before the test (quit it first if this fails)'
 
+    $frontendsBefore = (Get-FrontendProcesses).Count
     $widget = & $startScript -BackendPort $port -PassThru
     Start-Sleep -Seconds 8
 
@@ -66,18 +83,37 @@ try {
         $_.CommandLine -match 'server\.py' -and $_.CommandLine -match "--port $port\b" })
     Check ($backends.Count -eq 0) 'no second backend was started'
 
-    $frontends = @(Get-CimInstance Win32_Process | Where-Object {
-        $_.CommandLine -match 'vite' -and $_.CommandLine -match 'preview' })
-    Check ($frontends.Count -eq 0) 'no frontend was started'
+    Check ((Get-FrontendProcesses).Count -le $frontendsBefore) 'no frontend was started'
 
     # 3. A second run brings no second widget
     $second = & $startScript -BackendPort $port -PassThru
     Start-Sleep -Seconds 5
     Check (@(Get-WidgetMainProcesses).Count -eq 1) 'a second run leaves exactly one widget'
     Check ($second.HasExited) 'the second launch exits on its own'
+
+    # 4. An empty node_modules (the folder exists, nothing in it) is repaired, then the widget starts.
+    Stop-Widgets
+    $modules = Join-Path $widgetDir 'node_modules'
+    $aside = "$modules.test-aside"
+    Rename-Item -LiteralPath $modules -NewName (Split-Path $aside -Leaf)
+    New-Item -ItemType Directory -Path $modules | Out-Null
+    try {
+        & $startScript -BackendPort $port | Out-Null
+        Start-Sleep -Seconds 8
+        Check (Test-Path (Join-Path $modules 'electron\dist\electron.exe')) 'an empty node_modules is reinstalled, Electron binary included'
+        Check (@(Get-WidgetMainProcesses).Count -eq 1) 'the widget starts after the repair'
+    } finally {
+        Stop-Widgets
+        if (Test-Path (Join-Path $modules 'electron\dist\electron.exe')) {
+            Remove-Item -LiteralPath $aside -Recurse -Force
+        } else {
+            Remove-Item -LiteralPath $modules -Recurse -Force
+            Rename-Item -LiteralPath $aside -NewName 'node_modules'
+        }
+    }
 } finally {
     foreach ($proc in @($widget, $stub)) {
-        if ($proc) { & taskkill /PID $proc.Id /T /F 2>&1 | Out-Null }
+        if ($proc -and -not $proc.HasExited) { & taskkill /PID $proc.Id /T /F 2>&1 | Out-Null }
     }
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -10,9 +10,9 @@ no elevation ("Run only when user is logged on", RunLevel Limited), on a daily t
 app isn't running. Safe to re-run: an existing task with the same -TaskName is updated in place
 (action/trigger/settings only) rather than duplicated.
 
-Called directly from `hooks\ledgerScripts\`, or via the root Start-Ledger.ps1's -InstallBackupTask
-switch. .\Uninstall-HistoryBackupTask.ps1, alongside this script, removes what this one creates
-(also wired into the root Stop-Ledger.ps1 via -UninstallBackupTask).
+Called directly from `hooks\ledgerScripts\`. .\Uninstall-HistoryBackupTask.ps1, alongside this
+script, removes what this one creates (also wired into the root Stop-Ledger.ps1 via
+-UninstallBackupTask).
 
 .PARAMETER TaskName
 Name of the Scheduled Task. Default 'Ledger History Backup'.

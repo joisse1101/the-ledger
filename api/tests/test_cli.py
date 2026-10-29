@@ -17,7 +17,7 @@ def parse(*argv, **environ):
 
 def test_defaults_are_local_only_on_8501():
     settings = parse()
-    assert (settings.host, settings.port, settings.frontend_port) == ("127.0.0.1", 8501, 4173)
+    assert (settings.host, settings.port, settings.frontend_port) == ("127.0.0.1", 8501, 8502)
     assert not settings.exposed
 
 
@@ -98,7 +98,7 @@ def test_default_launch_is_local_with_no_access_log_and_no_token(launched, capsy
     # The token belongs to a Remote mode session, so none exists at launch.
     assert deps.access_token is None
     out = capsys.readouterr().out
-    assert "http://localhost:4173/" in out  # the frontend's default port, not the API's
+    assert "http://localhost:8502/" in out  # the frontend's default port, not the API's
     assert "token" not in out.lower()  # nothing about network sign-in is printed here anymore
 
 

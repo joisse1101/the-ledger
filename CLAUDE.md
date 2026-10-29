@@ -11,7 +11,7 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 
 ## Layout
 
-Exactly five top-level folders, each self-contained (four services and `widget/`):
+Exactly six top-level folders (four services, `widget/` and the shared `scripts/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
   its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
@@ -21,17 +21,22 @@ Exactly five top-level folders, each self-contained (four services and `widget/`
 - `widget/` — the Electron desktop widget: an always-on-top, read-only live-sessions window with its own
   `package.json`, startup scripts and tests. Talks to the backend on loopback only; imports nothing
   from `web/`.
+- `scripts/` — `Ledger-Common.ps1`, the PowerShell helper (`.env`, ports, prerequisites, dependency
+  stamps) dot-sourced by the start, install, widget and hook scripts. Its tests are
+  `api/tests/test_ledger_common.py`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
-`.env.example`) and `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
+`.env.example`) and `Install-Ledger.ps1` / `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
 
 ## Commands
 
 The venv already exists at `api/.venv`; use `api\.venv\Scripts\python.exe` rather than recreating it.
-The API and the frontend are two processes on two ports (8501 and 4173).
+The API and the frontend are two processes on two ports, chosen from 8501-8599 and saved (8501 and
+8502 are the first picks).
 
 ```powershell
-.\Start-Ledger.ps1              # backend + frontend; -Mode dev for hot reload, -Remote adds the gateway
+.\Install-Ledger.ps1            # setup, once: widget shortcut, toast hooks, relay hook, backup task
+.\Start-Ledger.ps1              # backend + frontend + widget; -Mode dev, -NoWidget, -Remote adds the gateway
 .\Stop-Ledger.ps1
 
 cd api; pytest                  # Python tests, run from api/ (that's where pyproject.toml is)

@@ -51,16 +51,31 @@ Electron main process                      renderer (sandboxed)
 
 ## Starting it
 
-`widget/Start-Widget.ps1` resolves ports with the same precedence as `Start-Ledger.ps1` (parameter,
-root `.env`, environment, defaults 8501/4173), runs `npm ci` on first use, rebuilds when the sources
-are newer than `dist/`, and launches Electron. `Start-Widget.vbs` runs it with no console window.
+`widget/Start-Widget.ps1` uses the ports `Start-Ledger.ps1` chose and saved (the backend's by the
+same rules: parameter, root `.env`, saved port, first free one in 8501-8599; the frontend's from
+parameter, `.env`, saved port, else 8502, never scanned because this script doesn't start it). Before
+launching it checks the backend's venv, the widget's packages and the Electron binary against their
+requirements and lock files, installs whatever is missing or stale (an empty `node_modules` or a
+missing `electron.exe` is repaired, not trusted because the folder exists) and stops with an error if
+that fails. It rebuilds when the sources are newer than `dist/`, and launches Electron.
+`Start-Widget.vbs` runs it with no console window, which is why the checks live here rather than only
+in `Start-Ledger.ps1`.
 
 ```powershell
 .\widget\Start-Widget.ps1                           # widget + the backend it needs
-.\widget\Install-WidgetShortcut.ps1 -Desktop        # "Ledger Widget" on the desktop
+.\Install-Ledger.ps1                                # offers the shortcut and the sign-in autostart
+.\widget\Install-WidgetShortcut.ps1 -Desktop        # "Ledger Widget" on the desktop (what the installer calls)
 .\widget\Install-WidgetShortcut.ps1 -Startup        # also start at sign-in (Startup folder)
 .\widget\Uninstall-WidgetShortcut.ps1 [-Startup]    # remove both, or only autostart
 ```
+
+`Install-Ledger.ps1` is the setup route: it asks about the shortcut and, separately, the sign-in
+autostart, and accepting the shortcut installs the widget's packages first so the first launch from it,
+which shows no window while it prepares, isn't a long silent `npm ci`. Both shortcut scripts also take
+`-DesktopPath`/`-StartupPath` to work in other folders (the tests use throwaway ones).
+`Start-Ledger.ps1` launches the widget too (`-NoWidget` skips it) once the backend answers; it records
+the widget's PID only when it launched it, so `Stop-Ledger.ps1` closes that widget and leaves one that
+was already running.
 
 The Startup-folder shortcut needs no elevation, shows in Windows' Startup apps list, and removing it
 leaves the desktop shortcut working.
