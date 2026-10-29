@@ -4,10 +4,13 @@ Every case works on a throwaway folder or an injected resolver, so the real repo
 environment's BACKEND_PORT and the machine's installed tools are never consulted.
 """
 
+import http.server
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -307,3 +310,54 @@ def test_repair_fails_when_electron_is_still_missing_after_its_step(repo):
 
     assert result.returncode != 0
     assert "Electron binary is missing" in result.stderr + result.stdout
+
+
+# --- start verification ------------------------------------------------------------------------
+
+def test_wait_until_returns_true_at_once_when_the_condition_holds():
+    assert _ps("Wait-Until -Condition { $true } -TimeoutSeconds 0") == "True"
+
+
+def test_wait_until_returns_true_once_the_condition_turns_true():
+    output = _ps("$n = 0; Wait-Until -Condition { $script:n++; $script:n -ge 3 } -TimeoutSeconds 10 -IntervalSeconds 0.05")
+    assert output == "True"
+
+
+def test_wait_until_returns_false_when_the_timeout_passes():
+    assert _ps("Wait-Until -Condition { $false } -TimeoutSeconds 1 -IntervalSeconds 0.1") == "False"
+
+
+def test_http_up_is_true_for_a_server_answering_200():
+    server = http.server.HTTPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        assert _ps(f"Test-HttpUp -Url 'http://127.0.0.1:{server.server_port}/'") == "True"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_http_up_is_false_when_nothing_listens():
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        closed_port = probe.getsockname()[1]
+
+    assert _ps(f"Test-HttpUp -Url 'http://127.0.0.1:{closed_port}/'") == "False"
+
+
+def test_start_summary_lists_each_piece_and_passes_when_nothing_failed():
+    output = _ps(
+        "Write-StartSummary -Result @("
+        "[PSCustomObject]@{ Name = 'backend'; State = 'running'; Address = 'http://localhost:8501' },"
+        "[PSCustomObject]@{ Name = 'widget'; State = 'skipped'; Address = $null }) 6>&1"
+    )
+    assert output.splitlines() == ["backend   running  http://localhost:8501", "widget    skipped", "True"]
+
+
+def test_start_summary_fails_when_a_piece_did_not_come_up():
+    output = _ps(
+        "Write-StartSummary -Result @("
+        "[PSCustomObject]@{ Name = 'backend'; State = 'running'; Address = 'http://localhost:8501' },"
+        "[PSCustomObject]@{ Name = 'frontend'; State = 'failed'; Address = 'http://localhost:8502' }) 6>&1"
+    )
+    assert output.splitlines() == ["backend   running  http://localhost:8501", "frontend  failed  http://localhost:8502", "False"]

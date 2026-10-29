@@ -290,3 +290,43 @@ function Save-DependencyStamp {
         Write-Stamp -StampPath (Join-Path $Step.Directory "node_modules\$script:NpmStampName") -Value $lockStamp
     }
 }
+
+function Wait-Until {
+    # Polls the condition until it is true or the timeout passes; it is always checked at least once.
+    param([scriptblock]$Condition, [int]$TimeoutSeconds, [double]$IntervalSeconds = 1)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        if (& $Condition) { return $true }
+        Start-Sleep -Milliseconds ([int]($IntervalSeconds * 1000))
+    } while ((Get-Date) -lt $deadline)
+    return $false
+}
+
+function Test-HttpUp {
+    # True when the URL answers 200.
+    param([string]$Url)
+    try {
+        return ((Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200)
+    } catch {
+        return $false
+    }
+}
+
+function Get-RunningWidget {
+    # The widget's Electron main process (the one without a --type switch) for this widget folder.
+    param([string]$WidgetDir)
+    @(Get-CimInstance Win32_Process -Filter "Name = 'electron.exe'" |
+        Where-Object { $_.CommandLine -like "*$WidgetDir*" -and $_.CommandLine -notmatch '--type=' })
+}
+
+function Write-StartSummary {
+    # One line per piece: Name, State ('running', 'already running', 'skipped' or 'failed') and an
+    # optional Address. Returns $false when any piece failed.
+    param([object[]]$Result)
+    foreach ($item in $Result) {
+        $line = '{0,-9} {1}' -f $item.Name, $item.State
+        if ($item.Address) { $line += "  $($item.Address)" }
+        Write-Host $line
+    }
+    return (@($Result | Where-Object { $_.State -eq 'failed' }).Count -eq 0)
+}
