@@ -113,3 +113,76 @@ def test_stamp_matches_only_the_value_written(tmp_path):
     )
 
     assert output == "False True False"
+
+
+def _resolve(saved: str = "@{}", free: str = "$true", reuse: str = "$false", extra: str = "") -> str:
+    """Resolve BACKEND_PORT with an injected notion of which ports are free; return 'port source'."""
+    return _ps(
+        f"$r = Resolve-LedgerPort -Name 'BACKEND_PORT' -SavedPorts {saved} "
+        f"-IsFree {{ param($p) {free} }} -ReuseWhen {{ param($p) {reuse} }} {extra}; \"$($r.Port) $($r.Source)\""
+    )
+
+
+def test_resolve_ledger_port_scans_from_the_start_of_the_range_on_first_run():
+    assert _resolve() == "8501 scanned"
+
+
+def test_resolve_ledger_port_skips_busy_ports_while_scanning():
+    assert _resolve(free="$p -ge 8503") == "8503 scanned"
+
+
+def test_resolve_ledger_port_reuses_the_saved_port_when_it_is_free():
+    assert _resolve(saved="@{ BACKEND_PORT = 8520 }") == "8520 saved"
+
+
+def test_resolve_ledger_port_repicks_when_another_program_holds_the_saved_port():
+    assert _resolve(saved="@{ BACKEND_PORT = 8520 }", free="$p -ne 8520") == "8501 scanned"
+
+
+def test_resolve_ledger_port_reuses_a_busy_saved_port_held_by_this_app():
+    assert _resolve(saved="@{ BACKEND_PORT = 8520 }", free="$p -ne 8520", reuse="$p -eq 8520") == "8520 saved"
+
+
+def test_resolve_ledger_port_prefers_explicit_then_env_file_over_saved():
+    saved = "@{ BACKEND_PORT = 8520 }"
+    assert _resolve(saved=saved, extra="-Explicit 9000 -EnvFileValues @{ BACKEND_PORT = '8511' }") == "9000 parameter"
+    assert _resolve(saved=saved, extra="-EnvFileValues @{ BACKEND_PORT = '8511' }") == "8511 env"
+
+
+def test_resolve_ledger_port_does_not_hand_out_an_excluded_port():
+    assert _resolve(extra="-Exclude 8501,8502") == "8503 scanned"
+
+
+def test_resolve_ledger_port_fails_when_the_range_is_full():
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-Command",
+         f". '{HELPER}'; Resolve-LedgerPort -Name 'BACKEND_PORT' -IsFree {{ $false }}"],
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode != 0
+    assert "No free port left in 8501-8599" in result.stderr + result.stdout
+
+
+def test_saved_ports_round_trip_and_keep_other_services(tmp_path):
+    ports_file = tmp_path / "ports.json"
+
+    output = _ps(
+        f"Save-Port -Name 'BACKEND_PORT' -Port 8510 -Path '{ports_file}'; "
+        f"Save-Port -Name 'FRONTEND_PORT' -Port 8511 -Path '{ports_file}'; "
+        f"$s = Get-SavedPorts -Path '{ports_file}'; \"$($s['BACKEND_PORT']) $($s['FRONTEND_PORT'])\""
+    )
+
+    assert output == "8510 8511"
+
+
+def test_saved_ports_are_empty_before_the_first_run(tmp_path):
+    assert _ps(f"(Get-SavedPorts -Path '{tmp_path / 'none.json'}').Count") == "0"
+
+
+def test_port_free_is_false_while_a_listener_holds_it():
+    output = _ps(
+        "$l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0); $l.Start(); "
+        "$port = $l.LocalEndpoint.Port; $busy = Test-PortFree -Port $port; $l.Stop(); "
+        "$freed = Test-PortFree -Port $port; \"$busy $freed\""
+    )
+    assert output == "False True"

@@ -78,3 +78,86 @@ function Write-Stamp {
     param([string]$StampPath, [string]$Value)
     Set-Content -Path $StampPath -Value $Value -Encoding ascii
 }
+
+# Ports the app picks from when nothing is configured or saved.
+$script:LedgerPortRange = 8501..8599
+# Chosen ports survive between runs here (gitignored); .ledger-run.json is deleted on stop.
+$script:LedgerPortsFile = Join-Path (Split-Path $PSScriptRoot -Parent) '.ledger-ports.json'
+
+function Get-SavedPorts {
+    # The saved choice as a hashtable of name -> port; a missing file is no choice yet, an
+    # unreadable one is an error for the caller to see.
+    param([string]$Path = $script:LedgerPortsFile)
+    $saved = @{}
+    if (-not (Test-Path $Path)) { return $saved }
+    $parsed = Get-Content $Path -Raw | ConvertFrom-Json
+    foreach ($property in $parsed.PSObject.Properties) { $saved[$property.Name] = [int]$property.Value }
+    return $saved
+}
+
+function Save-Port {
+    param([string]$Name, [int]$Port, [string]$Path = $script:LedgerPortsFile)
+    $saved = Get-SavedPorts -Path $Path
+    $saved[$Name] = $Port
+    $saved | ConvertTo-Json | Set-Content -Path $Path -Encoding utf8
+}
+
+function Test-PortFree {
+    # Free means bindable on loopback (where the backend listens) and on every interface (where the
+    # gateway publishes); Windows lets the second succeed while another process holds the first.
+    param([int]$Port)
+    foreach ($address in @([Net.IPAddress]::Loopback, [Net.IPAddress]::Any)) {
+        $listener = New-Object Net.Sockets.TcpListener($address, $Port)
+        try {
+            $listener.Start()
+        } catch [Net.Sockets.SocketException] {
+            return $false
+        } finally {
+            $listener.Stop()
+        }
+    }
+    return $true
+}
+
+function Test-LedgerBackend {
+    # True when something on the port answers /api/meta the way this app's backend does.
+    param([int]$Port)
+    try {
+        $meta = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/meta" -TimeoutSec 3
+    } catch {
+        return $false
+    }
+    return [bool]($meta.PSObject.Properties['remote_mode'] -and $meta.PSObject.Properties['refreshed_at'])
+}
+
+function Resolve-LedgerPort {
+    # Explicit parameter, then .env, then the saved port, then the first free port in the range.
+    # Returns the port and where it came from; Source 'scanned' means the caller should save it.
+    # A saved port that is busy stays when -ReuseWhen says what holds it is ours (the backend).
+    # -Exclude keeps services of one start from being handed the same scanned port.
+    param(
+        [int]$Explicit,
+        [string]$Name,
+        [hashtable]$EnvFileValues = @{},
+        [hashtable]$SavedPorts = @{},
+        [int[]]$Exclude = @(),
+        [scriptblock]$IsFree = { param($port) Test-PortFree -Port $port },
+        [scriptblock]$ReuseWhen = { param($port) $false }
+    )
+    if ($Explicit) { return [PSCustomObject]@{ Port = $Explicit; Source = 'parameter' } }
+    if ($EnvFileValues.ContainsKey($Name)) { return [PSCustomObject]@{ Port = [int]$EnvFileValues[$Name]; Source = 'env' } }
+
+    if ($SavedPorts.ContainsKey($Name)) {
+        $saved = [int]$SavedPorts[$Name]
+        if (($saved -notin $Exclude) -and ((& $IsFree $saved) -or (& $ReuseWhen $saved))) {
+            return [PSCustomObject]@{ Port = $saved; Source = 'saved' }
+        }
+    }
+
+    foreach ($candidate in $script:LedgerPortRange) {
+        if (($candidate -notin $Exclude) -and (& $IsFree $candidate)) {
+            return [PSCustomObject]@{ Port = $candidate; Source = 'scanned' }
+        }
+    }
+    throw "No free port left in $($script:LedgerPortRange[0])-$($script:LedgerPortRange[-1]) for $Name."
+}
