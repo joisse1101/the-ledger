@@ -6,7 +6,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 
 ## Layout
 
-- Five top-level folders: `api/`, `web/`, `gateway/`, `hooks/` and `widget/`. All Python,
+- Six top-level folders: `api/`, `web/`, `gateway/`, `hooks/`, `widget/` and `scripts/`. All Python,
   tests and virtualenv included, lives in `api/`; the widget is TypeScript with its own `package.json`. See [Repository layout](Repository-Layout.md).
 - One module per concern. The data layer (`api/app/repositories/`, `api/app/domain/`) has no FastAPI dependency, so it can be
   read and tested on its own. See [Backend: data layer](Backend-Data-Layer.md).

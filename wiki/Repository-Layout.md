@@ -6,7 +6,9 @@ built so a phone or other device on the same network can read it too, behind a s
 The backend and frontend run as two separate processes/ports; the API never serves any HTML itself (see
 [Setup and run](Setup-And-Run.md)).
 
-The repo has exactly five top-level folders, each self-contained: `api/` (the
+The repo has exactly six top-level folders: `scripts/` (the shared PowerShell helper,
+`Ledger-Common.ps1`, dot-sourced by the start, install, widget and hook scripts; it runs nothing on
+its own) and five self-contained ones: `api/` (the
 backend — every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and its own
 gitignored `.venv`/`.ledger`/`.history`), `web/` (the frontend), `gateway/` (the containerized Nginx reverse
 proxy that's the only thing granting other devices access — its own Dockerfile, Nginx config

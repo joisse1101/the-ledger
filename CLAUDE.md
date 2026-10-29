@@ -11,7 +11,7 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 
 ## Layout
 
-Exactly five top-level folders, each self-contained (four services and `widget/`):
+Exactly six top-level folders (four services, `widget/` and the shared `scripts/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
   its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
@@ -21,6 +21,9 @@ Exactly five top-level folders, each self-contained (four services and `widget/`
 - `widget/` — the Electron desktop widget: an always-on-top, read-only live-sessions window with its own
   `package.json`, startup scripts and tests. Talks to the backend on loopback only; imports nothing
   from `web/`.
+- `scripts/` — `Ledger-Common.ps1`, the PowerShell helper (`.env`, ports, prerequisites, dependency
+  stamps) dot-sourced by the start, install, widget and hook scripts. Its tests are
+  `api/tests/test_ledger_common.py`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
 `.env.example`) and `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
