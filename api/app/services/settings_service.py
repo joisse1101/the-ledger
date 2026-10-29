@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from app import refresh
+from app.core.widget_settings import validate_max_projects
 from app.core.worktrees import BUILT_IN_FOLDER, WorktreeFolder, normalize_folder
 from app.repositories import settings_store
 from app.repositories.db import history, snapshot
@@ -29,15 +32,38 @@ def _validated(raw_folders: list[str]) -> list[str]:
     return folders
 
 
-def save_worktree_folders(raw_folders: list[str]) -> list[WorktreeFolder]:
+def get_max_projects() -> int:
+    return settings_store.load_max_projects()
+
+
+def _validated_max_projects(raw: object) -> int:
+    try:
+        return validate_max_projects(raw)
+    except ValueError as err:
+        raise InvalidInput(str(err)) from err
+
+
+def _apply_worktree_folders(folders: list[str]) -> None:
     """Replace the user's folders, then bring history and the snapshot in line before returning.
 
     History is reconciled before the rescan, so the rescan's live rows land on reconciled history.
     Both run under the refresh lock, so the timer's rescan can't interleave with a half-applied save.
     """
-    folders = _validated(raw_folders)
     with refresh.lock:
         settings_store.save_worktree_folders(folders)
         history.correct_worktree_rows()
         snapshot.refresh()
-    return get_worktree_folders()
+
+
+def save_settings(raw_folders: Optional[list[str]], raw_max_projects: Optional[object]) -> None:
+    """Save whichever settings were sent; the others stay as they are.
+
+    Everything is validated before anything is saved, so a bad value never leaves a half-applied
+    request. The widget's number is a display preference: saving it does not touch history or the snapshot.
+    """
+    folders = None if raw_folders is None else _validated(raw_folders)
+    max_projects = None if raw_max_projects is None else _validated_max_projects(raw_max_projects)
+    if max_projects is not None:
+        settings_store.save_max_projects(max_projects)
+    if folders is not None:
+        _apply_worktree_folders(folders)

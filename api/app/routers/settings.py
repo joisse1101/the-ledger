@@ -17,13 +17,19 @@ def _require_local(request: Request) -> None:
         raise HTTPException(status_code=403, detail="settings require a local request")
 
 
+def _current() -> dict:
+    return settings_body(settings_service.get_worktree_folders(), settings_service.get_max_projects())
+
+
 @router.get("/api/settings")
 def get_settings(request: Request) -> dict:
     _require_local(request)
-    return settings_body(settings_service.get_worktree_folders())
+    return _current()
 
 
 @router.put("/api/settings")
 def put_settings(body: SettingsRequest, request: Request) -> dict:
     _require_local(request)
-    return settings_body(settings_service.save_worktree_folders(body.worktree_folders))
+    max_projects = body.widget.max_projects if body.widget else None
+    settings_service.save_settings(body.worktree_folders, max_projects)
+    return _current()

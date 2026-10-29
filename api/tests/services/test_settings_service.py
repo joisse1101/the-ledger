@@ -39,10 +39,10 @@ def test_adding_then_removing_a_folder_moves_sessions_and_back(trees_sessions):
     before = _attribution()
     assert before == {"live": ("fix-nav", ""), "pruned": ("fix-nav", "")}
 
-    settings_service.save_worktree_folders([".trees"])
+    settings_service.save_settings([".trees"], None)
     assert _attribution() == {"live": ("the-ledger", "fix-nav"), "pruned": ("the-ledger", "fix-nav")}
 
-    settings_service.save_worktree_folders([])
+    settings_service.save_settings([], None)
     assert _attribution() == before
 
 
@@ -51,7 +51,8 @@ def test_the_list_starts_with_the_built_in_folder(isolated_settings):
 
 
 def test_saved_folders_are_normalised_and_kept_in_order(isolated_db):
-    folders = settings_service.save_worktree_folders(["tools\\wt\\", ".trees"])
+    settings_service.save_settings(["tools\\wt\\", ".trees"], None)
+    folders = settings_service.get_worktree_folders()
     assert [(f.path, f.built_in) for f in folders] == [
         (".claude/worktrees", True), ("tools/wt", False), (".trees", False)
     ]
@@ -71,5 +72,42 @@ def test_saved_folders_are_normalised_and_kept_in_order(isolated_db):
 def test_an_invalid_list_is_refused_and_nothing_changes(isolated_db, folders, reason):
     settings_store.save_worktree_folders([".trees"])
     with pytest.raises(InvalidInput, match=reason):
-        settings_service.save_worktree_folders(folders)
+        settings_service.save_settings(folders, None)
     assert settings_store.load_worktree_folders() == (".trees",)
+
+
+def test_the_widget_number_defaults_to_five(isolated_settings):
+    assert settings_service.get_max_projects() == 5
+
+
+def test_saving_the_widget_number_leaves_the_folders_and_the_stores_alone(isolated_db, monkeypatch):
+    settings_service.save_settings([".trees"], None)
+    reconciled = []
+    monkeypatch.setattr(history, "correct_worktree_rows", lambda: reconciled.append("history"))
+    monkeypatch.setattr(snapshot, "refresh", lambda: reconciled.append("snapshot"))
+
+    settings_service.save_settings(None, 3)
+
+    assert settings_service.get_max_projects() == 3
+    assert settings_store.load_worktree_folders() == (".trees",)
+    assert reconciled == []
+
+
+def test_saving_folders_leaves_the_widget_number(isolated_db):
+    settings_service.save_settings(None, 3)
+    settings_service.save_settings([".trees"], None)
+    assert settings_service.get_max_projects() == 3
+
+
+@pytest.mark.parametrize("value", [0, 11, -1, 2.5, True, "3", [3]])
+def test_an_invalid_widget_number_is_refused_and_nothing_changes(isolated_db, value):
+    settings_service.save_settings(None, 4)
+    with pytest.raises(InvalidInput):
+        settings_service.save_settings(None, value)
+    assert settings_service.get_max_projects() == 4
+
+
+def test_a_bad_number_stops_valid_folders_from_being_saved(isolated_db):
+    with pytest.raises(InvalidInput):
+        settings_service.save_settings([".trees"], 99)
+    assert settings_store.load_worktree_folders() == ()
