@@ -13,6 +13,13 @@ Remove only the desktop shortcut.
 .PARAMETER Startup
 Remove only the Startup-folder shortcut (turn logon autostart off).
 
+.PARAMETER DesktopPath
+Folder the desktop shortcut is in. Default: your Desktop. The tests point it at a throwaway folder.
+
+.PARAMETER StartupPath
+Folder the Startup shortcut is in. Default: your Startup folder. The tests point it at a throwaway
+folder.
+
 .PARAMETER Help
 Show this help and exit (-h works too).
 
@@ -28,6 +35,8 @@ Keep the desktop shortcut; stop starting at sign-in.
 param(
     [switch]$Desktop,
     [switch]$Startup,
+    [string]$DesktopPath = [Environment]::GetFolderPath('Desktop'),
+    [string]$StartupPath = [Environment]::GetFolderPath('Startup'),
     [switch]$Help
 )
 
@@ -43,8 +52,8 @@ if (-not $Desktop -and -not $Startup) { $Desktop = $true; $Startup = $true }
 
 $shortcutName = 'Ledger Widget.lnk'
 $folders = @()
-if ($Desktop) { $folders += [Environment]::GetFolderPath('Desktop') }
-if ($Startup) { $folders += [Environment]::GetFolderPath('Startup') }
+if ($Desktop) { $folders += $DesktopPath }
+if ($Startup) { $folders += $StartupPath }
 
 foreach ($folder in $folders) {
     $path = Join-Path $folder $shortcutName

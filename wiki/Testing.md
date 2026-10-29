@@ -39,7 +39,11 @@ Python tests, one file per module under test:
   `test_relay_hook.py` (runs the real `hooks/ledgerScripts/Relay-PermissionRequest.ps1` as a subprocess
   against a real uvicorn server: answers become decisions, and every no-answer path prints nothing),
   `test_hook_install.py` (the relay's `-IncludeSessionControl` install/uninstall against a throwaway
-  `USERPROFILE`, never the real `settings.json`). The last two are skipped off Windows.
+  `USERPROFILE`, never the real `settings.json`),
+  `test_ledger_common.py` (the shared `scripts/Ledger-Common.ps1`: `.env` and port rules, the saved-port
+  scan, prerequisite and dependency-repair planning with a fake installer, the start summary, the stale
+  relay-hook offer against a throwaway settings file) and `test_widget_shortcut.py` (the widget shortcut
+  install and uninstall into throwaway folders, with stdin closed). The last four are skipped off Windows.
 
 Frontend (`cd web`):
 

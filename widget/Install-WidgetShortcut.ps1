@@ -15,6 +15,13 @@ Create the desktop shortcut.
 .PARAMETER Startup
 Create the Startup-folder shortcut (logon autostart).
 
+.PARAMETER DesktopPath
+Folder the -Desktop shortcut goes in. Default: your Desktop. The tests point it at a throwaway folder.
+
+.PARAMETER StartupPath
+Folder the -Startup shortcut goes in. Default: your Startup folder. The tests point it at a throwaway
+folder.
+
 .PARAMETER Help
 Show this help and exit (-h works too).
 
@@ -31,6 +38,8 @@ Show this help and exit (-h works too).
 param(
     [switch]$Desktop,
     [switch]$Startup,
+    [string]$DesktopPath = [Environment]::GetFolderPath('Desktop'),
+    [string]$StartupPath = [Environment]::GetFolderPath('Startup'),
     [switch]$Help
 )
 
@@ -59,5 +68,5 @@ function New-WidgetShortcut {
     Write-Host "Created $path"
 }
 
-if ($Desktop) { New-WidgetShortcut -Folder ([Environment]::GetFolderPath('Desktop')) }
-if ($Startup) { New-WidgetShortcut -Folder ([Environment]::GetFolderPath('Startup')) }
+if ($Desktop) { New-WidgetShortcut -Folder $DesktopPath }
+if ($Startup) { New-WidgetShortcut -Folder $StartupPath }
