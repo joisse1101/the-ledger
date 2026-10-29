@@ -20,15 +20,20 @@ pytestmark = pytest.mark.skipif(
 HELPER = Path(__file__).resolve().parents[2] / "scripts" / "Ledger-Common.ps1"
 
 
-def _ps(snippet: str, env: dict[str, str] | None = None) -> str:
-    """Dot-source the helper, run the snippet, return its stdout (stripped)."""
+def _run_ps(snippet: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """Dot-source the helper and run the snippet in a clean port environment."""
     script = f"$ErrorActionPreference = 'Stop'; . '{HELPER}'; {snippet}"
     environment = {k: v for k, v in os.environ.items() if k not in ("BACKEND_PORT", "FRONTEND_PORT", "GATEWAY_PORT")}
     environment.update(env or {})
-    result = subprocess.run(
+    return subprocess.run(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
         env=environment, capture_output=True, text=True, timeout=60, check=False,
     )
+
+
+def _ps(snippet: str, env: dict[str, str] | None = None) -> str:
+    """Run the snippet, assert it succeeded, return its stdout (stripped)."""
+    result = _run_ps(snippet, env)
     assert result.returncode == 0, result.stdout + result.stderr
     return result.stdout.strip()
 
@@ -154,11 +159,8 @@ def test_resolve_ledger_port_does_not_hand_out_an_excluded_port():
 
 
 def test_resolve_ledger_port_fails_when_the_range_is_full():
-    result = subprocess.run(
-        ["powershell.exe", "-NoProfile", "-Command",
-         f". '{HELPER}'; Resolve-LedgerPort -Name 'BACKEND_PORT' -IsFree {{ $false }}"],
-        capture_output=True, text=True, timeout=60, check=False,
-    )
+    result = _run_ps("Resolve-LedgerPort -Name 'BACKEND_PORT' -IsFree { $false }")
+
     assert result.returncode != 0
     assert "No free port left in 8501-8599" in result.stderr + result.stdout
 
@@ -204,3 +206,104 @@ def test_prerequisite_check_ignores_missing_docker_without_remote():
 def test_prerequisite_check_names_docker_with_remote():
     output = _ps("Test-Prerequisites -Remote -Resolver { param($c) $c -ne 'docker' } 6>&1")
     assert output.splitlines() == ["Docker is not installed. Download it from https://www.docker.com/products/docker-desktop/", "False"]
+
+
+# --- dependency repair -------------------------------------------------------------------------
+
+# Stands in for the real installer: records each step and leaves behind what the real one would.
+FAKE_INSTALLER = r"""
+$calls = New-Object System.Collections.Generic.List[string]
+$installer = {
+    param($s)
+    $calls.Add("$($s.Component):$($s.Action)")
+    switch ($s.Action) {
+        'venv' { New-Item -ItemType File -Force "$($s.Directory)\.venv\Scripts\python.exe" | Out-Null }
+        'npm' { New-Item -ItemType File -Force "$($s.Directory)\node_modules\pkg\index.js" | Out-Null }
+        'electron' { New-Item -ItemType File -Force "$($s.Directory)\node_modules\electron\dist\electron.exe" | Out-Null }
+    }
+    $true
+}
+"""
+CALLS = '($calls -join ",")'
+
+
+@pytest.fixture
+def repo(tmp_path):
+    """A repo whose venv and node_modules folders exist but are empty."""
+    (tmp_path / "api" / ".venv").mkdir(parents=True)
+    (tmp_path / "api" / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
+    (tmp_path / "api" / "requirements-dev.txt").write_text("-r requirements.txt\npytest\n", encoding="utf-8")
+    for name in ("web", "widget"):
+        (tmp_path / name / "node_modules").mkdir(parents=True)
+        (tmp_path / name / "package-lock.json").write_text("{}", encoding="utf-8")
+    return tmp_path
+
+
+def _plan(root: Path) -> str:
+    return _ps(f"(Get-DependencyRepairs -RepoRoot '{root}' | ForEach-Object {{ \"$($_.Component):$($_.Action)\" }}) -join ','")
+
+
+def _repair(root: Path, component: str = "") -> str:
+    """Run the repair with the fake installer; return the steps it was asked to perform."""
+    only = f"-Component {component}" if component else ""
+    return _ps(f"{FAKE_INSTALLER} Invoke-DependencyRepair -RepoRoot '{root}' {only} -Installer $installer 6>$null; {CALLS}")
+
+
+def test_repair_plans_everything_when_the_folders_exist_but_are_empty(repo):
+    assert _plan(repo) == "api:venv,api:pip,web:npm,widget:npm,widget:electron"
+
+
+def test_repair_rebuilds_empty_folders_then_has_nothing_left_to_do(repo):
+    assert _repair(repo) == "api:venv,api:pip,web:npm,widget:npm,widget:electron"
+    assert _plan(repo) == ""
+
+
+def test_repair_installs_nothing_when_everything_is_current(repo):
+    _repair(repo)
+
+    assert _repair(repo) == ""
+
+
+def test_repair_fetches_only_the_electron_binary_when_it_is_missing(repo):
+    _repair(repo)
+    (repo / "widget" / "node_modules" / "electron" / "dist" / "electron.exe").unlink()
+
+    assert _repair(repo) == "widget:electron"
+
+
+def test_repair_reinstalls_packages_when_the_lockfile_changed(repo):
+    _repair(repo)
+    (repo / "web" / "package-lock.json").write_text('{"changed": true}', encoding="utf-8")
+
+    assert _repair(repo) == "web:npm"
+
+
+def test_repair_reinstalls_requirements_when_they_changed(repo):
+    _repair(repo)
+    (repo / "api" / "requirements.txt").write_text("fastapi\nuvicorn\n", encoding="utf-8")
+
+    assert _repair(repo) == "api:pip"
+
+
+def test_repair_only_touches_the_components_asked_for(repo):
+    assert _repair(repo, component="widget") == "widget:npm,widget:electron"
+
+
+def test_repair_stops_with_a_named_error_when_an_install_fails(repo):
+    result = _run_ps(f"Invoke-DependencyRepair -RepoRoot '{repo}' -Component web -Installer {{ $false }} 6>$null")
+
+    assert result.returncode != 0
+    assert "Installing the web packages (npm ci) failed" in result.stderr + result.stdout
+
+
+def test_repair_leaves_no_stamp_behind_when_an_install_fails(repo):
+    _run_ps(f"Invoke-DependencyRepair -RepoRoot '{repo}' -Component web -Installer {{ $false }} 6>$null")
+
+    assert "web:npm" in _plan(repo)
+
+
+def test_repair_fails_when_electron_is_still_missing_after_its_step(repo):
+    result = _run_ps(f"Invoke-DependencyRepair -RepoRoot '{repo}' -Component widget -Installer {{ $true }} 6>$null")
+
+    assert result.returncode != 0
+    assert "Electron binary is missing" in result.stderr + result.stdout

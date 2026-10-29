@@ -175,3 +175,118 @@ function Resolve-LedgerPort {
     }
     throw "No free port left in $($script:LedgerPortRange[0])-$($script:LedgerPortRange[-1]) for $Name."
 }
+
+# Stamps live inside the folder they describe, so deleting the folder resets the stamp.
+$script:VenvStampName = '.requirements-stamp'
+$script:NpmStampName = '.lock-stamp'
+
+function Get-ElectronPath {
+    param([string]$RepoRoot)
+    Join-Path $RepoRoot 'widget\node_modules\electron\dist\electron.exe'
+}
+
+function Test-VenvCurrent {
+    # The interpreter exists and the requirements are the ones last installed.
+    param([string]$RepoRoot)
+    $apiDir = Join-Path $RepoRoot 'api'
+    $venvDir = Join-Path $apiDir '.venv'
+    if (-not (Test-Path (Join-Path $venvDir 'Scripts\python.exe'))) { return $false }
+    $requirements = Get-ChildItem -Path $apiDir -Filter 'requirements*.txt' | Sort-Object Name | ForEach-Object FullName
+    return (Test-Stamp -StampPath (Join-Path $venvDir $script:VenvStampName) -Value (Get-FilesStamp -Path $requirements))
+}
+
+function Test-NpmCurrent {
+    # node_modules holds packages (not just the stamp) and they are the lockfile's.
+    param([string]$ProjectDir)
+    $modulesDir = Join-Path $ProjectDir 'node_modules'
+    if (-not (Test-Path $modulesDir)) { return $false }
+    $packages = @(Get-ChildItem -LiteralPath $modulesDir -Force | Where-Object Name -ne $script:NpmStampName)
+    if ($packages.Count -eq 0) { return $false }
+    $lockStamp = Get-FilesStamp -Path (Join-Path $ProjectDir 'package-lock.json')
+    return (Test-Stamp -StampPath (Join-Path $modulesDir $script:NpmStampName) -Value $lockStamp)
+}
+
+function Get-DependencyRepairs {
+    # The ordered steps needed to bring the chosen components ('api', 'web', 'widget') up to date;
+    # nothing when everything is current. Electron is planned whenever its binary is missing and is
+    # skipped at run time if the npm step already fetched it.
+    param([string]$RepoRoot, [string[]]$Component = @('api', 'web', 'widget'))
+    $steps = New-Object System.Collections.Generic.List[object]
+    function Add-Step([string]$Name, [string]$Action, [string]$Directory) {
+        $steps.Add([PSCustomObject]@{ Component = $Name; Action = $Action; Directory = $Directory })
+    }
+    $apiDir = Join-Path $RepoRoot 'api'
+    if (('api' -in $Component) -and -not (Test-VenvCurrent -RepoRoot $RepoRoot)) {
+        if (-not (Test-Path (Join-Path $apiDir '.venv\Scripts\python.exe'))) { Add-Step 'api' 'venv' $apiDir }
+        Add-Step 'api' 'pip' $apiDir
+    }
+    foreach ($name in @('web', 'widget')) {
+        $projectDir = Join-Path $RepoRoot $name
+        if (($name -in $Component) -and -not (Test-NpmCurrent -ProjectDir $projectDir)) { Add-Step $name 'npm' $projectDir }
+    }
+    if (('widget' -in $Component) -and -not (Test-Path (Get-ElectronPath -RepoRoot $RepoRoot))) {
+        Add-Step 'widget' 'electron' (Join-Path $RepoRoot 'widget')
+    }
+    return $steps.ToArray()
+}
+
+function Get-DependencyStepText {
+    param($Step)
+    switch ($Step.Action) {
+        'venv'     { return "Creating the backend's Python environment" }
+        'pip'      { return "Installing the backend requirements" }
+        'npm'      { return "Installing the $($Step.Component) packages (npm ci)" }
+        'electron' { return "Fetching the Electron binary" }
+    }
+}
+
+function Invoke-DependencyStep {
+    # Runs one repair step for real; $true when its command succeeded.
+    param($Step)
+    Push-Location $Step.Directory
+    try {
+        switch ($Step.Action) {
+            'venv'     { & python -m venv .venv }
+            'pip'      { & (Join-Path $Step.Directory '.venv\Scripts\python.exe') -m pip install -r requirements-dev.txt }
+            'npm'      { & npm ci }
+            'electron' { & node (Join-Path $Step.Directory 'node_modules\electron\install.js') }
+        }
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        Pop-Location
+    }
+}
+
+function Invoke-DependencyRepair {
+    # Applies Get-DependencyRepairs, saying what it does, recording a stamp after each successful
+    # install, and throwing when a step fails so the caller starts nothing. -Installer takes a step
+    # and returns success; tests pass a fake so no network or real install is involved.
+    param(
+        [string]$RepoRoot,
+        [string[]]$Component = @('api', 'web', 'widget'),
+        [scriptblock]$Installer = { param($step) Invoke-DependencyStep -Step $step }
+    )
+    foreach ($step in (Get-DependencyRepairs -RepoRoot $RepoRoot -Component $Component)) {
+        if ($step.Action -eq 'electron' -and (Test-Path (Get-ElectronPath -RepoRoot $RepoRoot))) { continue }
+        $text = Get-DependencyStepText -Step $step
+        Write-Host "$text..."
+        if (-not (& $Installer $step)) {
+            throw "$text failed. Check your network connection and try again; nothing was started."
+        }
+        if ($step.Action -eq 'electron' -and -not (Test-Path (Get-ElectronPath -RepoRoot $RepoRoot))) {
+            throw "The Electron binary is missing and could not be downloaded; nothing was started."
+        }
+        Save-DependencyStamp -Step $step
+    }
+}
+
+function Save-DependencyStamp {
+    param($Step)
+    if ($Step.Action -eq 'pip') {
+        $requirements = Get-ChildItem -Path $Step.Directory -Filter 'requirements*.txt' | Sort-Object Name | ForEach-Object FullName
+        Write-Stamp -StampPath (Join-Path $Step.Directory ".venv\$script:VenvStampName") -Value (Get-FilesStamp -Path $requirements)
+    } elseif ($Step.Action -eq 'npm') {
+        $lockStamp = Get-FilesStamp -Path (Join-Path $Step.Directory 'package-lock.json')
+        Write-Stamp -StampPath (Join-Path $Step.Directory "node_modules\$script:NpmStampName") -Value $lockStamp
+    }
+}
