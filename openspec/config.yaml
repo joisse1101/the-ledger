@@ -36,6 +36,7 @@ operations:
     guidance:
       # jois-init:opsx begin (managed by /jois-init:opsx; edits here are overwritten)
       - "At the end of each concern, stop and follow the jois-git-commit-hygiene rule: stage by explicit path, show the summary and message, name a confirmation word, and end the turn. Never commit in the turn you stage."
+      - "Hand each task to the opsx-task-applier agent, one at a time, and wait for its report before the next. Before each dispatch say: the task, the files you expect it to touch, a rough time estimate labeled as an estimate, that there is no live timer, how to open the agent's transcript (its row in the agent panel then Enter, or /tasks), and its turn limit (maxTurns in the agent file). After each report say in one line whether the task is done, failed or blocked. Copy the report's result: clause verbatim into the task's line in tasks.md and tick the box; on blocked: ask the user, then dispatch again with the answer."
       # jois-init:opsx end
   archive:
     guidance:
