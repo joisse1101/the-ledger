@@ -9,18 +9,22 @@ that is already running. It never starts the frontend or the gateway container: 
 Ledger" starts the frontend on demand. Quitting the widget stops only the processes the widget
 started. A second launch just brings the running widget forward.
 
-Port precedence per BackendPort/FrontendPort (highest wins): an explicit parameter, then the repo
-root's .env, then an already-set BACKEND_PORT/FRONTEND_PORT environment variable, then the defaults
-(8501, 4173) - the same precedence Start-Ledger.ps1 uses.
+Ports are the ones Start-Ledger.ps1 chose and saved (scripts\Ledger-Common.ps1 has the rules):
+for the backend an explicit parameter, then the repo root's .env, then the saved port, then the
+first free port in 8501-8599, which is saved. The frontend port is the explicit parameter, .env, an
+already-set FRONTEND_PORT, the saved port, then 8502; it is never scanned because this script does
+not start the frontend.
 
-On the first run it installs the widget's dependencies (`npm ci`), which needs network access once.
-It rebuilds the widget when the sources are newer than the build.
+Before launching it checks the backend's Python environment, the widget's packages and the Electron
+binary against their requirements and lock files, and installs whatever is missing or out of date
+(`pip install`, `npm ci`), which needs network access. It stops with an error when that fails. It
+rebuilds the widget when the sources are newer than the build.
 
 .PARAMETER BackendPort
-Port of the backend API. Default 8501.
+Port of the backend API. Default: the saved port, else the first free one in 8501-8599.
 
 .PARAMETER FrontendPort
-Port the dashboard frontend is served on when "Open Ledger" starts it. Default 4173.
+Port the dashboard frontend is served on when "Open Ledger" starts it. Default: the saved port, else 8502.
 
 .PARAMETER PassThru
 Return the launched Electron process (used by the tests).
@@ -52,47 +56,25 @@ if ($Help) {
 $widgetDir = $PSScriptRoot
 $repoRoot = Split-Path $widgetDir -Parent
 
-$envFileValues = @{}
-$rootEnvFile = Join-Path $repoRoot '.env'
-if (Test-Path $rootEnvFile) {
-    foreach ($line in Get-Content $rootEnvFile) {
-        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$' -and $line -notmatch '^\s*#') {
-            $envFileValues[$Matches[1]] = $Matches[2]
-        }
-    }
-}
+. (Join-Path $repoRoot 'scripts\Ledger-Common.ps1')
 
-function Resolve-Port {
-    param([int]$Explicit, [string]$Name, [int]$Default)
-    if ($Explicit) { return $Explicit }
-    if ($envFileValues.ContainsKey($Name)) { return [int]$envFileValues[$Name] }
-    $existing = [Environment]::GetEnvironmentVariable($Name)
-    if ($existing) { return [int]$existing }
-    return $Default
-}
+$defaultFrontendPort = 8502
+$envFileValues = Read-EnvFile -Path (Join-Path $repoRoot '.env')
+$savedPorts = Get-SavedPorts
 
-$env:BACKEND_PORT = Resolve-Port -Explicit $BackendPort -Name 'BACKEND_PORT' -Default 8501
-$env:FRONTEND_PORT = Resolve-Port -Explicit $FrontendPort -Name 'FRONTEND_PORT' -Default 4173
+$backend = Resolve-LedgerPort -Explicit $BackendPort -Name 'BACKEND_PORT' -EnvFileValues $envFileValues `
+    -SavedPorts $savedPorts -ReuseWhen { param($port) Test-LedgerBackend -Port $port }
+if ($backend.Source -eq 'scanned') { Save-Port -Name 'BACKEND_PORT' -Port $backend.Port }
+$env:BACKEND_PORT = $backend.Port
+
+$savedFrontend = if ($savedPorts.ContainsKey('FRONTEND_PORT')) { $savedPorts['FRONTEND_PORT'] } else { $defaultFrontendPort }
+$env:FRONTEND_PORT = Resolve-Port -Explicit $FrontendPort -Name 'FRONTEND_PORT' -Default $savedFrontend -EnvFileValues $envFileValues
+
+# The backend the widget starts needs its environment as much as the widget needs its packages.
+Invoke-DependencyRepair -RepoRoot $repoRoot -Component 'api', 'widget'
 
 Push-Location $widgetDir
 try {
-    if (-not (Test-Path (Join-Path $widgetDir 'node_modules'))) {
-        Write-Host 'Installing the widget dependencies (first run only)...'
-        npm ci
-        if ($LASTEXITCODE -ne 0) {
-            throw 'npm ci failed. The widget needs network access once to install; nothing was started.'
-        }
-    }
-
-    $electronExe = Join-Path $widgetDir 'node_modules\electron\dist\electron.exe'
-    if (-not (Test-Path $electronExe)) {
-        # Electron fetches its binary in a post-install step that can be skipped; run it now.
-        node (Join-Path $widgetDir 'node_modules\electron\install.js')
-        if (-not (Test-Path $electronExe)) {
-            throw 'The Electron binary is missing and could not be downloaded; nothing was started.'
-        }
-    }
-
     $built = Join-Path $widgetDir 'dist\main\index.js'
     $newestSource = Get-ChildItem (Join-Path $widgetDir 'src') -Recurse -File |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -105,5 +87,6 @@ try {
     Pop-Location
 }
 
+$electronExe = Get-ElectronPath -RepoRoot $repoRoot
 $process = Start-Process -FilePath $electronExe -ArgumentList ('"' + $widgetDir + '"') -WorkingDirectory $widgetDir -PassThru
 if ($PassThru) { $process }
