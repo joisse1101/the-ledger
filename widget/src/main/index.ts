@@ -4,11 +4,13 @@ import { createApi } from './api'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
 import { startPoller } from './poller'
+import { loadProjects, PROJECTS_POLL_MS, ProjectsTooltip } from './projectsTooltip'
 import { RemoteTooltip } from './remoteTooltip'
 import type { RemoteStatus } from '../shared/types'
 import { loadState } from './state'
 import { Supervisor } from './supervisor'
 import { createDeps } from './system'
+import { TooltipSlot } from './tooltipSlot'
 import { createTooltipWindow } from './tooltipWindow'
 import { createWidgetWindow, type WidgetWindow } from './window'
 
@@ -32,11 +34,22 @@ if (!app.requestSingleInstanceLock()) {
     // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
     let remote: RemoteStatus = { state: 'unavailable' }
     const tooltipWindow = createTooltipWindow()
+    // The Remote button and the Ledger button each have a tooltip; they share this one window.
+    const slot = new TooltipSlot((content) =>
+      content ? tooltipWindow.show(content, win.window.getBounds()) : tooltipWindow.hide(),
+    )
     const tooltip = new RemoteTooltip({
       fetchQr: () => api.fetchQr(),
-      present: (content) => (content ? tooltipWindow.show(content, win.window.getBounds()) : tooltipWindow.hide()),
+      present: (content) => slot.present('remote', content),
       now: Date.now,
     })
+    // Read at startup, every minute, and on each hover, so a hover shows rows at once. The poller
+    // never overlaps reads, and a hover during a read joins it.
+    const projects = new ProjectsTooltip({
+      present: (content) => slot.present('projects', content),
+      refresh: () => void projectsPoller.refresh(),
+    })
+    const projectsPoller = startPoller(() => loadProjects(api), (data) => projects.onData(data), PROJECTS_POLL_MS)
     const applyRemote = (status: RemoteStatus) => {
       remote = status
       win.sendRemote(status)
@@ -70,6 +83,9 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.on(CHANNELS.remoteHover, (_event, hovering: unknown) => {
       if (typeof hovering === 'boolean') tooltip.setHover(hovering)
     })
+    ipcMain.on(CHANNELS.ledgerHover, (_event, hovering: unknown) => {
+      if (typeof hovering === 'boolean') projects.setHover(hovering)
+    })
     ipcMain.on(CHANNELS.openLedger, () => void supervisor.openLedger())
     ipcMain.on(CHANNELS.setOpacity, (_event, value: unknown) => {
       if (typeof value === 'number') win.setOpacity(value)
@@ -98,7 +114,9 @@ if (!app.requestSingleInstanceLock()) {
     app.on('before-quit', (event) => {
       poller.stop()
       remotePoller.stop()
+      projectsPoller.stop()
       tooltip.dispose()
+      projects.dispose()
       tooltipWindow.destroy()
       const remoteActive = remote.state === 'starting' || remote.state === 'ready'
       if (!quitting && remoteActive && supervisor.ownedNames().includes('backend')) {
