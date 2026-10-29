@@ -10,9 +10,11 @@ const BUILT_IN = { path: ".claude/worktrees", built_in: true };
 interface World {
   isLocal: boolean;
   userFolders: string[];
+  maxProjects: number;
   /** Folders the fake server refuses, with its reason. */
   refused: Record<string, string>;
-  puts: string[][];
+  /** The body of each save, as the server received it. */
+  puts: { worktree_folders?: string[]; widget?: { max_projects: number } }[];
   /** While set, a save waits for it, so a test can look at the pending state. */
   gate: Promise<void> | null;
 }
@@ -24,6 +26,7 @@ function json(body: unknown, status = 200): Response {
 function settingsBody(world: World) {
   return {
     worktree_folders: [BUILT_IN, ...world.userFolders.map((path) => ({ path, built_in: false }))],
+    widget: { max_projects: world.maxProjects },
   };
 }
 
@@ -43,12 +46,17 @@ function stubServer(world: World) {
         return world.isLocal ? json(settingsBody(world)) : json({ detail: "settings require a local request" }, 403);
       }
       if (input === "/api/settings" && method === "PUT") {
-        const { worktree_folders } = JSON.parse(String(init?.body)) as { worktree_folders: string[] };
-        world.puts.push(worktree_folders);
+        const body = JSON.parse(String(init?.body)) as World["puts"][number];
+        world.puts.push(body);
         await world.gate;
-        const bad = worktree_folders.find((folder) => folder in world.refused);
+        const bad = body.worktree_folders?.find((folder) => folder in world.refused);
         if (bad !== undefined) return json({ detail: world.refused[bad] }, 422);
-        world.userFolders = worktree_folders;
+        const maxProjects = body.widget?.max_projects;
+        if (maxProjects !== undefined && !(Number.isInteger(maxProjects) && maxProjects >= 1 && maxProjects <= 10)) {
+          return json({ detail: "Must be a whole number from 1 to 10." }, 422);
+        }
+        if (body.worktree_folders) world.userFolders = body.worktree_folders;
+        if (maxProjects !== undefined) world.maxProjects = maxProjects;
         return json(settingsBody(world));
       }
       return json({ detail: "unexpected" }, 500);
@@ -72,7 +80,7 @@ function renderPage(world: World) {
 
 let world: World;
 beforeEach(() => {
-  world = { isLocal: true, userFolders: [], refused: {}, puts: [], gate: null };
+  world = { isLocal: true, userFolders: [], maxProjects: 5, refused: {}, puts: [], gate: null };
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -94,7 +102,7 @@ describe("SettingsPage", () => {
 
     const list = screen.getByRole("list", { name: "Worktree folders" });
     expect(await within(list).findByText(".trees")).toBeInTheDocument();
-    expect(world.puts).toEqual([[".trees"]]);
+    expect(world.puts).toEqual([{ worktree_folders: [".trees"] }]);
     expect(screen.getByLabelText("Add a folder")).toHaveValue("");
   });
 
@@ -105,7 +113,7 @@ describe("SettingsPage", () => {
     fireEvent.change(await screen.findByLabelText("Add a folder"), { target: { value: "tools/wt" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
-    await waitFor(() => expect(world.puts).toEqual([[".trees", "tools/wt"]]));
+    await waitFor(() => expect(world.puts).toEqual([{ worktree_folders: [".trees", "tools/wt"] }]));
   });
 
   it("removes a folder at once", async () => {
@@ -116,7 +124,7 @@ describe("SettingsPage", () => {
 
     const list = screen.getByRole("list", { name: "Worktree folders" });
     await waitFor(() => expect(within(list).queryByText(".trees")).not.toBeInTheDocument());
-    expect(world.puts).toEqual([["tools/wt"]]);
+    expect(world.puts).toEqual([{ worktree_folders: ["tools/wt"] }]);
     expect(within(list).getByText("tools/wt")).toBeInTheDocument();
   });
 
@@ -145,6 +153,53 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
     release();
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+  });
+
+  it("shows the widget's projects-shown number, 5 until set", async () => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Projects shown (1 to 10)");
+    await waitFor(() => expect(input).toHaveValue(5));
+  });
+
+  it("saves a new number on its own, without touching the folders", async () => {
+    world.userFolders = [".trees"];
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Projects shown (1 to 10)");
+    await waitFor(() => expect(input).toHaveValue(5));
+    fireEvent.change(input, { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(world.maxProjects).toBe(3));
+    expect(world.puts).toEqual([{ widget: { max_projects: 3 } }]);
+    expect(world.userFolders).toEqual([".trees"]);
+    await waitFor(() => expect(screen.getByLabelText("Projects shown (1 to 10)")).toHaveValue(3));
+  });
+
+  it("shows the server's reason for a rejected number and keeps what was typed", async () => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Projects shown (1 to 10)");
+    await waitFor(() => expect(input).toHaveValue(5));
+    fireEvent.change(input, { target: { value: "11" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("whole number from 1 to 10");
+    expect(screen.getByLabelText("Projects shown (1 to 10)")).toHaveValue(11);
+    expect(world.maxProjects).toBe(5);
+  });
+
+  it("leaves the number alone when a folder is added", async () => {
+    world.maxProjects = 3;
+    renderPage(world);
+
+    fireEvent.change(await screen.findByLabelText("Add a folder"), { target: { value: ".trees" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(world.puts).toEqual([{ worktree_folders: [".trees"] }]));
+    expect(world.maxProjects).toBe(3);
+    expect(screen.getByLabelText("Projects shown (1 to 10)")).toHaveValue(3);
   });
 
   it("sends a device that is not local to the home page without asking for settings", async () => {

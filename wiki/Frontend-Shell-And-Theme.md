@@ -20,6 +20,11 @@
   to `PUT /api/settings` (`useSaveSettings`) at once, disables the controls and shows "Saving..." while the server
   re-files sessions, shows its reason inline if a folder is refused (input and list stay as they were), and on success
   reloads the transcripts, session, overview, projects and live queries.
+  Below the folders, a "Desktop widget" section has a number input (1 to 10, 5 until set) for how many projects the
+  widget's Ledger-button tooltip lists. Its Save sends only `{widget: {max_projects}}` (`useSaveWidgetMaxProjects`),
+  which the server saves without re-filing sessions, so nothing else is reloaded. The form is `noValidate`, so a
+  rejected number shows the server's reason inline (same as a refused folder) and the typed value stays. The field
+  follows the saved number until the user types, and saving folders leaves it alone.
 - **Theme** (`web/src/theme/theme.ts`): `data-theme` on `<html>`, seeded from `localStorage` (guarded
   try/catch — private windows etc.) else `prefers-color-scheme`, applied *before* React even mounts.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button

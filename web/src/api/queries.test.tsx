@@ -17,6 +17,7 @@ import {
   useRefresh,
   useRemoteQr,
   useSaveSettings,
+  useSaveWidgetMaxProjects,
   useSetAutoApprove,
   useSetRemoteMode,
   useSettings,
@@ -516,6 +517,7 @@ describe("the settings", () => {
   }
 
   const saved = {
+    widget: { max_projects: 5 },
     worktree_folders: [
       { path: ".claude/worktrees", built_in: true },
       { path: ".trees", built_in: false },
@@ -563,6 +565,25 @@ describe("the settings", () => {
     expect(reloaded).toEqual(
       expect.arrayContaining([keys.transcripts, ["session"], ["overview"], keys.projects, keys.live]),
     );
+    client.clear();
+  });
+
+  it("saves the widget's number with a JSON PUT and reloads nothing derived from sessions", async () => {
+    const withThree = { ...saved, widget: { max_projects: 3 } };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withThree));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    const { result } = renderHook(() => useSaveWidgetMaxProjects(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync(3));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/settings");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual({ widget: { max_projects: 3 } });
+    expect(client.getQueryData(keys.settings)).toEqual(withThree);
+    expect(invalidate).not.toHaveBeenCalled();
     client.clear();
   });
 

@@ -377,3 +377,19 @@ export function useSaveSettings() {
     },
   });
 }
+
+/** Saves how many projects the desktop widget lists. A display preference only: nothing derived from
+ *  sessions changes, so nothing is reloaded. Rejects with an ApiError carrying the server's reason
+ *  (422 for a number outside 1 to 10). */
+export function useSaveWidgetMaxProjects() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (maxProjects: number) =>
+      apiFetch<Settings>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widget: { max_projects: maxProjects } }),
+      }),
+    onSuccess: (settings) => client.setQueryData(keys.settings, settings),
+  });
+}
