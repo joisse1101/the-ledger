@@ -17,9 +17,10 @@ otherwise. It also removes the earlier PreToolUse-based relay hook (entry and in
 that is still present.
 
 The relay hook has to know which port the Ledger API is on, so the install writes it into the hook's
-command as -Port. It's resolved the same way Start-Ledger.ps1 does (highest wins): -BackendPort, then
-BACKEND_PORT in the repo root's .env, then an already-set BACKEND_PORT environment variable, then
-8501. Re-run this install after changing BACKEND_PORT.
+command as -Port. It's resolved the same way Start-Ledger.ps1 does, through scripts\Ledger-Common.ps1:
+-BackendPort, then BACKEND_PORT in the repo root's .env, then the port saved by an earlier start, then
+the first free port in 8501-8599 (which is saved). Start-Ledger.ps1 offers to re-run this install when
+the backend port no longer matches the hook's.
 
 Run this directly (in your own PowerShell prompt) rather than embedding $env:USERPROFILE inside a
 hook's "command" string in settings.json - Claude Code runs those via Git Bash or PowerShell
@@ -35,7 +36,7 @@ Also install the optional Ledger relay hook (PermissionRequest).
 
 .PARAMETER BackendPort
 The Ledger API's port to write into the relay hook. Only used with -IncludeSessionControl; when
-omitted it comes from .env, the environment, or 8501 (see above).
+omitted it comes from .env, the saved port, or the first free port in 8501-8599 (see above).
 
 .PARAMETER SkipToastHooks
 Leave the toast hooks alone: don't copy the toast scripts, register the claudecode:// handler, or
@@ -70,6 +71,9 @@ if ($Help) {
     Get-Help $PSCommandPath -Detailed
     return
 }
+
+$repoRoot = Split-Path $PSScriptRoot -Parent
+. (Join-Path $repoRoot 'scripts\Ledger-Common.ps1')
 
 # Empty = every PermissionRequest. The event only fires when a dialog is about to be shown, so there
 # is nothing to narrow.
@@ -146,24 +150,14 @@ function Add-ToastHook {
     Write-Host "Added $EventName hook for `"$Title`""
 }
 
-# Same precedence as Start-Ledger.ps1's Resolve-Port: explicit parameter, then the repo root's .env,
-# then an already-set BACKEND_PORT environment variable, then the default.
+# Same rules as Start-Ledger.ps1, so the hook points at the port the backend actually uses.
 function Resolve-BackendPort {
     param([int]$Explicit)
-    if ($Explicit) { return $Explicit }
-
-    $rootEnvFile = Join-Path $PSScriptRoot '..\.env'
-    if (Test-Path $rootEnvFile) {
-        foreach ($line in Get-Content $rootEnvFile) {
-            if ($line -match '^\s*BACKEND_PORT\s*=\s*(\d+)\s*$' -and $line -notmatch '^\s*#') {
-                return [int]$Matches[1]
-            }
-        }
-    }
-
-    $existing = [Environment]::GetEnvironmentVariable('BACKEND_PORT')
-    if ($existing -match '^\d+$') { return [int]$existing }
-    return 8501
+    $port = Resolve-LedgerPort -Explicit $Explicit -Name 'BACKEND_PORT' `
+        -EnvFileValues (Read-EnvFile -Path (Join-Path $repoRoot '.env')) -SavedPorts (Get-SavedPorts) `
+        -ReuseWhen { param($candidate) Test-LedgerBackend -Port $candidate }
+    if ($port.Source -eq 'scanned') { Save-Port -Name 'BACKEND_PORT' -Port $port.Port }
+    return $port.Port
 }
 
 function Add-RelayHook {
@@ -226,7 +220,7 @@ if ($IncludeSessionControl) {
     Remove-LegacyRelayHook -Settings $settings -ScriptName $legacyRelayName
     $relayPort = Resolve-BackendPort -Explicit $BackendPort
     Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout -Port $relayPort
-    Write-Host "Relay hook will talk to the Ledger API on port $relayPort (re-run this install if BACKEND_PORT changes)"
+    Write-Host "Relay hook will talk to the Ledger API on port $relayPort (Start-Ledger.ps1 offers to re-run this install if the backend port changes)"
 }
 
 New-Item -ItemType Directory -Force -Path (Split-Path $settingsPath) | Out-Null
