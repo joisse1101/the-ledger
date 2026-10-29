@@ -58,6 +58,20 @@ function Get-MissingPrerequisites {
         Where-Object { ($Remote -or -not $_.RemoteOnly) -and -not (& $Resolver $_.Command) }
 }
 
+function Test-Prerequisites {
+    # Prints each missing prerequisite with where to install it and returns $false if any is missing,
+    # so the caller can stop before touching anything. See Get-MissingPrerequisites for the switches.
+    param(
+        [switch]$Remote,
+        [scriptblock]$Resolver = { param($command) [bool](Get-Command $command -ErrorAction SilentlyContinue) }
+    )
+    $missing = @(Get-MissingPrerequisites -Remote:$Remote -Resolver $Resolver)
+    foreach ($tool in $missing) {
+        Write-Host "$($tool.Name) is not installed. Download it from $($tool.Url)"
+    }
+    return ($missing.Count -eq 0)
+}
+
 function Get-FilesStamp {
     # One hash over the content of the given files, in the order given; a missing file is an error
     # for the caller to see rather than a silently shorter stamp.

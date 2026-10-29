@@ -186,3 +186,21 @@ def test_port_free_is_false_while_a_listener_holds_it():
         "$freed = Test-PortFree -Port $port; \"$busy $freed\""
     )
     assert output == "False True"
+
+
+def test_prerequisite_check_names_the_missing_tool_and_returns_false():
+    output = _ps("Test-Prerequisites -Resolver { param($c) $c -ne 'node' } 6>&1")
+    assert output.splitlines() == ["Node is not installed. Download it from https://nodejs.org/en/download", "False"]
+
+
+def test_prerequisite_check_passes_silently_when_everything_is_present():
+    assert _ps("Test-Prerequisites -Resolver { $true } 6>&1") == "True"
+
+
+def test_prerequisite_check_ignores_missing_docker_without_remote():
+    assert _ps("Test-Prerequisites -Resolver { param($c) $c -ne 'docker' } 6>&1") == "True"
+
+
+def test_prerequisite_check_names_docker_with_remote():
+    output = _ps("Test-Prerequisites -Remote -Resolver { param($c) $c -ne 'docker' } 6>&1")
+    assert output.splitlines() == ["Docker is not installed. Download it from https://www.docker.com/products/docker-desktop/", "False"]
