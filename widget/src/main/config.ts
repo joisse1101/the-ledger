@@ -17,6 +17,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // dist/main/config.js -> widget/dist/main -> repo root is three levels up.
     repoRoot: path.resolve(__dirname, '..', '..', '..'),
     backendPort: portFrom(env.BACKEND_PORT, 8501),
-    frontendPort: portFrom(env.FRONTEND_PORT, 4173),
+    frontendPort: portFrom(env.FRONTEND_PORT, 8502),
   }
 }

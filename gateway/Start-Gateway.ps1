@@ -11,16 +11,16 @@ another device is refused.
 Precedence per port (highest wins): an explicit -GatewayPort/-BackendPort/-FrontendPort, then the
 repo root's .env (see .env.example) - so that file is the one place to look/set these regardless of
 whatever's already in your shell - then an already-set GATEWAY_PORT/BACKEND_PORT/FRONTEND_PORT
-environment variable, then the hardcoded defaults (8080, 8501, 4173).
+environment variable, then the hardcoded defaults (8503, 8501, 8502).
 
 .PARAMETER GatewayPort
-Port the gateway is published on. Default 8080. Avoid Chromium's restricted ports (e.g. 10080).
+Port the gateway is published on. Default 8503. Avoid Chromium's restricted ports (e.g. 10080).
 
 .PARAMETER BackendPort
 Port of the running backend the gateway proxies /api/ to. Default 8501.
 
 .PARAMETER FrontendPort
-Port of the running frontend the gateway proxies / to. Default 4173.
+Port of the running frontend the gateway proxies / to. Default 8502.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
@@ -67,9 +67,9 @@ function Resolve-Port {
     return $Default
 }
 
-$GatewayPort = Resolve-Port -Explicit $GatewayPort -Name 'GATEWAY_PORT' -Default 8080
+$GatewayPort = Resolve-Port -Explicit $GatewayPort -Name 'GATEWAY_PORT' -Default 8503
 $BackendPort = Resolve-Port -Explicit $BackendPort -Name 'BACKEND_PORT' -Default 8501
-$FrontendPort = Resolve-Port -Explicit $FrontendPort -Name 'FRONTEND_PORT' -Default 4173
+$FrontendPort = Resolve-Port -Explicit $FrontendPort -Name 'FRONTEND_PORT' -Default 8502
 
 $env:GATEWAY_PORT = $GatewayPort
 $env:BACKEND_PORT = $BackendPort

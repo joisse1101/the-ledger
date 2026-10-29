@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Mapping, Optional, Sequence
 
-DEFAULT_FRONTEND_PORT = 4173  # Vite's own `vite preview` default
+DEFAULT_FRONTEND_PORT = 8502  # matches the installer's 8501-8599 range
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8501
@@ -45,7 +45,7 @@ def parse_settings(
     argv: Optional[Sequence[str]] = None, environ: Mapping[str, str] = os.environ
 ) -> Settings:
     """--host beats LEDGER_HOST beats 127.0.0.1; --port beats LEDGER_PORT beats 8501;
-    --frontend-port beats LEDGER_FRONTEND_PORT beats 4173 (only used for the printed link — this
+    --frontend-port beats LEDGER_FRONTEND_PORT beats 8502 (only used for the printed link — this
     process never connects to the frontend's port itself). `--lan` is no longer a bind mode: other
     devices now reach the app through the containerized gateway (see CLAUDE.md), so passing it exits
     with an error rather than doing anything. `--reload` has no env var (dev-only, always explicit)."""

@@ -17,7 +17,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from app.infra.remote_gateway import RemoteStartError
 
-DEFAULT_GATEWAY_PORT = 8080  # matches gateway/docker-compose.yml and .env.example
+DEFAULT_GATEWAY_PORT = 8503  # matches gateway/docker-compose.yml and .env.example
 DOCKER_INFO_TIMEOUT_SECONDS = 15
 COMPOSE_UP_TIMEOUT_SECONDS = 600  # the first run builds the image
 COMPOSE_TIMEOUT_SECONDS = 120

@@ -50,7 +50,7 @@ def test_gateway_port_prefers_the_root_env_file(tmp_path):
 
 def test_gateway_port_falls_back_to_the_environment_then_the_default(tmp_path):
     assert gateway_port(tmp_path, {"GATEWAY_PORT": "7000"}) == 7000
-    assert gateway_port(tmp_path, {}) == 8080
+    assert gateway_port(tmp_path, {}) == 8503
 
 
 # ------------------------------------------------ docker

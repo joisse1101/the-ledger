@@ -2,9 +2,9 @@ services:
   gateway:
     build: .
     ports:
-      - "${GATEWAY_PORT:-8080}:443"
+      - "${GATEWAY_PORT:-8503}:443"
     environment:
       - BACKEND_PORT=${BACKEND_PORT:-8501}
-      - FRONTEND_PORT=${FRONTEND_PORT:-4173}
+      - FRONTEND_PORT=${FRONTEND_PORT:-8502}
     extra_hosts:
       - "host.docker.internal:host-gateway"
