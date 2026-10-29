@@ -150,16 +150,6 @@ function Add-ToastHook {
     Write-Host "Added $EventName hook for `"$Title`""
 }
 
-# Same rules as Start-Ledger.ps1, so the hook points at the port the backend actually uses.
-function Resolve-BackendPort {
-    param([int]$Explicit)
-    $port = Resolve-LedgerPort -Explicit $Explicit -Name 'BACKEND_PORT' `
-        -EnvFileValues (Read-EnvFile -Path (Join-Path $repoRoot '.env')) -SavedPorts (Get-SavedPorts) `
-        -ReuseWhen { param($candidate) Test-LedgerBackend -Port $candidate }
-    if ($port.Source -eq 'scanned') { Save-Port -Name 'BACKEND_PORT' -Port $port.Port }
-    return $port.Port
-}
-
 function Add-RelayHook {
     param($Settings, [string]$ScriptPath, [string]$Matcher, [int]$Timeout, [int]$Port)
 
@@ -218,7 +208,7 @@ if ($IncludeSessionControl) {
     $legacyScript = Join-Path $ledgerScriptsDir $legacyRelayName
     if (Test-Path $legacyScript) { Remove-Item -Path $legacyScript -Force }
     Remove-LegacyRelayHook -Settings $settings -ScriptName $legacyRelayName
-    $relayPort = Resolve-BackendPort -Explicit $BackendPort
+    $relayPort = Resolve-BackendPort -RepoRoot $repoRoot -Explicit $BackendPort
     Add-RelayHook -Settings $settings -ScriptPath $relayScript -Matcher $relayMatcher -Timeout $relayHookTimeout -Port $relayPort
     Write-Host "Relay hook will talk to the Ledger API on port $relayPort (Start-Ledger.ps1 offers to re-run this install if the backend port changes)"
 }

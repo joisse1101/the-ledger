@@ -331,6 +331,16 @@ function Write-StartSummary {
     return (@($Result | Where-Object { $_.State -eq 'failed' }).Count -eq 0)
 }
 
+function Resolve-BackendPort {
+    # The backend port by the shared rules (parameter, .env, saved, first free); a scanned port is saved.
+    param([string]$RepoRoot, [int]$Explicit)
+    $port = Resolve-LedgerPort -Explicit $Explicit -Name 'BACKEND_PORT' `
+        -EnvFileValues (Read-EnvFile -Path (Join-Path $RepoRoot '.env')) -SavedPorts (Get-SavedPorts) `
+        -ReuseWhen { param($candidate) Test-LedgerBackend -Port $candidate }
+    if ($port.Source -eq 'scanned') { Save-Port -Name 'BACKEND_PORT' -Port $port.Port }
+    return $port.Port
+}
+
 function Test-InteractiveConsole {
     # True when a person can answer a prompt: a user session with input that is not redirected.
     return ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected)
