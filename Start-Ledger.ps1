@@ -14,6 +14,10 @@ window PIDs are recorded to the root .ledger-run.json (gitignored) so the paired
 stop exactly these windows (and their child processes) without touching any other window you have
 open. A backend that is already answering on the chosen port is reused, not started a second time.
 
+When the relay hook is installed for a different backend port than the one chosen, the script says so
+and offers to reinstall it: it asks first when a console is attached, and reinstalls (and says so)
+when none is or when -Yes is given. Nothing is said when the hook is not installed.
+
 A missing prerequisite stops the start before anything is touched: the script names it, prints the
 official page to install it from, and exits non-zero. A dependency that cannot be installed (for
 example with no network) stops it the same way.
@@ -53,6 +57,9 @@ the sign-in QR from the dashboard. Switch it off from the dashboard or the widge
 
 .PARAMETER NoWidget
 Don't start the desktop widget (and don't check its dependencies).
+
+.PARAMETER Yes
+Answer yes to the offer to reinstall a relay hook that points at an old backend port.
 
 .PARAMETER NoGateway
 Accepted for old command lines and does nothing: the gateway is no longer started by default.
@@ -104,6 +111,7 @@ param(
     [switch]$Remote,
     [switch]$NoWidget,
     [switch]$NoGateway,
+    [switch]$Yes,
     [int]$BackendPort,
     [int]$FrontendPort,
     [int]$GatewayPort,
@@ -148,6 +156,14 @@ foreach ($name in $chosenPorts.Keys) {
 $BackendPort = $backend.Port
 $FrontendPort = $frontend.Port
 $GatewayPort = $gateway.Port
+
+try {
+    $relayInstaller = Join-Path $PSScriptRoot 'hooks\Install-ClaudeHooks.ps1'
+    Update-StaleRelayHook -BackendPort $BackendPort -Yes:$Yes `
+        -Reinstall { param($port) & $relayInstaller -IncludeSessionControl -SkipToastHooks -BackendPort $port } | Out-Null
+} catch {
+    Write-Warning "Could not check the relay hook: $($_.Exception.Message)"
+}
 
 $venvPython = Join-Path $PSScriptRoot 'api\.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }

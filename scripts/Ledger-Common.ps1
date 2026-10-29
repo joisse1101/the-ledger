@@ -330,3 +330,51 @@ function Write-StartSummary {
     }
     return (@($Result | Where-Object { $_.State -eq 'failed' }).Count -eq 0)
 }
+
+function Test-InteractiveConsole {
+    # True when a person can answer a prompt: a user session with input that is not redirected.
+    return ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected)
+}
+
+function Get-RelayHookPort {
+    # The backend port baked into the installed relay hook's command, or $null when the hook (or the
+    # settings file) is not there.
+    param([string]$SettingsPath = (Join-Path $env:USERPROFILE '.claude\settings.json'))
+    if (-not (Test-Path $SettingsPath)) { return $null }
+    $settings = Get-Content $SettingsPath -Raw | ConvertFrom-Json
+    if (-not $settings.PSObject.Properties['hooks'] -or -not $settings.hooks.PSObject.Properties['PermissionRequest']) { return $null }
+    foreach ($entry in @($settings.hooks.PermissionRequest)) {
+        foreach ($hook in @($entry.hooks)) {
+            if ($hook.command -match 'Relay-PermissionRequest\.ps1.*\s-Port\s+(\d+)') { return [int]$Matches[1] }
+        }
+    }
+    return $null
+}
+
+function Update-StaleRelayHook {
+    # Offers to reinstall the relay hook when it points at a different backend port than the one in use.
+    # With a console it asks first; with none, or with -Yes, it reinstalls and says so. Says nothing when
+    # the hook is not installed or already current. Returns 'current', 'reinstalled' or 'declined'.
+    # -Reinstall takes the port; -Ask takes the question and returns the answer.
+    param(
+        [int]$BackendPort,
+        [scriptblock]$Reinstall,
+        [string]$SettingsPath = (Join-Path $env:USERPROFILE '.claude\settings.json'),
+        [switch]$Yes,
+        [bool]$Interactive = (Test-InteractiveConsole),
+        [scriptblock]$Ask = { param($question) (Read-Host "$question [y/N]") -match '^(y|yes)$' }
+    )
+    $installedPort = Get-RelayHookPort -SettingsPath $SettingsPath
+    if (($null -eq $installedPort) -or ($installedPort -eq $BackendPort)) { return 'current' }
+
+    Write-Host "The relay hook is installed for backend port $installedPort, but the backend is on $BackendPort."
+    if ($Interactive -and -not $Yes) {
+        if (-not (& $Ask "Reinstall the relay hook for port $BackendPort?")) {
+            Write-Host "Left the relay hook on port $installedPort; answering prompts from the dashboard won't work until it is reinstalled."
+            return 'declined'
+        }
+    }
+    & $Reinstall $BackendPort | Out-Null
+    Write-Host "Reinstalled the relay hook for port $BackendPort."
+    return 'reinstalled'
+}

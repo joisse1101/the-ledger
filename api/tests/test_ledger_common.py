@@ -5,6 +5,7 @@ environment's BACKEND_PORT and the machine's installed tools are never consulted
 """
 
 import http.server
+import json
 import os
 import shutil
 import socket
@@ -361,3 +362,74 @@ def test_start_summary_fails_when_a_piece_did_not_come_up():
         "[PSCustomObject]@{ Name = 'frontend'; State = 'failed'; Address = 'http://localhost:8502' }) 6>&1"
     )
     assert output.splitlines() == ["backend   running  http://localhost:8501", "frontend  failed  http://localhost:8502", "False"]
+
+
+# --- relay hook staleness ----------------------------------------------------------------------
+
+def _settings_with_relay(tmp_path: Path, port: int | None) -> Path:
+    """A throwaway settings.json; with a port, it holds the relay hook installed for that port."""
+    hooks: dict = {}
+    if port is not None:
+        command = f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:/u/ledgerScripts/Relay-PermissionRequest.ps1" -Port {port}'
+        hooks["PermissionRequest"] = [{"matcher": "", "hooks": [{"type": "command", "command": command, "timeout": 1810}]}]
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
+    return settings
+
+
+def _update(settings: Path, backend_port: int, interactive: str, answer: str = "$true", extra: str = "") -> list[str]:
+    """Run Update-StaleRelayHook with fakes; lines are what it printed, then what the fakes recorded."""
+    output = _ps(
+        f"$log = New-Object System.Collections.Generic.List[string]; "
+        f"Update-StaleRelayHook -BackendPort {backend_port} -SettingsPath '{settings}' -Interactive {interactive} {extra} "
+        f"-Reinstall {{ param($p) $log.Add(\"reinstall:$p\") }} "
+        f"-Ask {{ param($q) $log.Add('asked'); {answer} }} 6>&1; "
+        f"$log -join ','"
+    )
+    return output.splitlines()
+
+
+def test_relay_hook_port_is_read_from_the_installed_command(tmp_path):
+    settings = _settings_with_relay(tmp_path, 8511)
+    assert _ps(f"Get-RelayHookPort -SettingsPath '{settings}'") == "8511"
+
+
+def test_relay_hook_port_is_empty_when_the_hook_is_not_installed(tmp_path):
+    settings = _settings_with_relay(tmp_path, None)
+    assert _ps(f"$null -eq (Get-RelayHookPort -SettingsPath '{settings}')") == "True"
+
+
+def test_relay_hook_port_is_empty_when_there_is_no_settings_file(tmp_path):
+    assert _ps(f"$null -eq (Get-RelayHookPort -SettingsPath '{tmp_path / 'absent.json'}')") == "True"
+
+
+def test_stale_relay_hook_is_reinstalled_when_the_console_user_agrees(tmp_path):
+    lines = _update(_settings_with_relay(tmp_path, 8511), 8520, interactive="$true", answer="$true")
+
+    assert lines[-3:] == ["Reinstalled the relay hook for port 8520.", "reinstalled", "asked,reinstall:8520"]
+
+
+def test_stale_relay_hook_is_left_alone_when_the_console_user_declines(tmp_path):
+    lines = _update(_settings_with_relay(tmp_path, 8511), 8520, interactive="$true", answer="$false")
+
+    assert lines[-2:] == ["declined", "asked"]
+
+
+def test_stale_relay_hook_is_reinstalled_with_a_notice_when_there_is_no_console(tmp_path):
+    lines = _update(_settings_with_relay(tmp_path, 8511), 8520, interactive="$false")
+
+    assert lines[-3:] == ["Reinstalled the relay hook for port 8520.", "reinstalled", "reinstall:8520"]
+
+
+def test_stale_relay_hook_is_reinstalled_without_asking_when_told_to_assume_yes(tmp_path):
+    lines = _update(_settings_with_relay(tmp_path, 8511), 8520, interactive="$true", extra="-Yes")
+
+    assert lines[-2:] == ["reinstalled", "reinstall:8520"]
+
+
+def test_relay_hook_that_is_not_installed_is_not_mentioned_or_installed(tmp_path):
+    assert _update(_settings_with_relay(tmp_path, None), 8520, interactive="$true") == ["current"]
+
+
+def test_relay_hook_on_the_current_port_is_left_alone_silently(tmp_path):
+    assert _update(_settings_with_relay(tmp_path, 8520), 8520, interactive="$true") == ["current"]
