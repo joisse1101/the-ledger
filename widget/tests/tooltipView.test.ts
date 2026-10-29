@@ -58,6 +58,52 @@ describe('renderTooltip', () => {
   })
 })
 
+describe('renderTooltip: projects', () => {
+  const rows = [
+    { name: 'the-ledger', source: 'GitHub', issues: 7, prs: 2 },
+    { name: 'scratch', source: 'GitHub', issues: null, prs: null },
+  ]
+
+  it('shows a heading line and a line per project with name, source, issues and PRs', () => {
+    renderTooltip(card, { kind: 'projects', rows, more: 0 })
+    const cells = [...card.querySelectorAll('.cell')].map((cell) => cell.textContent)
+    expect(cells).toEqual([
+      'Project', 'Source', 'Issues', 'PRs',
+      'the-ledger', 'GitHub', '7', '2',
+      'scratch', 'GitHub', '--', '--',
+    ])
+  })
+
+  it('shows a "+N more" line only when there are more', () => {
+    renderTooltip(card, { kind: 'projects', rows, more: 3 })
+    expect(card.querySelector('.more')?.textContent).toBe('+3 more')
+    renderTooltip(card, { kind: 'projects', rows, more: 0 })
+    expect(card.querySelector('.more')).toBeNull()
+  })
+
+  it('shows a zero count as 0, not as unavailable', () => {
+    renderTooltip(card, { kind: 'projects', rows: [{ name: 'quiet', source: 'GitHub', issues: 0, prs: 0 }], more: 0 })
+    expect([...card.querySelectorAll('.num')].map((cell) => cell.textContent)).toEqual(['0', '0'])
+  })
+
+  it('inserts every value as text, never as markup', () => {
+    renderTooltip(card, {
+      kind: 'projects',
+      rows: [{ name: '<img src=x onerror=alert(1)>', source: '<b>GitHub</b>', issues: 1, prs: 1 }],
+      more: 0,
+    })
+    expect(card.querySelector('img, b')).toBeNull()
+    expect(card.querySelector('.name')?.textContent).toBe('<img src=x onerror=alert(1)>')
+  })
+
+  it('replaces a code that was there before', () => {
+    renderTooltip(card, { kind: 'qr', svg: '<svg/>', displayUrl: 'https://10.0.0.5:8080', timeLeft: null })
+    renderTooltip(card, { kind: 'projects', rows, more: 0 })
+    expect(card.querySelector('img')).toBeNull()
+    expect(card.children).toHaveLength(1)
+  })
+})
+
 describe('the tooltip page', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'tooltip.html'), 'utf8')
 

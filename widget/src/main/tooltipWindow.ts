@@ -4,9 +4,7 @@ import { CHANNELS } from '../shared/ipc'
 import type { TooltipContent } from '../shared/types'
 import { placeTooltip } from './remoteTooltip'
 import type { Rect } from './state'
-
-const MESSAGE_SIZE = { width: 220, height: 64 }
-const QR_SIZE = { width: 220, height: 290 }
+import { MESSAGE_SIZE, tooltipSize } from './tooltipSize'
 
 export interface TooltipWindow {
   /** Draws `content` next to `anchor` (the widget's bounds) without taking focus. */
@@ -16,10 +14,11 @@ export interface TooltipWindow {
 }
 
 /**
- * The small window beside the widget that shows Remote mode's status and sign-in code. Frameless,
- * always on top, never focusable, ignoring the mouse (so it can't be stuck open or steal a click),
- * and no taskbar entry. It draws only what the main process sends it, in the same sandbox and
- * CSP as the widget. Created on first use and kept hidden between uses.
+ * The small window beside the widget that shows Remote mode's status and sign-in code, or the
+ * projects list. Frameless, always on top, never focusable, ignoring the mouse (so it can't be
+ * stuck open or steal a click), and no taskbar entry. It draws only what the main process sends it,
+ * sized by `tooltipSize`, in the same sandbox and CSP as the widget. Created on first use and kept
+ * hidden between uses.
  */
 export function createTooltipWindow(): TooltipWindow {
   let window: BrowserWindow | undefined
@@ -65,7 +64,7 @@ export function createTooltipWindow(): TooltipWindow {
   return {
     show(content, anchor) {
       const target = ensure()
-      const size = content.kind === 'qr' ? QR_SIZE : MESSAGE_SIZE
+      const size = tooltipSize(content)
       const workArea = screen.getDisplayMatching(anchor).workArea
       target.setBounds({ ...placeTooltip(anchor, size, workArea), ...size })
       pending = content

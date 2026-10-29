@@ -68,6 +68,7 @@ export interface ProjectRow {
 export type TooltipContent =
   | { kind: 'message'; text: string }
   | { kind: 'qr'; svg: string; displayUrl: string; timeLeft: string | null }
+  | { kind: 'projects'; rows: ProjectRow[]; more: number }
 
 /** What the tooltip window's preload exposes to its page as `window.tooltip`. */
 export interface TooltipBridge {
