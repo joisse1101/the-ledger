@@ -182,35 +182,47 @@ if ($Mode -eq 'dev') {
 }
 $frontendProc = Start-Process powershell -ArgumentList '-NoExit', '-Command', $frontendCommand -PassThru
 
-# Recorded so Stop-Ledger.ps1 can find exactly these windows later.
-[PSCustomObject]@{
-    BackendPid  = $backendPid
-    FrontendPid = $frontendProc.Id
-    StartedAt   = (Get-Date).ToString('o')
-} | ConvertTo-Json | Set-Content -Path $stateFile -Encoding utf8
+$widgetDir = Join-Path $PSScriptRoot 'widget'
+$widgetPid = $null
+
+# Recorded so Stop-Ledger.ps1 can find exactly the processes this start launched.
+function Save-RunState {
+    [PSCustomObject]@{
+        BackendPid  = $backendPid
+        FrontendPid = $frontendProc.Id
+        WidgetPid   = $widgetPid
+        StartedAt   = (Get-Date).ToString('o')
+    } | ConvertTo-Json | Set-Content -Path $stateFile -Encoding utf8
+}
+Save-RunState
 
 # The widget starts its own hidden backend if none answers, so it waits for this one.
 Write-Host "Waiting for the backend..."
 $backendUp = Wait-Until -Condition { Test-LedgerBackend -Port $BackendPort } -TimeoutSeconds $StartupTimeoutSeconds
 
-$widgetDir = Join-Path $PSScriptRoot 'widget'
 $widgetState = 'skipped'
 if (-not $NoWidget -and $backendUp) {
-    if (@(Get-RunningWidget -WidgetDir $widgetDir).Count -gt 0) {
+    $runningWidgets = @(Get-RunningWidget -WidgetDir $widgetDir)
+    if ($runningWidgets.Count -gt 0) {
         Write-Host "The widget is already running - leaving it alone."
         $widgetState = 'already running'
+        # A widget an earlier start launched is still this start's to stop.
+        if ($previousState -and ($previousState.WidgetPid -in $runningWidgets.ProcessId)) { $widgetPid = $previousState.WidgetPid }
     } else {
         Write-Host "Starting the widget..."
         try {
             & (Join-Path $widgetDir 'Start-Widget.ps1') -BackendPort $BackendPort -FrontendPort $FrontendPort | Out-Null
             $widgetUp = Wait-Until -Condition { @(Get-RunningWidget -WidgetDir $widgetDir).Count -gt 0 } -TimeoutSeconds $StartupTimeoutSeconds
             $widgetState = if ($widgetUp) { 'running' } else { 'failed' }
+            if ($widgetUp) { $widgetPid = @(Get-RunningWidget -WidgetDir $widgetDir)[0].ProcessId }
         } catch {
             Write-Host "ERROR: the widget did not start: $($_.Exception.Message)"
             $widgetState = 'failed'
         }
     }
 }
+
+Save-RunState
 
 Write-Host "Waiting for the frontend..."
 $frontendUp = Wait-Until -Condition { Test-HttpUp -Url "http://127.0.0.1:$FrontendPort/" } -TimeoutSeconds $StartupTimeoutSeconds

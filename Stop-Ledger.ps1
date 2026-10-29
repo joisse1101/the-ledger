@@ -1,16 +1,18 @@
 <#
 .SYNOPSIS
-Stops what Start-Ledger.ps1 started: backend, frontend and gateway.
+Stops what Start-Ledger.ps1 started: backend, frontend, widget and gateway.
 
 .DESCRIPTION
-Stops the backend and frontend windows (found via the PIDs Start-Ledger.ps1 recorded to the root
-.ledger-run.json, removed once used) and the gateway container (`docker compose down`, same as
-gateway\Stop-Gateway.ps1) - all three, in one call. The gateway is stopped however it was started
+Stops the backend and frontend windows and the widget (found via the PIDs Start-Ledger.ps1 recorded
+to the root .ledger-run.json, removed once used) and the gateway container (`docker compose down`,
+same as gateway\Stop-Gateway.ps1) - all in one call. The gateway is stopped however it was started
 (Remote mode from the dashboard or widget, -Remote, or gateway\Start-Gateway.ps1); when Docker isn't
 running there is no gateway, so that step is skipped quietly.
 
 Only ever touches processes Start-Ledger.ps1 itself launched - it won't find or stop a
-backend/frontend you started by hand in your own terminal (there's no .ledger-run.json for those).
+backend/frontend you started by hand in your own terminal (there's no .ledger-run.json for those),
+and it leaves a widget that was already running when Start-Ledger.ps1 ran (no widget PID is recorded
+for it).
 Each window is stopped as a whole process tree (its `npm`/`vite`/`python` children included), not
 just the outer PowerShell window.
 
@@ -72,8 +74,14 @@ if (Test-Path $stateFile) {
     $targets = @(
         [PSCustomObject]@{ Name = 'backend'; Id = $state.BackendPid }
         [PSCustomObject]@{ Name = 'frontend'; Id = $state.FrontendPid }
+        [PSCustomObject]@{ Name = 'widget'; Id = $state.WidgetPid }
     )
     foreach ($target in $targets) {
+        # No recorded PID: Start-Ledger.ps1 reused it (a backend) or found it running (the widget).
+        if (-not $target.Id) {
+            Write-Host "$($target.Name) wasn't started by Start-Ledger.ps1 - leaving it alone."
+            continue
+        }
         if ($target.Id -and (Get-Process -Id $target.Id -ErrorAction SilentlyContinue)) {
             Write-Host "Stopping $($target.Name) (PID $($target.Id)) and its child processes..."
             & taskkill.exe /PID $target.Id /T /F | Out-Null
