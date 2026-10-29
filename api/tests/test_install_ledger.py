@@ -41,13 +41,15 @@ class Sandbox:
         for folder in (self.home / ".claude", self.desktop, self.startup):
             folder.mkdir(parents=True)
 
-    def run(self, *switches: str) -> str:
+    def run(self, *switches: str, port: str = BACKEND_PORT) -> str:
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(INSTALLER),
              "-DesktopPath", str(self.desktop), "-StartupPath", str(self.startup),
-             "-TaskName", self.task_name, "-BackendPort", BACKEND_PORT, *switches],
+             "-TaskName", self.task_name, "-BackendPort", port, *switches],
             env={**os.environ, "USERPROFILE": str(self.home)},
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, check=False,
+            # With a throwaway USERPROFILE, PowerShell's module cache falls back to a path relative to the
+            # working directory; run in the sandbox so nothing lands in the repo.
+            cwd=self.home.parent, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, check=False,
         )
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout
@@ -160,3 +162,48 @@ def test_a_second_run_duplicates_no_shortcut_hook_entry_or_task(sandbox):
     assert len(sandbox.relay_entries()) == 1
     assert sandbox.settings_path.read_text(encoding="utf-8-sig") == first_settings
     assert sandbox.task_count() == 1
+
+
+def test_a_relay_hook_that_is_not_installed_is_offered_a_first_install(sandbox):
+    output = sandbox.run(*NOTHING)
+
+    assert "== Relay hook" in output
+    assert "== Relay hook (already installed)" not in output
+
+
+def test_an_installed_relay_hook_is_offered_a_reinstall_that_updates_its_port(sandbox):
+    sandbox.run("-Shortcut", "no", "-ToastHooks", "no", "-RelayHook", "yes", "-BackupTask", "no", port="8511")
+
+    output = sandbox.run("-Shortcut", "no", "-ToastHooks", "no", "-RelayHook", "yes", "-BackupTask", "no", port="8522")
+
+    assert "== Relay hook (already installed)" in output
+    assert "installed for backend port 8511" in output
+    assert "relay hook           reinstalled" in output
+    entries = sandbox.relay_entries()
+    assert len(entries) == 1
+    assert "-Port 8522" in entries[0]["hooks"][0]["command"]
+
+
+def test_declining_the_reinstall_leaves_the_installed_hook_alone(sandbox):
+    sandbox.run("-Shortcut", "no", "-ToastHooks", "no", "-RelayHook", "yes", "-BackupTask", "no", port="8511")
+    before = sandbox.settings_path.read_text(encoding="utf-8-sig")
+
+    sandbox.run(*NOTHING, port="8522")
+
+    assert sandbox.settings_path.read_text(encoding="utf-8-sig") == before
+
+
+def test_accepting_the_shortcut_prepares_the_backend_and_widget_dependencies(sandbox):
+    output = sandbox.run("-Shortcut", "yes", "-Autostart", "no", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
+
+    assert "Checking dependencies (api, widget)" in output
+
+
+def test_accepting_only_the_backup_task_prepares_just_the_backend(sandbox):
+    output = sandbox.run("-Shortcut", "no", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "yes")
+
+    assert "Checking dependencies (api)" in output
+
+
+def test_declining_everything_checks_no_dependencies(sandbox):
+    assert "Checking dependencies" not in sandbox.run(*NOTHING)

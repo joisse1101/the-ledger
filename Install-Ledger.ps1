@@ -11,6 +11,10 @@ what it did.
 
 It first checks that Python and Node are installed and stops with the download pages if not. Then it
 asks every question, then installs what was accepted, so you can stop (Ctrl+C) before anything changes.
+Accepting the shortcut also installs the widget's packages (and the backend's environment) first, so
+the shortcut's first launch, which shows no window while it prepares, is not slow or silently broken.
+If the relay hook is already installed, you are offered a reinstall instead of a first install: that
+updates the backend port it uses.
 
 Each extra is installed by its own script (widget\Install-WidgetShortcut.ps1,
 hooks\Install-ClaudeHooks.ps1, hooks\ledgerScripts\Install-HistoryBackupTask.ps1), which asks nothing
@@ -127,21 +131,48 @@ $wantToast = Read-ExtraChoice -Title 'Toast hooks' -Mode $ToastHooks -Question '
     -Changes 'Copies the toast scripts into %USERPROFILE%\.claude\hooks, registers the claudecode:// protocol handler for your user, and edits %USERPROFILE%\.claude\settings.json to add Notification and Stop hooks.' `
     -Declining 'No toasts, and your Claude Code settings are left alone.'
 
-$wantRelay = Read-ExtraChoice -Title 'Relay hook' -Mode $RelayHook -Question 'Install the Ledger relay hook?' `
-    -Does 'Lets you answer a live session''s permission prompts and questions from the Ledger dashboard, on this PC or another device. The terminal dialog keeps working either way.' `
-    -Changes 'Copies the relay script into %USERPROFILE%\.claude\hooks\ledgerScripts and adds a PermissionRequest hook to %USERPROFILE%\.claude\settings.json with the backend port baked in.' `
-    -Declining 'Prompts can only be answered in the terminal, and your Claude Code settings are left alone.'
+$installedRelayPort = Get-RelayHookPort
+$relayChanges = 'Copies the relay script into %USERPROFILE%\.claude\hooks\ledgerScripts and adds a PermissionRequest hook to %USERPROFILE%\.claude\settings.json with the backend port baked in.'
+if ($null -eq $installedRelayPort) {
+    $wantRelay = Read-ExtraChoice -Title 'Relay hook' -Mode $RelayHook -Question 'Install the Ledger relay hook?' `
+        -Does 'Lets you answer a live session''s permission prompts and questions from the Ledger dashboard, on this PC or another device. The terminal dialog keeps working either way.' `
+        -Changes $relayChanges `
+        -Declining 'Prompts can only be answered in the terminal, and your Claude Code settings are left alone.'
+} else {
+    $wantRelay = Read-ExtraChoice -Title 'Relay hook (already installed)' -Mode $RelayHook -Question 'Reinstall the Ledger relay hook?' `
+        -Does "The relay hook is installed for backend port $installedRelayPort. Reinstalling updates the backend port it uses to the one Ledger uses now, and refreshes its scripts." `
+        -Changes "Rewrites the relay script and its PermissionRequest entry in %USERPROFILE%\.claude\settings.json (the entry is updated in place, not added again)." `
+        -Declining "The hook stays on port $installedRelayPort; if the backend runs on another port, dashboard answers won't reach your sessions."
+}
 
 $wantBackup = Read-ExtraChoice -Title 'History backup task' -Mode $BackupTask -Question 'Register the daily history backup task?' `
     -Does 'Runs api\backup_history.py every day at 14:00 so the session history database keeps growing even when the app is not running.' `
     -Changes "Registers a Task Scheduler task named '$TaskName' that runs as you, without elevation." `
     -Declining 'History only grows while the app runs. Stop-Ledger.ps1 -UninstallBackupTask removes the task later.'
 
+# The shortcut starts the widget hidden, so its dependencies are installed now, where failures show.
+# The backup task runs the backend's venv python.
+$components = @()
+if ($wantShortcut) { $components += 'api', 'widget' }
+if ($wantBackup) { $components += 'api' }
+$components = @($components | Select-Object -Unique)
+if ($components.Count -gt 0) {
+    Write-Host ""
+    Write-Host "Checking dependencies ($($components -join ', '))..."
+    try {
+        Invoke-DependencyRepair -RepoRoot $PSScriptRoot -Component $components
+    } catch {
+        Write-Host "ERROR: $($_.Exception.Message)"
+        Write-Host "Nothing was installed."
+        exit 1
+    }
+}
+
 $results = New-Object System.Collections.Generic.List[object]
 
 function Install-Extra {
     # Runs one extra's install script; a failure is recorded and the others still run.
-    param([string]$Name, [bool]$Wanted, [scriptblock]$Install)
+    param([string]$Name, [bool]$Wanted, [scriptblock]$Install, [string]$DoneState = 'installed')
     if (-not $Wanted) {
         $results.Add([PSCustomObject]@{ Name = $Name; State = 'skipped' })
         return
@@ -150,7 +181,7 @@ function Install-Extra {
     Write-Host "Installing: $Name"
     try {
         & $Install | Out-Host
-        $results.Add([PSCustomObject]@{ Name = $Name; State = 'installed' })
+        $results.Add([PSCustomObject]@{ Name = $Name; State = $DoneState })
     } catch {
         Write-Host "ERROR: $Name failed: $($_.Exception.Message)"
         $results.Add([PSCustomObject]@{ Name = $Name; State = 'failed' })
@@ -173,7 +204,8 @@ Install-Extra -Name 'sign-in autostart' -Wanted $wantAutostart -Install {
 Install-Extra -Name 'toast hooks' -Wanted $wantToast -Install {
     & (Join-Path $PSScriptRoot 'hooks\Install-ClaudeHooks.ps1')
 }
-Install-Extra -Name 'relay hook' -Wanted $wantRelay -Install {
+$relayDoneState = if ($null -eq $installedRelayPort) { 'installed' } else { 'reinstalled' }
+Install-Extra -Name 'relay hook' -Wanted $wantRelay -DoneState $relayDoneState -Install {
     & (Join-Path $PSScriptRoot 'hooks\Install-ClaudeHooks.ps1') -IncludeSessionControl -SkipToastHooks @relayArgs
 }
 Install-Extra -Name 'history backup task' -Wanted $wantBackup -Install {
