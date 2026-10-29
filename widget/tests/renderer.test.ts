@@ -38,6 +38,7 @@ function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true) 
     setRemote: vi.fn(),
     setAutoApprove: vi.fn(async () => autoApproveResult),
     ledgerHover: vi.fn(),
+    remoteHover: vi.fn(),
     setOpacity: vi.fn(),
     setContentHeight: vi.fn(),
   }
@@ -420,5 +421,14 @@ describe('Remote mode toggle', () => {
     ledger.dispatchEvent(new MouseEvent('mouseenter'))
     ledger.dispatchEvent(new MouseEvent('mouseleave'))
     expect(vi.mocked(bridge.ledgerHover).mock.calls).toEqual([[true], [false]])
+    expect(bridge.remoteHover).not.toHaveBeenCalled()
+  })
+
+  it('tells the main process when the pointer enters and leaves the Remote button, and only that', () => {
+    const { bridge } = setup()
+    remote().dispatchEvent(new MouseEvent('mouseenter'))
+    remote().dispatchEvent(new MouseEvent('mouseleave'))
+    expect(vi.mocked(bridge.remoteHover).mock.calls).toEqual([[true], [false]])
+    expect(bridge.ledgerHover).not.toHaveBeenCalled()
   })
 })

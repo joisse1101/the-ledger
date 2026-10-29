@@ -86,7 +86,10 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
     remote.title = remoteTitle(status)
   })
   remote.addEventListener('click', () => bridge.setRemote(!remoteOn))
-  // The Ledger button's hover shows the Remote status tooltip (see main/remoteTooltip.ts).
+  // Each button's hover shows its own tooltip: the Remote button's is Remote status and the sign-in
+  // code (main/remoteTooltip.ts), the Ledger button's is the projects' open issues and pull requests.
+  remote.addEventListener('mouseenter', () => bridge.remoteHover(true))
+  remote.addEventListener('mouseleave', () => bridge.remoteHover(false))
   const ledger = byId('ledger')
   ledger.addEventListener('mouseenter', () => bridge.ledgerHover(true))
   ledger.addEventListener('mouseleave', () => bridge.ledgerHover(false))

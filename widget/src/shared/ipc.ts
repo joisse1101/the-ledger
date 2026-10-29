@@ -13,5 +13,6 @@ export const CHANNELS = {
   setRemote: 'widget:set-remote',
   setAutoApprove: 'widget:set-auto-approve',
   ledgerHover: 'widget:ledger-hover',
+  remoteHover: 'widget:remote-hover',
   tooltip: 'widget:tooltip',
 } as const

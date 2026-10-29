@@ -67,7 +67,7 @@ if (!app.requestSingleInstanceLock()) {
       void poller.refresh()
       return ok
     })
-    ipcMain.on(CHANNELS.ledgerHover, (_event, hovering: unknown) => {
+    ipcMain.on(CHANNELS.remoteHover, (_event, hovering: unknown) => {
       if (typeof hovering === 'boolean') tooltip.setHover(hovering)
     })
     ipcMain.on(CHANNELS.openLedger, () => void supervisor.openLedger())

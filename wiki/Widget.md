@@ -86,11 +86,12 @@ script, so a cold start and the tray's "Start backend" share one code path.
 The header has a Remote mode toggle. The widget only asks: it calls `POST /api/remote-mode` and reads
 `remote_mode` from `/api/meta` on its poll; Docker, the frontend and the gateway are the backend's job
 (see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)). While it starts, and when it
-fails, the Ledger button's tooltip shows the step or reason; at `ready`, hovering the Ledger button shows a
+fails, the Remote button's tooltip shows the step or reason; at `ready`, hovering the Remote button shows a
 small separate window (`widget/src/main/tooltipWindow.ts`, a frameless, unfocusable,
 mouse-transparent, sandboxed page with a strict CSP) with the sign-in QR, the `https://` address and
 the time left. The QR is fetched only while hovering and held in memory only; the token is never
-shown or stored. `remoteTooltip.ts` holds the message text and placement logic.
+shown or stored. `remoteTooltip.ts` holds the message text and placement logic. When a start the
+widget watched finishes, the tooltip also pops up by itself for a few seconds.
 
 ## Window
 

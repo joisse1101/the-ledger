@@ -85,8 +85,10 @@ export interface WidgetBridge {
   onRemote(callback: (status: RemoteStatus) => void): void
   /** Asks the backend to turn Remote mode on or off; the new state arrives through `onRemote`. */
   setRemote(enabled: boolean): void
-  /** The pointer entered or left the Ledger button, which shows the Remote status tooltip. */
+  /** The pointer entered or left the Ledger button, which shows the projects tooltip. */
   ledgerHover(hovering: boolean): void
+  /** The pointer entered or left the Remote button, which shows the Remote status tooltip. */
+  remoteHover(hovering: boolean): void
   /** Switches one session's auto-approve; resolves false when the backend refused or was unreachable.
    *  The new state arrives with the next poll. */
   setAutoApprove(sessionId: string, enabled: boolean): Promise<boolean>
