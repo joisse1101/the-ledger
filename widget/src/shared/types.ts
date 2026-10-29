@@ -47,10 +47,28 @@ export interface RemoteQr {
   displayUrl: string
 }
 
+/** One project's repo info as `GET /api/projects/repos` reports it. Everything but `path` is null
+ *  when unknown: no remote, a host other than GitHub, or counts that could not be read. */
+export interface ProjectRepo {
+  path: string
+  host: string | null
+  issues: number | null
+  prs: number | null
+}
+
+/** One row of the projects tooltip. A count is null when it could not be read. */
+export interface ProjectRow {
+  name: string
+  source: string
+  issues: number | null
+  prs: number | null
+}
+
 /** What the Remote status tooltip window draws. Built in the main process; the page only renders it. */
 export type TooltipContent =
   | { kind: 'message'; text: string }
   | { kind: 'qr'; svg: string; displayUrl: string; timeLeft: string | null }
+  | { kind: 'projects'; rows: ProjectRow[]; more: number }
 
 /** What the tooltip window's preload exposes to its page as `window.tooltip`. */
 export interface TooltipBridge {
@@ -68,8 +86,10 @@ export interface WidgetBridge {
   onRemote(callback: (status: RemoteStatus) => void): void
   /** Asks the backend to turn Remote mode on or off; the new state arrives through `onRemote`. */
   setRemote(enabled: boolean): void
-  /** The pointer entered or left the Ledger button, which shows the Remote status tooltip. */
+  /** The pointer entered or left the Ledger button, which shows the projects tooltip. */
   ledgerHover(hovering: boolean): void
+  /** The pointer entered or left the Remote button, which shows the Remote status tooltip. */
+  remoteHover(hovering: boolean): void
   /** Switches one session's auto-approve; resolves false when the backend refused or was unreachable.
    *  The new state arrives with the next poll. */
   setAutoApprove(sessionId: string, enabled: boolean): Promise<boolean>

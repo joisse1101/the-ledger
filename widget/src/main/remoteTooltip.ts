@@ -2,7 +2,7 @@
  * When the Remote status tooltip shows, and what it says. Pure logic with its side effects
  * injected: the controller decides, `present` draws (see tooltipWindow.ts).
  *
- * It shows while the pointer rests on the Ledger button, and by itself for a few seconds when
+ * It shows while the pointer rests on the Remote button, and by itself for a few seconds when
  * Remote mode finishes starting so the code can be scanned without hovering. It says nothing
  * while Remote mode is off, and it fetches the sign-in code only while Remote mode is ready.
  */
@@ -61,7 +61,7 @@ export class RemoteTooltip {
     this.refresh()
   }
 
-  /** The pointer entered or left the Ledger button. */
+  /** The pointer entered or left the Remote button. */
   setHover(hovering: boolean): void {
     clearTimeout(this.hoverTimer)
     if (hovering) {

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createApi } from '../src/main/api'
+import { createApi, DEFAULT_MAX_PROJECTS } from '../src/main/api'
 import { json, startStub, type Stub } from './stubServer'
 
 let stub: Stub | undefined
@@ -214,5 +214,91 @@ describe('fetchQr', () => {
   it('is null when the body is not a code', async () => {
     stub = await startStub((_req, res) => json(res, 200, { svg: 3 }))
     expect(await createApi(stub.port).fetchQr()).toBeNull()
+  })
+})
+
+describe('fetchProjectRepos', () => {
+  const repos = [
+    { path: '/r/app', host: 'GitHub', url: 'https://github.com/acme/app', issues: 7, prs: 2 },
+    { path: '/r/none', host: null, url: null, issues: null, prs: null },
+  ]
+
+  it('returns the repo info without the url, asking the backend on loopback without a token', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { repos }))
+    expect(await createApi(stub.port).fetchProjectRepos()).toEqual([
+      { path: '/r/app', host: 'GitHub', issues: 7, prs: 2 },
+      { path: '/r/none', host: null, issues: null, prs: null },
+    ])
+    expect(stub.requests[0].url).toBe('/api/projects/repos')
+    expect(stub.requests[0].headers.authorization).toBeUndefined()
+  })
+
+  it('keeps the good entries and drops those without a path', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { repos: [repos[0], { host: 'GitHub' }, 'x', null] }))
+    expect(await createApi(stub.port).fetchProjectRepos()).toEqual([
+      { path: '/r/app', host: 'GitHub', issues: 7, prs: 2 },
+    ])
+  })
+
+  it('treats a count that is not a whole number as unreadable', async () => {
+    stub = await startStub((_req, res) =>
+      json(res, 200, { repos: [{ path: '/r/a', host: 'GitHub', issues: '7', prs: -1 }] }),
+    )
+    expect(await createApi(stub.port).fetchProjectRepos()).toEqual([
+      { path: '/r/a', host: 'GitHub', issues: null, prs: null },
+    ])
+  })
+
+  it('is null on an error status', async () => {
+    stub = await startStub((_req, res) => json(res, 500, { repos }))
+    expect(await createApi(stub.port).fetchProjectRepos()).toBeNull()
+  })
+
+  it('is null on a malformed body', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { repos: 'nope' }))
+    expect(await createApi(stub.port).fetchProjectRepos()).toBeNull()
+  })
+
+  it('is null when the connection is refused', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { repos }))
+    const port = stub.port
+    await stub.close()
+    stub = undefined
+    expect(await createApi(port).fetchProjectRepos()).toBeNull()
+  })
+
+  it('is null when the backend does not answer in time, and waits longer than a poll does', async () => {
+    stub = await startStub((_req, res) => {
+      setTimeout(() => json(res, 200, { repos }), 300)
+    })
+    expect(await createApi(stub.port, fetch, 100, 100).fetchProjectRepos()).toBeNull()
+    expect(await createApi(stub.port, fetch, 100).fetchProjectRepos()).toHaveLength(2)
+  })
+})
+
+describe('fetchMaxProjects', () => {
+  it('returns the number the Settings page has', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { worktree_folders: [], widget: { max_projects: 3 } }))
+    expect(await createApi(stub.port).fetchMaxProjects()).toBe(3)
+    expect(stub.requests[0].url).toBe('/api/settings')
+  })
+
+  it.each([
+    ['an error status', 403, { widget: { max_projects: 3 } }],
+    ['a missing widget part', 200, {}],
+    ['a number that is not whole', 200, { widget: { max_projects: 2.5 } }],
+    ['zero', 200, { widget: { max_projects: 0 } }],
+    ['a string', 200, { widget: { max_projects: '3' } }],
+  ])('falls back to the default on %s', async (_name, status, body) => {
+    stub = await startStub((_req, res) => json(res, status, body))
+    expect(await createApi(stub.port).fetchMaxProjects()).toBe(DEFAULT_MAX_PROJECTS)
+  })
+
+  it('falls back to the default when the backend is unreachable', async () => {
+    stub = await startStub((_req, res) => json(res, 200, {}))
+    const port = stub.port
+    await stub.close()
+    stub = undefined
+    expect(await createApi(port).fetchMaxProjects()).toBe(DEFAULT_MAX_PROJECTS)
   })
 })

@@ -86,11 +86,41 @@ script, so a cold start and the tray's "Start backend" share one code path.
 The header has a Remote mode toggle. The widget only asks: it calls `POST /api/remote-mode` and reads
 `remote_mode` from `/api/meta` on its poll; Docker, the frontend and the gateway are the backend's job
 (see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)). While it starts, and when it
-fails, the Ledger button's tooltip shows the step or reason; at `ready`, hovering the Ledger button shows a
+fails, the Remote button's tooltip shows the step or reason; at `ready`, hovering the Remote button shows a
 small separate window (`widget/src/main/tooltipWindow.ts`, a frameless, unfocusable,
 mouse-transparent, sandboxed page with a strict CSP) with the sign-in QR, the `https://` address and
 the time left. The QR is fetched only while hovering and held in memory only; the token is never
-shown or stored. `remoteTooltip.ts` holds the message text and placement logic.
+shown or stored. `remoteTooltip.ts` holds the message text and placement logic. When a start the
+widget watched finishes, the tooltip also pops up by itself for a few seconds.
+
+## Projects tooltip
+
+Hovering the Ledger button shows the same kind of window below the widget, listing the **GitHub**
+projects with name, source, open issues and open pull requests (`--` for a count that could not be
+read). It is the Projects page's data, not a second lookup: the widget reads `GET /api/projects/repos`
+(see [Backend API routes](Backend-API-Routes.md)) and the `widget.max_projects` setting from
+`GET /api/settings`, both over loopback, which counts as a local request, so no token. The setting is
+edited on the dashboard's Settings page (1 to 10, 5 until set); the widget has no settings UI and falls
+back to 5 if it cannot read it.
+
+- **Never waits on `gh`.** `ProjectsTooltip` (`widget/src/main/projectsTooltip.ts`) keeps the last read. The widget
+  reads at startup, every 60 s and on each hover (a hover that lands during a read joins it, because
+  `startPoller` never overlaps), so a hover shows the last rows at once and rows that arrive while it
+  is open replace them in place. The read has its own 30 s timeout, since a cold backend runs `git`
+  and `gh` for every project. A failed read keeps the last rows; before the first read it says
+  "Loading projects...", and if none ever succeeded "Could not load the projects". The widget never
+  calls `/api/refresh`, so it can be as stale as the backend's cache (5 minutes); the Projects page's
+  refresh button drops that cache.
+- **Which rows.** `projectsView` (`widget/src/main/projects.ts`, pure) keeps `host === 'GitHub'`, orders by open
+  issues plus pull requests (projects whose counts could not be read last, ties in the backend's order),
+  names each from the path's last segment, cuts to the setting and reports the rest as "+N more".
+  With no GitHub project it says "No GitHub projects".
+- **One window, two tooltips.** The Remote and Ledger buttons are separate tooltips (`remoteHover` and
+  `ledgerHover` IPC) drawing into one window through `TooltipSlot` (`widget/src/main/tooltipSlot.ts`): the most
+  recently presented content wins, and the window hides only when neither has any, so the sign-in code
+  appearing on ready and going away does not take a hovered projects list with it. `tooltipSize` sizes
+  the window; the projects page draws every line 20 px tall so its height follows the line count.
+  Values are set as text, never markup.
 
 ## Window
 

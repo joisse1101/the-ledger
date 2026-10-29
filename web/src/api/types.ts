@@ -61,6 +61,10 @@ export interface WorktreeFolder {
 export interface Settings {
   /** The built-in folder first, then the user's in the order they were added. */
   worktree_folders: WorktreeFolder[];
+  widget: {
+    /** How many projects the desktop widget's Ledger-button tooltip lists: a whole number from 1 to 10. */
+    max_projects: number;
+  };
 }
 
 export interface LiveContext {

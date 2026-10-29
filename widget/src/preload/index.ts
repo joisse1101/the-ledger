@@ -20,6 +20,7 @@ const bridge: WidgetBridge = {
   setAutoApprove: (sessionId, enabled): Promise<boolean> =>
     ipcRenderer.invoke('widget:set-auto-approve', sessionId, enabled),
   ledgerHover: (hovering) => ipcRenderer.send('widget:ledger-hover', hovering),
+  remoteHover: (hovering) => ipcRenderer.send('widget:remote-hover', hovering),
   setOpacity: (opacity) => ipcRenderer.send('widget:set-opacity', opacity),
   setContentHeight: (height) => ipcRenderer.send('widget:set-content-height', height),
   openSession: (sessionId): Promise<OpenRepoResult> => ipcRenderer.invoke('widget:open-session', sessionId),

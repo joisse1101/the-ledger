@@ -54,3 +54,25 @@ body { border: 1px solid var(--border-subtle); }
 
 .address { margin: 0; font-family: "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; }
 .left { margin: 0; color: var(--text-muted); }
+
+/* The projects list: four columns, and every line exactly 20px so the window can be sized from the
+   line count (main/tooltipSize.ts). The card is a flex column that centers, so the grid stretches. */
+.projects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  column-gap: 12px;
+  align-self: stretch;
+  text-align: left;
+}
+
+.cell {
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell.head { color: var(--text-muted); }
+.cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cell.more { grid-column: 1 / -1; color: var(--text-muted); }
