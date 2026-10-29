@@ -47,6 +47,23 @@ export interface RemoteQr {
   displayUrl: string
 }
 
+/** One project's repo info as `GET /api/projects/repos` reports it. Everything but `path` is null
+ *  when unknown: no remote, a host other than GitHub, or counts that could not be read. */
+export interface ProjectRepo {
+  path: string
+  host: string | null
+  issues: number | null
+  prs: number | null
+}
+
+/** One row of the projects tooltip. A count is null when it could not be read. */
+export interface ProjectRow {
+  name: string
+  source: string
+  issues: number | null
+  prs: number | null
+}
+
 /** What the Remote status tooltip window draws. Built in the main process; the page only renders it. */
 export type TooltipContent =
   | { kind: 'message'; text: string }

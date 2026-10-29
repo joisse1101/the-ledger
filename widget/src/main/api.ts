@@ -1,8 +1,21 @@
-import type { LiveSession, LiveState, OpenRepoResult, RemoteQr, RemoteStatus, RemoteStep } from '../shared/types'
+import type {
+  LiveSession,
+  LiveState,
+  OpenRepoResult,
+  ProjectRepo,
+  RemoteQr,
+  RemoteStatus,
+  RemoteStep,
+} from '../shared/types'
 
 export const POLL_TIMEOUT_MS = 3000
 /** Turning Remote mode off runs `docker compose down` inside the request, so it gets longer. */
 export const REMOTE_SWITCH_TIMEOUT_MS = 20_000
+/** The repo read runs `git` and `gh` for every project when the backend's cache is cold, so it
+ *  gets longer than a poll. The poller never overlaps reads, so waiting costs nothing. */
+export const REPOS_TIMEOUT_MS = 30_000
+/** How many projects the tooltip lists until the backend says otherwise (the Settings page's default). */
+export const DEFAULT_MAX_PROJECTS = 5
 
 export interface Api {
   fetchLive(): Promise<LiveState>
@@ -17,6 +30,10 @@ export interface Api {
   fetchQr(): Promise<RemoteQr | null>
   /** Switches one session's auto-approve; false when the backend refused or did not answer. */
   setAutoApprove(sessionId: string, enabled: boolean): Promise<boolean>
+  /** Every known project's repo info, or null when the backend did not answer or answered something unreadable. */
+  fetchProjectRepos(): Promise<ProjectRepo[] | null>
+  /** How many projects the tooltip lists, as the Settings page has it; the default when it cannot be read. */
+  fetchMaxProjects(): Promise<number>
 }
 
 const STEPS: readonly string[] = ['docker', 'frontend', 'gateway']
@@ -39,6 +56,18 @@ export function toRemoteStatus(remoteMode: unknown): RemoteStatus {
   }
 }
 
+const nullableString = (value: unknown): string | null => (typeof value === 'string' ? value : null)
+const nullableCount = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+
+/** One entry of `/api/projects/repos`; null for anything without a path, so one bad entry never hides the rest. */
+function toProjectRepo(entry: unknown): ProjectRepo | null {
+  if (typeof entry !== 'object' || entry === null) return null
+  const { path, host, issues, prs } = entry as Record<string, unknown>
+  if (typeof path !== 'string' || !path) return null
+  return { path, host: nullableString(host), issues: nullableCount(issues), prs: nullableCount(prs) }
+}
+
 type FetchLike = typeof fetch
 
 /**
@@ -49,6 +78,7 @@ export function createApi(
   backendPort: number,
   fetchImpl: FetchLike = fetch,
   timeoutMs = POLL_TIMEOUT_MS,
+  reposTimeoutMs = REPOS_TIMEOUT_MS,
 ): Api {
   const base = `http://127.0.0.1:${backendPort}`
   const signal = () => AbortSignal.timeout(timeoutMs)
@@ -139,6 +169,30 @@ export function createApi(
         return response.ok
       } catch {
         return false
+      }
+    },
+
+    async fetchProjectRepos() {
+      try {
+        const response = await fetchImpl(`${base}/api/projects/repos`, { signal: AbortSignal.timeout(reposTimeoutMs) })
+        if (!response.ok) return null
+        const { repos } = (await response.json()) as { repos?: unknown }
+        if (!Array.isArray(repos)) return null
+        return repos.flatMap((entry) => toProjectRepo(entry) ?? [])
+      } catch {
+        return null
+      }
+    },
+
+    async fetchMaxProjects() {
+      try {
+        const response = await fetchImpl(`${base}/api/settings`, { signal: signal() })
+        if (!response.ok) return DEFAULT_MAX_PROJECTS
+        const { widget } = (await response.json()) as { widget?: { max_projects?: unknown } }
+        const value = widget?.max_projects
+        return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : DEFAULT_MAX_PROJECTS
+      } catch {
+        return DEFAULT_MAX_PROJECTS
       }
     },
 
