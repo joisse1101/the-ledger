@@ -31,6 +31,6 @@ upgrade. See `hooks/README.md` section 6.
 same folder, register/remove the Windows Scheduled Task that runs `api/backup_history.py` daily
 (see [Setup and run](Setup-And-Run.md)) — unlike the relay hook, these aren't Claude Code hooks at all (nothing
 copies them anywhere or touches `settings.json`); they're run directly from this checkout, either by
-hand or via the root `Start-Ledger.ps1 -InstallBackupTask`/`Stop-Ledger.ps1 -UninstallBackupTask`.
+hand, with the root `Stop-Ledger.ps1 -UninstallBackupTask` as the shortcut for removing the task.
 They live here rather than in `api/` because, like the relay hook, they're PowerShell tooling
 specific to this app rather than part of the Python backend itself.

@@ -96,8 +96,7 @@ cd hooks\ledgerScripts
 .\Uninstall-HistoryBackupTask.ps1            # remove it
 ```
 
-Or fold either into the root scripts as one flag: `.\Start-Ledger.ps1 -InstallBackupTask` /
-`.\Stop-Ledger.ps1 -UninstallBackupTask`. If you'd rather set the task up (or tear it down) by hand
+Removing it is also one flag on the root stop script: `.\Stop-Ledger.ps1 -UninstallBackupTask`. If you'd rather set the task up (or tear it down) by hand
 than run a script, the two scripts themselves are the reference — they're the definitive list of
 exactly which fields to set (program, arguments, working directory, trigger, logon type, run level),
 so reading them and replicating those same fields in Task Scheduler's UI produces the same task.

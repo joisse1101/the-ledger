@@ -34,13 +34,6 @@ The gateway needs Docker Desktop. Without -Remote the app is reachable from this
 CLAUDE.md's "From another device on your network"). The backend learns the gateway port from the
 root .env, then GATEWAY_PORT, so an explicit -GatewayPort only reaches it when .env doesn't set one.
 
--InstallBackupTask registers (or updates) the daily Task Scheduler entry that keeps
-`api/.history/history.db` accumulating between runs of this app - the same thing
-`hooks\ledgerScripts\Install-HistoryBackupTask.ps1` does on its own, wired in here as a one-flag
-convenience. It runs before anything else starts, and a failure there doesn't stop the
-backend/frontend/gateway from still starting normally. The paired Stop-Ledger.ps1's
--UninstallBackupTask removes it again.
-
 .PARAMETER Mode
 'build' (default): build the frontend once and serve it with `vite preview`; backend without
 --reload. 'dev': hot-reloading vite dev server; backend with --reload.
@@ -51,10 +44,6 @@ the sign-in QR from the dashboard. Switch it off from the dashboard or the widge
 
 .PARAMETER NoGateway
 Accepted for old command lines and does nothing: the gateway is no longer started by default.
-
-.PARAMETER InstallBackupTask
-Also register (or update) the daily history-backup scheduled task - see
-hooks\ledgerScripts\Install-HistoryBackupTask.ps1.
 
 .PARAMETER BackendPort
 Port for the backend API. Default 8501.
@@ -84,13 +73,8 @@ Backend + frontend, then Remote mode on with its sign-in QR.
 .\Start-Ledger.ps1 -BackendPort 9000 -FrontendPort 5000 -GatewayPort 9090
 Override every port.
 
-.EXAMPLE
-.\Start-Ledger.ps1 -InstallBackupTask
-Also register the daily history-backup scheduled task, then start as normal.
-
 .LINK
-.\Stop-Ledger.ps1 stops everything this script started (and, with -UninstallBackupTask, removes the
-scheduled task this script's -InstallBackupTask installs).
+.\Stop-Ledger.ps1 stops everything this script started.
 #>
 
 param(
@@ -98,7 +82,6 @@ param(
     [string]$Mode = 'build',
     [switch]$Remote,
     [switch]$NoGateway,
-    [switch]$InstallBackupTask,
     [int]$BackendPort,
     [int]$FrontendPort,
     [int]$GatewayPort,
@@ -140,15 +123,6 @@ $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
 
 if ($NoGateway) {
     Write-Host "Note: -NoGateway does nothing now - the gateway only starts with Remote mode (-Remote)."
-}
-
-if ($InstallBackupTask) {
-    Write-Host "Installing the daily history-backup scheduled task..."
-    try {
-        & (Join-Path $PSScriptRoot 'hooks\ledgerScripts\Install-HistoryBackupTask.ps1')
-    } catch {
-        Write-Warning "Failed to install the history-backup task: $_"
-    }
 }
 
 # The backend reads these when Remote mode starts the gateway.

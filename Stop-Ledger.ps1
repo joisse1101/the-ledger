@@ -14,8 +14,8 @@ backend/frontend you started by hand in your own terminal (there's no .ledger-ru
 Each window is stopped as a whole process tree (its `npm`/`vite`/`python` children included), not
 just the outer PowerShell window.
 
--UninstallBackupTask removes the daily history-backup Scheduled Task Start-Ledger.ps1's
--InstallBackupTask (or hooks\ledgerScripts\Install-HistoryBackupTask.ps1 directly) installs - opt-in
+-UninstallBackupTask removes the daily history-backup Scheduled Task that
+hooks\ledgerScripts\Install-HistoryBackupTask.ps1 installs - opt-in
 only, since that task is meant to keep running independently of whether the app itself is up.
 
 .PARAMETER NoGateway
@@ -41,7 +41,7 @@ Stop backend + frontend, leave the gateway container running.
 Also remove the daily history-backup scheduled task.
 
 .LINK
-.\Start-Ledger.ps1's -InstallBackupTask installs the scheduled task this script's
+.\hooks\ledgerScripts\Install-HistoryBackupTask.ps1 installs the scheduled task this script's
 -UninstallBackupTask removes.
 #>
 
