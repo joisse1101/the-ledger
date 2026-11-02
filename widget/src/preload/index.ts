@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../shared/types'
+import type { AfkState, LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../shared/types'
 
 // A sandboxed preload cannot require local files, so the channel names are repeated here from
 // shared/ipc.ts; tests/ipc.test.ts fails if they drift.
@@ -16,6 +16,10 @@ const bridge: WidgetBridge = {
   onRemote: (callback) => {
     ipcRenderer.on('widget:remote-state', (_event, status: RemoteStatus) => callback(status))
   },
+  onAfk: (callback) => {
+    ipcRenderer.on('widget:afk-state', (_event, afk: AfkState) => callback(afk))
+  },
+  setAfk: (enabled): Promise<boolean> => ipcRenderer.invoke('widget:set-afk', enabled),
   setRemote: (enabled) => ipcRenderer.send('widget:set-remote', enabled),
   setAutoApprove: (sessionId, enabled): Promise<boolean> =>
     ipcRenderer.invoke('widget:set-auto-approve', sessionId, enabled),

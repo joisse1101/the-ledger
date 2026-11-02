@@ -75,9 +75,22 @@ export interface TooltipBridge {
   onContent(callback: (content: TooltipContent) => void): void
 }
 
+/** The chimes' AFK switch as the main process reads it from the flag file on each poll, so it
+ *  needs no backend. `installed` is whether the chime hook's script is on disk: the button is
+ *  hidden without it. `minutesLeft` is meaningful only while `on`. */
+export interface AfkState {
+  installed: boolean
+  on: boolean
+  minutesLeft: number
+}
+
 /** What the preload bridge exposes to the renderer as `window.widget`. */
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void
+  onAfk(callback: (afk: AfkState) => void): void
+  /** Switches the chimes' AFK flag on or off; resolves false when the flag file could not be changed.
+   *  The new state arrives through `onAfk`. */
+  setAfk(enabled: boolean): Promise<boolean>
   onCollapsed(callback: (collapsed: boolean) => void): void
   onOpacity(callback: (opacity: number) => void): void
   setOpacity(opacity: number): void

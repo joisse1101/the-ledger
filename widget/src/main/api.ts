@@ -16,6 +16,8 @@ export const REMOTE_SWITCH_TIMEOUT_MS = 20_000
 export const REPOS_TIMEOUT_MS = 30_000
 /** How many projects the tooltip lists until the backend says otherwise (the Settings page's default). */
 export const DEFAULT_MAX_PROJECTS = 5
+/** How long the AFK switch lasts until the backend says otherwise (the Settings page's default). */
+export const DEFAULT_AFK_MINUTES = 30
 
 export interface Api {
   fetchLive(): Promise<LiveState>
@@ -34,6 +36,9 @@ export interface Api {
   fetchProjectRepos(): Promise<ProjectRepo[] | null>
   /** How many projects the tooltip lists, as the Settings page has it; the default when it cannot be read. */
   fetchMaxProjects(): Promise<number>
+  /** The AFK duration in minutes as the Settings page has it; when it cannot be read, the last value
+   *  read, or 30 if none was. Read when switching AFK on, so a later change applies to the next switch-on. */
+  fetchAfkMinutes(): Promise<number>
 }
 
 const STEPS: readonly string[] = ['docker', 'frontend', 'gateway']
@@ -82,6 +87,7 @@ export function createApi(
 ): Api {
   const base = `http://127.0.0.1:${backendPort}`
   const signal = () => AbortSignal.timeout(timeoutMs)
+  let lastAfkMinutes = DEFAULT_AFK_MINUTES
 
   /** Whether `/api/meta` says a prompt has been relayed. Anything unreadable counts as not seen:
    *  the auto-approve button stays hidden rather than appear on a guess. */
@@ -193,6 +199,19 @@ export function createApi(
         return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : DEFAULT_MAX_PROJECTS
       } catch {
         return DEFAULT_MAX_PROJECTS
+      }
+    },
+
+    async fetchAfkMinutes() {
+      try {
+        const response = await fetchImpl(`${base}/api/settings`, { signal: signal() })
+        if (!response.ok) return lastAfkMinutes
+        const { widget } = (await response.json()) as { widget?: { afk_minutes?: unknown } }
+        const value = widget?.afk_minutes
+        if (typeof value === 'number' && Number.isInteger(value) && value >= 1) lastAfkMinutes = value
+        return lastAfkMinutes
+      } catch {
+        return lastAfkMinutes
       }
     },
 

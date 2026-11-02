@@ -93,6 +93,8 @@ button {
 /* Remote mode: the dot says where it is without a hover (amber pulse while starting). */
 .remote { display: inline-flex; align-items: center; gap: 5px; }
 .remote:disabled { opacity: 0.5; cursor: default; }
+.afk[hidden] { display: none; }
+.afk[data-state="on"] { background: var(--brand-accent); color: var(--text-on-accent); }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
 .remote[data-state="ready"] .dot { background: var(--status-ok); }
 .remote[data-state="failed"] .dot { background: var(--status-bad); }
@@ -179,5 +181,6 @@ body.collapsed .list,
 body.collapsed .note,
 body.collapsed .sun,
 body.collapsed #remote,
+body.collapsed #afk,
 body.collapsed #ledger { display: none; }
 body.collapsed .bar { border-bottom: 0; }
