@@ -25,6 +25,9 @@
   which the server saves without re-filing sessions, so nothing else is reloaded. The form is `noValidate`, so a
   rejected number shows the server's reason inline (same as a refused folder) and the typed value stays. The field
   follows the saved number until the user types, and saving folders leaves it alone.
+  The same section has a second number input, "AFK minutes (1 to 240)", 30 until set, for how long the widget's AFK
+  switch stays on. Its Save sends only `{widget: {afk_minutes}}` (`useSaveWidgetAfkMinutes`), with the same inline
+  rejection and typed-value behaviour; a new number applies the next time the switch is turned on.
 - **Theme** (`web/src/theme/theme.ts`): `data-theme` on `<html>`, seeded from `localStorage` (guarded
   try/catch — private windows etc.) else `prefers-color-scheme`, applied *before* React even mounts.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button

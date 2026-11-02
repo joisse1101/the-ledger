@@ -11,10 +11,11 @@ interface World {
   isLocal: boolean;
   userFolders: string[];
   maxProjects: number;
+  afkMinutes: number;
   /** Folders the fake server refuses, with its reason. */
   refused: Record<string, string>;
   /** The body of each save, as the server received it. */
-  puts: { worktree_folders?: string[]; widget?: { max_projects: number } }[];
+  puts: { worktree_folders?: string[]; widget?: { max_projects?: number; afk_minutes?: number } }[];
   /** While set, a save waits for it, so a test can look at the pending state. */
   gate: Promise<void> | null;
 }
@@ -26,7 +27,7 @@ function json(body: unknown, status = 200): Response {
 function settingsBody(world: World) {
   return {
     worktree_folders: [BUILT_IN, ...world.userFolders.map((path) => ({ path, built_in: false }))],
-    widget: { max_projects: world.maxProjects },
+    widget: { max_projects: world.maxProjects, afk_minutes: world.afkMinutes },
   };
 }
 
@@ -55,8 +56,13 @@ function stubServer(world: World) {
         if (maxProjects !== undefined && !(Number.isInteger(maxProjects) && maxProjects >= 1 && maxProjects <= 10)) {
           return json({ detail: "Must be a whole number from 1 to 10." }, 422);
         }
+        const afkMinutes = body.widget?.afk_minutes;
+        if (afkMinutes !== undefined && !(Number.isInteger(afkMinutes) && afkMinutes >= 1 && afkMinutes <= 240)) {
+          return json({ detail: "Must be a whole number from 1 to 240." }, 422);
+        }
         if (body.worktree_folders) world.userFolders = body.worktree_folders;
         if (maxProjects !== undefined) world.maxProjects = maxProjects;
+        if (afkMinutes !== undefined) world.afkMinutes = afkMinutes;
         return json(settingsBody(world));
       }
       return json({ detail: "unexpected" }, 500);
@@ -80,7 +86,7 @@ function renderPage(world: World) {
 
 let world: World;
 beforeEach(() => {
-  world = { isLocal: true, userFolders: [], maxProjects: 5, refused: {}, puts: [], gate: null };
+  world = { isLocal: true, userFolders: [], maxProjects: 5, afkMinutes: 30, refused: {}, puts: [], gate: null };
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -200,6 +206,58 @@ describe("SettingsPage", () => {
     await waitFor(() => expect(world.puts).toEqual([{ worktree_folders: [".trees"] }]));
     expect(world.maxProjects).toBe(3);
     expect(screen.getByLabelText("Projects shown (1 to 10)")).toHaveValue(3);
+  });
+
+  it("shows the AFK minutes, 30 until set", async () => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("AFK minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(30));
+  });
+
+  it("saves new AFK minutes on their own, leaving the folders and the projects number", async () => {
+    world.userFolders = [".trees"];
+    world.maxProjects = 3;
+    renderPage(world);
+
+    const input = await screen.findByLabelText("AFK minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(30));
+    fireEvent.change(input, { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save AFK minutes" }));
+
+    await waitFor(() => expect(world.afkMinutes).toBe(10));
+    expect(world.puts).toEqual([{ widget: { afk_minutes: 10 } }]);
+    expect(world.userFolders).toEqual([".trees"]);
+    expect(world.maxProjects).toBe(3);
+    await waitFor(() => expect(screen.getByLabelText("AFK minutes (1 to 240)")).toHaveValue(10));
+  });
+
+  it.each(["0", "241", "7.5"])("shows the server's reason for %s AFK minutes and keeps what was typed", async (typed) => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("AFK minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(30));
+    fireEvent.change(input, { target: { value: typed } });
+    fireEvent.click(screen.getByRole("button", { name: "Save AFK minutes" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("whole number from 1 to 240");
+    expect(screen.getByLabelText("AFK minutes (1 to 240)")).toHaveValue(Number(typed));
+    expect(world.afkMinutes).toBe(30);
+  });
+
+  it("leaves the AFK minutes alone when the projects number is saved", async () => {
+    world.afkMinutes = 10;
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Projects shown (1 to 10)");
+    await waitFor(() => expect(input).toHaveValue(5));
+    fireEvent.change(input, { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(world.maxProjects).toBe(3));
+    expect(world.puts).toEqual([{ widget: { max_projects: 3 } }]);
+    expect(world.afkMinutes).toBe(10);
+    expect(screen.getByLabelText("AFK minutes (1 to 240)")).toHaveValue(10);
   });
 
   it("sends a device that is not local to the home page without asking for settings", async () => {

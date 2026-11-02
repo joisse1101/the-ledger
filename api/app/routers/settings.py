@@ -18,7 +18,11 @@ def _require_local(request: Request) -> None:
 
 
 def _current() -> dict:
-    return settings_body(settings_service.get_worktree_folders(), settings_service.get_max_projects())
+    return settings_body(
+        settings_service.get_worktree_folders(),
+        settings_service.get_max_projects(),
+        settings_service.get_afk_minutes(),
+    )
 
 
 @router.get("/api/settings")
@@ -31,5 +35,6 @@ def get_settings(request: Request) -> dict:
 def put_settings(body: SettingsRequest, request: Request) -> dict:
     _require_local(request)
     max_projects = body.widget.max_projects if body.widget else None
-    settings_service.save_settings(body.worktree_folders, max_projects)
+    afk_minutes = body.widget.afk_minutes if body.widget else None
+    settings_service.save_settings(body.worktree_folders, max_projects, afk_minutes)
     return _current()

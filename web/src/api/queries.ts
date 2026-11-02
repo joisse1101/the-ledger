@@ -393,3 +393,19 @@ export function useSaveWidgetMaxProjects() {
     onSuccess: (settings) => client.setQueryData(keys.settings, settings),
   });
 }
+
+/** Saves how many minutes the desktop widget's AFK switch stays on. Like the projects number, a display
+ *  preference: nothing is reloaded. Rejects with an ApiError carrying the server's reason (422 for a
+ *  value outside 1 to 240 or not a whole number). */
+export function useSaveWidgetAfkMinutes() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (afkMinutes: number) =>
+      apiFetch<Settings>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widget: { afk_minutes: afkMinutes } }),
+      }),
+    onSuccess: (settings) => client.setQueryData(keys.settings, settings),
+  });
+}

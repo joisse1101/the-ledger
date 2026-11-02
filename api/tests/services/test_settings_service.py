@@ -107,6 +107,45 @@ def test_an_invalid_widget_number_is_refused_and_nothing_changes(isolated_db, va
     assert settings_service.get_max_projects() == 4
 
 
+def test_the_afk_minutes_default_to_thirty(isolated_settings):
+    assert settings_service.get_afk_minutes() == 30
+
+
+def test_saving_the_afk_minutes_changes_only_them(isolated_db, monkeypatch):
+    settings_service.save_settings([".trees"], 3)
+    reconciled = []
+    monkeypatch.setattr(history, "correct_worktree_rows", lambda: reconciled.append("history"))
+    monkeypatch.setattr(snapshot, "refresh", lambda: reconciled.append("snapshot"))
+
+    settings_service.save_settings(None, None, 10)
+
+    assert settings_service.get_afk_minutes() == 10
+    assert settings_service.get_max_projects() == 3
+    assert settings_store.load_worktree_folders() == (".trees",)
+    assert reconciled == []
+
+
+def test_saving_folders_and_max_projects_leaves_the_afk_minutes(isolated_db):
+    settings_service.save_settings(None, None, 10)
+    settings_service.save_settings([".trees"], 3)
+    assert settings_service.get_afk_minutes() == 10
+
+
+@pytest.mark.parametrize("value", [0, 241, -1, 7.5, True, "30", [30]])
+def test_invalid_afk_minutes_are_refused_and_nothing_changes(isolated_db, value):
+    settings_service.save_settings(None, None, 20)
+    with pytest.raises(InvalidInput, match="whole number"):
+        settings_service.save_settings(None, None, value)
+    assert settings_service.get_afk_minutes() == 20
+
+
+def test_bad_afk_minutes_stop_valid_folders_and_max_projects_from_being_saved(isolated_db):
+    with pytest.raises(InvalidInput):
+        settings_service.save_settings([".trees"], 3, 999)
+    assert settings_store.load_worktree_folders() == ()
+    assert settings_service.get_max_projects() == 5
+
+
 def test_a_bad_number_stops_valid_folders_from_being_saved(isolated_db):
     with pytest.raises(InvalidInput):
         settings_service.save_settings([".trees"], 99)

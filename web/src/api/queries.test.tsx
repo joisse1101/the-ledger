@@ -17,6 +17,7 @@ import {
   useRefresh,
   useRemoteQr,
   useSaveSettings,
+  useSaveWidgetAfkMinutes,
   useSaveWidgetMaxProjects,
   useSetAutoApprove,
   useSetRemoteMode,
@@ -517,7 +518,7 @@ describe("the settings", () => {
   }
 
   const saved = {
-    widget: { max_projects: 5 },
+    widget: { max_projects: 5, afk_minutes: 30 },
     worktree_folders: [
       { path: ".claude/worktrees", built_in: true },
       { path: ".trees", built_in: false },
@@ -569,7 +570,7 @@ describe("the settings", () => {
   });
 
   it("saves the widget's number with a JSON PUT and reloads nothing derived from sessions", async () => {
-    const withThree = { ...saved, widget: { max_projects: 3 } };
+    const withThree = { ...saved, widget: { max_projects: 3, afk_minutes: 30 } };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withThree));
     vi.stubGlobal("fetch", fetchMock);
     const client = createQueryClient();
@@ -584,6 +585,45 @@ describe("the settings", () => {
     expect(JSON.parse(init.body)).toEqual({ widget: { max_projects: 3 } });
     expect(client.getQueryData(keys.settings)).toEqual(withThree);
     expect(invalidate).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("saves the AFK minutes with a JSON PUT and reloads nothing derived from sessions", async () => {
+    const withTen = { ...saved, widget: { max_projects: 5, afk_minutes: 10 } };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withTen));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    const { result } = renderHook(() => useSaveWidgetAfkMinutes(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync(10));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/settings");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual({ widget: { afk_minutes: 10 } });
+    expect(client.getQueryData(keys.settings)).toEqual(withTen);
+    expect(invalidate).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("surfaces the server's reason when the AFK minutes are refused", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "Must be a whole number from 1 to 240." }), {
+          status: 422,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useSaveWidgetAfkMinutes(), { wrapper: wrapper(client) });
+    await expect(act(() => result.current.mutateAsync(241))).rejects.toMatchObject({
+      status: 422,
+      message: "Must be a whole number from 1 to 240.",
+    });
     client.clear();
   });
 

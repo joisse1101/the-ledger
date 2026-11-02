@@ -64,7 +64,9 @@ testable and readable independent of the web framework wrapping it.
   `load_worktree_folders()` re-reads the file only when its mtime or size changes, treats a missing or unreadable file as no
   folders, and skips (with a warning) entries that fail `normalize_folder`. The file also holds `widget_max_projects`, how
   many projects the widget's tooltip lists: `load_max_projects()` reads it, and a missing or out-of-range value reads as 5.
-  Every save (`save_worktree_folders()`, `save_max_projects()`) is a read-modify-write under a lock that sets one key, keeps
+  It also holds `widget_afk_minutes`, how long the widget's AFK switch stays on: `load_afk_minutes()` reads it, and a
+  missing or out-of-range value reads as 30.
+  Every save (`save_worktree_folders()`, `save_max_projects()`, `save_afk_minutes()`) is a read-modify-write under a lock that sets one key, keeps
   the others (unknown keys too), writes a temp file and `os.replace`s it. The scanner, `paths.project_folder` and `history.correct_worktree_rows` all read it, so
   `backup_history.py` follows the same list with no wiring of its own.
 - `claude_sessions.py` parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`

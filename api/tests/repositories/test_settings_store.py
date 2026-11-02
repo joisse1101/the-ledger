@@ -82,3 +82,38 @@ def test_unknown_keys_survive_a_save(isolated_settings):
 def test_an_invalid_stored_max_projects_reads_as_the_default(isolated_settings, stored):
     isolated_settings.write_text(json.dumps({"widget_max_projects": stored}), encoding="utf-8")
     assert settings_store.load_max_projects() == 5
+
+
+def test_afk_minutes_defaults_to_thirty_when_the_file_is_missing(isolated_settings):
+    assert settings_store.load_afk_minutes() == 30
+
+
+def test_afk_minutes_round_trip(isolated_settings):
+    settings_store.save_afk_minutes(10)
+    assert settings_store.load_afk_minutes() == 10
+
+
+def test_afk_minutes_survive_a_restart(isolated_settings, monkeypatch):
+    settings_store.save_afk_minutes(10)
+    # A restart is a new process: nothing cached, only the file.
+    monkeypatch.setattr(settings_store, "_cache", None)
+    assert settings_store.load_afk_minutes() == 10
+
+
+def test_saving_afk_minutes_keeps_folders_and_max_projects_and_the_other_way_round(isolated_settings):
+    settings_store.save_afk_minutes(10)
+    settings_store.save_max_projects(3)
+    settings_store.save_worktree_folders([".trees"])
+    assert settings_store.load_afk_minutes() == 10
+    assert settings_store.load_max_projects() == 3
+
+    settings_store.save_afk_minutes(60)
+    assert settings_store.load_max_projects() == 3
+    assert settings_store.load_worktree_folders() == (".trees",)
+    assert settings_store.load_afk_minutes() == 60
+
+
+@pytest.mark.parametrize("stored", [0, 241, 7.5, True, "30", None, [30]])
+def test_an_invalid_stored_afk_minutes_reads_as_the_default(isolated_settings, stored):
+    isolated_settings.write_text(json.dumps({"widget_afk_minutes": stored}), encoding="utf-8")
+    assert settings_store.load_afk_minutes() == 30
