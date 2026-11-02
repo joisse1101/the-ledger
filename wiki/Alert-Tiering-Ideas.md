@@ -6,8 +6,10 @@ The idea: replace the single, always-loud toast with alerts that are sorted by h
 
 ## Status
 
-- **Planned now:** sound only. Two chimes ("finished" and "needs you"), skipped when you are already looking at the session, and merged when several sessions fire at once.
-- **Parked:** everything else on this page (the "full tiering").
+- **Planned now:** sound only when away. Two chimes ("finished" and "needs you"), played only when you are away from the PC, and merged when several sessions fire at once. Away means Windows sees no keyboard or mouse input for 5 minutes, or the widget's AFK button is on.
+- **Parked:** everything else on this page (the "full tiering"), including:
+  - A delayed reminder when a session sits unanswered.
+  - Away detection from session activity, instead of keyboard and mouse input.
 - **Owner of the next step:** the repo owner, who decides when to start tiering. No date is set.
 
 ## Why
