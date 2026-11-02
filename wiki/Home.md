@@ -38,3 +38,6 @@ Requirements live in `openspec/specs/`, not here. Docs conventions are in [Codin
 - [Gateway](Gateway.md): LAN access through the Nginx container
 - [Hooks](Hooks.md): toast hooks, relay hook, scheduled-task scripts
 - [Widget](Widget.md): floating live-sessions widget, startup shortcut, process ownership
+
+**Ideas**
+- [Alert tiering ideas](Alert-Tiering-Ideas.md): parked plan for sorting alerts by urgency
