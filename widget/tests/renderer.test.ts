@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../src/renderer/app'
-import { afkLabel, afkTitle, remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
+import { afkTitle, remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
 import type { AfkState, LiveSession, LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../src/shared/types'
 
 const session = (over: Partial<LiveSession> = {}): LiveSession => ({
@@ -21,7 +21,7 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
 function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true, afkResult = true) {
   document.body.className = ''
   document.body.innerHTML = `
-    <span id="summary"></span><button id="afk" hidden></button><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
+    <span id="summary"></span><button id="afk" hidden><span class="dot"></span>AFK</button><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
     <main id="body"></main><footer id="note"></footer>`
   let push!: (s: LiveState) => void
   let setCollapsed!: (c: boolean) => void
@@ -450,31 +450,39 @@ describe('AFK button', () => {
     expect(afk().hidden).toBe(false)
   })
 
-  it('shows on, with the time left in the hover text', () => {
+  it('marks the switch checked with state on, and the time left in the hover text', () => {
     const { pushAfk } = setup()
     pushAfk(installed(true, 20))
-    expect(afk().textContent).toBe('AFK on')
     expect(afk().dataset.state).toBe('on')
-    expect(afk().getAttribute('aria-pressed')).toBe('true')
+    expect(afk().getAttribute('aria-checked')).toBe('true')
     expect(afk().title).toContain('20 minutes')
   })
 
-  it('shows off, with what a click does in the hover text', () => {
+  it('marks the switch unchecked with state off, and what a click does in the hover text', () => {
     const { pushAfk } = setup()
     pushAfk(installed(false))
-    expect(afk().textContent).toBe('AFK off')
     expect(afk().dataset.state).toBe('off')
-    expect(afk().getAttribute('aria-pressed')).toBe('false')
+    expect(afk().getAttribute('aria-checked')).toBe('false')
     expect(afk().title).toMatch(/^Turn on AFK/)
   })
 
-  it('shows off when the next poll says the flag has expired', () => {
+  it('keeps the dot and the fixed label AFK whether on or off', () => {
+    const { pushAfk } = setup()
+    pushAfk(installed(true, 5))
+    expect(afk().querySelector('.dot')).not.toBeNull()
+    expect(afk().textContent).toBe('AFK')
+    pushAfk(installed(false))
+    expect(afk().querySelector('.dot')).not.toBeNull()
+    expect(afk().textContent).toBe('AFK')
+  })
+
+  it('switches to off when the next poll says the flag has expired', () => {
     const { pushAfk } = setup()
     pushAfk(installed(true, 1))
-    expect(afk().textContent).toBe('AFK on')
+    expect(afk().dataset.state).toBe('on')
     pushAfk(installed(false))
-    expect(afk().textContent).toBe('AFK off')
     expect(afk().dataset.state).toBe('off')
+    expect(afk().getAttribute('aria-checked')).toBe('false')
   })
 
   it('asks the bridge to switch on from off, and off from on', () => {
@@ -496,7 +504,6 @@ describe('AFK button', () => {
 
   it('words the time left in the singular for one minute', () => {
     expect(afkTitle(installed(true, 1))).toContain('1 minute more')
-    expect(afkLabel(installed(true, 1))).toBe('AFK on')
   })
 
   it('is hidden by the collapsed pill rule in the stylesheet', () => {

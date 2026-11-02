@@ -26,9 +26,6 @@ export function remoteTitle(status: RemoteStatus): string {
   }
 }
 
-/** The AFK button's label: on or off, readable without a hover. */
-export const afkLabel = (afk: AfkState): string => (afk.on ? 'AFK on' : 'AFK off')
-
 /** The AFK button's hover text: what a click does and, while on, the time left. */
 export function afkTitle(afk: AfkState): string {
   if (!afk.on) return 'Turn on AFK: play the chime sounds even while you are using the PC'

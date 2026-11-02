@@ -111,7 +111,8 @@ widget watched finishes, the tooltip also pops up by itself for a few seconds.
 
 ## AFK button
 
-The header has an "AFK on" / "AFK off" button for the session chimes (see [Hooks](Hooks.md)): on makes the
+The header has an "AFK" switch for the session chimes (see [Hooks](Hooks.md)). It looks like the Remote
+button: a small dot and the fixed label "AFK", with the dot green when on and grey when off. On makes the
 chime hook play even while you are using the PC, until the AFK duration runs out. It is the widget's first
 local write and it does not use the backend to switch: the widget writes or deletes one file,
 `%USERPROFILE%\.claude\hooks\chimeScripts\state\afk.flag`, holding the expiry as one `Z`-suffixed UTC time.

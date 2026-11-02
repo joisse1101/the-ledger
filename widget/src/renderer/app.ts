@@ -1,5 +1,5 @@
 import type { LiveState, WidgetBridge } from '../shared/types'
-import { afkLabel, afkTitle, remoteTitle, renderBody, summaryText } from './view.js'
+import { afkTitle, remoteTitle, renderBody, summaryText } from './view.js'
 
 const NOTE_MS = 3000
 const OPACITY_STEP = 0.1
@@ -82,8 +82,7 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
     afkOn = next.on
     afk.hidden = !next.installed
     afk.dataset.state = next.on ? 'on' : 'off'
-    afk.setAttribute('aria-pressed', String(next.on))
-    afk.textContent = afkLabel(next)
+    afk.setAttribute('aria-checked', String(next.on))
     afk.title = afkTitle(next)
   })
   afk.addEventListener('click', async () => {
