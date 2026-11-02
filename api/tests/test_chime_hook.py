@@ -10,6 +10,7 @@ needs-input alert, and nothing ever reaches Claude Code.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -126,6 +127,12 @@ def test_plays_again_when_the_last_sound_is_older_than_5_seconds(state, kind):
     (state / "done.stamp").write_text(old, encoding="ascii")
     (state / "needs-input.stamp").write_text(old, encoding="ascii")
     assert _decide(kind, state) == "play"
+
+
+def test_done_and_needs_input_use_two_different_system_sounds():
+    table = re.search(r"\$SoundByKind = @\{(.*?)\}", SCRIPT.read_text(encoding="utf-8"))
+    sounds = dict(re.findall(r"'([\w-]+)'\s*=\s*'(\w+)'", table.group(1)))
+    assert sounds == {"done": "Asterisk", "needs-input": "Hand"}
 
 
 def test_a_present_user_writes_no_state(state):

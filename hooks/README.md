@@ -224,7 +224,7 @@ the worst case is that the terminal dialog stays the only way to answer; the hoo
 ## 7. Optional: session chimes
 
 A short Windows sound when a session finishes (`Stop`, plays Asterisk) or needs your input
-(`Notification`, plays Exclamation), only while you are away: no keyboard or mouse input for 5 minutes,
+(`Notification`, plays Hand), only while you are away: no keyboard or mouse input for 5 minutes,
 or the AFK flag is valid. Alerts within 5 seconds make one sound. It needs no BurntToast, no toast
 hooks and no dashboard, and it is **not** installed by default.
 

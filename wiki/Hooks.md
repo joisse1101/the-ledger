@@ -44,7 +44,9 @@ is separate from `scripts/` because the toast uninstall deletes every file liste
 `hooks/README.md` section 7.
 
 - **Two kinds.** `-Kind done` (for the `Stop` event) plays Asterisk. `-Kind needs-input` (for the
-  `Notification` event) plays Exclamation. Any other kind does nothing.
+  `Notification` event) plays Hand. Any other kind does nothing. Both sounds follow the Windows sound scheme, and some
+  Windows 11 schemes map Asterisk and Exclamation to the same file, which is why needs-input uses
+  Hand. If the two chimes sound alike, check Sound settings.
 - **Away rule.** Away means no keyboard or mouse input for 300 seconds or more (`GetLastInputInfo`),
   or a valid `afk.flag` in the state folder (a UTC expiry time still in the future). If Windows will
   not report idle time, you count as away. A missing, garbled or past-due flag counts as no flag.

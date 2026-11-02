@@ -15,7 +15,7 @@ Order of decisions:
 2. Merge. Under a named mutex, one timestamp file per kind in the state folder: 'done' is skipped if
    any sound played in the last 5 seconds, 'needs-input' only if a needs-input sound did. If the mutex
    cannot be taken quickly, or the state folder is unusable, the sound plays.
-3. Play. A hidden child PowerShell plays System.Media.SystemSounds (Asterisk for done, Exclamation for
+3. Play. A hidden child PowerShell plays System.Media.SystemSounds (Asterisk for done, Hand for
    needs-input), so the hook returns at once.
 
 .PARAMETER Kind
@@ -49,7 +49,7 @@ $AwayAfterSeconds = 300
 $MergeWindowSeconds = 5
 $MutexName = 'Local\ClaudeChimeMerge'
 $MutexWaitMilliseconds = 500
-$SoundByKind = @{ 'done' = 'Asterisk'; 'needs-input' = 'Exclamation' }
+$SoundByKind = @{ 'done' = 'Asterisk'; 'needs-input' = 'Hand' }
 
 # Whole seconds since the last keyboard/mouse input, or $null when Windows won't say.
 function Get-IdleSeconds {
