@@ -15,10 +15,15 @@ there (other hooks under either event are left alone), and the installed ledgerS
 .PARAMETER IncludeSessionControl
 Also remove the optional Ledger relay hook (PermissionRequest).
 
+.PARAMETER IncludeChimes
+Also remove the optional chime hooks: the Stop and Notification entries referencing
+Play-ClaudeChime.ps1 (other hooks under either event are left alone) and the installed chimeScripts
+folder, including its state files and any AFK flag.
+
 .PARAMETER SkipToastHooks
-Leave the toast hooks alone: don't touch the Notification/Stop hooks, the claudecode:// handler, or
-the toast scripts. Combine with -IncludeSessionControl to remove only the relay hook. Does nothing
-on its own.
+Leave the toast hooks alone: don't touch the toast Notification/Stop hooks, the claudecode:// handler,
+or the toast scripts. Combine with -IncludeSessionControl and/or -IncludeChimes to remove only those
+hooks. Does nothing on its own.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
@@ -34,9 +39,14 @@ Removes the toast hooks and the relay hook.
 .EXAMPLE
 .\Uninstall-ClaudeHooks.ps1 -IncludeSessionControl -SkipToastHooks
 Removes only the relay hook, leaving the toast hooks installed.
+
+.EXAMPLE
+.\Uninstall-ClaudeHooks.ps1 -IncludeChimes -SkipToastHooks
+Removes only the chime hooks, leaving the toast hooks installed.
 #>
 param(
     [switch]$IncludeSessionControl,
+    [switch]$IncludeChimes,
     [switch]$SkipToastHooks,
     [switch]$Help
 )
@@ -48,12 +58,13 @@ if ($Help) {
     return
 }
 
-if ($SkipToastHooks -and -not $IncludeSessionControl) {
-    Write-Host 'Nothing to uninstall: -SkipToastHooks without -IncludeSessionControl.'
+if ($SkipToastHooks -and -not $IncludeSessionControl -and -not $IncludeChimes) {
+    Write-Host 'Nothing to uninstall: -SkipToastHooks without -IncludeSessionControl or -IncludeChimes.'
     return
 }
 
 $hooksDir = Join-Path $env:USERPROFILE '.claude\hooks'
+$chimeScriptsDir = Join-Path $hooksDir 'chimeScripts'
 $ledgerScriptsDir = Join-Path $hooksDir 'ledgerScripts'
 $settingsPath = Join-Path $env:USERPROFILE '.claude\settings.json'
 
@@ -71,6 +82,20 @@ if (Test-Path $settingsPath) {
                 }
             }
             Write-Host "Removed toast hooks from $settingsPath"
+        }
+        if ($IncludeChimes) {
+            foreach ($eventName in 'Stop', 'Notification') {
+                if (-not $settings.hooks.PSObject.Properties[$eventName]) { continue }
+                $kept = @(@($settings.hooks.$eventName) | Where-Object {
+                    -not (@($_.hooks) | Where-Object { $_.command -like '*Play-ClaudeChime.ps1*' })
+                })
+                if ($kept.Count -gt 0) {
+                    $settings.hooks.$eventName = $kept
+                } else {
+                    $settings.hooks.PSObject.Properties.Remove($eventName)
+                }
+            }
+            Write-Host "Removed the chime hooks from $settingsPath"
         }
         if ($IncludeSessionControl) {
             # PermissionRequest is the current relay; PreToolUse is the earlier one, which may still be
@@ -117,7 +142,17 @@ if (-not $SkipToastHooks) {
     Write-Host "Removed the hook scripts from $hooksDir"
 }
 
-# 4. Delete the relay hook's own folder (it only ever holds what Install copied there)
+# 4a. Delete the chime folder (it only holds what Install copied, plus the state files and AFK flag)
+if ($IncludeChimes) {
+    if (Test-Path $chimeScriptsDir) {
+        Remove-Item -Path $chimeScriptsDir -Recurse -Force
+        Write-Host "Removed the chime scripts and state from $chimeScriptsDir"
+    } else {
+        Write-Host "$chimeScriptsDir not found, skipping"
+    }
+}
+
+# 4b. Delete the relay hook's own folder (it only ever holds what Install copied there)
 if ($IncludeSessionControl) {
     if (Test-Path $ledgerScriptsDir) {
         Remove-Item -Path $ledgerScriptsDir -Recurse -Force

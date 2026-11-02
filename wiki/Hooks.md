@@ -34,8 +34,14 @@ with a console; reinstalls and says so without one, or with `-Yes`).
 
 `hooks/chimeScripts/Play-ClaudeChime.ps1` is the **chime script**: a short Windows sound when a
 session needs you, played only while you are away. Like the toast hooks it is machine-wide and has
-nothing to do with the dashboard. It is not wired into `settings.json` yet (the installer switch comes
-in a later step of the `add-session-chimes` change); until then it only runs by hand.
+nothing to do with the dashboard. `Install-ClaudeHooks.ps1 -IncludeChimes` copies it to
+`%USERPROFILE%\.claude\hooks\chimeScripts\` and merges one `Stop` entry (`-Kind done`) and one
+`Notification` entry (`-Kind needs-input`), both with an empty matcher, matched by script name so a
+re-run updates the path and never duplicates. Add `-SkipToastHooks` for chimes alone: no toast script,
+no BurntToast, no `claudecode://` handler. `Uninstall-ClaudeHooks.ps1 -IncludeChimes` removes just those
+entries (toast and your own hooks stay) and the folder with its state files and any AFK flag. The folder
+is separate from `scripts/` because the toast uninstall deletes every file listed there. See
+`hooks/README.md` section 7.
 
 - **Two kinds.** `-Kind done` (for the `Stop` event) plays Asterisk. `-Kind needs-input` (for the
   `Notification` event) plays Exclamation. Any other kind does nothing.

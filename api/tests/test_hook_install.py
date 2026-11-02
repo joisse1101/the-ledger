@@ -6,7 +6,8 @@ are exercised, because the toast install also writes the machine's real HKCU cla
 
 Guards the promises of the relay hook's install story: it goes in as one PermissionRequest entry with
 a timeout above the script's own wait, replaces the earlier PreToolUse relay without touching anything
-else, is idempotent, and comes out again leaving the toast hooks alone.
+else, is idempotent, and comes out again leaving the toast hooks alone. The same goes for the chime
+hooks (-IncludeChimes): one Stop and one Notification entry, never a protocol handler.
 """
 
 import json
@@ -187,3 +188,150 @@ def test_uninstall_with_nothing_installed_is_harmless(home):
     _uninstall(home)
 
     assert _settings(home)["hooks"]["Notification"] == TOAST_HOOKS["Notification"]
+
+
+# --- chime hooks (-IncludeChimes) -------------------------------------------------------------
+
+CHIME = "Play-ClaudeChime.ps1"
+CHIME_DIR_PARTS = (".claude", "hooks", "chimeScripts")
+USERS_OWN_STOP = {"matcher": "", "hooks": [{"type": "command", "command": "python my-own-stop.py"}]}
+
+
+def _chime_dir(home: Path) -> Path:
+    return home.joinpath(*CHIME_DIR_PARTS)
+
+
+def _install_chimes(home: Path, *extra: str) -> subprocess.CompletedProcess:
+    result = _run("Install-ClaudeHooks.ps1", home, "-IncludeChimes", "-SkipToastHooks", *extra)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return result
+
+
+def _uninstall_chimes(home: Path) -> subprocess.CompletedProcess:
+    result = _run("Uninstall-ClaudeHooks.ps1", home, "-IncludeChimes", "-SkipToastHooks")
+    assert result.returncode == 0, result.stdout + result.stderr
+    return result
+
+
+def _chime_entries(settings: dict, event: str) -> list[dict]:
+    return [e for e in settings["hooks"].get(event, []) if any(CHIME in h["command"] for h in e["hooks"])]
+
+
+def _protocol_handler_present() -> bool:
+    # Read-only look at the real registry: the chimes-only install must leave it exactly as it was.
+    result = subprocess.run(
+        ["reg", "query", r"HKCU\Software\Classes\claudecode"], capture_output=True, text=True, check=False,
+    )
+    return result.returncode == 0
+
+
+def test_chimes_only_install_adds_one_stop_and_one_notification_entry_and_copies_the_script(home):
+    handler_before = _protocol_handler_present()
+
+    result = _install_chimes(home)
+
+    settings = _settings(home)
+    stop = _chime_entries(settings, "Stop")
+    notification = _chime_entries(settings, "Notification")
+    assert len(stop) == 1 and len(notification) == 1
+    assert stop[0]["matcher"] == "" and notification[0]["matcher"] == ""
+    script = _chime_dir(home) / CHIME
+    assert script.is_file()
+    assert f'-File "{script}" -Kind done' in stop[0]["hooks"][0]["command"]
+    assert f'-File "{script}" -Kind needs-input' in notification[0]["hooks"][0]["command"]
+    # No toast: no toast script, no protocol handler written or changed.
+    assert not (home / ".claude" / "hooks" / "Send-ClaudeToast.ps1").exists()
+    assert "protocol handler" not in result.stdout
+    assert _protocol_handler_present() == handler_before
+
+
+def test_chimes_install_sits_next_to_existing_toast_and_own_hooks(home):
+    _seed(home, {**TOAST_HOOKS, "Stop": TOAST_HOOKS["Stop"] + [USERS_OWN_STOP]})
+
+    _install_chimes(home)
+
+    settings = _settings(home)
+    assert settings["hooks"]["Stop"][:2] == TOAST_HOOKS["Stop"] + [USERS_OWN_STOP]
+    assert len(settings["hooks"]["Stop"]) == 3
+    assert settings["hooks"]["Notification"][0] == TOAST_HOOKS["Notification"][0]
+    assert len(settings["hooks"]["Notification"]) == 2
+    assert settings["model"] == "keep-me"
+
+
+def test_installing_chimes_twice_does_not_duplicate_and_updates_the_path(home):
+    _install_chimes(home)
+    stale = _settings(home)
+    for event in ("Stop", "Notification"):
+        entry = _chime_entries(stale, event)[0]
+        entry["hooks"][0]["command"] = entry["hooks"][0]["command"].replace("chimeScripts", "oldFolder")
+    (home / ".claude" / "settings.json").write_text(json.dumps(stale), encoding="utf-8")
+
+    _install_chimes(home)
+
+    settings = _settings(home)
+    for event in ("Stop", "Notification"):
+        entries = _chime_entries(settings, event)
+        assert len(entries) == 1
+        assert "oldFolder" not in entries[0]["hooks"][0]["command"]
+        assert str(_chime_dir(home) / CHIME) in entries[0]["hooks"][0]["command"]
+
+
+def test_skip_toast_hooks_alone_still_installs_nothing(home):
+    result = _run("Install-ClaudeHooks.ps1", home, "-SkipToastHooks")
+
+    assert result.returncode == 0
+    assert "Nothing to install" in result.stdout
+    assert not (home / ".claude" / "settings.json").exists()
+
+
+def test_chimes_uninstall_removes_only_chime_entries_and_folder_with_state(home):
+    _seed(home, {**TOAST_HOOKS, "Stop": TOAST_HOOKS["Stop"] + [USERS_OWN_STOP]})
+    _install_chimes(home)
+    state = _chime_dir(home) / "state"
+    state.mkdir()
+    (state / "afk.flag").write_text("2999-01-01T00:00:00Z", encoding="utf-8")
+    (state / "done.stamp").write_text("2026-01-01T00:00:00Z", encoding="utf-8")
+
+    _uninstall_chimes(home)
+
+    settings = _settings(home)
+    assert CHIME not in json.dumps(settings)
+    assert settings["hooks"]["Stop"] == TOAST_HOOKS["Stop"] + [USERS_OWN_STOP]
+    assert settings["hooks"]["Notification"] == TOAST_HOOKS["Notification"]
+    assert settings["model"] == "keep-me"
+    assert not _chime_dir(home).exists()
+
+
+def test_chimes_uninstall_drops_an_event_key_that_only_held_the_chime(home):
+    _install_chimes(home)
+
+    _uninstall_chimes(home)
+
+    hooks = _settings(home)["hooks"]
+    assert "Stop" not in hooks and "Notification" not in hooks
+
+
+def test_chimes_uninstall_leaves_the_relay_hook_alone(home):
+    _install(home)
+    _install_chimes(home)
+
+    _uninstall_chimes(home)
+
+    assert len(_settings(home)["hooks"]["PermissionRequest"]) == 1
+    assert (home / ".claude" / "hooks" / "ledgerScripts" / RELAY).is_file()
+
+
+def test_chimes_uninstall_with_nothing_installed_is_harmless(home):
+    _seed(home, TOAST_HOOKS)
+
+    _uninstall_chimes(home)
+
+    settings = _settings(home)
+    assert settings["hooks"]["Notification"] == TOAST_HOOKS["Notification"]
+    assert settings["hooks"]["Stop"] == TOAST_HOOKS["Stop"]
+
+
+def test_chimes_uninstall_with_no_settings_file_is_harmless(home):
+    _uninstall_chimes(home)
+
+    assert not (home / ".claude" / "settings.json").exists()

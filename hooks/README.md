@@ -20,6 +20,7 @@ Copy this whole `hooks\` folder to the other machine:
 | `Install-ClaudeHooks.ps1` | Copies everything in `scripts\` into `%USERPROFILE%\.claude\hooks\`, registers the protocol handler, and adds the hooks to `settings.json`. See section 3. |
 | `Uninstall-ClaudeHooks.ps1` | Reverses the above. See section 5. |
 | `ledgerScripts\Relay-PermissionRequest.ps1` | **Optional**, dashboard-coupled: relays a session's blocking prompts (permission dialogs, questions) to the Ledger app. Installed separately; see section 6. |
+| `chimeScripts\Play-ClaudeChime.ps1` | **Optional**, standalone: plays a short sound when a session finishes or needs input, only while you are away. Installed separately; see section 7. |
 
 
 ## 2. What needs to be installed
@@ -219,3 +220,42 @@ being discarded after the dialog was already answered - established by reading i
 by spikes, not from public documentation. **Re-check it after Claude Code upgrades** (the checks in the
 `add-remote-session-control` change's task group 7 cover it). If a future version changes any of it,
 the worst case is that the terminal dialog stays the only way to answer; the hook never blocks it.
+
+## 7. Optional: session chimes
+
+A short Windows sound when a session finishes (`Stop`, plays Asterisk) or needs your input
+(`Notification`, plays Exclamation), only while you are away: no keyboard or mouse input for 5 minutes,
+or the AFK flag is valid. Alerts within 5 seconds make one sound. It needs no BurntToast, no toast
+hooks and no dashboard, and it is **not** installed by default.
+
+**Install:**
+
+```powershell
+# chimes only: no toast script, no BurntToast, no claudecode:// handler
+.\hooks\Install-ClaudeHooks.ps1 -IncludeChimes -SkipToastHooks
+
+# toast hooks and the chimes
+.\hooks\Install-ClaudeHooks.ps1 -IncludeChimes
+```
+
+This copies `chimeScripts\` to `%USERPROFILE%\.claude\hooks\chimeScripts\` and adds one `Stop` and one
+`Notification` entry (empty matcher) to `settings.json`, next to any toast or other hooks already there.
+Entries are matched by the script name `Play-ClaudeChime.ps1`, so a re-run updates the path and never
+duplicates. Start a new Claude Code session afterwards.
+
+**Uninstall:**
+
+```powershell
+# chimes only (toast hooks stay)
+.\hooks\Uninstall-ClaudeHooks.ps1 -IncludeChimes -SkipToastHooks
+
+# toast hooks and the chimes
+.\hooks\Uninstall-ClaudeHooks.ps1 -IncludeChimes
+```
+
+This removes only the `Stop` and `Notification` entries that reference `Play-ClaudeChime.ps1` (your own
+hooks stay) and deletes the `chimeScripts\` folder, including its `state\` folder and any `afk.flag`.
+Uninstalling when nothing is installed does nothing.
+
+**If you hear nothing:** the sounds are your Windows system sounds, so check the Windows sound scheme
+and that system sounds are on. The script cannot tell when a sound fails; it stays silent by design.
