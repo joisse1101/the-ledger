@@ -19,8 +19,8 @@ A token is the unit Claude counts text in. Context is how many tokens one reques
 - Time: Avg. session, Total duration, Longest session and Shortest session.
 - Cost: Avg. session cost, Total cost, Most expensive session and Cheapest session.
 - Tokens: Avg. tokens / session, Total tokens, Most tokens and Least tokens.
-- Hover a longest, shortest, most expensive, cheapest, most or least figure to see the project and session it belongs to.
-- A figure marked with an asterisk is an estimate. Hover it for what the estimate leaves out.
+
+Hover a longest, shortest, most expensive, cheapest, most or least figure to see the project and session it belongs to. A figure marked with an asterisk is an estimate. Hover it for what the estimate leaves out.
 
 ## When nothing shows
 

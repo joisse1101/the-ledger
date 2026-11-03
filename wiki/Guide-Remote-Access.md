@@ -37,7 +37,8 @@ If a device says "This device isn't signed in", Remote mode was turned off and o
 - See live sessions and answer their prompts. See [Live sessions](Guide-Live-Sessions.md).
 - Browse the Overview, Manage Sessions and Manage Projects pages.
 - Use **Files** to send and fetch files. See [Files](Guide-Files.md).
-- You cannot delete sessions, projects or files, change Remote mode, open Settings or see the sign-in code. Those work only on the PC.
+
+You cannot delete sessions, projects or files, change Remote mode, open Settings or see the sign-in code. Those work only on the PC.
 
 ## Turn it off
 
@@ -46,9 +47,7 @@ If a device says "This device isn't signed in", Remote mode was turned off and o
 
 ## The certificate warning
 
-- The warning appears because the address is a local network address, which has no certificate from a public authority.
-- The traffic is still encrypted, but the browser cannot confirm who it is talking to.
-- Do this only on a network you trust.
+The warning appears because the address is a local network address, which has no certificate from a public authority. The traffic is still encrypted, but the browser cannot confirm who it is talking to. Do this only on a network you trust.
 
 ## Checked and unchecked
 

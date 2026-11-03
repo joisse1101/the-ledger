@@ -43,8 +43,7 @@ AFK makes chimes play even while you are at the keyboard, for example when you s
 
 ## If the two sounds seem alike
 
-- Both sounds come from your Windows sound scheme.
-- If they sound the same, check Windows Sound settings.
+Both sounds come from your Windows sound scheme. If they sound the same, check Windows Sound settings.
 
 ## Checked and unchecked
 
