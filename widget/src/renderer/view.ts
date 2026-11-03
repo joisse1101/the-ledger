@@ -1,4 +1,4 @@
-import type { LiveSession, LiveState, RemoteStatus } from '../shared/types'
+import type { AfkState, LiveSession, LiveState, RemoteStatus } from '../shared/types'
 
 /** Header text: the one-line summary shown both expanded and as the collapsed pill. */
 export function summaryText(state: LiveState | null): string {
@@ -24,6 +24,13 @@ export function remoteTitle(status: RemoteStatus): string {
     case 'failed':
       return `Remote mode could not start: ${status.reason}. Click to try again`
   }
+}
+
+/** The AFK button's hover text: what a click does and, while on, the time left. */
+export function afkTitle(afk: AfkState): string {
+  if (!afk.on) return 'Turn on AFK: play the chime sounds even while you are using the PC'
+  const minutes = afk.minutesLeft === 1 ? '1 minute' : `${afk.minutesLeft} minutes`
+  return `AFK is on for ${minutes} more. Click to turn it off`
 }
 
 /** Sparkline segments kept in a row; the label's trailing glyphs are the newest responses. */

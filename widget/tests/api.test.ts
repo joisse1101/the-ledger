@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createApi, DEFAULT_MAX_PROJECTS } from '../src/main/api'
+import { createApi, DEFAULT_AFK_MINUTES, DEFAULT_MAX_PROJECTS } from '../src/main/api'
 import { json, startStub, type Stub } from './stubServer'
 
 let stub: Stub | undefined
@@ -300,5 +300,48 @@ describe('fetchMaxProjects', () => {
     await stub.close()
     stub = undefined
     expect(await createApi(port).fetchMaxProjects()).toBe(DEFAULT_MAX_PROJECTS)
+  })
+})
+
+describe('fetchAfkMinutes', () => {
+  it('returns the number the Settings page has', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { max_projects: 5, afk_minutes: 10 } }))
+    expect(await createApi(stub.port).fetchAfkMinutes()).toBe(10)
+    expect(stub.requests[0].url).toBe('/api/settings')
+  })
+
+  it('returns the last value read when the backend then goes away', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { afk_minutes: 10 } }))
+    const port = stub.port
+    const api = createApi(port)
+    expect(await api.fetchAfkMinutes()).toBe(10)
+    await stub.close()
+    stub = undefined
+    expect(await api.fetchAfkMinutes()).toBe(10)
+  })
+
+  it('returns the last value read when a later answer is an error or unreadable', async () => {
+    let reply: [number, unknown] = [200, { widget: { afk_minutes: 45 } }]
+    stub = await startStub((_req, res) => json(res, reply[0], reply[1]))
+    const api = createApi(stub.port)
+    expect(await api.fetchAfkMinutes()).toBe(45)
+    reply = [500, {}]
+    expect(await api.fetchAfkMinutes()).toBe(45)
+    reply = [200, { widget: { afk_minutes: 2.5 } }]
+    expect(await api.fetchAfkMinutes()).toBe(45)
+  })
+
+  it('returns 30 when the backend is unreachable before any value was read', async () => {
+    stub = await startStub((_req, res) => json(res, 200, {}))
+    const port = stub.port
+    await stub.close()
+    stub = undefined
+    expect(await createApi(port).fetchAfkMinutes()).toBe(DEFAULT_AFK_MINUTES)
+    expect(DEFAULT_AFK_MINUTES).toBe(30)
+  })
+
+  it('returns 30 when the first answer has no usable value', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { max_projects: 3 } }))
+    expect(await createApi(stub.port).fetchAfkMinutes()).toBe(30)
   })
 })

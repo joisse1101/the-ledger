@@ -34,14 +34,19 @@ already there instead of duplicating them.
 .PARAMETER IncludeSessionControl
 Also install the optional Ledger relay hook (PermissionRequest).
 
+.PARAMETER IncludeChimes
+Also install the optional chime hooks: copies .\chimeScripts to %USERPROFILE%\.claude\hooks\chimeScripts
+and adds one Stop entry (-Kind done) and one Notification entry (-Kind needs-input), both with an empty
+matcher, next to any toast or other hooks already there. Independent of the dashboard.
+
 .PARAMETER BackendPort
 The Ledger API's port to write into the relay hook. Only used with -IncludeSessionControl; when
 omitted it comes from .env, the saved port, or the first free port in 8501-8599 (see above).
 
 .PARAMETER SkipToastHooks
 Leave the toast hooks alone: don't copy the toast scripts, register the claudecode:// handler, or
-touch the Notification/Stop hooks. Combine with -IncludeSessionControl to install only the relay
-hook. Does nothing on its own.
+touch the toast Notification/Stop hooks. Combine with -IncludeSessionControl and/or -IncludeChimes to
+install only those hooks. Does nothing on its own.
 
 .PARAMETER Help
 Show this help and exit (-h works too).
@@ -57,9 +62,14 @@ Installs the toast hooks and the relay hook.
 .EXAMPLE
 .\Install-ClaudeHooks.ps1 -IncludeSessionControl -SkipToastHooks
 Installs only the relay hook.
+
+.EXAMPLE
+.\Install-ClaudeHooks.ps1 -IncludeChimes -SkipToastHooks
+Installs only the chime hooks (no toast, no BurntToast, no protocol handler).
 #>
 param(
     [switch]$IncludeSessionControl,
+    [switch]$IncludeChimes,
     [switch]$SkipToastHooks,
     [int]$BackendPort,
     [switch]$Help
@@ -82,13 +92,15 @@ $relayMatcher = ''
 # Claude Code kills the hook mid-wait.
 $relayHookTimeout = 1810
 
-if ($SkipToastHooks -and -not $IncludeSessionControl) {
-    Write-Host 'Nothing to install: -SkipToastHooks without -IncludeSessionControl.'
+if ($SkipToastHooks -and -not $IncludeSessionControl -and -not $IncludeChimes) {
+    Write-Host 'Nothing to install: -SkipToastHooks without -IncludeSessionControl or -IncludeChimes.'
     return
 }
 
 $hooksDir = Join-Path $env:USERPROFILE '.claude\hooks'
 $toastScript = Join-Path $hooksDir 'Send-ClaudeToast.ps1'
+$chimeScriptsDir = Join-Path $hooksDir 'chimeScripts'
+$chimeScript = Join-Path $chimeScriptsDir 'Play-ClaudeChime.ps1'
 $ledgerScriptsDir = Join-Path $hooksDir 'ledgerScripts'
 $relayScript = Join-Path $ledgerScriptsDir 'Relay-PermissionRequest.ps1'
 # The earlier, PreToolUse-based relay: removed on install, matched by script name.
@@ -177,6 +189,32 @@ function Add-RelayHook {
     Write-Host 'Added PermissionRequest relay hook'
 }
 
+function Add-ChimeHook {
+    param($Settings, [string]$EventName, [string]$Kind, [string]$ScriptPath)
+
+    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Kind $Kind"
+
+    if (-not $Settings.hooks.PSObject.Properties[$EventName]) {
+        $Settings.hooks | Add-Member -NotePropertyName $EventName -NotePropertyValue @()
+    }
+
+    $alreadyInstalled = @($Settings.hooks.$EventName) | Where-Object {
+        @($_.hooks) | Where-Object { $_.command -like '*Play-ClaudeChime.ps1*' }
+    }
+    if ($alreadyInstalled) {
+        Write-Host "$EventName chime hook already present, updating path"
+        @($alreadyInstalled)[0].hooks[0].command = $command
+        return
+    }
+
+    $newEntry = [PSCustomObject]@{
+        matcher = ''
+        hooks   = @([PSCustomObject]@{ type = 'command'; command = $command })
+    }
+    $Settings.hooks.$EventName = @($Settings.hooks.$EventName) + $newEntry
+    Write-Host "Added $EventName chime hook"
+}
+
 # Drops the earlier PreToolUse relay entry (other PreToolUse hooks stay), and the whole PreToolUse key
 # if that leaves it empty.
 function Remove-LegacyRelayHook {
@@ -201,6 +239,14 @@ if (-not $SkipToastHooks) {
     Add-ToastHook -Settings $settings -EventName 'Stop' -Title 'Claude Code Done' -BodyTemplate 'Finished task in {0}!' -ScriptPath $toastScript
 }
 
+if ($IncludeChimes) {
+    New-Item -ItemType Directory -Force -Path $chimeScriptsDir | Out-Null
+    Copy-Item -Path (Join-Path $PSScriptRoot 'chimeScripts\*') -Destination $chimeScriptsDir -Force
+    Write-Host "Copied chime scripts to $chimeScriptsDir"
+    Add-ChimeHook -Settings $settings -EventName 'Stop' -Kind 'done' -ScriptPath $chimeScript
+    Add-ChimeHook -Settings $settings -EventName 'Notification' -Kind 'needs-input' -ScriptPath $chimeScript
+}
+
 if ($IncludeSessionControl) {
     New-Item -ItemType Directory -Force -Path $ledgerScriptsDir | Out-Null
     Copy-Item -Path (Join-Path $PSScriptRoot 'ledgerScripts\*') -Destination $ledgerScriptsDir -Force
@@ -218,7 +264,7 @@ $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding
 Write-Host "Updated $settingsPath"
 
 if ($SkipToastHooks) {
-    Write-Host "`nDone. See README.md's session-control section to verify."
+    Write-Host "`nDone. See README.md's chime and session-control sections to verify."
 } else {
     Write-Host "`nDone. Run the tests in README.md to verify (BurntToast module must already be installed)."
 }

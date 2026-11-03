@@ -32,6 +32,38 @@ upgrade. See `hooks/README.md` section 6. The port is baked into `settings.json`
 moves to another port `Start-Ledger.ps1` notices the mismatch and offers to reinstall the hook (asks
 with a console; reinstalls and says so without one, or with `-Yes`).
 
+`hooks/chimeScripts/Play-ClaudeChime.ps1` is the **chime script**: a short Windows sound when a
+session needs you, played only while you are away. Like the toast hooks it is machine-wide and has
+nothing to do with the dashboard. `Install-ClaudeHooks.ps1 -IncludeChimes` copies it to
+`%USERPROFILE%\.claude\hooks\chimeScripts\` and merges one `Stop` entry (`-Kind done`) and one
+`Notification` entry (`-Kind needs-input`), both with an empty matcher, matched by script name so a
+re-run updates the path and never duplicates. Add `-SkipToastHooks` for chimes alone: no toast script,
+no BurntToast, no `claudecode://` handler. `Uninstall-ClaudeHooks.ps1 -IncludeChimes` removes just those
+entries (toast and your own hooks stay) and the folder with its state files and any AFK flag. The folder
+is separate from `scripts/` because the toast uninstall deletes every file listed there. See
+`hooks/README.md` section 7.
+
+- **Two kinds.** `-Kind done` (for the `Stop` event) plays Asterisk. `-Kind needs-input` (for the
+  `Notification` event) plays Hand. Any other kind does nothing. Both sounds follow the Windows sound scheme, and some
+  Windows 11 schemes map Asterisk and Exclamation to the same file, which is why needs-input uses
+  Hand. If the two chimes sound alike, check Sound settings.
+- **Away rule.** Away means no keyboard or mouse input for 300 seconds or more (`GetLastInputInfo`),
+  or a valid `afk.flag` in the state folder (a UTC expiry time still in the future). If Windows will
+  not report idle time, you count as away. A missing, garbled or past-due flag counts as no flag.
+  A present user leaves no state behind.
+- **Merge rule.** Alerts within 5 seconds make one sound. Each kind keeps a timestamp file in the
+  state folder, guarded by a named mutex. `done` is skipped after any recent sound. `needs-input` is
+  skipped only after a recent `needs-input`, so a finish never hides a request for input. If the
+  mutex or the folder is unusable, the sound plays.
+- **Silence contract.** The script prints nothing and exits 0 on every path, so it cannot disturb
+  Claude Code. The sound plays from a hidden child PowerShell, so the hook returns at once.
+- **Test-only parameters.** `-DryRun` prints `play`, `skip-present` or `skip-merged` instead of
+  playing. `-IdleSeconds` replaces the idle clock (negative means unreadable). `-StateDir` replaces
+  the state folder. `-PlayerPath` replaces the program that plays the sound. `api/tests/test_chime_hook.py`
+  uses all four with throwaway folders, so no sound plays and the real state is never touched.
+- **Unchecked by ear.** Tests cover the decisions, not the sound. That the two sounds differ and are
+  audible is not yet checked; it needs a person listening on a real machine.
+
 `Install-HistoryBackupTask.ps1`/`Uninstall-HistoryBackupTask.ps1`, alongside the relay hook in the
 same folder, register/remove the Windows Scheduled Task that runs `api/backup_history.py` daily
 (see [Setup and run](Setup-And-Run.md)) — unlike the relay hook, these aren't Claude Code hooks at all (nothing

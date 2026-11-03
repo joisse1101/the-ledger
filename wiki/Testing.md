@@ -38,8 +38,8 @@ Python tests, one file per module under test:
   `test_pending_decisions.py` (the pending-prompt store, transcript-based clearing, Remote mode),
   `test_relay_hook.py` (runs the real `hooks/ledgerScripts/Relay-PermissionRequest.ps1` as a subprocess
   against a real uvicorn server: answers become decisions, and every no-answer path prints nothing),
-  `test_hook_install.py` (the relay's `-IncludeSessionControl` install/uninstall against a throwaway
-  `USERPROFILE`, never the real `settings.json`),
+  `test_hook_install.py` (the relay's `-IncludeSessionControl` and the chimes' `-IncludeChimes`
+  install/uninstall against a throwaway `USERPROFILE`, never the real `settings.json`),
   `test_ledger_common.py` (the shared `scripts/Ledger-Common.ps1`: `.env` and port rules, the saved-port
   scan, prerequisite and dependency-repair planning with a fake installer, the start summary, the stale
   relay-hook offer against a throwaway settings file) and `test_widget_shortcut.py` (the widget shortcut
@@ -71,8 +71,8 @@ Widget (`cd widget`):
 
 ```powershell
 npm test          # Vitest: the loopback API client (against a stub HTTP server), the poller,
-                   # the process Supervisor (fake spawner: never kills what it didn't start, never
-                   # touches Docker), window-state clamping/persistence, the renderer (jsdom), IPC names
+                   # the AFK flag module (throwaway folders), the process Supervisor (fake spawner:
+                   # never kills what it didn't start, never touches Docker), window-state clamping/persistence, the renderer (jsdom), IPC names
 npm run build     # tsc for the main process and for the renderer, then copies the static files
 powershell -File tests\Test-StartWidget.ps1   # Start-Widget.ps1 against a stub backend (needs a build)
 ```

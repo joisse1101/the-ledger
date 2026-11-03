@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 import { app, ipcMain, Menu, nativeImage, Tray } from 'electron'
+import { chimeFolder, pollLiveAndAfk, switchAfk } from './afk'
 import { createApi } from './api'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
@@ -29,7 +30,15 @@ if (!app.requestSingleInstanceLock()) {
 
     const win = createWidgetWindow(stateFile, loadState(stateFile))
     widget = win
-    const poller = startPoller(() => api.fetchLive(), (state) => win.sendState(state))
+    // The AFK flag is a local file, read on every poll beside /api/live, so the button works with the backend down.
+    const chimes = chimeFolder()
+    const poller = startPoller(
+      () => pollLiveAndAfk(() => api.fetchLive(), chimes),
+      ({ live, afk }) => {
+        win.sendState(live)
+        win.sendAfk(afk)
+      },
+    )
 
     // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
     let remote: RemoteStatus = { state: 'unavailable' }
@@ -77,6 +86,12 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle(CHANNELS.setAutoApprove, async (_event, sessionId: unknown, enabled: unknown) => {
       if (typeof sessionId !== 'string' || typeof enabled !== 'boolean') return false
       const ok = await api.setAutoApprove(sessionId, enabled)
+      void poller.refresh()
+      return ok
+    })
+    ipcMain.handle(CHANNELS.setAfk, async (_event, enabled: unknown) => {
+      if (typeof enabled !== 'boolean') return false
+      const ok = await switchAfk(chimes, enabled, () => api.fetchAfkMinutes())
       void poller.refresh()
       return ok
     })

@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../src/renderer/app'
-import { remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
-import type { LiveSession, LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../src/shared/types'
+import { afkTitle, remoteTitle, summaryText, trimSparkline } from '../src/renderer/view'
+import type { AfkState, LiveSession, LiveState, OpenRepoResult, RemoteStatus, WidgetBridge } from '../src/shared/types'
 
 const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   session_id: 's1',
@@ -18,15 +18,16 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
   ...over,
 })
 
-function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true) {
+function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true, afkResult = true) {
   document.body.className = ''
   document.body.innerHTML = `
-    <span id="summary"></span><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
+    <span id="summary"></span><button id="afk" hidden><span class="dot"></span>AFK</button><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
     <main id="body"></main><footer id="note"></footer>`
   let push!: (s: LiveState) => void
   let setCollapsed!: (c: boolean) => void
   let setOpacity!: (o: number) => void
   let pushRemote!: (s: RemoteStatus) => void
+  let pushAfk!: (a: AfkState) => void
   const bridge: WidgetBridge = {
     onState: (cb) => (push = cb),
     onCollapsed: (cb) => (setCollapsed = cb),
@@ -36,6 +37,8 @@ function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true) 
     onOpacity: (cb) => (setOpacity = cb),
     onRemote: (cb) => (pushRemote = cb),
     setRemote: vi.fn(),
+    onAfk: (cb) => (pushAfk = cb),
+    setAfk: vi.fn(async () => afkResult),
     setAutoApprove: vi.fn(async () => autoApproveResult),
     ledgerHover: vi.fn(),
     remoteHover: vi.fn(),
@@ -43,7 +46,7 @@ function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true) 
     setContentHeight: vi.fn(),
   }
   mount(document, bridge)
-  return { bridge, pushRemote: (s: RemoteStatus) => pushRemote(s), push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
+  return { bridge, pushAfk: (a: AfkState) => pushAfk(a), pushRemote: (s: RemoteStatus) => pushRemote(s), push: (s: LiveState) => push(s), setCollapsed: (c: boolean) => setCollapsed(c), setOpacity: (o: number) => setOpacity(o) }
 }
 
 const text = (selector: string) => document.querySelector(selector)?.textContent
@@ -430,5 +433,81 @@ describe('Remote mode toggle', () => {
     remote().dispatchEvent(new MouseEvent('mouseleave'))
     expect(vi.mocked(bridge.remoteHover).mock.calls).toEqual([[true], [false]])
     expect(bridge.ledgerHover).not.toHaveBeenCalled()
+  })
+})
+
+describe('AFK button', () => {
+  const afk = () => document.getElementById('afk') as HTMLButtonElement
+  const noteText = () => document.getElementById('note')!.textContent
+  const installed = (on: boolean, minutesLeft = 0): AfkState => ({ installed: true, on, minutesLeft })
+
+  it('is hidden until the chime hook is known to be installed', () => {
+    const { pushAfk } = setup()
+    expect(afk().hidden).toBe(true)
+    pushAfk({ installed: false, on: false, minutesLeft: 0 })
+    expect(afk().hidden).toBe(true)
+    pushAfk(installed(false))
+    expect(afk().hidden).toBe(false)
+  })
+
+  it('marks the switch checked with state on, and the time left in the hover text', () => {
+    const { pushAfk } = setup()
+    pushAfk(installed(true, 20))
+    expect(afk().dataset.state).toBe('on')
+    expect(afk().getAttribute('aria-checked')).toBe('true')
+    expect(afk().title).toContain('20 minutes')
+  })
+
+  it('marks the switch unchecked with state off, and what a click does in the hover text', () => {
+    const { pushAfk } = setup()
+    pushAfk(installed(false))
+    expect(afk().dataset.state).toBe('off')
+    expect(afk().getAttribute('aria-checked')).toBe('false')
+    expect(afk().title).toMatch(/^Turn on AFK/)
+  })
+
+  it('keeps the dot and the fixed label AFK whether on or off', () => {
+    const { pushAfk } = setup()
+    pushAfk(installed(true, 5))
+    expect(afk().querySelector('.dot')).not.toBeNull()
+    expect(afk().textContent).toBe('AFK')
+    pushAfk(installed(false))
+    expect(afk().querySelector('.dot')).not.toBeNull()
+    expect(afk().textContent).toBe('AFK')
+  })
+
+  it('switches to off when the next poll says the flag has expired', () => {
+    const { pushAfk } = setup()
+    pushAfk(installed(true, 1))
+    expect(afk().dataset.state).toBe('on')
+    pushAfk(installed(false))
+    expect(afk().dataset.state).toBe('off')
+    expect(afk().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('asks the bridge to switch on from off, and off from on', () => {
+    const { bridge, pushAfk } = setup()
+    pushAfk(installed(false))
+    afk().click()
+    pushAfk(installed(true, 30))
+    afk().click()
+    expect(vi.mocked(bridge.setAfk).mock.calls).toEqual([[true], [false]])
+  })
+
+  it('shows a note when the flag could not be changed', async () => {
+    const { pushAfk } = setup('opened', true, false)
+    pushAfk(installed(false))
+    afk().click()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(noteText()).toBe("Couldn't change AFK")
+  })
+
+  it('words the time left in the singular for one minute', () => {
+    expect(afkTitle(installed(true, 1))).toContain('1 minute more')
+  })
+
+  it('is hidden by the collapsed pill rule in the stylesheet', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/style.css'), 'utf8')
+    expect(css).toMatch(/body\.collapsed #afk/)
   })
 })

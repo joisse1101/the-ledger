@@ -12,6 +12,8 @@ export const CHANNELS = {
   remoteState: 'widget:remote-state',
   setRemote: 'widget:set-remote',
   setAutoApprove: 'widget:set-auto-approve',
+  afkState: 'widget:afk-state',
+  setAfk: 'widget:set-afk',
   ledgerHover: 'widget:ledger-hover',
   remoteHover: 'widget:remote-hover',
   tooltip: 'widget:tooltip',

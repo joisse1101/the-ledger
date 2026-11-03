@@ -64,6 +64,8 @@ export interface Settings {
   widget: {
     /** How many projects the desktop widget's Ledger-button tooltip lists: a whole number from 1 to 10. */
     max_projects: number;
+    /** How many minutes the desktop widget's AFK switch stays on: a whole number from 1 to 240. */
+    afk_minutes: number;
   };
 }
 

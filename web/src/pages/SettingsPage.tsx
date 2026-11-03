@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { useMeta, useSaveSettings, useSaveWidgetMaxProjects, useSettings } from "../api/queries";
+import {
+  useMeta,
+  useSaveSettings,
+  useSaveWidgetAfkMinutes,
+  useSaveWidgetMaxProjects,
+  useSettings,
+} from "../api/queries";
 import styles from "./SettingsPage.module.css";
 
 function messageOf(error: unknown): string {
@@ -16,9 +22,11 @@ export function SettingsPage() {
   const settings = useSettings(isLocal);
   const save = useSaveSettings();
   const saveWidget = useSaveWidgetMaxProjects();
+  const saveAfk = useSaveWidgetAfkMinutes();
   const [draft, setDraft] = useState("");
   // Null until the user types, so the field follows the saved number (including after a reload).
   const [maxProjectsDraft, setMaxProjectsDraft] = useState<string | null>(null);
+  const [afkMinutesDraft, setAfkMinutesDraft] = useState<string | null>(null);
 
   if (meta.data && !isLocal) return <Navigate to="/" replace />;
   if (!meta.data) return null;
@@ -37,6 +45,13 @@ export function SettingsPage() {
   function onSaveWidget(event: FormEvent) {
     event.preventDefault();
     saveWidget.mutate(Number(maxProjects), { onSuccess: () => setMaxProjectsDraft(null) });
+  }
+
+  const afkMinutes = afkMinutesDraft ?? String(settings.data?.widget.afk_minutes ?? "");
+
+  function onSaveAfk(event: FormEvent) {
+    event.preventDefault();
+    saveAfk.mutate(Number(afkMinutes), { onSuccess: () => setAfkMinutesDraft(null) });
   }
 
   return (
@@ -127,6 +142,35 @@ export function SettingsPage() {
         </div>
       </form>
       {saveWidget.isError && <p role="alert">{messageOf(saveWidget.error)}</p>}
+
+      <p className={styles.hint}>
+        How long the widget's AFK switch stays on after you turn it on. While it is on, the chime sounds play even if
+        you are at the keyboard. A new number applies the next time you turn the switch on, not to one already on.
+      </p>
+      <form className={styles.add} onSubmit={onSaveAfk} noValidate>
+        <label htmlFor="widget-afk-minutes">AFK minutes (1 to 240)</label>
+        <div className={styles.addRow}>
+          <input
+            id="widget-afk-minutes"
+            type="number"
+            min={1}
+            max={240}
+            step={1}
+            value={afkMinutes}
+            disabled={saveAfk.isPending || settings.isPending}
+            onChange={(event) => setAfkMinutesDraft(event.target.value)}
+          />
+          <button
+            type="submit"
+            className="button"
+            aria-label="Save AFK minutes"
+            disabled={saveAfk.isPending || settings.isPending}
+          >
+            Save
+          </button>
+        </div>
+      </form>
+      {saveAfk.isError && <p role="alert">{messageOf(saveAfk.error)}</p>}
     </section>
   );
 }

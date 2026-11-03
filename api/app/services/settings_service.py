@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app import refresh
-from app.core.widget_settings import validate_max_projects
+from app.core.widget_settings import validate_afk_minutes, validate_max_projects
 from app.core.worktrees import BUILT_IN_FOLDER, WorktreeFolder, normalize_folder
 from app.repositories import settings_store
 from app.repositories.db import history, snapshot
@@ -43,6 +43,17 @@ def _validated_max_projects(raw: object) -> int:
         raise InvalidInput(str(err)) from err
 
 
+def get_afk_minutes() -> int:
+    return settings_store.load_afk_minutes()
+
+
+def _validated_afk_minutes(raw: object) -> int:
+    try:
+        return validate_afk_minutes(raw)
+    except ValueError as err:
+        raise InvalidInput(str(err)) from err
+
+
 def _apply_worktree_folders(folders: list[str]) -> None:
     """Replace the user's folders, then bring history and the snapshot in line before returning.
 
@@ -55,15 +66,22 @@ def _apply_worktree_folders(folders: list[str]) -> None:
         snapshot.refresh()
 
 
-def save_settings(raw_folders: Optional[list[str]], raw_max_projects: Optional[object]) -> None:
+def save_settings(
+    raw_folders: Optional[list[str]],
+    raw_max_projects: Optional[object],
+    raw_afk_minutes: Optional[object] = None,
+) -> None:
     """Save whichever settings were sent; the others stay as they are.
 
     Everything is validated before anything is saved, so a bad value never leaves a half-applied
-    request. The widget's number is a display preference: saving it does not touch history or the snapshot.
+    request. The widget's numbers are display preferences: saving them does not touch history or the snapshot.
     """
     folders = None if raw_folders is None else _validated(raw_folders)
     max_projects = None if raw_max_projects is None else _validated_max_projects(raw_max_projects)
+    afk_minutes = None if raw_afk_minutes is None else _validated_afk_minutes(raw_afk_minutes)
     if max_projects is not None:
         settings_store.save_max_projects(max_projects)
+    if afk_minutes is not None:
+        settings_store.save_afk_minutes(afk_minutes)
     if folders is not None:
         _apply_worktree_folders(folders)

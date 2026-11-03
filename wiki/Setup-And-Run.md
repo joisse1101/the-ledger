@@ -3,14 +3,14 @@
 Two scripts at the repo root do the setup and the running:
 
 ```powershell
-.\Install-Ledger.ps1   # once, optional: the extras (widget shortcut, toast hooks, relay hook, backup task)
+.\Install-Ledger.ps1   # once, optional: the extras (widget shortcut, chime hooks, toast hooks, relay hook, backup task)
 .\Start-Ledger.ps1     # every time: checks, repairs, starts and verifies
 ```
 
 `Install-Ledger.ps1` offers each extra one at a time and says first what it does, what it changes on
 the machine and what declining means; it installs only what you accept. Accepting the widget shortcut
 also installs the widget's packages up front. Each extra has its own switch (`-Shortcut`, `-Autostart`,
-`-ToastHooks`, `-RelayHook`, `-BackupTask`, each `ask`/`yes`/`no`) and `-Yes` accepts the rest; with no
+`-ChimeHooks`, `-ToastHooks`, `-RelayHook`, `-BackupTask`, each `ask`/`yes`/`no`) and `-Yes` accepts the rest; with no
 console to ask on, an unanswered extra is skipped. Running it again updates what is installed in
 place and duplicates nothing. See [Hooks](Hooks.md) and [Widget](Widget.md) for the extras themselves.
 

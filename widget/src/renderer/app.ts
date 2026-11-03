@@ -1,5 +1,5 @@
 import type { LiveState, WidgetBridge } from '../shared/types'
-import { remoteTitle, renderBody, summaryText } from './view.js'
+import { afkTitle, remoteTitle, renderBody, summaryText } from './view.js'
 
 const NOTE_MS = 3000
 const OPACITY_STEP = 0.1
@@ -7,7 +7,7 @@ const MIN_OPACITY = 0.1
 const MAX_ROWS = 10
 const BODY_BORDER = 2 // the 1px border above and below, which offsetHeight of the children excludes
 
-/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #remote, #collapse, #fade, #solid. */
+/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #afk, #remote, #collapse, #fade, #solid. */
 export function mount(doc: Document, bridge: WidgetBridge): void {
   const byId = (id: string) => doc.getElementById(id) as HTMLElement
   const summary = byId('summary')
@@ -74,6 +74,20 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
   bridge.onOpacity(applyOpacity)
   byId('fade').addEventListener('click', () => step(-OPACITY_STEP))
   byId('solid').addEventListener('click', () => step(OPACITY_STEP))
+  // AFK: the chimes' switch. The main process reads its flag file on each poll, so the button
+  // follows the file (and shows off once it expires); it is hidden unless the chime hook is installed.
+  const afk = byId('afk') as HTMLButtonElement
+  let afkOn = false
+  bridge.onAfk((next) => {
+    afkOn = next.on
+    afk.hidden = !next.installed
+    afk.dataset.state = next.on ? 'on' : 'off'
+    afk.setAttribute('aria-checked', String(next.on))
+    afk.title = afkTitle(next)
+  })
+  afk.addEventListener('click', async () => {
+    if (!(await bridge.setAfk(!afkOn))) showNote("Couldn't change AFK")
+  })
   // Remote mode: one click turns it on (or retries after a failure), another turns it off, and
   // while it is starting a click cancels. The state comes back from the backend, not from here.
   const remote = byId('remote') as HTMLButtonElement

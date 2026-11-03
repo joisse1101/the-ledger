@@ -4,8 +4,8 @@ Sets up the Ledger's optional extras on this machine, explaining each before it 
 
 .DESCRIPTION
 Run once after cloning (and again whenever you want to change what is installed). It offers, one at
-a time: the desktop widget shortcut (and, separately, starting it at sign-in), the toast hooks, the
-relay hook and the daily history backup task. Before each question it says what the extra does, what
+a time: the desktop widget shortcut (and, separately, starting it at sign-in), the chime hooks, the
+toast hooks, the relay hook and the daily history backup task. Before each question it says what the extra does, what
 it changes on the machine and what declining means. It installs only what you accept, then prints
 what it did.
 
@@ -17,7 +17,7 @@ If the relay hook is already installed, you are offered a reinstall instead of a
 updates the backend port it uses.
 
 Each extra is installed by its own script (widget\Install-WidgetShortcut.ps1,
-hooks\Install-ClaudeHooks.ps1, hooks\ledgerScripts\Install-HistoryBackupTask.ps1), which asks nothing
+hooks\Install-ClaudeHooks.ps1 (chimes, toasts and relay each get their own call), hooks\ledgerScripts\Install-HistoryBackupTask.ps1), which asks nothing
 itself. Running this again is safe: shortcuts, hook entries and the scheduled task are updated in
 place, never duplicated.
 
@@ -29,6 +29,10 @@ Pre-answer with the per-extra switches below, or -Yes for all of them.
 
 .PARAMETER Autostart
 'ask' (default), 'yes' or 'no': also start the widget at sign-in. Only offered with the shortcut.
+
+.PARAMETER ChimeHooks
+'ask' (default), 'yes' or 'no': a sound when a Claude Code session finishes or needs input while you
+are away. Independent of the toast hooks.
 
 .PARAMETER ToastHooks
 'ask' (default), 'yes' or 'no': the Windows toast notifications for Claude Code.
@@ -64,7 +68,7 @@ Show this help and exit (-h works too).
 Walk through each extra and answer as you go.
 
 .EXAMPLE
-.\Install-Ledger.ps1 -Shortcut yes -Autostart no -ToastHooks no -RelayHook no -BackupTask yes
+.\Install-Ledger.ps1 -Shortcut yes -Autostart no -ChimeHooks no -ToastHooks no -RelayHook no -BackupTask yes
 Unattended: the shortcut and the backup task only.
 
 .LINK
@@ -74,6 +78,7 @@ Unattended: the shortcut and the backup task only.
 param(
     [ValidateSet('ask', 'yes', 'no')][string]$Shortcut = 'ask',
     [ValidateSet('ask', 'yes', 'no')][string]$Autostart = 'ask',
+    [ValidateSet('ask', 'yes', 'no')][string]$ChimeHooks = 'ask',
     [ValidateSet('ask', 'yes', 'no')][string]$ToastHooks = 'ask',
     [ValidateSet('ask', 'yes', 'no')][string]$RelayHook = 'ask',
     [ValidateSet('ask', 'yes', 'no')][string]$BackupTask = 'ask',
@@ -125,6 +130,11 @@ if ($wantShortcut) {
         -Changes 'Creates "Ledger Widget.lnk" in your Startup folder; it appears in Windows'' Startup apps list, where you can also switch it off.' `
         -Declining 'Nothing starts at sign-in. The desktop shortcut keeps working.'
 }
+
+$wantChime = Read-ExtraChoice -Title 'Chime hooks' -Mode $ChimeHooks -Question 'Install the Claude Code chime hooks?' `
+    -Does 'Plays a short sound when a Claude Code session finishes or needs input while you are away from the keyboard. Works without the toast hooks and without the dashboard.' `
+    -Changes 'Copies one script into %USERPROFILE%\.claude\hooks\chimeScripts and edits %USERPROFILE%\.claude\settings.json to add sound hooks (a Stop and a Notification entry), next to any hooks already there.' `
+    -Declining 'No sounds, and your Claude Code settings are left alone.'
 
 $wantToast = Read-ExtraChoice -Title 'Toast hooks' -Mode $ToastHooks -Question 'Install the Claude Code toast hooks?' `
     -Does 'Shows a Windows toast when a Claude Code session needs input or finishes; clicking it focuses that repo''s VS Code window. Needs the BurntToast PowerShell module.' `
@@ -200,6 +210,9 @@ Install-Extra -Name 'widget shortcut' -Wanted $wantShortcut -Install {
 }
 Install-Extra -Name 'sign-in autostart' -Wanted $wantAutostart -Install {
     & (Join-Path $PSScriptRoot 'widget\Install-WidgetShortcut.ps1') -Startup @shortcutArgs
+}
+Install-Extra -Name 'chime hooks' -Wanted $wantChime -Install {
+    & (Join-Path $PSScriptRoot 'hooks\Install-ClaudeHooks.ps1') -IncludeChimes -SkipToastHooks
 }
 Install-Extra -Name 'toast hooks' -Wanted $wantToast -Install {
     & (Join-Path $PSScriptRoot 'hooks\Install-ClaudeHooks.ps1')

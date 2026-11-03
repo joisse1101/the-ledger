@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = ROOT / "Install-Ledger.ps1"
 SHORTCUT = "Ledger Widget.lnk"
 BACKEND_PORT = "8511"
+CHIME_SCRIPT = "Play-ClaudeChime.ps1"
 
 pytestmark = pytest.mark.skipif(
     sys.platform != "win32"
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.skipif(
     reason="the installer is a Windows PowerShell script and the backup task needs the api venv",
 )
 
-NOTHING = ("-Shortcut", "no", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
+NOTHING = ("-Shortcut", "no", "-ChimeHooks", "no", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
 
 
 class Sandbox:
@@ -85,7 +86,7 @@ def test_declining_everything_installs_nothing(sandbox):
     assert list(sandbox.startup.iterdir()) == []
     assert not sandbox.settings_path.exists()
     assert sandbox.task_count() == 0
-    assert output.count("skipped") == 5
+    assert output.count("skipped") == 6
 
 
 def test_accepting_some_extras_installs_only_those(sandbox):
@@ -100,9 +101,9 @@ def test_accepting_some_extras_installs_only_those(sandbox):
 def test_each_extra_is_explained_before_it_is_offered(sandbox):
     output = sandbox.run("-Shortcut", "yes", "-Autostart", "no", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
 
-    assert output.count("What it does:") == 5
-    assert output.count("What it changes:") == 5
-    assert output.count("If you decline:") == 5
+    assert output.count("What it does:") == 6
+    assert output.count("What it changes:") == 6
+    assert output.count("If you decline:") == 6
     toast = output[output.index("== Toast hooks"):output.index("== Relay hook")]
     assert "registers the claudecode:// protocol handler" in toast
     assert "settings.json" in toast
@@ -144,6 +145,7 @@ def test_without_a_console_extras_that_were_not_pre_answered_are_skipped(sandbox
 def test_yes_accepts_every_extra_that_was_not_pre_answered(sandbox):
     sandbox.run("-Yes", "-ToastHooks", "no")
 
+    assert len(chime_commands(sandbox, "Stop")) == 1
     assert (sandbox.desktop / SHORTCUT).is_file()
     assert (sandbox.startup / SHORTCUT).is_file()
     assert len(sandbox.relay_entries()) == 1
@@ -162,6 +164,55 @@ def test_a_second_run_duplicates_no_shortcut_hook_entry_or_task(sandbox):
     assert len(sandbox.relay_entries()) == 1
     assert sandbox.settings_path.read_text(encoding="utf-8-sig") == first_settings
     assert sandbox.task_count() == 1
+
+
+def chime_commands(sandbox, event):
+    hooks = json.loads(sandbox.settings_path.read_text(encoding="utf-8-sig"))["hooks"]
+    return [hook["command"] for entry in hooks.get(event, []) for hook in entry["hooks"] if CHIME_SCRIPT in hook["command"]]
+
+
+def test_accepting_only_the_chimes_installs_the_chime_entries_and_nothing_else(sandbox):
+    output = sandbox.run("-Shortcut", "no", "-ChimeHooks", "yes", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
+
+    hooks = json.loads(sandbox.settings_path.read_text(encoding="utf-8-sig"))["hooks"]
+    assert sorted(hooks) == ["Notification", "Stop"]
+    assert len(chime_commands(sandbox, "Stop")) == 1
+    assert len(chime_commands(sandbox, "Notification")) == 1
+    assert (sandbox.home / ".claude" / "hooks" / "chimeScripts" / CHIME_SCRIPT).is_file()
+    assert not (sandbox.home / ".claude" / "hooks" / "ledgerScripts").exists()
+    assert "chime hooks          installed" in output
+    assert list(sandbox.desktop.iterdir()) == []
+    assert sandbox.task_count() == 0
+
+
+def test_chimes_are_explained_before_they_are_offered(sandbox):
+    output = sandbox.run(*NOTHING)
+
+    chimes = output[output.index("== Chime hooks"):output.index("== Toast hooks")]
+    assert "settings.json" in chimes
+    assert "sound hooks" in chimes
+    assert "chimeScripts" in chimes
+    assert "Installing: chime hooks" not in output
+
+
+def test_declining_the_chimes_leaves_settings_alone(sandbox):
+    sandbox.run("-Shortcut", "no", "-ChimeHooks", "no", "-ToastHooks", "no", "-RelayHook", "yes", "-BackupTask", "no")
+
+    hooks = json.loads(sandbox.settings_path.read_text(encoding="utf-8-sig"))["hooks"]
+    assert list(hooks) == ["PermissionRequest"]
+    assert not (sandbox.home / ".claude" / "hooks" / "chimeScripts").exists()
+
+
+def test_a_second_chime_run_changes_nothing(sandbox):
+    accept = ("-Shortcut", "no", "-ChimeHooks", "yes", "-ToastHooks", "no", "-RelayHook", "no", "-BackupTask", "no")
+    sandbox.run(*accept)
+    first_settings = sandbox.settings_path.read_text(encoding="utf-8-sig")
+
+    sandbox.run(*accept)
+
+    assert sandbox.settings_path.read_text(encoding="utf-8-sig") == first_settings
+    assert len(chime_commands(sandbox, "Stop")) == 1
+    assert len(chime_commands(sandbox, "Notification")) == 1
 
 
 def test_a_relay_hook_that_is_not_installed_is_offered_a_first_install(sandbox):

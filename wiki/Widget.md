@@ -4,9 +4,10 @@
 
 `widget/` is a small Electron app: a frameless, always-on-top window that lists the live Claude Code
 sessions with each one's context size, so the Ledger is useful without opening it. It only reads
-sessions (apart from two switches) and is Windows-only, like `hooks/`. It has its own `package.json`, imports nothing from `web/`, and is
+sessions (apart from three switches) and is Windows-only, like `hooks/`. It has its own `package.json`, imports nothing from `web/`, and is
 is the only part of the repo that is not a service, a hook or a skill. Its writes are the Remote
-mode switch and the per-row auto-approve button, both described below.
+mode switch and the per-row auto-approve button, both through the backend, and the AFK button, a local
+file write described below.
 
 ## How it works
 
@@ -107,6 +108,28 @@ mouse-transparent, sandboxed page with a strict CSP) with the sign-in QR, the `h
 the time left. The QR is fetched only while hovering and held in memory only; the token is never
 shown or stored. `remoteTooltip.ts` holds the message text and placement logic. When a start the
 widget watched finishes, the tooltip also pops up by itself for a few seconds.
+
+## AFK button
+
+The header has an "AFK" switch for the session chimes (see [Hooks](Hooks.md)). It looks like the Remote
+button: a small dot and the fixed label "AFK", with the dot green when on and grey when off. On makes the
+chime hook play even while you are using the PC, until the AFK duration runs out. It is the widget's first
+local write and it does not use the backend to switch: the widget writes or deletes one file,
+`%USERPROFILE%\.claude\hooks\chimeScripts\state\afk.flag`, holding the expiry as one `Z`-suffixed UTC time.
+The hook treats a missing, unreadable or past-due file as no flag.
+
+- **Module.** `widget/src/main/afk.ts` is the file side: read the flag (off, or on with minutes left),
+  write it from a duration, clear it, and say whether `Play-ClaudeChime.ps1` is installed. Each takes the
+  chime folder as an argument, so tests use throwaway folders. `chimeFolder()` is the one place the widget
+  names the real folder.
+- **State.** Each poll reads the flag beside `/api/live` and pushes it on its own channel (`afkState`),
+  so the button follows the file, shows off within one poll (2 s) of expiry, and works with the backend
+  down. The button is hidden unless the script is installed, and hidden in the collapsed pill.
+- **Switching on** (`setAfk` bridge channel, like `setAutoApprove`) reads `widget.afk_minutes` from
+  `GET /api/settings` (1 to 240, 30 until set) and writes now plus that. If the backend does not answer it
+  uses the last value read, or 30 if there is none. An AFK already on keeps the time it was given. A
+  failed write shows a brief note.
+- **Hover text** says what a click does and, while on, the minutes left.
 
 ## Projects tooltip
 
