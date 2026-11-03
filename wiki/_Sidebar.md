@@ -5,6 +5,7 @@
 - [Testing](Testing.md)
 - [Repository layout](Repository-Layout.md)
 - [Coding standards](Coding-Standards.md)
+- [Glossary](Glossary.md)
 
 **Backend**
 - [Data layer](Backend-Data-Layer.md)

@@ -16,6 +16,7 @@ Requirements live in `openspec/specs/`, not here. Docs conventions are in [Codin
 - [Testing](Testing.md): running the Python and frontend suites
 - [Repository layout](Repository-Layout.md): folders, gitignored state, OpenSpec
 - [Coding standards](Coding-Standards.md): what "human-understandable" means here
+- [Glossary](Glossary.md): plain-English meanings of terms used across the pages
 
 **Backend**
 - [Data layer](Backend-Data-Layer.md): SQLite snapshot, projects, transcripts, live sessions, context

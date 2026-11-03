@@ -36,6 +36,12 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Requirements live in `openspec/specs/`; wiki pages point at them and do not restate them.
 - `CLAUDE.md` files hold commands, conventions and pointers only. `python check_docs.py` (run from
   `api/`) enforces links, paths and size budgets; CI runs it on every pull request.
+- Wiki pages follow the readability rules below. They are the rules for every page in `wiki/`.
+  - **Purpose first.** The first paragraph says what the page covers or what a reader can do with it.
+  - **One header per topic.** Nest headers by hierarchy.
+  - **One idea per bullet.** Keep each bullet to one short sentence; move a second idea into its own bullet.
+  - **Define terms.** Define a technical term where it is first used, or link to its entry in [Glossary](Glossary.md).
+  - **Mark certainty.** Label what is known, assumed and unchecked apart from each other. Never present an unchecked statement as fact.
 - Link between wiki pages as `[text](Page-Name.md)`. The publish step strips the `.md` for the wiki.
 - A repo path in code formatting must exist. If it is deliberately absent from a checkout (a
   gitignored file), put `<!-- docs-check: ignore -->` on that line.
