@@ -1,0 +1,6 @@
+# Starter workout: shoulder shrug (4 frames, seconds per frame)
+images:
+  - {file: 1.svg, seconds: 20}
+  - {file: 2.svg, seconds: 20}
+  - {file: 3.svg, seconds: 25}
+  - {file: 4.svg, seconds: 20}

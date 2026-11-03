@@ -1,0 +1,7 @@
+# Starter workout: look left and right (5 frames, seconds per frame)
+images:
+  - {file: 1.svg, seconds: 20}
+  - {file: 2.svg, seconds: 20}
+  - {file: 3.svg, seconds: 15}
+  - {file: 4.svg, seconds: 20}
+  - {file: 5.svg, seconds: 15}
