@@ -1,5 +1,17 @@
 **[Home](Home.md)**
 
+**User guide**
+- [Getting started](Guide-Getting-Started.md)
+- [Overview](Guide-Overview.md)
+- [Live sessions](Guide-Live-Sessions.md)
+- [All sessions](Guide-All-Sessions.md)
+- [Projects](Guide-Projects.md)
+- [Files](Guide-Files.md)
+- [Settings](Guide-Settings.md)
+- [Remote access](Guide-Remote-Access.md)
+- [Desktop widget](Guide-Widget.md)
+- [Notifications](Guide-Notifications.md)
+
 **Getting started**
 - [Setup and run](Setup-And-Run.md)
 - [Testing](Testing.md)
