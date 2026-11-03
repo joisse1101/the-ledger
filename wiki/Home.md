@@ -3,10 +3,7 @@
 The Ledger is a dashboard for your local Claude Code sessions and projects.
 Use these pages to run it, to learn each screen, or to change the code.
 
-- It shows Overview, Sessions (Live and All), and Projects.
-- It is an API-only FastAPI backend (`api/`) plus a React + Vite frontend (`web/`).
-- Another device on the same network can read it through a gateway, behind a shared access token.
-- Terms such as "gateway" and "access token" are explained in the [Glossary](Glossary.md).
+It shows Overview, Sessions (Live and All), and Projects. It is an API-only FastAPI backend (`api/`) plus a React + Vite frontend (`web/`). Another device on the same network can read it through a gateway, behind a shared access token. Terms such as "gateway" and "access token" are explained in the [Glossary](Glossary.md).
 
 > **Edit these pages in the repo (`wiki/`), not on the GitHub wiki.** The wiki is a one-way mirror
 > published on every push to `main`; edits made in the browser are overwritten.
