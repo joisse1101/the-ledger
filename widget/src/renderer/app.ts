@@ -1,5 +1,5 @@
 import type { LiveState, WidgetBridge } from '../shared/types'
-import { afkTitle, remoteTitle, renderBody, summaryText } from './view.js'
+import { afkTitle, countdownText, countdownTitle, remoteTitle, renderBody, summaryText } from './view.js'
 
 const NOTE_MS = 3000
 const OPACITY_STEP = 0.1
@@ -7,7 +7,7 @@ const MIN_OPACITY = 0.1
 const MAX_ROWS = 10
 const BODY_BORDER = 2 // the 1px border above and below, which offsetHeight of the children excludes
 
-/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #afk, #remote, #collapse, #fade, #solid. */
+/** Wires the page to the preload bridge. `doc` must contain #summary, #body, #note, #ledger, #afk, #countdown, #remote, #collapse, #fade, #solid. */
 export function mount(doc: Document, bridge: WidgetBridge): void {
   const byId = (id: string) => doc.getElementById(id) as HTMLElement
   const summary = byId('summary')
@@ -84,6 +84,15 @@ export function mount(doc: Document, bridge: WidgetBridge): void {
     afk.dataset.state = next.on ? 'on' : 'off'
     afk.setAttribute('aria-checked', String(next.on))
     afk.title = afkTitle(next)
+  })
+  // The break countdown: the main process owns the count and pushes it each second. The page only
+  // draws it; the pill hides it with CSS while the pushes carry on.
+  const countdown = byId('countdown')
+  bridge.onBreakCountdown((next) => {
+    countdown.textContent = countdownText(next.remainingSeconds)
+    countdown.title = countdownTitle(next)
+    if (next.paused) countdown.dataset.state = 'paused'
+    else delete countdown.dataset.state
   })
   afk.addEventListener('click', async () => {
     if (!(await bridge.setAfk(!afkOn))) showNote("Couldn't change AFK")

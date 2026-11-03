@@ -3,7 +3,7 @@ import { app, ipcMain, Menu, nativeImage, net, protocol, Tray } from 'electron'
 import { chimeFolder, pollLiveAndAfk, switchAfk } from './afk'
 import { createApi } from './api'
 import { BreakController } from './breakController'
-import { BreakTimer, DEFAULT_BREAK_MINUTES } from './breakTimer'
+import { BreakTimer, breakCountdown, DEFAULT_BREAK_MINUTES } from './breakTimer'
 import { createBreakWindow } from './breakWindow'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
@@ -66,10 +66,14 @@ if (!app.requestSingleInstanceLock()) {
     })
     let breakMinutes = DEFAULT_BREAK_MINUTES
     const breakMinutesPoller = startPoller(() => api.fetchBreakMinutes(), (minutes) => (breakMinutes = minutes), BREAK_MINUTES_POLL_MS)
+    const pushCountdown = () => win.sendBreakCountdown(breakCountdown(breakTimer, afkOn, breakMinutes, breaks.isOpen))
     const breakTick = setInterval(() => {
       breakTimer.tick(afkOn, breakMinutes)
       if (breakTimer.due) breaks.open()
+      pushCountdown()
     }, BREAK_TICK_MS)
+    // Seed the value so a page that finishes loading before the first tick is not blank.
+    pushCountdown()
 
     // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
     let remote: RemoteStatus = { state: 'unavailable' }

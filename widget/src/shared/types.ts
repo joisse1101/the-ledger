@@ -100,6 +100,12 @@ export interface BreakState {
   notes: string[]
 }
 
+/** The time to the next break as the list window's top bar draws it. `paused` is true while AFK is on. */
+export interface BreakCountdown {
+  remainingSeconds: number
+  paused: boolean
+}
+
 /** What the break window's preload exposes to its page as `window.breakWindow`. */
 export interface BreakBridge {
   onState(callback: (state: BreakState) => void): void
@@ -116,6 +122,7 @@ export interface BreakBridge {
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void
   onAfk(callback: (afk: AfkState) => void): void
+  onBreakCountdown(callback: (countdown: BreakCountdown) => void): void
   /** Switches the chimes' AFK flag on or off; resolves false when the flag file could not be changed.
    *  The new state arrives through `onAfk`. */
   setAfk(enabled: boolean): Promise<boolean>

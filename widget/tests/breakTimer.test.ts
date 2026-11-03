@@ -77,6 +77,50 @@ describe('BreakTimer', () => {
     expect(timer.due).toBe(true)
   })
 
+  it('reports the full break length before any work', () => {
+    const { timer } = setup()
+    expect(timer.remaining(60)).toBe(3600)
+  })
+
+  it('reaches 0 after an hour of work and stays there', () => {
+    const { timer, run } = setup()
+    run(59 * 60)
+    expect(timer.remaining(60)).toBe(60)
+    run(60)
+    expect(timer.remaining(60)).toBe(0)
+    run(30)
+    expect(timer.remaining(60)).toBe(0)
+  })
+
+  it('does not change while AFK is on', () => {
+    const { timer, run } = setup()
+    run(18 * 60)
+    expect(timer.remaining(60)).toBe(42 * 60)
+    run(5 * 60, true)
+    expect(timer.remaining(60)).toBe(42 * 60)
+  })
+
+  it('goes back to the full length on reset', () => {
+    const { timer, run } = setup()
+    run(10 * 60)
+    timer.reset()
+    expect(timer.remaining(60)).toBe(3600)
+  })
+
+  it('follows a break length lowered mid-count and never goes below 0', () => {
+    const { timer, run } = setup()
+    run(30 * 60)
+    expect(timer.remaining(45)).toBe(15 * 60)
+    expect(timer.remaining(20)).toBe(0)
+  })
+
+  it('does not change the count when read', () => {
+    const { timer, run } = setup()
+    run(10)
+    timer.remaining(60)
+    expect(timer.workedMs).toBe(10_000)
+  })
+
   it('applies a break length raised mid-count', () => {
     const { timer, run } = setup()
     run(60 * 60)

@@ -1,4 +1,4 @@
-import type { AfkState, LiveSession, LiveState, RemoteStatus } from '../shared/types'
+import type { AfkState, BreakCountdown, LiveSession, LiveState, RemoteStatus } from '../shared/types'
 
 /** Header text: the one-line summary shown both expanded and as the collapsed pill. */
 export function summaryText(state: LiveState | null): string {
@@ -31,6 +31,22 @@ export function afkTitle(afk: AfkState): string {
   if (!afk.on) return 'Turn on AFK: play the chime sounds even while you are using the PC'
   const minutes = afk.minutesLeft === 1 ? '1 minute' : `${afk.minutesLeft} minutes`
   return `AFK is on for ${minutes} more. Click to turn it off`
+}
+
+const SECONDS_PER_MINUTE = 60
+
+/** The countdown's text as `m:ss`, such as `42:10` or `0:00`. */
+export function countdownText(remainingSeconds: number): string {
+  const total = Math.max(0, Math.floor(remainingSeconds))
+  const seconds = total % SECONDS_PER_MINUTE
+  return `${Math.floor(total / SECONDS_PER_MINUTE)}:${String(seconds).padStart(2, '0')}`
+}
+
+/** The countdown's hover text, such as `Next break in 42 min 10 s`; it says so while AFK holds it. */
+export function countdownTitle(countdown: BreakCountdown): string {
+  const total = Math.max(0, Math.floor(countdown.remainingSeconds))
+  const text = `Next break in ${Math.floor(total / SECONDS_PER_MINUTE)} min ${total % SECONDS_PER_MINUTE} s`
+  return countdown.paused ? `${text} (paused, AFK on)` : text
 }
 
 /** Sparkline segments kept in a row; the label's trailing glyphs are the newest responses. */

@@ -202,6 +202,14 @@ in the break-timer capability's spec; this section says how the code meets them.
   is idle, playing or finished, and is independent of Electron: tests pass a fake window. It sends the page one
   `breakState` message; the page sends `breakStart`, `breakSkip`, `breakClose` and `breakFinished`, each
   checked in the handler. The page steps images with timers and reports the end.
+- **Countdown in the top bar.** The main process pushes `{remainingSeconds, paused}` to the list window once
+  a second on the `breakCountdown` channel, and once when the page finishes loading. The value is
+  `BreakTimer.remaining` for the same break length the tick uses, and 0 while a break is due or the break
+  window is open (`breakCountdown` in `widget/src/main/breakTimer.ts`). `paused` is the AFK flag. The page
+  draws it as `m:ss` in `#countdown`, the first child of `.actions`, with a tooltip such as "Next break in 42 min 10 s"
+  (and "(paused, AFK on)" while paused) and `data-state="paused"` that dims it. The collapsed pill hides it
+  by CSS only; pushes carry on, so the right time shows on expanding. A new break length shows after the
+  next once-a-minute read.
 - **The list window is untouched.** Closing the break window cannot fire `window-all-closed`, because the
   list window is always open, so the widget keeps running.
 

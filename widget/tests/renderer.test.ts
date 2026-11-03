@@ -21,7 +21,7 @@ const session = (over: Partial<LiveSession> = {}): LiveSession => ({
 function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true, afkResult = true) {
   document.body.className = ''
   document.body.innerHTML = `
-    <span id="summary"></span><button id="afk" hidden><span class="dot"></span>AFK</button><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
+    <span id="summary"></span><span id="countdown"></span><button id="afk" hidden><span class="dot"></span>AFK</button><button id="remote"></button><button id="ledger"></button><button id="collapse"></button><button id="fade"></button><button id="solid"></button>
     <main id="body"></main><footer id="note"></footer>`
   let push!: (s: LiveState) => void
   let setCollapsed!: (c: boolean) => void
@@ -38,6 +38,7 @@ function setup(openResult: OpenRepoResult = 'opened', autoApproveResult = true, 
     onRemote: (cb) => (pushRemote = cb),
     setRemote: vi.fn(),
     onAfk: (cb) => (pushAfk = cb),
+    onBreakCountdown: vi.fn(),
     setAfk: vi.fn(async () => afkResult),
     setAutoApprove: vi.fn(async () => autoApproveResult),
     ledgerHover: vi.fn(),

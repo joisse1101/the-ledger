@@ -1,3 +1,5 @@
+import type { BreakCountdown } from '../shared/types'
+
 export const MS_PER_MINUTE = 60_000
 /** The most one tick can add. A PC that slept for hours makes one long gap between ticks, and
  *  this keeps that gap from counting as work. */
@@ -41,4 +43,22 @@ export class BreakTimer {
   get workedMs(): number {
     return this.elapsedMs
   }
+
+  /** Whole seconds left before a break at the given length, never below 0. Changes nothing, so
+   *  the list window can read it without disturbing the count. */
+  remaining(breakMinutes: number): number {
+    return Math.max(0, Math.ceil((breakMinutes * MS_PER_MINUTE - this.elapsedMs) / 1000))
+  }
+}
+
+/** What the list window's top bar shows: the time left, and whether it is paused by AFK. A break
+ *  that is due or open shows 0:00. */
+export function breakCountdown(
+  timer: BreakTimer,
+  afkOn: boolean,
+  breakMinutes: number,
+  breakOpen: boolean,
+): BreakCountdown {
+  const remainingSeconds = timer.due || breakOpen ? 0 : timer.remaining(breakMinutes)
+  return { remainingSeconds, paused: afkOn }
 }
