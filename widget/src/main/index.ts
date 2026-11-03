@@ -1,7 +1,10 @@
 import * as path from 'node:path'
-import { app, ipcMain, Menu, nativeImage, Tray } from 'electron'
+import { app, ipcMain, Menu, nativeImage, net, protocol, Tray } from 'electron'
 import { chimeFolder, pollLiveAndAfk, switchAfk } from './afk'
 import { createApi } from './api'
+import { BreakController } from './breakController'
+import { BreakTimer, DEFAULT_BREAK_MINUTES } from './breakTimer'
+import { createBreakWindow } from './breakWindow'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
 import { startPoller } from './poller'
@@ -14,6 +17,12 @@ import { createDeps } from './system'
 import { TooltipSlot } from './tooltipSlot'
 import { createTooltipWindow } from './tooltipWindow'
 import { createWidgetWindow, type WidgetWindow } from './window'
+import { registerWorkoutHandler, registerWorkoutScheme } from './workoutProtocol'
+import { discoverWorkouts, workoutFolders } from './workouts'
+
+const BREAK_TICK_MS = 1000
+/** How often the break length is read from Settings, so a change reaches a count in progress. */
+const BREAK_MINUTES_POLL_MS = 60_000
 
 // One widget per user session: a second launch just brings the first one forward.
 if (!app.requestSingleInstanceLock()) {
@@ -21,6 +30,8 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   let widget: WidgetWindow | undefined
   app.on('second-instance', () => widget?.show())
+  // The workout scheme must be privileged before the app is ready; its handler is added after.
+  registerWorkoutScheme(protocol)
 
   void app.whenReady().then(() => {
     const config = loadConfig()
@@ -32,13 +43,33 @@ if (!app.requestSingleInstanceLock()) {
     widget = win
     // The AFK flag is a local file, read on every poll beside /api/live, so the button works with the backend down.
     const chimes = chimeFolder()
+    // The break count pauses while AFK is on; it reads the latest flag the poll below saw.
+    let afkOn = false
     const poller = startPoller(
       () => pollLiveAndAfk(() => api.fetchLive(), chimes),
       ({ live, afk }) => {
+        afkOn = afk.on
         win.sendState(live)
         win.sendAfk(afk)
       },
     )
+
+    // The break timer counts work time; the break window is its own window and the list window is
+    // never touched. Closing the break window restarts the count.
+    const folders = workoutFolders(config.repoRoot)
+    registerWorkoutHandler(protocol, net, folders)
+    const breakTimer = new BreakTimer()
+    const breaks = new BreakController({
+      scan: () => discoverWorkouts(folders),
+      openWindow: createBreakWindow,
+      onClosed: () => breakTimer.reset(),
+    })
+    let breakMinutes = DEFAULT_BREAK_MINUTES
+    const breakMinutesPoller = startPoller(() => api.fetchBreakMinutes(), (minutes) => (breakMinutes = minutes), BREAK_MINUTES_POLL_MS)
+    const breakTick = setInterval(() => {
+      breakTimer.tick(afkOn, breakMinutes)
+      if (breakTimer.due) breaks.open()
+    }, BREAK_TICK_MS)
 
     // Remote mode is the backend's to run; the widget only shows it and asks for it on or off.
     let remote: RemoteStatus = { state: 'unavailable' }
@@ -109,6 +140,10 @@ if (!app.requestSingleInstanceLock()) {
       if (typeof value === 'number' && Number.isFinite(value)) win.setContentHeight(value)
     })
     ipcMain.on(CHANNELS.toggleCollapse, () => win.toggleCollapse())
+    ipcMain.on(CHANNELS.breakStart, () => breaks.start())
+    ipcMain.on(CHANNELS.breakSkip, () => breaks.skip())
+    ipcMain.on(CHANNELS.breakClose, () => breaks.close())
+    ipcMain.on(CHANNELS.breakFinished, () => breaks.finished())
 
     const tray = new Tray(nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'tray.png')))
     tray.setToolTip('Ledger live sessions')
@@ -130,6 +165,8 @@ if (!app.requestSingleInstanceLock()) {
       poller.stop()
       remotePoller.stop()
       projectsPoller.stop()
+      breakMinutesPoller.stop()
+      clearInterval(breakTick)
       tooltip.dispose()
       projects.dispose()
       tooltipWindow.destroy()
