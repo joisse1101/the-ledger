@@ -28,6 +28,11 @@
   The same section has a second number input, "AFK minutes (1 to 240)", 30 until set, for how long the widget's AFK
   switch stays on. Its Save sends only `{widget: {afk_minutes}}` (`useSaveWidgetAfkMinutes`), with the same inline
   rejection and typed-value behaviour; a new number applies the next time the switch is turned on.
+  A "Break workouts" block follows with "Break minutes (1 to 240)", 60 until set: the minutes of work before the
+  widget opens its break window. Its Save sends only `{widget: {break_minutes}}` (`useSaveWidgetBreakMinutes`), with
+  the same inline rejection and typed-value behaviour. Below it the personal workouts folder's path
+  (the ignored `mine` folder under the widget's `workouts` folder, created on first open) and an Open folder button (`useOpenWorkoutsFolder`, `POST /api/widget/workouts/open`);
+  if opening fails, the server's message, which names the folder, shows inline.
 - **Theme** (`web/src/theme/theme.ts`): `data-theme` on `<html>`, seeded from `localStorage` (guarded
   try/catch — private windows etc.) else `prefers-color-scheme`, applied *before* React even mounts.
   A module-level store (not per-component `useState`) notifies every subscriber — the toggle button
