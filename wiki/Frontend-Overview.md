@@ -1,22 +1,44 @@
 # Frontend: overview
 
+This page explains how the Overview page and its charts are built. Read it before changing them. The same chart components also serve the Projects panel (see [Frontend projects](Frontend-Projects.md)).
+
 > Requirements live in `openspec/specs/web-dashboard/spec.md`. This page describes how the code meets them, not what it must do.
 
-- **Overview** (`components/overview/`, `web/src/pages/OverviewPage.tsx`): `TimeRangeSelector` is a
-  `ButtonSelector` (single-select, hidden label) over the same seven ranges as `overview_stats.TIME_RANGES`.
-  `chartTheme.ts`'s `chartColors()`/`groupColorScale()`/`groupColorMap()` centralize reading the
-  CSS-variable palette and turning the API's `group_order` into a Vega-Lite domain/range (`"Other"`
-  always the muted ink) shared by `GroupDonutChart` and `GroupBarChart`; both take `groups`,
-  `groupOrder` and a `groupLabel` (`"project"` on Overview, `"worktree"` in the Projects panel, worded "branch / worktree") that
-  drives their headings, aria labels, tooltip titles and captions. `GroupDonutChart` draws
-  its own color key as a plain HTML list (`GroupLegend`) instead of a Vega-Lite legend so long
-  group names wrap instead of clipping. `GroupBarChart` ("Messages & Cost by Project"/"…by Branch / Worktree")
-  normalizes each measure to % of its own peak (a non-dual-axis choice so two differently-scaled
-  measures can share one axis). `ActivityLineChart` ("Activity by Hour of Day", in 30-minute blocks, smoothed lines, plus a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`: each measure as a share of its own peak, averaged, then a 3-block moving average, on its own hidden 0-100 scale, with the calculation explained in a caption note) instead is a layered
-  dual-axis line chart of absolute counts — Sessions on the left axis, Messages on the right
-  (`resolve.scale.y: "independent"`), gridlines on the left only. Both keep "Messages" on the same
-  categorical hue (`hues[0]`). All three charts use the shared `useVegaEmbed` hook
-  (lazy `vega-embed` import, re-embeds on spec change, `useVegaEmbed.ts` — the general form of the
-  pattern `TokensChart` uses directly). `SummaryStats` renders the KPI tiles; the four extreme
-  figures are buttons that toggle an inline disclosure naming their project/session (plus a `title`
-  attribute for hover on pointer devices) since there's no hover-only affordance on a touchscreen.
+## Where the code is
+
+- `components/overview/` holds the Overview components.
+- `web/src/pages/OverviewPage.tsx` is the page.
+
+## Time range
+
+`TimeRangeSelector` is a `ButtonSelector` (single-select, hidden label) over the same seven ranges as `overview_stats.TIME_RANGES`.
+
+## Shared chart colors and group props
+
+`chartTheme.ts` centralizes how charts get their colors. Its `chartColors()`, `groupColorScale()` and `groupColorMap()` read the CSS-variable palette and turn the API's `group_order` into a Vega-Lite domain and range, with `"Other"` always the muted ink. `GroupDonutChart` and `GroupBarChart` share this.
+
+Both charts take `groups`, `groupOrder` and a `groupLabel`. The label is `"project"` on Overview and `"worktree"` in the Projects panel, worded "branch / worktree". It drives their headings, aria labels, tooltip titles and captions.
+
+## The charts
+
+### `GroupDonutChart`
+
+It draws its own color key as a plain HTML list (`GroupLegend`) instead of a Vega-Lite legend, so long group names wrap instead of clipping.
+
+### `GroupBarChart`
+
+Its heading is "Messages & Cost by Project", or "…by Branch / Worktree" in the Projects panel. It normalizes each measure to a percent of its own peak. This is a non-dual-axis choice, so two differently scaled measures can share one axis.
+
+### `ActivityLineChart`
+
+Its heading is "Activity by Hour of Day". It is a layered dual-axis line chart of absolute counts, in 30-minute blocks with smoothed lines. Sessions sit on the left axis and Messages on the right (`resolve.scale.y: "independent"`), with gridlines on the left only.
+
+It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The layer takes each measure as a share of its own peak, averages them, then applies a 3-block moving average. It sits on its own hidden 0-100 scale, and a caption note explains the calculation.
+
+### Shared behavior
+
+`GroupBarChart` and `ActivityLineChart` both keep "Messages" on the same categorical hue (`hues[0]`). All three charts use the shared `useVegaEmbed` hook (`useVegaEmbed.ts`), which lazily imports `vega-embed` and re-embeds when the spec changes. It is the general form of the pattern `TokensChart` uses directly.
+
+## Summary tiles
+
+`SummaryStats` renders the KPI tiles. The four extreme figures are buttons that toggle an inline disclosure naming their project or session, plus a `title` attribute for hover on pointer devices. Buttons are used because a touchscreen has no hover-only affordance.
