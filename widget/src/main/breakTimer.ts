@@ -6,6 +6,8 @@ export const MS_PER_MINUTE = 60_000
 export const MAX_TICK_MS = 5000
 /** How long the work count runs before a break until the backend says otherwise (the Settings page's default). */
 export const DEFAULT_BREAK_MINUTES = 60
+/** How often the break length is read from Settings, so a change reaches a count in progress. */
+export const BREAK_MINUTES_POLL_MS = 30_000
 
 /**
  * Counts work time toward a break. Pure: it knows no windows or files, and takes its clock as an

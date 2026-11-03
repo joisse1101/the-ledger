@@ -3,7 +3,7 @@ import { app, ipcMain, Menu, nativeImage, net, protocol, Tray } from 'electron'
 import { chimeFolder, pollLiveAndAfk, switchAfk } from './afk'
 import { createApi } from './api'
 import { BreakController } from './breakController'
-import { BreakTimer, breakCountdown, DEFAULT_BREAK_MINUTES } from './breakTimer'
+import { BREAK_MINUTES_POLL_MS, BreakTimer, breakCountdown, DEFAULT_BREAK_MINUTES } from './breakTimer'
 import { createBreakWindow } from './breakWindow'
 import { loadConfig } from './config'
 import { CHANNELS } from '../shared/ipc'
@@ -21,8 +21,6 @@ import { registerWorkoutHandler, registerWorkoutScheme } from './workoutProtocol
 import { discoverWorkouts, workoutFolders } from './workouts'
 
 const BREAK_TICK_MS = 1000
-/** How often the break length is read from Settings, so a change reaches a count in progress. */
-const BREAK_MINUTES_POLL_MS = 60_000
 
 // One widget per user session: a second launch just brings the first one forward.
 if (!app.requestSingleInstanceLock()) {

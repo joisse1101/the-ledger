@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BreakTimer, DEFAULT_BREAK_MINUTES, MAX_TICK_MS, MS_PER_MINUTE } from '../src/main/breakTimer'
+import { BREAK_MINUTES_POLL_MS, BreakTimer, DEFAULT_BREAK_MINUTES, MAX_TICK_MS, MS_PER_MINUTE } from '../src/main/breakTimer'
+
+describe('break length poll', () => {
+  it('reads the break length every 30 seconds', () => {
+    expect(BREAK_MINUTES_POLL_MS).toBe(30_000)
+  })
+})
 
 /** A timer on a clock the test moves by hand. */
 function setup() {

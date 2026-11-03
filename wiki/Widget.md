@@ -170,7 +170,7 @@ in the break-timer capability's spec; this section says how the code meets them.
   the AFK switch is off, so sleep adds one tick rather than hours. The AFK state is the latest one the
   2 s poll saw, so it can lag by up to 2 s. The count starts at zero on every launch and again when the
   break window closes. The break length is `widget.break_minutes` from `GET /api/settings` (1 to 240, 60
-  until set), read every minute through `fetchBreakMinutes`, which keeps its last value when the backend
+  until set), read every 30 seconds (`BREAK_MINUTES_POLL_MS`) through `fetchBreakMinutes`, which keeps its last value when the backend
   does not answer. A new value applies to a count in progress.
 - **Two workout folders.** The starter folder is committed and holds the shipped stretches. The personal
   folder is listed in `.gitignore`, is created when missing, and is where your own files go. Both sit

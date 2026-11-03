@@ -41,7 +41,7 @@ export interface Api {
    *  read, or 30 if none was. Read when switching AFK on, so a later change applies to the next switch-on. */
   fetchAfkMinutes(): Promise<number>
   /** The break length in minutes as the Settings page has it; when it cannot be read, the last
-   *  value read, or 60 if none was. Read every minute, so a change reaches a count in progress. */
+   *  value read, or 60 if none was. Read every 30 seconds, so a change reaches a count in progress. */
   fetchBreakMinutes(): Promise<number>
 }
 
