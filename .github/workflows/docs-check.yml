@@ -1,0 +1,21 @@
+# jois-init:docs begin (managed by /jois-init:docs; edits here are overwritten)
+name: docs-check
+
+# Runs on every pull request, not only those that change docs: a code rename can break a path a page names.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the docs
+        run: python api/check_docs.py
+# jois-init:docs end
