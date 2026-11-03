@@ -303,6 +303,47 @@ describe('fetchMaxProjects', () => {
   })
 })
 
+describe('fetchBreakMinutes', () => {
+  it('returns the number the Settings page has', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { max_projects: 5, afk_minutes: 30, break_minutes: 45 } }))
+    expect(await createApi(stub.port).fetchBreakMinutes()).toBe(45)
+    expect(stub.requests[0].url).toBe('/api/settings')
+  })
+
+  it('returns the last value read when the backend then goes away', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { break_minutes: 90 } }))
+    const api = createApi(stub.port)
+    expect(await api.fetchBreakMinutes()).toBe(90)
+    await stub.close()
+    stub = undefined
+    expect(await api.fetchBreakMinutes()).toBe(90)
+  })
+
+  it('returns the last value read when a later answer is an error or unreadable', async () => {
+    let reply: [number, unknown] = [200, { widget: { break_minutes: 25 } }]
+    stub = await startStub((_req, res) => json(res, reply[0], reply[1]))
+    const api = createApi(stub.port)
+    expect(await api.fetchBreakMinutes()).toBe(25)
+    reply = [500, {}]
+    expect(await api.fetchBreakMinutes()).toBe(25)
+    reply = [200, { widget: { break_minutes: 0 } }]
+    expect(await api.fetchBreakMinutes()).toBe(25)
+  })
+
+  it('returns 60 when the backend is unreachable before any value was read', async () => {
+    stub = await startStub((_req, res) => json(res, 200, {}))
+    const port = stub.port
+    await stub.close()
+    stub = undefined
+    expect(await createApi(port).fetchBreakMinutes()).toBe(60)
+  })
+
+  it('returns 60 when the first answer has no usable value', async () => {
+    stub = await startStub((_req, res) => json(res, 200, { widget: { afk_minutes: 10 } }))
+    expect(await createApi(stub.port).fetchBreakMinutes()).toBe(60)
+  })
+})
+
 describe('fetchAfkMinutes', () => {
   it('returns the number the Settings page has', async () => {
     stub = await startStub((_req, res) => json(res, 200, { widget: { max_projects: 5, afk_minutes: 10 } }))

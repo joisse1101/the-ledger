@@ -7,6 +7,7 @@ import type {
   RemoteStatus,
   RemoteStep,
 } from '../shared/types'
+import { DEFAULT_BREAK_MINUTES } from './breakTimer'
 
 export const POLL_TIMEOUT_MS = 3000
 /** Turning Remote mode off runs `docker compose down` inside the request, so it gets longer. */
@@ -39,6 +40,9 @@ export interface Api {
   /** The AFK duration in minutes as the Settings page has it; when it cannot be read, the last value
    *  read, or 30 if none was. Read when switching AFK on, so a later change applies to the next switch-on. */
   fetchAfkMinutes(): Promise<number>
+  /** The break length in minutes as the Settings page has it; when it cannot be read, the last
+   *  value read, or 60 if none was. Read every minute, so a change reaches a count in progress. */
+  fetchBreakMinutes(): Promise<number>
 }
 
 const STEPS: readonly string[] = ['docker', 'frontend', 'gateway']
@@ -88,6 +92,7 @@ export function createApi(
   const base = `http://127.0.0.1:${backendPort}`
   const signal = () => AbortSignal.timeout(timeoutMs)
   let lastAfkMinutes = DEFAULT_AFK_MINUTES
+  let lastBreakMinutes = DEFAULT_BREAK_MINUTES
 
   /** Whether `/api/meta` says a prompt has been relayed. Anything unreadable counts as not seen:
    *  the auto-approve button stays hidden rather than appear on a guess. */
@@ -212,6 +217,19 @@ export function createApi(
         return lastAfkMinutes
       } catch {
         return lastAfkMinutes
+      }
+    },
+
+    async fetchBreakMinutes() {
+      try {
+        const response = await fetchImpl(`${base}/api/settings`, { signal: signal() })
+        if (!response.ok) return lastBreakMinutes
+        const { widget } = (await response.json()) as { widget?: { break_minutes?: unknown } }
+        const value = widget?.break_minutes
+        if (typeof value === 'number' && Number.isInteger(value) && value >= 1) lastBreakMinutes = value
+        return lastBreakMinutes
+      } catch {
+        return lastBreakMinutes
       }
     },
 
