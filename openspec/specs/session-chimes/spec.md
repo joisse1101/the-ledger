@@ -10,14 +10,14 @@ Plays a short sound when a Claude Code session finishes or needs the user's inpu
 When a Claude Code session finishes its work and stops while the user is away, a short sound SHALL play on this PC.
 
 #### Scenario: Session finishes while the user is away
-- **WHEN** a session finishes and the user has not used the keyboard or mouse for 6 minutes
+- **WHEN** a session finishes and the user has not used the keyboard or mouse for 5 minutes
 - **THEN** the finished sound plays once
 
 ### Requirement: A session that needs input plays a different sound
 When a Claude Code session needs the user's input, such as a permission prompt or a question, while the user is away, a short sound SHALL play that the user can tell apart from the finished sound.
 
 #### Scenario: Session asks for permission while the user is away
-- **WHEN** a session is waiting for the user's answer and the user has not used the keyboard or mouse for 6 minutes
+- **WHEN** a session is waiting for the user's answer and the user has not used the keyboard or mouse for 5 minutes
 - **THEN** the needs-input sound plays once, and it is not the finished sound
 
 ### Requirement: Sound only when the user is away
