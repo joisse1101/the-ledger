@@ -84,6 +84,34 @@ export interface AfkState {
   minutesLeft: number
 }
 
+/** Where the break window is: waiting for Start, playing, or at the end of a workout. */
+export type BreakStage = 'idle' | 'playing' | 'finished'
+
+/** A workout as the break page gets it: names and `ledger-workout:` URLs, never file paths. */
+export type BreakWorkout =
+  | { kind: 'video'; name: string; src: string }
+  | { kind: 'images'; name: string; images: Array<{ src: string; seconds: number }> }
+
+/** The one message the main process sends the break page. `workout` is null when no valid
+ *  workout exists; `notes` say why workouts were left out. */
+export interface BreakState {
+  workout: BreakWorkout | null
+  stage: BreakStage
+  notes: string[]
+}
+
+/** What the break window's preload exposes to its page as `window.breakWindow`. */
+export interface BreakBridge {
+  onState(callback: (state: BreakState) => void): void
+  /** Start (or play again). */
+  start(): void
+  /** Pick another workout, which waits for Start. */
+  skip(): void
+  close(): void
+  /** The page has shown the last image or the video has ended. */
+  finished(): void
+}
+
 /** What the preload bridge exposes to the renderer as `window.widget`. */
 export interface WidgetBridge {
   onState(callback: (state: LiveState) => void): void

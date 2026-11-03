@@ -9,7 +9,7 @@ import { startStub, type Stub } from './stubServer'
 
 describe('preload channels', () => {
   it('uses exactly the channel names in shared/ipc.ts', () => {
-    const preloads = ['index.ts', 'tooltip.ts'].map((file) =>
+    const preloads = ['index.ts', 'tooltip.ts', 'breakWindow.ts'].map((file) =>
       fs.readFileSync(path.join(__dirname, '..', 'src', 'preload', file), 'utf8'),
     )
     const used = preloads.flatMap((source) => [...source.matchAll(/'(widget:[a-z-]+)'/g)].map((m) => m[1]))
