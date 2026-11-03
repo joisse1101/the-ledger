@@ -12,8 +12,10 @@ from typing import Optional
 
 from app.core.widget_settings import (
     DEFAULT_AFK_MINUTES,
+    DEFAULT_BREAK_MINUTES,
     DEFAULT_MAX_PROJECTS,
     validate_afk_minutes,
+    validate_break_minutes,
     validate_max_projects,
 )
 from app.core.worktrees import normalize_folder
@@ -25,6 +27,7 @@ DEFAULT_PATH = Path(__file__).resolve().parents[2] / ".ledger" / "settings.json"
 WORKTREE_FOLDERS_KEY = "worktree_folders"
 MAX_PROJECTS_KEY = "widget_max_projects"
 AFK_MINUTES_KEY = "widget_afk_minutes"
+BREAK_MINUTES_KEY = "widget_break_minutes"
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,7 @@ class _Loaded:
     worktree_folders: tuple[str, ...]
     max_projects: int
     afk_minutes: int
+    break_minutes: int
 
 
 # (path, mtime_ns, size) of the file last read, and what it held. Every transcript's project
@@ -97,6 +101,16 @@ def _afk_minutes_from(raw: dict, path: Path) -> int:
         return DEFAULT_AFK_MINUTES
 
 
+def _break_minutes_from(raw: dict, path: Path) -> int:
+    if BREAK_MINUTES_KEY not in raw:
+        return DEFAULT_BREAK_MINUTES
+    try:
+        return validate_break_minutes(raw[BREAK_MINUTES_KEY])
+    except ValueError:
+        logger.warning("settings_break_minutes_skipped path=%s value=%r", path, raw[BREAK_MINUTES_KEY])
+        return DEFAULT_BREAK_MINUTES
+
+
 def _load() -> _Loaded:
     global _cache
     path = settings_path()
@@ -104,14 +118,24 @@ def _load() -> _Loaded:
         stat = path.stat()
     except FileNotFoundError:
         return _Loaded(
-            raw={}, worktree_folders=(), max_projects=DEFAULT_MAX_PROJECTS, afk_minutes=DEFAULT_AFK_MINUTES
+            raw={},
+            worktree_folders=(),
+            max_projects=DEFAULT_MAX_PROJECTS,
+            afk_minutes=DEFAULT_AFK_MINUTES,
+            break_minutes=DEFAULT_BREAK_MINUTES,
         )
     key = (str(path), stat.st_mtime_ns, stat.st_size)
     if _cache is None or _cache[0] != key:
         raw = _read_raw(path)
         _cache = (
             key,
-            _Loaded(raw, _folders_from(raw, path), _max_projects_from(raw, path), _afk_minutes_from(raw, path)),
+            _Loaded(
+                raw,
+                _folders_from(raw, path),
+                _max_projects_from(raw, path),
+                _afk_minutes_from(raw, path),
+                _break_minutes_from(raw, path),
+            ),
         )
     return _cache[1]
 
@@ -129,6 +153,11 @@ def load_max_projects() -> int:
 def load_afk_minutes() -> int:
     """How long the widget's AFK switch stays on, in minutes; the default when never set or not valid."""
     return _load().afk_minutes
+
+
+def load_break_minutes() -> int:
+    """Minutes of work before the widget's break window opens; the default when never set or not valid."""
+    return _load().break_minutes
 
 
 def _save_key(key: str, value: object) -> None:
@@ -161,3 +190,8 @@ def save_max_projects(max_projects: int) -> None:
 def save_afk_minutes(afk_minutes: int) -> None:
     """Replace the stored minutes the widget's AFK switch stays on."""
     _save_key(AFK_MINUTES_KEY, afk_minutes)
+
+
+def save_break_minutes(break_minutes: int) -> None:
+    """Replace the stored minutes of work before the widget's break window opens."""
+    _save_key(BREAK_MINUTES_KEY, break_minutes)

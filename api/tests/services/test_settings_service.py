@@ -150,3 +150,43 @@ def test_a_bad_number_stops_valid_folders_from_being_saved(isolated_db):
     with pytest.raises(InvalidInput):
         settings_service.save_settings([".trees"], 99)
     assert settings_store.load_worktree_folders() == ()
+
+
+def test_the_break_minutes_default_to_sixty(isolated_settings):
+    assert settings_service.get_break_minutes() == 60
+
+
+def test_saving_the_break_minutes_changes_only_them(isolated_db, monkeypatch):
+    settings_service.save_settings([".trees"], 3, 10)
+    reconciled = []
+    monkeypatch.setattr(history, "correct_worktree_rows", lambda: reconciled.append("history"))
+    monkeypatch.setattr(snapshot, "refresh", lambda: reconciled.append("snapshot"))
+
+    settings_service.save_settings(None, None, None, 45)
+
+    assert settings_service.get_break_minutes() == 45
+    assert settings_service.get_afk_minutes() == 10
+    assert settings_service.get_max_projects() == 3
+    assert settings_store.load_worktree_folders() == (".trees",)
+    assert reconciled == []
+
+
+def test_saving_the_other_settings_leaves_the_break_minutes(isolated_db):
+    settings_service.save_settings(None, None, None, 45)
+    settings_service.save_settings([".trees"], 3, 10)
+    assert settings_service.get_break_minutes() == 45
+
+
+@pytest.mark.parametrize("value", [0, 241, -1, 7.5, True, "60", [60]])
+def test_invalid_break_minutes_are_refused_and_nothing_changes(isolated_db, value):
+    settings_service.save_settings(None, None, None, 20)
+    with pytest.raises(InvalidInput, match="whole number"):
+        settings_service.save_settings(None, None, None, value)
+    assert settings_service.get_break_minutes() == 20
+
+
+def test_bad_break_minutes_stop_the_other_settings_from_being_saved(isolated_db):
+    with pytest.raises(InvalidInput):
+        settings_service.save_settings([".trees"], 3, 10, 999)
+    assert settings_store.load_worktree_folders() == ()
+    assert settings_service.get_afk_minutes() == 30
