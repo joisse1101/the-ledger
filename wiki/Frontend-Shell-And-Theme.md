@@ -30,7 +30,8 @@
   rejection and typed-value behaviour; a new number applies the next time the switch is turned on.
   A "Break workouts" block follows with "Break minutes (1 to 240)", 60 until set: the minutes of work before the
   widget opens its break window. Its Save sends only `{widget: {break_minutes}}` (`useSaveWidgetBreakMinutes`), with
-  the same inline rejection and typed-value behaviour. Below it the personal workouts folder's path
+  the same inline rejection and typed-value behaviour. A line above the input says the widget takes a new
+  break length within about 30 seconds. Below it the personal workouts folder's path
   (the ignored `mine` folder under the widget's `workouts` folder, created on first open) and an Open folder button (`useOpenWorkoutsFolder`, `POST /api/widget/workouts/open`);
   if opening fails, the server's message, which names the folder, shows inline.
 - **Theme** (`web/src/theme/theme.ts`): `data-theme` on `<html>`, seeded from `localStorage` (guarded

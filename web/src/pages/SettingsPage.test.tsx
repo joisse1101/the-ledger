@@ -289,6 +289,12 @@ describe("SettingsPage", () => {
     await waitFor(() => expect(input).toHaveValue(60));
   });
 
+  it("says the widget takes a new break length within about 30 seconds", async () => {
+    renderPage(world);
+
+    expect(await screen.findByText(/the widget takes it within about 30 seconds/)).toBeInTheDocument();
+  });
+
   it("saves new break minutes on their own, leaving the other settings", async () => {
     world.userFolders = [".trees"];
     world.maxProjects = 3;

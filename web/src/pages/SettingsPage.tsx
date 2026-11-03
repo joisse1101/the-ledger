@@ -190,7 +190,7 @@ export function SettingsPage() {
       <h2>Break workouts</h2>
       <p className={styles.hint}>
         After this many minutes of work, with the AFK switch off, the widget opens a break window with a random
-        workout. A new number applies to the count already running.
+        workout. A new number applies to the count already running; the widget takes it within about 30 seconds.
       </p>
       <form className={styles.add} onSubmit={onSaveBreak} noValidate>
         <label htmlFor="widget-break-minutes">Break minutes (1 to 240)</label>
