@@ -14,6 +14,7 @@ class WidgetSettingsRequest(BaseModel):
     # rather than a schema error.
     max_projects: Optional[object] = None
     afk_minutes: Optional[object] = None
+    break_minutes: Optional[object] = None
 
 
 class SettingsRequest(BaseModel):
@@ -23,8 +24,8 @@ class SettingsRequest(BaseModel):
     widget: Optional[WidgetSettingsRequest] = None
 
 
-def settings_body(folders: list[WorktreeFolder], max_projects: int, afk_minutes: int) -> dict:
+def settings_body(folders: list[WorktreeFolder], max_projects: int, afk_minutes: int, break_minutes: int) -> dict:
     return {
         "worktree_folders": [{"path": f.path, "built_in": f.built_in} for f in folders],
-        "widget": {"max_projects": max_projects, "afk_minutes": afk_minutes},
+        "widget": {"max_projects": max_projects, "afk_minutes": afk_minutes, "break_minutes": break_minutes},
     }

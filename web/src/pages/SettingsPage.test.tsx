@@ -12,10 +12,15 @@ interface World {
   userFolders: string[];
   maxProjects: number;
   afkMinutes: number;
+  breakMinutes: number;
+  /** What the fake server answers to Open folder: a path on success, or a failure message. */
+  openResult: { path: string } | { detail: string };
   /** Folders the fake server refuses, with its reason. */
   refused: Record<string, string>;
   /** The body of each save, as the server received it. */
-  puts: { worktree_folders?: string[]; widget?: { max_projects?: number; afk_minutes?: number } }[];
+  puts: { worktree_folders?: string[]; widget?: { max_projects?: number; afk_minutes?: number; break_minutes?: number } }[];
+  /** How many times the folder was asked to open. */
+  opens: number;
   /** While set, a save waits for it, so a test can look at the pending state. */
   gate: Promise<void> | null;
 }
@@ -27,7 +32,7 @@ function json(body: unknown, status = 200): Response {
 function settingsBody(world: World) {
   return {
     worktree_folders: [BUILT_IN, ...world.userFolders.map((path) => ({ path, built_in: false }))],
-    widget: { max_projects: world.maxProjects, afk_minutes: world.afkMinutes },
+    widget: { max_projects: world.maxProjects, afk_minutes: world.afkMinutes, break_minutes: world.breakMinutes },
   };
 }
 
@@ -56,6 +61,10 @@ function stubServer(world: World) {
         if (maxProjects !== undefined && !(Number.isInteger(maxProjects) && maxProjects >= 1 && maxProjects <= 10)) {
           return json({ detail: "Must be a whole number from 1 to 10." }, 422);
         }
+        const breakMinutes = body.widget?.break_minutes;
+        if (breakMinutes !== undefined && !(Number.isInteger(breakMinutes) && breakMinutes >= 1 && breakMinutes <= 240)) {
+          return json({ detail: "Must be a whole number from 1 to 240." }, 422);
+        }
         const afkMinutes = body.widget?.afk_minutes;
         if (afkMinutes !== undefined && !(Number.isInteger(afkMinutes) && afkMinutes >= 1 && afkMinutes <= 240)) {
           return json({ detail: "Must be a whole number from 1 to 240." }, 422);
@@ -63,7 +72,12 @@ function stubServer(world: World) {
         if (body.worktree_folders) world.userFolders = body.worktree_folders;
         if (maxProjects !== undefined) world.maxProjects = maxProjects;
         if (afkMinutes !== undefined) world.afkMinutes = afkMinutes;
+        if (breakMinutes !== undefined) world.breakMinutes = breakMinutes;
         return json(settingsBody(world));
+      }
+      if (input === "/api/widget/workouts/open" && method === "POST") {
+        world.opens += 1;
+        return "path" in world.openResult ? json(world.openResult) : json(world.openResult, 500);
       }
       return json({ detail: "unexpected" }, 500);
     }),
@@ -86,7 +100,15 @@ function renderPage(world: World) {
 
 let world: World;
 beforeEach(() => {
-  world = { isLocal: true, userFolders: [], maxProjects: 5, afkMinutes: 30, refused: {}, puts: [], gate: null };
+  world = {
+    isLocal: true, userFolders: [], maxProjects: 5, afkMinutes: 30,
+    breakMinutes: 60,
+    openResult: { path: "C:/ledger/widget/workouts/mine" },
+    refused: {},
+    puts: [],
+    opens: 0,
+    gate: null,
+  };
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -258,6 +280,70 @@ describe("SettingsPage", () => {
     expect(world.puts).toEqual([{ widget: { max_projects: 3 } }]);
     expect(world.afkMinutes).toBe(10);
     expect(screen.getByLabelText("AFK minutes (1 to 240)")).toHaveValue(10);
+  });
+
+  it("shows the break minutes, 60 until set", async () => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Break minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(60));
+  });
+
+  it("says the widget takes a new break length within about 30 seconds", async () => {
+    renderPage(world);
+
+    expect(await screen.findByText(/the widget takes it within about 30 seconds/)).toBeInTheDocument();
+  });
+
+  it("saves new break minutes on their own, leaving the other settings", async () => {
+    world.userFolders = [".trees"];
+    world.maxProjects = 3;
+    world.afkMinutes = 10;
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Break minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(60));
+    fireEvent.change(input, { target: { value: "45" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save break minutes" }));
+
+    await waitFor(() => expect(world.breakMinutes).toBe(45));
+    expect(world.puts).toEqual([{ widget: { break_minutes: 45 } }]);
+    expect(world.userFolders).toEqual([".trees"]);
+    expect(world.maxProjects).toBe(3);
+    expect(world.afkMinutes).toBe(10);
+    await waitFor(() => expect(screen.getByLabelText("Break minutes (1 to 240)")).toHaveValue(45));
+  });
+
+  it.each(["0", "241", "7.5"])("shows the server's reason for %s break minutes and keeps what was typed", async (typed) => {
+    renderPage(world);
+
+    const input = await screen.findByLabelText("Break minutes (1 to 240)");
+    await waitFor(() => expect(input).toHaveValue(60));
+    fireEvent.change(input, { target: { value: typed } });
+    fireEvent.click(screen.getByRole("button", { name: "Save break minutes" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("whole number from 1 to 240");
+    expect(screen.getByLabelText("Break minutes (1 to 240)")).toHaveValue(Number(typed));
+    expect(world.breakMinutes).toBe(60);
+  });
+
+  it("shows the personal folder's path and asks the server to open it", async () => {
+    renderPage(world);
+
+    expect(await screen.findByText("widget/workouts/mine")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() => expect(world.opens).toBe(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows a message with the folder's path when opening fails", async () => {
+    world.openResult = { detail: "Could not open C:/ledger/widget/workouts/mine." };
+    renderPage(world);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open folder" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("C:/ledger/widget/workouts/mine");
   });
 
   it("sends a device that is not local to the home page without asking for settings", async () => {

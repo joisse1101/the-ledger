@@ -10,6 +10,10 @@ DEFAULT_AFK_MINUTES = 30
 MIN_AFK_MINUTES = 1
 MAX_AFK_MINUTES = 240
 
+DEFAULT_BREAK_MINUTES = 60
+MIN_BREAK_MINUTES = 1
+MAX_BREAK_MINUTES = 240
+
 
 def validate_max_projects(raw: object) -> int:
     """`raw` as the number of projects the widget lists; ValueError says why not."""
@@ -27,4 +31,13 @@ def validate_afk_minutes(raw: object) -> int:
         raise ValueError("Enter a whole number.")
     if not MIN_AFK_MINUTES <= raw <= MAX_AFK_MINUTES:
         raise ValueError(f"Must be a whole number from {MIN_AFK_MINUTES} to {MAX_AFK_MINUTES}.")
+    return raw
+
+
+def validate_break_minutes(raw: object) -> int:
+    """`raw` as the minutes of work before the widget's break window opens; ValueError says why not."""
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ValueError("Enter a whole number.")
+    if not MIN_BREAK_MINUTES <= raw <= MAX_BREAK_MINUTES:
+        raise ValueError(f"Must be a whole number from {MIN_BREAK_MINUTES} to {MAX_BREAK_MINUTES}.")
     return raw

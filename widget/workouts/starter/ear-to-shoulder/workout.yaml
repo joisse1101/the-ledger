@@ -1,0 +1,8 @@
+# Starter workout: ear to shoulder (6 frames, seconds per frame)
+images:
+  - {file: 1.svg, seconds: 2}
+  - {file: 2.svg, seconds: 2}
+  - {file: 3.svg, seconds: 3}
+  - {file: 4.svg, seconds: 2}
+  - {file: 5.svg, seconds: 2}
+  - {file: 6.svg, seconds: 3}

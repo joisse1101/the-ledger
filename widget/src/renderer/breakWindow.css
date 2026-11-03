@@ -1,0 +1,120 @@
+:root {
+  color-scheme: light dark;
+}
+
+/* Same palette as style.css, copied by hand (the widget imports nothing from web/). */
+:root {
+  --bg-main: #f3eef0;
+  --bg-surface: #fff;
+  --text-main: #241820;
+  --text-muted: #6b5a61;
+  --text-on-accent: #fff;
+  --border-subtle: #e7dfe2;
+  --brand-accent: #8a4a5e;
+  --brand-border-strong: #c98da0;
+  --warn-bg: #fff4d6;
+  --warn-text: #5c3d00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #121214;
+    --bg-surface: #1b1b1f;
+    --text-main: #fff;
+    --text-muted: #a1a1aa;
+    --border-subtle: #27272a;
+    --brand-accent: #96556c;
+    --brand-border-strong: #b8738a;
+    --warn-bg: #3d2f00;
+    --warn-text: #ffe29a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: 15px/1.45 "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+body { border: 1px solid var(--border-subtle); }
+
+.break {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px 20px;
+  gap: 14px;
+}
+
+/* The top strip drags the frameless window; its button opts out so it stays clickable. */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  -webkit-app-region: drag;
+}
+
+.title { margin: 0; font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.eyebrow { margin: 0; color: var(--text-muted); font-size: 13px; }
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.media {
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+img.media { width: min(100%, 420px); height: auto; }
+video.media { width: 100%; }
+
+.hint { margin: 0; color: var(--text-muted); }
+
+.note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.problems { margin: 0; padding: 0; list-style: none; color: var(--text-muted); font-size: 13px; }
+
+.actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+.button {
+  min-width: 88px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--brand-border-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.button:hover { background: var(--bg-surface); }
+.button.primary { background: var(--brand-accent); border-color: var(--brand-accent); color: var(--text-on-accent); }
+.button.primary:hover { filter: brightness(1.1); }
+.button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app import refresh
-from app.core.widget_settings import validate_afk_minutes, validate_max_projects
+from app.core.widget_settings import validate_afk_minutes, validate_break_minutes, validate_max_projects
 from app.core.worktrees import BUILT_IN_FOLDER, WorktreeFolder, normalize_folder
 from app.repositories import settings_store
 from app.repositories.db import history, snapshot
@@ -54,6 +54,17 @@ def _validated_afk_minutes(raw: object) -> int:
         raise InvalidInput(str(err)) from err
 
 
+def get_break_minutes() -> int:
+    return settings_store.load_break_minutes()
+
+
+def _validated_break_minutes(raw: object) -> int:
+    try:
+        return validate_break_minutes(raw)
+    except ValueError as err:
+        raise InvalidInput(str(err)) from err
+
+
 def _apply_worktree_folders(folders: list[str]) -> None:
     """Replace the user's folders, then bring history and the snapshot in line before returning.
 
@@ -70,6 +81,7 @@ def save_settings(
     raw_folders: Optional[list[str]],
     raw_max_projects: Optional[object],
     raw_afk_minutes: Optional[object] = None,
+    raw_break_minutes: Optional[object] = None,
 ) -> None:
     """Save whichever settings were sent; the others stay as they are.
 
@@ -79,9 +91,12 @@ def save_settings(
     folders = None if raw_folders is None else _validated(raw_folders)
     max_projects = None if raw_max_projects is None else _validated_max_projects(raw_max_projects)
     afk_minutes = None if raw_afk_minutes is None else _validated_afk_minutes(raw_afk_minutes)
+    break_minutes = None if raw_break_minutes is None else _validated_break_minutes(raw_break_minutes)
     if max_projects is not None:
         settings_store.save_max_projects(max_projects)
     if afk_minutes is not None:
         settings_store.save_afk_minutes(afk_minutes)
+    if break_minutes is not None:
+        settings_store.save_break_minutes(break_minutes)
     if folders is not None:
         _apply_worktree_folders(folders)

@@ -2,12 +2,17 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import {
   useMeta,
+  useOpenWorkoutsFolder,
   useSaveSettings,
   useSaveWidgetAfkMinutes,
+  useSaveWidgetBreakMinutes,
   useSaveWidgetMaxProjects,
   useSettings,
 } from "../api/queries";
 import styles from "./SettingsPage.module.css";
+
+/** The personal workouts folder, relative to the repo. The widget and the server build the same path. */
+const PERSONAL_WORKOUTS_FOLDER = "widget/workouts/mine";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -27,6 +32,9 @@ export function SettingsPage() {
   // Null until the user types, so the field follows the saved number (including after a reload).
   const [maxProjectsDraft, setMaxProjectsDraft] = useState<string | null>(null);
   const [afkMinutesDraft, setAfkMinutesDraft] = useState<string | null>(null);
+  const saveBreak = useSaveWidgetBreakMinutes();
+  const openFolder = useOpenWorkoutsFolder();
+  const [breakMinutesDraft, setBreakMinutesDraft] = useState<string | null>(null);
 
   if (meta.data && !isLocal) return <Navigate to="/" replace />;
   if (!meta.data) return null;
@@ -52,6 +60,13 @@ export function SettingsPage() {
   function onSaveAfk(event: FormEvent) {
     event.preventDefault();
     saveAfk.mutate(Number(afkMinutes), { onSuccess: () => setAfkMinutesDraft(null) });
+  }
+
+  const breakMinutes = breakMinutesDraft ?? String(settings.data?.widget.break_minutes ?? "");
+
+  function onSaveBreak(event: FormEvent) {
+    event.preventDefault();
+    saveBreak.mutate(Number(breakMinutes), { onSuccess: () => setBreakMinutesDraft(null) });
   }
 
   return (
@@ -171,6 +186,52 @@ export function SettingsPage() {
         </div>
       </form>
       {saveAfk.isError && <p role="alert">{messageOf(saveAfk.error)}</p>}
+
+      <h2>Break workouts</h2>
+      <p className={styles.hint}>
+        After this many minutes of work, with the AFK switch off, the widget opens a break window with a random
+        workout. A new number applies to the count already running; the widget takes it within about 30 seconds.
+      </p>
+      <form className={styles.add} onSubmit={onSaveBreak} noValidate>
+        <label htmlFor="widget-break-minutes">Break minutes (1 to 240)</label>
+        <div className={styles.addRow}>
+          <input
+            id="widget-break-minutes"
+            type="number"
+            min={1}
+            max={240}
+            step={1}
+            value={breakMinutes}
+            disabled={saveBreak.isPending || settings.isPending}
+            onChange={(event) => setBreakMinutesDraft(event.target.value)}
+          />
+          <button
+            type="submit"
+            className="button"
+            aria-label="Save break minutes"
+            disabled={saveBreak.isPending || settings.isPending}
+          >
+            Save
+          </button>
+        </div>
+      </form>
+      {saveBreak.isError && <p role="alert">{messageOf(saveBreak.error)}</p>}
+
+      <p className={styles.hint}>
+        Put your own workout videos, or folders of images, in this folder. They join the starter workouts.
+      </p>
+      <div className={styles.addRow}>
+        <code className={styles.path}>{PERSONAL_WORKOUTS_FOLDER}</code>
+        <button
+          type="button"
+          className="button"
+          disabled={openFolder.isPending}
+          onClick={() => openFolder.mutate()}
+        >
+          Open folder
+        </button>
+      </div>
+      {openFolder.isError && <p role="alert">{messageOf(openFolder.error)}</p>}
     </section>
   );
 }

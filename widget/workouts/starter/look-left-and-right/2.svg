@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300" role="img"><title>Look left and right, step 2 of 5: turn the head to look over the left shoulder</title><style>
+.bg{fill:var(--ledger-break-bg,#f6f7f9)}
+.body{fill:var(--ledger-break-body,#cfd6e0);stroke:var(--ledger-break-line,#2b3340);stroke-width:4;stroke-linejoin:round;stroke-linecap:round}
+.line{fill:none;stroke:var(--ledger-break-line,#2b3340);stroke-width:4;stroke-linecap:round}
+.neck{fill:none;stroke:var(--ledger-break-line,#2b3340);stroke-width:30;stroke-linecap:round}
+.neckfill{fill:none;stroke:var(--ledger-break-body,#cfd6e0);stroke-width:22;stroke-linecap:round}
+.dot{fill:var(--ledger-break-line,#2b3340)}
+.ink{fill:var(--ledger-break-line,#2b3340)}
+.accent{fill:var(--ledger-break-accent,#d9622b)}
+.accent-line{fill:none;stroke:var(--ledger-break-accent,#d9622b);stroke-width:5;stroke-linecap:round}
+.guide{fill:none;stroke:var(--ledger-break-accent,#d9622b);stroke-width:2;stroke-dasharray:6 6;opacity:.7}
+.off{fill:none;stroke:var(--ledger-break-line,#2b3340);stroke-width:2;opacity:.35}
+@media (prefers-color-scheme: dark){
+.bg{fill:var(--ledger-break-bg,#161a21)}
+.body{fill:var(--ledger-break-body,#465062);stroke:var(--ledger-break-line,#e6e9ef)}
+.line,.neck{stroke:var(--ledger-break-line,#e6e9ef)}
+.neckfill{stroke:var(--ledger-break-body,#465062)}
+.dot,.ink{fill:var(--ledger-break-line,#e6e9ef)}
+.off{stroke:var(--ledger-break-line,#e6e9ef)}
+.accent{fill:var(--ledger-break-accent,#ff8a4c)}
+.accent-line{stroke:var(--ledger-break-accent,#ff8a4c)}
+.guide{stroke:var(--ledger-break-accent,#ff8a4c)}
+}
+</style><rect class="bg" width="400" height="300"/><path class="body" d="M105 240 Q200 222.0 295 240 L315 300 L85 300Z"/><g transform="translate(0 0) rotate(0 200 236.0)"><path class="neck" d="M200 236.0 L200 190"/><path class="neckfill" d="M200 236.0 L200 190"/><circle class="body" cx="200" cy="150" r="40"/><circle class="ink" cx="155.2" cy="146" r="4"/><circle class="ink" cx="183.2" cy="146" r="4"/><path class="line" d="M169.2 152 L167.0 162" style="stroke-width:3"/><path class="line" d="M161.4 172 Q171.4 178 181.4 172" style="stroke-width:3"/></g><path class="accent-line" d="M150 90 L106.0 90.0"/><path class="accent" d="M100 90 L112.3 83.3 L112.3 96.7Z"/><circle cx="308" cy="22" r="5" class="dot"/><circle cx="326" cy="22" r="5" class="dot"/><circle cx="344" cy="22" r="5" class="off"/><circle cx="362" cy="22" r="5" class="off"/><circle cx="380" cy="22" r="5" class="off"/></svg>

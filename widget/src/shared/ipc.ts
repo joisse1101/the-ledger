@@ -17,4 +17,10 @@ export const CHANNELS = {
   ledgerHover: 'widget:ledger-hover',
   remoteHover: 'widget:remote-hover',
   tooltip: 'widget:tooltip',
+  breakCountdown: 'widget:break-countdown',
+  breakState: 'widget:break-state',
+  breakStart: 'widget:break-start',
+  breakSkip: 'widget:break-skip',
+  breakClose: 'widget:break-close',
+  breakFinished: 'widget:break-finished',
 } as const

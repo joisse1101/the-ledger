@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
 import { CHANNELS } from '../shared/ipc'
-import type { AfkState, LiveState, RemoteStatus } from '../shared/types'
+import type { AfkState, BreakCountdown, LiveState, RemoteStatus } from '../shared/types'
 import { clampOpacity, clampToDisplays, saveState, type Rect, type WidgetState } from './state'
 
 const PILL_HEIGHT = 34
@@ -13,6 +13,7 @@ export interface WidgetWindow {
   sendState(state: LiveState): void
   sendRemote(status: RemoteStatus): void
   sendAfk(afk: AfkState): void
+  sendBreakCountdown(countdown: BreakCountdown): void
   toggleCollapse(): void
   toggleVisible(): void
   setOpacity(value: number): void
@@ -30,6 +31,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
   let lastState: LiveState | null = null
   let lastRemote: RemoteStatus | null = null
   let lastAfk: AfkState | null = null
+  let lastCountdown: BreakCountdown | null = null
   let contentHeight: number | null = null
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -74,6 +76,7 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
     if (lastState) window.webContents.send(CHANNELS.state, lastState)
     if (lastRemote) window.webContents.send(CHANNELS.remoteState, lastRemote)
     if (lastAfk) window.webContents.send(CHANNELS.afkState, lastAfk)
+    if (lastCountdown) window.webContents.send(CHANNELS.breakCountdown, lastCountdown)
   }
   window.webContents.on('did-finish-load', () => {
     push()
@@ -106,6 +109,10 @@ export function createWidgetWindow(stateFile: string, saved: WidgetState): Widge
     sendRemote(status) {
       lastRemote = status
       if (!window.isDestroyed()) window.webContents.send(CHANNELS.remoteState, status)
+    },
+    sendBreakCountdown(countdown) {
+      lastCountdown = countdown
+      if (!window.isDestroyed()) window.webContents.send(CHANNELS.breakCountdown, countdown)
     },
     sendAfk(afk) {
       lastAfk = afk
