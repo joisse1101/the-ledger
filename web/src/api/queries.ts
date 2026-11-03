@@ -409,3 +409,27 @@ export function useSaveWidgetAfkMinutes() {
     onSuccess: (settings) => client.setQueryData(keys.settings, settings),
   });
 }
+
+/** Saves how many minutes of work pass before the desktop widget opens its break window. A display
+ *  preference like the others: nothing is reloaded. Rejects with an ApiError carrying the server's reason
+ *  (422 for a value outside 1 to 240 or not a whole number). */
+export function useSaveWidgetBreakMinutes() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (breakMinutes: number) =>
+      apiFetch<Settings>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widget: { break_minutes: breakMinutes } }),
+      }),
+    onSuccess: (settings) => client.setQueryData(keys.settings, settings),
+  });
+}
+
+/** Opens the widget's personal workouts folder in the file manager on the machine running the app.
+ *  Rejects with an ApiError whose message names the folder when it cannot be opened. */
+export function useOpenWorkoutsFolder() {
+  return useMutation({
+    mutationFn: () => apiFetch<{ path: string }>("/api/widget/workouts/open", { method: "POST" }),
+  });
+}

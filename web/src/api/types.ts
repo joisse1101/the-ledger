@@ -66,6 +66,8 @@ export interface Settings {
     max_projects: number;
     /** How many minutes the desktop widget's AFK switch stays on: a whole number from 1 to 240. */
     afk_minutes: number;
+    /** Minutes of work after which the desktop widget opens its break window: a whole number from 1 to 240. */
+    break_minutes: number;
   };
 }
 

@@ -11,6 +11,7 @@ import {
   useDeleteProject,
   useMeta,
   useOpenRepo,
+  useOpenWorkoutsFolder,
   useOverview,
   usePendingDecision,
   useProjectRepos,
@@ -18,6 +19,7 @@ import {
   useRemoteQr,
   useSaveSettings,
   useSaveWidgetAfkMinutes,
+  useSaveWidgetBreakMinutes,
   useSaveWidgetMaxProjects,
   useSetAutoApprove,
   useSetRemoteMode,
@@ -320,6 +322,21 @@ describe("the session control hooks", () => {
     client.clear();
   });
 
+  it("opens the workouts folder with a bodiless POST and returns its path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ path: "C:/ledger/widget/workouts/mine" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+
+    const { result } = renderHook(() => useOpenWorkoutsFolder(), { wrapper: wrapper(client) });
+    await expect(act(() => result.current.mutateAsync())).resolves.toEqual({ path: "C:/ledger/widget/workouts/mine" });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/widget/workouts/open");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+    client.clear();
+  });
+
   it("switches a session's auto-approve and refreshes the Live list", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ auto_approve: true }));
     vi.stubGlobal("fetch", fetchMock);
@@ -518,7 +535,7 @@ describe("the settings", () => {
   }
 
   const saved = {
-    widget: { max_projects: 5, afk_minutes: 30 },
+    widget: { max_projects: 5, afk_minutes: 30, break_minutes: 60 },
     worktree_folders: [
       { path: ".claude/worktrees", built_in: true },
       { path: ".trees", built_in: false },
@@ -570,7 +587,7 @@ describe("the settings", () => {
   });
 
   it("saves the widget's number with a JSON PUT and reloads nothing derived from sessions", async () => {
-    const withThree = { ...saved, widget: { max_projects: 3, afk_minutes: 30 } };
+    const withThree = { ...saved, widget: { max_projects: 3, afk_minutes: 30, break_minutes: 60 } };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withThree));
     vi.stubGlobal("fetch", fetchMock);
     const client = createQueryClient();
@@ -589,7 +606,7 @@ describe("the settings", () => {
   });
 
   it("saves the AFK minutes with a JSON PUT and reloads nothing derived from sessions", async () => {
-    const withTen = { ...saved, widget: { max_projects: 5, afk_minutes: 10 } };
+    const withTen = { ...saved, widget: { max_projects: 5, afk_minutes: 10, break_minutes: 60 } };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withTen));
     vi.stubGlobal("fetch", fetchMock);
     const client = createQueryClient();
@@ -603,6 +620,25 @@ describe("the settings", () => {
     expect(init.method).toBe("PUT");
     expect(JSON.parse(init.body)).toEqual({ widget: { afk_minutes: 10 } });
     expect(client.getQueryData(keys.settings)).toEqual(withTen);
+    expect(invalidate).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("saves the break minutes with a JSON PUT and reloads nothing derived from sessions", async () => {
+    const withFortyFive = { ...saved, widget: { max_projects: 5, afk_minutes: 30, break_minutes: 45 } };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(withFortyFive));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createQueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+
+    const { result } = renderHook(() => useSaveWidgetBreakMinutes(), { wrapper: wrapper(client) });
+    await act(() => result.current.mutateAsync(45));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/settings");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual({ widget: { break_minutes: 45 } });
+    expect(client.getQueryData(keys.settings)).toEqual(withFortyFive);
     expect(invalidate).not.toHaveBeenCalled();
     client.clear();
   });
