@@ -160,6 +160,51 @@ back to 5 if it cannot read it.
   the window; the projects page draws every line 20 px tall so its height follows the line count.
   Values are set as text, never markup.
 
+## Break timer
+
+After a stretch of work the widget opens a small break window with one neck workout. Requirements are
+in the break-timer capability's spec; this section says how the code meets them.
+
+- **Timer.** `BreakTimer` (`widget/src/main/breakTimer.ts`, pure, with an injected clock) is ticked once a
+  second from the main process. Each tick adds the time since the last one, at most 5 s, and only while
+  the AFK switch is off, so sleep adds one tick rather than hours. The AFK state is the latest one the
+  2 s poll saw, so it can lag by up to 2 s. The count starts at zero on every launch and again when the
+  break window closes. The break length is `widget.break_minutes` from `GET /api/settings` (1 to 240, 60
+  until set), read every minute through `fetchBreakMinutes`, which keeps its last value when the backend
+  does not answer. A new value applies to a count in progress.
+- **Two workout folders.** The starter folder is committed and holds the shipped stretches. The personal
+  folder is listed in `.gitignore`, is created when missing, and is where your own files go. Both sit
+  under `widget/workouts/`, named `starter` and `mine`. The relative paths are constants in
+  `widget/src/main/workouts.ts`. All workouts from both folders form one pool.
+- **A workout** is a video file directly in a folder (named after the file; mp4, webm, m4v, ogv or mov),
+  or a subfolder of images (named after the folder; png, jpg, gif, svg or webp) with a `workout.yaml`.
+- **The YAML file** has one field, `images`, a non-empty list. Each entry has `file`, a path inside the
+  workout's folder that exists, and `seconds`, a number above 0 and up to 600. The images show in list order
+  for their seconds. If a personal image folder has no YAML file, the widget writes one listing every image
+  in natural file-name order (`2.png` before `10.png`) at 20 s each. It writes with an exclusive flag, so an
+  existing file is never replaced, and it never writes into the starter folder. A workout with an unreadable
+  file, a bad field, a missing image, or an entry that leaves the folder (absolute path, `..` or a link) is left out
+  with a note, and the note shows in the break window.
+- **Serving files.** The break page gets files only through the `ledger-workout://<root>/<path>` scheme
+  (`widget/src/main/workoutProtocol.ts`, root `starter` or `mine`). The handler resolves the real path and
+  answers 404 unless it is still inside that folder, and forwards the `Range` header so a video can seek.
+  The scheme is registered as privileged before the app is ready, and its handler afterwards.
+- **The break window** (`widget/src/main/breakWindow.ts`, page `widget/src/renderer/breakWindow.html`) is a
+  separate, frameless, always-on-top, sandboxed window with its own preload and CSP
+  (`default-src 'none'`, images and media only from the workout scheme). It is focusable so its buttons work, but
+  is shown with `showInactive`, so typing in another window never presses Start. At most one exists. It
+  shows the workout's name with Start, Skip and Close, and nothing plays until Start. Skip picks a different
+  workout when there is more than one (`pickWorkout`) and waits for Start again, even during play. Close
+  destroys the window from any state. A break that comes due while one is open is ignored. With no valid
+  workout the page shows a note and only Close. A video that cannot play shows a note and keeps Skip and
+  Close.
+- **State.** `BreakController` (`widget/src/main/breakController.ts`) holds the chosen workout and whether it
+  is idle, playing or finished, and is independent of Electron: tests pass a fake window. It sends the page one
+  `breakState` message; the page sends `breakStart`, `breakSkip`, `breakClose` and `breakFinished`, each
+  checked in the handler. The page steps images with timers and reports the end.
+- **The list window is untouched.** Closing the break window cannot fire `window-all-closed`, because the
+  list window is always open, so the widget keeps running.
+
 ## Window
 
 - Last position and size persist to `widget-state.json` under Electron's `userData` and are clamped
