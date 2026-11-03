@@ -39,7 +39,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Wiki pages follow the readability rules below. They are the rules for every page in `wiki/`.
   - **Purpose first.** The first paragraph says what the page covers or what a reader can do with it.
   - **One header per topic.** Nest headers by hierarchy.
-  - **One idea per bullet.** Keep each bullet to one short sentence; move a second idea into its own bullet.
+  - **Paragraphs for prose, bullets for lists.** Write explanations, reasons and purpose lines as short paragraphs. Use a bullet only for a real list, a step or parallel items, and keep each bullet to one idea in one short sentence. Do not break prose into bullets: if the items are not parallel, or a bullet only makes sense after the one before it, write a paragraph.
   - **Define terms.** Define a technical term where it is first used, or link to its entry in [Glossary](Glossary.md).
   - **Mark certainty.** Label what is known, assumed and unchecked apart from each other. Never present an unchecked statement as fact.
 - Link between wiki pages as `[text](Page-Name.md)`. The publish step strips the `.md` for the wiki.
