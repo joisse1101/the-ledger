@@ -6,7 +6,7 @@ This page explains how the Overview page and its charts are built. Read it befor
 
 ## Where the code is
 
-- `components/overview/` holds the Overview components.
+- `web/src/components/overview/` holds the Overview components.
 - `web/src/pages/OverviewPage.tsx` is the page.
 
 ## Time range

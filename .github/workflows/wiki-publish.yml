@@ -23,6 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the flat wiki pages
+        run: python scripts/build_wiki.py --out "$RUNNER_TEMP/wiki-out"
       - name: Clone the wiki
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,7 +48,7 @@ jobs:
             echo "::warning title=Wiki edited outside the repo::These wiki commits were not made by the publish workflow and will be overwritten: $(echo "$foreign" | tr '\n' ';')"
           fi
       - name: Mirror the output into the wiki
-        run: rsync -a --delete --exclude '.git' wiki/ "$RUNNER_TEMP/wiki/"
+        run: rsync -a --delete --exclude '.git' "$RUNNER_TEMP/wiki-out/" "$RUNNER_TEMP/wiki/"
       - name: Commit and push when something changed
         working-directory: ${{ runner.temp }}/wiki
         run: |

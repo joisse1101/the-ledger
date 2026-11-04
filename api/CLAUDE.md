@@ -4,9 +4,9 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 
 | Working on | Read |
 |---|---|
-| `app/repositories/`, SQLite snapshot | [Backend-Data-Layer](../wiki/Backend-Data-Layer.md) |
+| `api/app/repositories/`, SQLite snapshot | [Backend-Data-Layer](../wiki/Backend-Data-Layer.md) |
 | `history.db`, `backup_history.py` | [Backend-History-Store](../wiki/Backend-History-Store.md) |
-| Routes in `app/routers/` | [Backend-API-Routes](../wiki/Backend-API-Routes.md) |
+| Routes in `api/app/routers/` | [Backend-API-Routes](../wiki/Backend-API-Routes.md) |
 | `api/app/core/security.py`, locality, token | [Backend-Security](../wiki/Backend-Security.md) |
 | Pending prompts, Remote mode | [Backend-Live-Sessions-And-Prompts](../wiki/Backend-Live-Sessions-And-Prompts.md) |
 | `api/app/domain/overview_stats.py`, `api/app/domain/transcript_query.py` | [Backend-Overview-And-Queries](../wiki/Backend-Overview-And-Queries.md) |
@@ -18,10 +18,10 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 - Layers in `app/`: `routers` (HTTP only) -> `services` (rules, raise `api/app/services/errors.py`) -> `repositories` / `domain` -> `core`; `schemas` shape JSON,
   `infra` wraps the OS, Docker and QR; `deps.py` holds the shared singletons. Imports point downward only;
   `api/tests/test_layers.py` fails the build when one doesn't.
-- Run the server with `python -m app` from `api/`. `backup_history.py` and
-  `check_docs.py` stay at the `api/` root: scheduled tasks and scripts run them by path.
+- Run the server with `python -m app` from `api/`. `backup_history.py` stays
+  at the `api/` root: the scheduled task runs it by path.
 - Delete routes and Remote-mode switching check `is_local` in the route.
 - No `CORSMiddleware`; the frontend only calls relative `/api` paths.
 - `api/` runs `hooks/scripts/Open-ClaudeRepoWindow.ps1` for open-repo, so keep that path stable.
-- Docs: `python check_docs.py` checks `wiki/` and every `CLAUDE.md`. Update the wiki page when a
+- Docs: `python scripts/check_docs.py` (from the repo root) checks `wiki/` and every `CLAUDE.md`. Update the wiki page when a
   route or module changes.

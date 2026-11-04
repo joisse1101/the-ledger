@@ -2,7 +2,7 @@
 
 | Working on | Read |
 |---|---|
-| `src/api/` (token, client, queries) | [Frontend-Api-Layer](../wiki/Frontend-Api-Layer.md) |
+| `web/src/api/` (token, client, queries) | [Frontend-Api-Layer](../wiki/Frontend-Api-Layer.md) |
 | Shell, nav, theme, `tokens.css` | [Frontend-Shell-And-Theme](../wiki/Frontend-Shell-And-Theme.md) |
 | Live and All session pages | [Frontend-Sessions](../wiki/Frontend-Sessions.md) |
 | Overview page and charts | [Frontend-Overview](../wiki/Frontend-Overview.md) |
@@ -15,7 +15,7 @@
 
 - `npm run build` type-checks (`tsc --noEmit`); run it before calling a change done.
 - Colours come from `tokens.css` variables. Migrate an old component when touching it; don't
-  rewrite `src/styles/` wholesale.
+  rewrite `web/src/styles/` wholesale.
 - Breakpoints live in `web/src/lib/breakpoints.ts`; stylesheets use `@media (--narrow)` and friends.
 - `web/src/api/types.ts` mirrors the server JSON.
 - The API client is `apiFetch`, with relative `/api` paths.

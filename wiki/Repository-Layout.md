@@ -17,7 +17,7 @@ The repo has exactly six top-level folders: `scripts/` plus five self-contained 
 - `gateway/` is the containerized Nginx reverse proxy that's the only thing granting other devices access. It has its own Dockerfile, Nginx config template, and compose file; see [Gateway](Gateway.md).
 - `hooks/` holds Claude Code toast hooks, plus dashboard-coupled scripts: a relay hook and the history-backup scheduled-task installer/uninstaller. See [Hooks](Hooks.md).
 - `widget/` is the Electron desktop widget: a floating, read-only live-sessions window with its own `package.json`, tests and startup scripts; see [Widget](Widget.md).
-- `scripts/` is the shared PowerShell helper, `Ledger-Common.ps1`, dot-sourced by the start, install, widget and hook scripts. It runs nothing on its own.
+- `scripts/` is the shared PowerShell helper, `Ledger-Common.ps1`, dot-sourced by the start, install, widget and hook scripts. It also holds the docs tooling: `check_docs.py`, `build_wiki.py` and their tests in `scripts/tests/`. The helper runs nothing on its own.
 
 ## Root files
 
@@ -74,4 +74,4 @@ Treat the specs as the authoritative record of what a capability is required to 
 - Root `.env.example` (committed) documents `BACKEND_PORT`/`FRONTEND_PORT`/`GATEWAY_PORT` in one place. Copy it to `.env` (gitignored) to override any of them; see [Setup and run](Setup-And-Run.md) for how each one is actually consumed.
 - `api/requirements.txt`: `fastapi`, `uvicorn`, `qrcode`, unpinned. `requirements-dev.txt` adds `pytest` and `httpx` (for FastAPI's `TestClient`).
 - `.github/dependabot.yml`: weekly (Monday) npm update PRs for `web/` and `widget/`, with minor and patch bumps grouped into one PR. `api/` is left out because its requirements are unpinned.
-- `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom` and `vega-embed` (dependencies); Vite, TypeScript, Vitest, Testing Library and jsdom (devDependencies). `npm run build` is `tsc --noEmit && vite build`, so a type error fails the build, not just lint.
+- `web/package.json`: React 19, `@tanstack/react-query`, `react-router-dom` and `vega-embed` (dependencies); Vite, TypeScript, Vitest, Testing Library and jsdom (devDependencies). `npm run build` is `tsc --noEmit && vite build`, so a type error fails the build, not just lint. <!-- docs-check: ignore -->

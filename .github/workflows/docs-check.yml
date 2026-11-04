@@ -17,5 +17,5 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check the docs
-        run: python api/check_docs.py
+        run: python scripts/check_docs.py
 # jois-init:docs end

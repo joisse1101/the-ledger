@@ -85,7 +85,7 @@ It holds the `ClaudeTranscript` dataclass and query and delete functions for ses
 
 ### Worktree sessions
 
-A session whose first `cwd` is under `<repo>/<folder>/<name>` is a worktree session. `<folder>` is `.claude/worktrees` or any folder listed in the Settings page. `api/app/core/worktrees.py`'s `parse_worktree` recognises it, trying the longest folder first. The session stores that `<name>`. It belongs to its repo's project, instead of showing up as a project named after the worktree.
+A session whose first `cwd` is under `<repo>/<folder>/<name>` is a worktree session. `<folder>` is `.claude/worktrees` or any folder listed in the Settings page. `api/app/core/worktrees.py`'s `parse_worktree` recognises it, trying the longest folder first. The session stores that `<name>`. It belongs to its repo's project, instead of showing up as a project named after the worktree. <!-- docs-check: ignore -->
 
 `ClaudeTranscript.project_folder` is the `~/.claude/projects/` folder a transcript counts under. It is the transcript's own folder. For a worktree session it is the repo's, with the sanitized `/<folder>/<name>` suffix stripped off, via `paths.repo_folder_of_worktree`.
 
@@ -99,7 +99,7 @@ Both look up the affected path or paths via `queries`. Both remove the real file
 
 ### Where settings live
 
-It keeps the user's worktree folders in `api/.ledger/settings.json` (gitignored). `LEDGER_SETTINGS_PATH` overrides the path. The test suite points it at a temp file. Only user folders are stored; `.claude/worktrees` is built in.
+It keeps the user's worktree folders in `api/.ledger/settings.json` (gitignored). `LEDGER_SETTINGS_PATH` overrides the path. The test suite points it at a temp file. Only user folders are stored; `.claude/worktrees` is built in. <!-- docs-check: ignore -->
 
 ### Reading
 
@@ -121,7 +121,7 @@ The scanner, `paths.project_folder` and `history.correct_worktree_rows` all read
 
 ### What it does
 
-It parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`, one file per process. It reads directly from disk on every call. Unlike projects and transcripts, it is not routed through `app/repositories/db/`. The Live views poll it every ~2s, and a snapshot refreshed only on demand would defeat that.
+It parses Claude Code's live session registry at `~/.claude/sessions/<pid>.json`, one file per process. It reads directly from disk on every call. Unlike projects and transcripts, it is not routed through `api/app/repositories/db/`. The Live views poll it every ~2s, and a snapshot refreshed only on demand would defeat that.
 
 ### What it returns
 
@@ -137,7 +137,7 @@ The same lookup replaces `started_at` with the transcript's earliest timestamp. 
 
 ### What it is
 
-It reads a live session's token usage straight from its transcript. It sits outside `app/repositories/db/` (SQLite), for the same reason `claude_sessions.py` does. The transcript is located from the registry's `cwd` and session ID. It falls back to one memoized `*/<session-id>.jsonl` glob.
+It reads a live session's token usage straight from its transcript. It sits outside `api/app/repositories/db/` (SQLite), for the same reason `claude_sessions.py` does. The transcript is located from the registry's `cwd` and session ID. It falls back to one memoized `*/<session-id>.jsonl` glob.
 
 ### Its files
 
@@ -176,7 +176,7 @@ The same scan also collects the startup-content `attachment` entries. They are `
 
 `build_breakdown()` turns them into `SessionDetail.breakdown`. It holds three things:
 
-- Startup snapshots: memory files, skills, custom agents and MCP instructions, each itemised. They are estimated as `chars/4`. They are scaled down so they never exceed the segment's first response.
+- Startup snapshots: memory files, skills, custom agents and MCP instructions, each itemised. They are estimated as `chars/4`. They are scaled down so they never exceed the segment's first response. <!-- docs-check: ignore -->
 - Per response, the exact cumulative growth by tool since the segment start. A segment restarts at each compaction. The crediting rule is the same as the attribution.
 - A remainder: system prompt, built-in tools and compaction summary.
 

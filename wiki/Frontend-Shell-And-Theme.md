@@ -32,7 +32,7 @@ Files: `web/src/pages/SettingsPage.tsx`, route `/settings`.
 
 ### Worktree folders
 
-The page's main part is the worktree-folder list. The built-in `.claude/worktrees` is listed with a "Built in" label and no Remove button. User folders each have Remove, and an input adds one.
+The page's main part is the worktree-folder list. The built-in `.claude/worktrees` is listed with a "Built in" label and no Remove button. User folders each have Remove, and an input adds one. <!-- docs-check: ignore -->
 
 Every add or remove sends the whole user list to `PUT /api/settings` (`useSaveSettings`) at once. The controls are disabled and "Saving..." shows while the server re-files sessions. If a folder is refused, its reason shows inline and the input and list stay as they were. On success the transcripts, session, overview, projects and live queries reload.
 
@@ -62,7 +62,7 @@ The theme is chosen per device, not shared server-side. Each browser picks up `p
 
 ### Tokens (`web/src/theme/tokens.css`)
 
-`tokens.css` holds the light and dark CSS variables. The palette (backgrounds, text, brand, borders, feedback, syntax, shadows, inputs) and the font families are a manual copy of `@joisse1101/ui-library`'s theme variables under that library's own names, such as `--bg-main`, `--text-main`, `--brand-accent`, `--brand-text` and `--syntax-keyword`. Provenance and version are in the file's header comment. Components copied from the library therefore work unchanged.
+`tokens.css` holds the light and dark CSS variables. The palette (backgrounds, text, brand, borders, feedback, syntax, shadows, inputs) and the font families are a manual copy of `@joisse1101/ui-library`'s theme variables under that library's own names, such as `--bg-main`, `--text-main`, `--brand-accent`, `--brand-text` and `--syntax-keyword`. Provenance and version are in the file's header comment. Components copied from the library therefore work unchanged. <!-- docs-check: ignore -->
 
 The package is **not** a dependency. Refresh by re-copying the variable blocks from the package's `dist/ui-library.css` (not in this repo). <!-- docs-check: ignore -->
 

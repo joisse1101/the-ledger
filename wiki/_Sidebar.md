@@ -1,45 +1,35 @@
-**[Home](Home.md)**
-
-**User guide**
-- [Getting started](Guide-Getting-Started.md)
-- [Overview](Guide-Overview.md)
-- [Live sessions](Guide-Live-Sessions.md)
-- [All sessions](Guide-All-Sessions.md)
-- [Projects](Guide-Projects.md)
-- [Files](Guide-Files.md)
-- [Settings](Guide-Settings.md)
-- [Remote access](Guide-Remote-Access.md)
-- [Desktop widget](Guide-Widget.md)
-- [Notifications](Guide-Notifications.md)
-
-**Getting started**
+<!-- jois-init:docs begin -->
+- [Home](Home.md)
+- [Alert tiering ideas](Alert-Tiering-Ideas.md)
+- [Backend: API routes](Backend-API-Routes.md)
+- [Backend: data layer](Backend-Data-Layer.md)
+- [Backend: history store](Backend-History-Store.md)
+- [Backend: live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)
+- [Backend: overview and query modules](Backend-Overview-And-Queries.md)
+- [Backend: security](Backend-Security.md)
+- [Coding standards](Coding-Standards.md)
+- [Frontend: API layer](Frontend-Api-Layer.md)
+- [Frontend: files](Frontend-Files.md)
+- [Frontend: overview](Frontend-Overview.md)
+- [Frontend: projects](Frontend-Projects.md)
+- [Frontend: sessions](Frontend-Sessions.md)
+- [Frontend: shared components](Frontend-Shared-Components.md)
+- [Frontend: shell and theme](Frontend-Shell-And-Theme.md)
+- [Gateway](Gateway.md)
+- [Glossary](Glossary.md)
+- [Guide: All sessions](Guide-All-Sessions.md)
+- [Guide: Files](Guide-Files.md)
+- [Guide: Getting started](Guide-Getting-Started.md)
+- [Guide: Live sessions](Guide-Live-Sessions.md)
+- [Guide: Notifications](Guide-Notifications.md)
+- [Guide: Overview](Guide-Overview.md)
+- [Guide: Projects](Guide-Projects.md)
+- [Guide: Remote access](Guide-Remote-Access.md)
+- [Guide: Settings](Guide-Settings.md)
+- [Guide: Desktop widget](Guide-Widget.md)
+- [Hooks](Hooks.md)
+- [Repository layout](Repository-Layout.md)
 - [Setup and run](Setup-And-Run.md)
 - [Testing](Testing.md)
-- [Repository layout](Repository-Layout.md)
-- [Coding standards](Coding-Standards.md)
-- [Glossary](Glossary.md)
-
-**Backend**
-- [Data layer](Backend-Data-Layer.md)
-- [History store](Backend-History-Store.md)
-- [API routes](Backend-API-Routes.md)
-- [Security](Backend-Security.md)
-- [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)
-- [Overview and queries](Backend-Overview-And-Queries.md)
-
-**Frontend**
-- [API layer](Frontend-Api-Layer.md)
-- [Shell and theme](Frontend-Shell-And-Theme.md)
-- [Sessions](Frontend-Sessions.md)
-- [Overview](Frontend-Overview.md)
-- [Projects](Frontend-Projects.md)
-- [Files](Frontend-Files.md)
-- [Shared components](Frontend-Shared-Components.md)
-
-**Services**
-- [Gateway](Gateway.md)
-- [Hooks](Hooks.md)
 - [Widget](Widget.md)
-
-**Ideas**
-- [Alert tiering ideas](Alert-Tiering-Ideas.md)
+<!-- jois-init:docs end -->
