@@ -30,7 +30,7 @@ A session started in `<repo>/<folder>/<name>` then counts toward its repository 
 
 ## Choose how long AFK stays on
 
-AFK is a widget switch that makes the chime sounds play even while you are at the keyboard. See [Notifications](Guide-Notifications.md).
+AFK is a widget switch that makes the chime sounds play even while you are at the keyboard. See [Notifications](Notifications.md).
 
 1. Enter a number in **AFK minutes (1 to 240)**.
 2. Click **Save**. Its button is named "Save AFK minutes".
@@ -41,7 +41,7 @@ AFK is a widget switch that makes the chime sounds play even while you are at th
 1. Find the **Break workouts** section.
 2. Enter a number in **Break minutes (1 to 240)**.
 3. Click **Save**. Its button is named "Save break minutes".
-4. Wait about 30 seconds for the widget to pick it up. See [Desktop widget](Guide-Widget.md).
+4. Wait about 30 seconds for the widget to pick it up. See [Desktop widget](Widget.md).
 
 ## Add your own workouts
 
@@ -58,6 +58,6 @@ AFK is a widget switch that makes the chime sounds play even while you are at th
 
 ## More detail
 
-- [Frontend: Shell and theme](Frontend-Shell-And-Theme.md) covers how the navigation hides this page.
-- [Widget](Widget.md) explains how the widget reads these settings.
+- [Frontend: Shell and theme](../Frontend/Shell-And-Theme.md) covers how the navigation hides this page.
+- [Widget](../Services/Widget.md) explains how the widget reads these settings.
 - `openspec/specs/dashboard-settings/spec.md` holds the requirements, including defaults.

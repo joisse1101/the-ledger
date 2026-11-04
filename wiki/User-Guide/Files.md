@@ -1,12 +1,12 @@
 # Guide: Files
 
 Move files between the PC and another device, such as a phone, through one shared folder on the PC.
-The page exists only while [Remote mode](Glossary.md#remote-mode) is on. See [Remote access](Guide-Remote-Access.md) to turn it on.
+The page exists only while [Remote mode](../Glossary.md#remote-mode) is on. See [Remote access](Remote-Access.md) to turn it on.
 
 ## Open the page
 
 1. Turn on Remote mode on the PC.
-2. Sign in on the other device. See [Remote access](Guide-Remote-Access.md).
+2. Sign in on the other device. See [Remote access](Remote-Access.md).
 3. Open **Files** in the navigation.
 4. If Remote mode is off there is no Files entry. Opening the address sends you to the home page.
 5. If Remote mode turns off while the page is open, you are sent home.
@@ -42,6 +42,6 @@ Only a browser on the PC that runs the Ledger shows **Delete**.
 
 ## More detail
 
-- [Frontend: Files](Frontend-Files.md) explains the page.
-- [API routes](Backend-API-Routes.md) lists the file-drop routes.
+- [Frontend: files page](../Frontend/Files-Page.md) explains the page.
+- [API routes](../Backend/API-Routes.md) lists the file-drop routes.
 - `openspec/specs/file-drop/spec.md` holds the requirements.

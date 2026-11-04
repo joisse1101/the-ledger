@@ -1,6 +1,6 @@
-# Frontend: sessions
+# Frontend: sessions page
 
-This page explains how the Live and All sessions pages are built, including the session detail dialog, delete and the tokens chart. Read it before changing them. A live session and Remote mode are defined in the [Glossary](Glossary.md#live-session).
+This page explains how the Live and All sessions pages are built, including the session detail dialog, delete and the tokens chart. Read it before changing them. A live session and Remote mode are defined in the [Glossary](../Glossary.md#live-session).
 
 > Requirements live in `openspec/specs/web-dashboard/spec.md`, `openspec/specs/remote-session-control/spec.md`. This page describes how the code meets them, not what it must do.
 

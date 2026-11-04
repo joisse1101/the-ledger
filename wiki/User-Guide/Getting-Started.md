@@ -7,7 +7,7 @@ You need a Windows PC that already runs Claude Code.
 
 - Install [Python](https://www.python.org/downloads/) and [Node.js](https://nodejs.org/en/download).
 - Open PowerShell in the folder you cloned the Ledger into (the repo root).
-- Docker is only needed for [Remote mode](Glossary.md#remote-mode), covered in [Remote access](Guide-Remote-Access.md).
+- Docker is only needed for [Remote mode](../Glossary.md#remote-mode), covered in [Remote access](Remote-Access.md).
 
 ## Install the optional extras (once)
 
@@ -19,9 +19,9 @@ The installer is optional. Skip it if you only want the dashboard.
 
 The extras it can offer:
 
-- The desktop widget shortcut, with a choice to start it when you sign in to Windows. See [Desktop widget](Guide-Widget.md).
-- Toast hooks and chime hooks. See [Notifications](Guide-Notifications.md).
-- The relay hook, which lets the dashboard show and answer Claude's prompts. See [Live sessions](Guide-Live-Sessions.md).
+- The desktop widget shortcut, with a choice to start it when you sign in to Windows. See [Desktop widget](Widget.md).
+- Toast hooks and chime hooks. See [Notifications](Notifications.md).
+- The relay hook, which lets the dashboard show and answer Claude's prompts. See [Live sessions](Live-Sessions.md).
 - A daily backup of your session history.
 
 ## Start the Ledger
@@ -35,7 +35,7 @@ Useful variations:
 
 - `.\Start-Ledger.ps1 -NoWidget` starts the dashboard without the widget.
 - `.\Start-Ledger.ps1 -Mode dev` starts hot-reloading dev servers. Use it only if you are changing the code.
-- `.\Start-Ledger.ps1 -Remote` also turns on Remote mode. See [Remote access](Guide-Remote-Access.md).
+- `.\Start-Ledger.ps1 -Remote` also turns on Remote mode. See [Remote access](Remote-Access.md).
 
 ## Open the dashboard
 
@@ -46,7 +46,7 @@ Useful variations:
 ## Sign in
 
 - On the PC that runs the Ledger you do not sign in. The page just opens.
-- On another device you scan a sign-in code. See [Remote access](Guide-Remote-Access.md).
+- On another device you scan a sign-in code. See [Remote access](Remote-Access.md).
 - A device that is not signed in sees "This device isn't signed in" and the steps to fix it.
 
 ## Stop the Ledger
@@ -62,5 +62,5 @@ Useful variations:
 
 ## More detail
 
-- [Setup and run](Setup-And-Run.md) explains ports, the `.env` file and what the start script checks.
+- [Setup and run](../Contributing/Setup-And-Run.md) explains ports, the `.env` file and what the start script checks.
 - `openspec/specs/installer/spec.md` and `openspec/specs/app-startup/spec.md` hold the requirements.

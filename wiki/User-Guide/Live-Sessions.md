@@ -1,7 +1,7 @@
 # Guide: Live sessions
 
 See the Claude Code sessions running now, answer a session's prompt from the dashboard, let a session approve plain prompts on its own, and spot sessions that should be compacted.
-A [live session](Glossary.md#live-session) is a session whose Claude Code process is running.
+A [live session](../Glossary.md#live-session) is a session whose Claude Code process is running.
 
 ## See running sessions
 
@@ -14,7 +14,7 @@ A [live session](Glossary.md#live-session) is a session whose Claude Code proces
 
 ## Spot sessions that need compacting
 
-[Compact](Glossary.md#compact) means summarising a long conversation to free space.
+[Compact](../Glossary.md#compact) means summarising a long conversation to free space.
 
 1. Look at the **Compact** column, or the badge on a phone card.
 2. Read "Should compact" as a hint and "Needs compact" as a stronger one.
@@ -23,7 +23,7 @@ A [live session](Glossary.md#live-session) is a session whose Claude Code proces
 
 ## Answer a prompt from the dashboard
 
-A [pending decision](Glossary.md#pending-decision) is a prompt a session is blocked on. This needs the [relay hook](Glossary.md#relay-hook) installed. See [Getting started](Guide-Getting-Started.md).
+A [pending decision](../Glossary.md#pending-decision) is a prompt a session is blocked on. This needs the [relay hook](../Glossary.md#relay-hook) installed. See [Getting started](Getting-Started.md).
 
 1. Look for a badge in the **Decision** column. It reads "Needs decision" followed by a tool name, or "Asking a question".
 2. Click the session's row. A control panel opens below the list, headed by the session's title.
@@ -42,7 +42,7 @@ The panel opens by itself when a session starts waiting on you.
 
 ## Turn on auto-approve
 
-[Auto-approve](Glossary.md#auto-approve) answers "allow" to plain permission prompts for one session. It never answers questions or plan approvals, and it skips commands that look dangerous.
+[Auto-approve](../Glossary.md#auto-approve) answers "allow" to plain permission prompts for one session. It never answers questions or plan approvals, and it skips commands that look dangerous.
 
 1. Wait until the dashboard has seen at least one relayed prompt. Until then the switch is hidden.
 2. Open the session's panel as above.
@@ -53,17 +53,17 @@ The panel opens by itself when a session starts waiting on you.
 
 ## Remote mode
 
-The Remote mode switch and the **QR code** button sit above the list. See [Remote access](Guide-Remote-Access.md).
+The Remote mode switch and the **QR code** button sit above the list. See [Remote access](Remote-Access.md).
 
 ## Checked and unchecked
 
 - Checked: column headers, badge texts, button names, switch labels and messages above against `LiveList.tsx`, `LiveSessionPanel.tsx`, `LiveControl.tsx`, `DecisionPrompt.tsx` and `AutoApproveControl.tsx`.
 - Unchecked: the panel opening by itself, read from `LiveSessionsPage.tsx` only and not seen running.
-- Unchecked: the thresholds for the two compact badges. Take them from [Glossary](Glossary.md#compact).
+- Unchecked: the thresholds for the two compact badges. Take them from [Glossary](../Glossary.md#compact).
 - Unchecked: which columns a phone card hides.
 
 ## More detail
 
-- [Frontend: Sessions](Frontend-Sessions.md) explains the page.
-- [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md) explains how the backend relays prompts.
+- [Frontend: sessions page](../Frontend/Sessions-Page.md) explains the page.
+- [Live sessions and prompts](../Backend/Live-Sessions-And-Prompts.md) explains how the backend relays prompts.
 - `openspec/specs/remote-session-control/spec.md` and `openspec/specs/web-dashboard/spec.md` hold the requirements.

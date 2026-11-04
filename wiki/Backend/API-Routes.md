@@ -2,7 +2,7 @@
 
 This page lists every `/api/*` route the backend serves, and explains the app, its command line and the rules shared by all routes. Read it to learn what a route takes and returns, and which routes only a local request may use.
 
-A local request is one made from the machine running the app. The exact test is in [Security](Backend-Security.md).
+A local request is one made from the machine running the app. The exact test is in [Security](Security.md).
 
 ## The app
 
@@ -16,7 +16,7 @@ The form is `python -m app [--host] [--port] [--frontend-port] [--reload]`. The 
 
 It always binds loopback only now. `--frontend-port` only controls the printed frontend link.
 
-`--lan` is still recognized by the parser. `--lan` exits with an error that points at the gateway (`gateway/`) instead of binding `0.0.0.0`. The gateway container is the only thing that ever grants LAN access. See [Setup and run](Setup-And-Run.md).
+`--lan` is still recognized by the parser. `--lan` exits with an error that points at the gateway (`gateway/`) instead of binding `0.0.0.0`. The gateway container is the only thing that ever grants LAN access. See [Setup and run](../Contributing/Setup-And-Run.md).
 
 ### Reload (dev only)
 
@@ -36,7 +36,7 @@ The services raise the domain errors in `api/app/services/errors.py`. `api/app/r
 
 ### What it serves
 
-It serves `/api/*` only: no HTML, no static assets. The frontend is a wholly separate process. See [Frontend API layer](Frontend-Api-Layer.md). There is no static-file serving or SPA fallback here; that is `vite preview`'s job in `web/`.
+It serves `/api/*` only: no HTML, no static assets. The frontend is a wholly separate process. See [Frontend API layer](../Frontend/Api-Layer.md). There is no static-file serving or SPA fallback here; that is `vite preview`'s job in `web/`.
 
 ## Middleware
 
@@ -94,7 +94,7 @@ The last two are visible to every client.
 
 Body is `{enabled}`. Local requests only: 403 otherwise, token or not. 404 unless the session is live. Returns `{auto_approve}`.
 
-Turning it on also approves the session's already-pending plain prompts. See [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md).
+Turning it on also approves the session's already-pending plain prompts. See [Live sessions and prompts](Live-Sessions-And-Prompts.md).
 
 #### `GET /api/sessions/{id}/pending-decision`
 
@@ -252,7 +252,7 @@ Every response, empty or not, also carries `available_ranges`. `available_ranges
 
 ### Helpers no longer used at startup
 
-`discover_ipv4()` finds the outbound interface with a UDP-connect trick, plus hostname resolution. `usable_ipv4` filters out loopback, link-local and unspecified addresses. It now feeds the sign-in address (see [Gateway](Gateway.md)).
+`discover_ipv4()` finds the outbound interface with a UDP-connect trick, plus hostname resolution. `usable_ipv4` filters out loopback, link-local and unspecified addresses. It now feeds the sign-in address (see [Gateway](../Services/Gateway.md)).
 
 `render_qr()` makes an ASCII QR via `qrcode`. It returns `None` if the package or the terminal's encoding cannot render it.
 

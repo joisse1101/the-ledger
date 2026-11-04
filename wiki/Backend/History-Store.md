@@ -1,6 +1,6 @@
 # Backend: history store
 
-This page explains the durable history database, which keeps transcripts after Claude Code prunes them from disk, and the standalone script that fills it. The term is defined in the [Glossary](Glossary.md#history-store).
+This page explains the durable history database, which keeps transcripts after Claude Code prunes them from disk, and the standalone script that fills it. The term is defined in the [Glossary](../Glossary.md#history-store).
 
 > Requirements live in `openspec/specs/transcript-history/spec.md`. This page describes how the code meets them, not what it must do.
 
@@ -50,6 +50,6 @@ It applies these rules in order:
 
 It is a standalone script, runnable independently of the backend. No server process is needed. It calls `scanner.scan_projects()` and `scan_transcripts()` directly, the same scan `refresh()` itself calls. It upserts the results straight into `history.db`. It skips `ledger.db` entirely.
 
-It is meant to be triggered daily by an OS-level scheduled task. See [Setup and run](Setup-And-Run.md). So history keeps accumulating even when the app is not running.
+It is meant to be triggered daily by an OS-level scheduled task. See [Setup and run](../Contributing/Setup-And-Run.md). So history keeps accumulating even when the app is not running.
 
 It is safe to run repeatedly. The upsert overwrites an unchanged session's row rather than growing it.

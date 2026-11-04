@@ -1,12 +1,12 @@
 # Guide: Remote access
 
 Open the dashboard on your phone or another computer on the same network, see live sessions, answer their prompts and move files.
-[Remote mode](Glossary.md#remote-mode) is the switch that allows this. It is off by default.
+[Remote mode](../Glossary.md#remote-mode) is the switch that allows this. It is off by default.
 
 ## Before you begin
 
 - Install Docker Desktop on the PC. Remote mode needs it.
-- Start the Ledger. See [Getting started](Guide-Getting-Started.md).
+- Start the Ledger. See [Getting started](Getting-Started.md).
 - Use a network you trust. The connection uses a self-signed certificate. See the note below.
 
 ## Turn on Remote mode
@@ -25,8 +25,8 @@ Only the PC that runs the Ledger can flip the switch. Other devices see "Remote 
 1. On the PC, click **QR code** next to the switch. It is usable only while Remote mode is on.
 2. Read the window titled "Open on another device". It shows a QR code and the address below it.
 3. On the other device, scan the code with the camera.
-4. Accept the browser's one-time certificate warning. It is expected, because the [gateway](Glossary.md#gateway) makes its own certificate.
-5. The dashboard loads. The sign-in code is an [access token](Glossary.md#access-token) in the link. The browser removes it from the address bar and remembers you.
+4. Accept the browser's one-time certificate warning. It is expected, because the [gateway](../Glossary.md#gateway) makes its own certificate.
+5. The dashboard loads. The sign-in code is an [access token](../Glossary.md#access-token) in the link. The browser removes it from the address bar and remembers you.
 6. Next time, open the plain address. You stay signed in until Remote mode is turned off.
 7. Click **Close** on the PC to hide the code.
 
@@ -34,9 +34,9 @@ If a device says "This device isn't signed in", Remote mode was turned off and o
 
 ## What you can do from the other device
 
-- See live sessions and answer their prompts. See [Live sessions](Guide-Live-Sessions.md).
+- See live sessions and answer their prompts. See [Live sessions](Live-Sessions.md).
 - Browse the Overview, Manage Sessions and Manage Projects pages.
-- Use **Files** to send and fetch files. See [Files](Guide-Files.md).
+- Use **Files** to send and fetch files. See [Files](Files.md).
 
 You cannot delete sessions, projects or files, change Remote mode, open Settings or see the sign-in code. Those work only on the PC.
 
@@ -53,11 +53,11 @@ The warning appears because the address is a local network address, which has no
 
 - Checked: control names and messages above against `RemoteModeControl.tsx`, `RemoteQrDialog.tsx`, `ServerBanner.tsx` and `Nav.tsx`.
 - Checked: the sign-in, token and local-only behaviour against `openspec/specs/network-access/spec.md` and `openspec/specs/remote-session-control/spec.md`.
-- Unchecked: the first-time Windows firewall prompt for Docker. [Gateway](Gateway.md) says to allow it on Private networks, and it was not seen here.
+- Unchecked: the first-time Windows firewall prompt for Docker. [Gateway](../Services/Gateway.md) says to allow it on Private networks, and it was not seen here.
 - Unchecked: scanning with a real phone.
 
 ## More detail
 
-- [Gateway](Gateway.md) explains the container, the certificate and the ports.
-- [Security](Backend-Security.md) explains how the token is checked.
+- [Gateway](../Services/Gateway.md) explains the container, the certificate and the ports.
+- [Security](../Backend/Security.md) explains how the token is checked.
 - `openspec/specs/network-access/spec.md` and `openspec/specs/remote-session-control/spec.md` hold the requirements, including how long Remote mode lasts.

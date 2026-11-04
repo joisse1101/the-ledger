@@ -6,7 +6,7 @@ This page explains how the desktop widget in `widget/` is built: its window, how
 
 ## What the widget is
 
-`widget/` is a small Electron app (a desktop app built on web technology). Its window is frameless and always on top. It lists the live Claude Code sessions with each one's context size, so the Ledger is useful without opening it. A live session is defined in the [Glossary](Glossary.md#live-session).
+`widget/` is a small Electron app (a desktop app built on web technology). Its window is frameless and always on top. It lists the live Claude Code sessions with each one's context size, so the Ledger is useful without opening it. A live session is defined in the [Glossary](../Glossary.md#live-session).
 
 It only reads sessions, apart from three switches. It is Windows-only, like `hooks/`. It has its own `package.json` and imports nothing from `web/`. It is the only part of the repo that is not a service, a hook or a skill.
 
@@ -135,11 +135,11 @@ If the widget is killed instead of quit, its backend can be orphaned. The next l
 
 ## Remote mode
 
-Remote mode lets other devices on your network use the dashboard; see the [Glossary](Glossary.md#remote-mode).
+Remote mode lets other devices on your network use the dashboard; see the [Glossary](../Glossary.md#remote-mode).
 
 ### The toggle
 
-The header has a Remote mode toggle. The widget only asks: it calls `POST /api/remote-mode`. It reads `remote_mode` from `/api/meta` on its poll. Docker, the frontend and the gateway are the backend's job; see [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md).
+The header has a Remote mode toggle. The widget only asks: it calls `POST /api/remote-mode`. It reads `remote_mode` from `/api/meta` on its poll. Docker, the frontend and the gateway are the backend's job; see [Live sessions and prompts](../Backend/Live-Sessions-And-Prompts.md).
 
 ### The tooltip
 
@@ -194,7 +194,7 @@ Hovering the Ledger button shows the same kind of window below the widget. It li
 
 A count that could not be read shows as `--`. It is the Projects page's data, not a second lookup.
 
-The widget reads `GET /api/projects/repos` (see [Backend API routes](Backend-API-Routes.md)). It also reads the `widget.max_projects` setting from `GET /api/settings`. Both reads go over loopback, which counts as a local request, so no token is needed.
+The widget reads `GET /api/projects/repos` (see [Backend API routes](../Backend/API-Routes.md)). It also reads the `widget.max_projects` setting from `GET /api/settings`. Both reads go over loopback, which counts as a local request, so no token is needed.
 
 The setting is edited on the dashboard's Settings page: 1 to 10, 5 until set. The widget has no settings UI. It falls back to 5 if it cannot read the setting.
 
@@ -318,5 +318,5 @@ A transparent frameless window may not be resizable by dragging on Windows.
 
 ## Related pages
 
-- [Testing](Testing.md) covers the suites.
+- [Testing](../Contributing/Testing.md) covers the suites.
 - [Hooks](Hooks.md) covers the toast the click action mirrors.

@@ -1,6 +1,6 @@
-# Frontend: overview
+# Frontend: overview page
 
-This page explains how the Overview page and its charts are built. Read it before changing them. The same chart components also serve the Projects panel (see [Frontend projects](Frontend-Projects.md)).
+This page explains how the Overview page and its charts are built. Read it before changing them. The same chart components also serve the Projects panel (see [Frontend projects](Projects-Page.md)).
 
 > Requirements live in `openspec/specs/web-dashboard/spec.md`. This page describes how the code meets them, not what it must do.
 

@@ -9,7 +9,7 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 - Six top-level folders: `api/`, `web/`, `gateway/`, `hooks/`, `widget/` and `scripts/`. All Python,
   tests and virtualenv included, lives in `api/`; the widget is TypeScript with its own `package.json`. See [Repository layout](Repository-Layout.md).
 - One module per concern. The data layer (`api/app/repositories/`, `api/app/domain/`) has no FastAPI dependency, so it can be
-  read and tested on its own. See [Backend: data layer](Backend-Data-Layer.md).
+  read and tested on its own. See [Backend: data layer](../Backend/Data-Layer.md).
 - One test file per module under test, named `test_<module>.py`. See [Testing](Testing.md).
 
 ## Reading the code
@@ -25,9 +25,9 @@ unrelated. The rules below are the ones this codebase already follows; new code 
 
 - Plain hand-written CSS, colours only from the variables in `web/src/theme/tokens.css`. New
   components use a colocated CSS module; migrate a component when you touch it, do not rewrite
-  `web/src/styles/` wholesale. See [Frontend: shell and theme](Frontend-Shell-And-Theme.md).
+  `web/src/styles/` wholesale. See [Frontend: shell and theme](../Frontend/Shell-And-Theme.md).
 - Views take the same data whatever the screen size; only layout changes with the viewport. See
-  [Frontend: shared components](Frontend-Shared-Components.md).
+  [Frontend: shared components](../Frontend/Shared-Components.md).
 - Types in `web/src/api/types.ts` mirror the server's JSON one to one. A type error fails the build.
 
 ## Documentation
@@ -40,7 +40,7 @@ the repo root) enforces links, paths and size budgets; CI runs it on every pull 
   - **Purpose first.** The first paragraph says what the page covers or what a reader can do with it.
   - **One header per topic.** Nest headers by hierarchy.
   - **Paragraphs for prose, bullets for lists.** Write explanations, reasons and purpose lines as short paragraphs. Use a bullet only for a real list, a step or parallel items, and keep each bullet to one idea in one short sentence. Do not break prose into bullets: if the items are not parallel, or a bullet only makes sense after the one before it, write a paragraph.
-  - **Define terms.** Define a technical term where it is first used, or link to its entry in [Glossary](Glossary.md).
+  - **Define terms.** Define a technical term where it is first used, or link to its entry in [Glossary](../Glossary.md).
   - **Mark certainty.** Label what is known, assumed and unchecked apart from each other. Never present an unchecked statement as fact.
 - Link between wiki pages as a markdown link to the page's file name, with its `.md`. The publish step strips the `.md` for the wiki.
 - A repo path in code formatting must exist. If it is deliberately absent from a checkout (a

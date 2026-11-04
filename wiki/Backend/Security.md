@@ -1,6 +1,6 @@
 # Backend: security
 
-This page explains how the backend decides who may call it: what counts as a local request, how the access token works, and which routes refuse a remote device. The access token is defined in the [Glossary](Glossary.md#access-token).
+This page explains how the backend decides who may call it: what counts as a local request, how the access token works, and which routes refuse a remote device. The access token is defined in the [Glossary](../Glossary.md#access-token).
 
 > Requirements live in `openspec/specs/network-access/spec.md`. This page describes how the code meets them, not what it must do.
 
@@ -44,7 +44,7 @@ So a remote device can read. With Remote mode on, it can also answer prompts. It
 
 Every non-local request needs the access token as `Authorization: Bearer <token>`. The comparison uses `hmac.compare_digest`. Without it the request gets a 401, with a message pointing back at the sign-in code.
 
-There is no `?token=` query handling or cookie on the API side at all. Turning a sign-in link's `?token=` into that header is entirely the frontend's job. See [Frontend API layer](Frontend-Api-Layer.md).
+There is no `?token=` query handling or cookie on the API side at all. Turning a sign-in link's `?token=` into that header is entirely the frontend's job. See [Frontend API layer](../Frontend/Api-Layer.md).
 
 ### The `X-Requested-With` header
 
@@ -70,4 +70,4 @@ A non-local device may make one request without the token: a **file-drop downloa
 
 The route redeems the ticket, which is single-use, 60 seconds and one file. The route still refuses while Remote mode is off. So the ticket, not the middleware, is the credential.
 
-A browser download cannot carry the bearer header, which is why this exists. See [API routes](Backend-API-Routes.md).
+A browser download cannot carry the bearer header, which is why this exists. See [API routes](API-Routes.md).

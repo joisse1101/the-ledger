@@ -1,6 +1,6 @@
 # Setup and run
 
-This page explains how to install, start and stop the Ledger, how its ports are chosen, and how to schedule the history backup. Two scripts at the repo root do the work. Remote mode is defined in the [Glossary](Glossary.md#remote-mode).
+This page explains how to install, start and stop the Ledger, how its ports are chosen, and how to schedule the history backup. Two scripts at the repo root do the work. Remote mode is defined in the [Glossary](../Glossary.md#remote-mode).
 
 ```powershell
 .\Install-Ledger.ps1   # once, optional: the extras (widget shortcut, chime hooks, toast hooks, relay hook, backup task)
@@ -11,7 +11,7 @@ This page explains how to install, start and stop the Ledger, how its ports are 
 
 `Install-Ledger.ps1` offers each extra one at a time and says first what it does, what it changes on the machine and what declining means. It installs only what you accept. Accepting the widget shortcut also installs the widget's packages up front.
 
-Running it again updates what is installed in place and duplicates nothing. See [Hooks](Hooks.md) and [Widget](Widget.md) for the extras themselves.
+Running it again updates what is installed in place and duplicates nothing. See [Hooks](../Services/Hooks.md) and [Widget](../Services/Widget.md) for the extras themselves.
 
 Each extra has its own switch, and each takes `ask`, `yes` or `no`:
 
@@ -83,7 +83,7 @@ Two things are left alone. A backend already answering on the chosen port is reu
 
 `Stop-Ledger.ps1` stops exactly what the start launched. The backend, frontend and widget PIDs are recorded to the root `.ledger-run.json` (gitignored). A reused backend or already-running widget has no recorded PID, so it is left running. It also stops any gateway container, however it was started.
 
-The gateway is not part of the default start. It comes up through **Remote mode** (the switch in the Ledger or the widget; see [Gateway](Gateway.md)), or with `-Remote` here:
+The gateway is not part of the default start. It comes up through **Remote mode** (the switch in the Ledger or the widget; see [Gateway](../Services/Gateway.md)), or with `-Remote` here:
 
 ```powershell
 .\Start-Ledger.ps1              # build mode (default) — matches normal local use
@@ -138,7 +138,7 @@ A custom `BACKEND_PORT` also needs to be set in the frontend process's own envir
 
 ## Keep session history past Claude Code's retention window
 
-`api/backup_history.py` (see [Data layer](Backend-Data-Layer.md)) needs to actually run on a schedule to be useful. The app itself never triggers it.
+`api/backup_history.py` (see [Data layer](../Backend/Data-Layer.md)) needs to actually run on a schedule to be useful. The app itself never triggers it.
 
 `Install-Ledger.ps1` offers to register the daily Windows Task Scheduler entry for it (`Start-Ledger.ps1` no longer installs it). The script it calls, `hooks\ledgerScripts\Install-HistoryBackupTask.ps1`, can also be run directly, and registers or updates that same entry:
 

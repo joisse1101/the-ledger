@@ -13,8 +13,8 @@ Browse every project you have used Claude Code in, open a project's charts, jump
 ## Open a project's charts
 
 1. Click a project's row. Its panel opens directly below the row.
-2. Pick a time range with the same buttons as the [Overview](Guide-Overview.md). A range with nothing in it is disabled.
-3. Read the charts. They group sessions by worktree. A worktree is a separate working copy of one repository. See [Settings](Guide-Settings.md) to make the Ledger count worktree folders under their repository.
+2. Pick a time range with the same buttons as the [Overview](Overview.md). A range with nothing in it is disabled.
+3. Read the charts. They group sessions by worktree. A worktree is a separate working copy of one repository. See [Settings](Settings.md) to make the Ledger count worktree folders under their repository.
 4. Click the row again to close the panel. You can open several panels at once.
 5. Copy the page address to reopen the same panels later. Which panels are open is kept in the address.
 
@@ -41,5 +41,5 @@ Only a browser on the PC that runs the Ledger shows this button.
 
 ## More detail
 
-- [Frontend: Projects](Frontend-Projects.md) explains how the page is built.
+- [Frontend: projects page](../Frontend/Projects-Page.md) explains how the page is built.
 - `openspec/specs/web-dashboard/spec.md` holds the requirements.

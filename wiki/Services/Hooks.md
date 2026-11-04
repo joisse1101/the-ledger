@@ -14,7 +14,7 @@ A hook is a command Claude Code runs when an event happens, such as a notificati
 
 ### The dashboard's reach into it
 
-`api/` runs `hooks/scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action. See [API routes](Backend-API-Routes.md).
+`api/` runs `hooks/scripts/Open-ClaudeRepoWindow.ps1` for the open-repo action. See [API routes](../Backend/API-Routes.md).
 
 ## Dashboard-coupled scripts
 
@@ -26,7 +26,7 @@ It holds one Claude Code hook: `Relay-PermissionRequest.ps1`. It also holds two 
 
 ## Relay hook
 
-The relay hook is defined in the [Glossary](Glossary.md#relay-hook). Without it the dashboard cannot show or answer pending decisions.
+The relay hook is defined in the [Glossary](../Glossary.md#relay-hook). Without it the dashboard cannot show or answer pending decisions.
 
 ### What it does
 
@@ -109,7 +109,7 @@ Tests cover the decisions, not the sound. Unchecked: that the two sounds differ 
 
 ## History backup task scripts
 
-`Install-HistoryBackupTask.ps1` and `Uninstall-HistoryBackupTask.ps1` register and remove the Windows Scheduled Task. The task runs `api/backup_history.py` daily. See [Setup and run](Setup-And-Run.md).
+`Install-HistoryBackupTask.ps1` and `Uninstall-HistoryBackupTask.ps1` register and remove the Windows Scheduled Task. The task runs `api/backup_history.py` daily. See [Setup and run](../Contributing/Setup-And-Run.md).
 
 They sit alongside the relay hook in the same folder. Unlike the relay hook, they are not Claude Code hooks at all. Nothing copies them anywhere or touches `settings.json`. They run directly from this checkout.
 

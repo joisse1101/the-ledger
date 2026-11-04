@@ -1,7 +1,7 @@
 # Guide: All sessions
 
 Find any past or present Claude Code session, read what it did and delete a transcript you no longer want.
-A session is one conversation with Claude Code. See [Glossary](Glossary.md#session).
+A session is one conversation with Claude Code. See [Glossary](../Glossary.md#session).
 
 ## Search
 
@@ -56,5 +56,5 @@ Only a browser on the PC that runs the Ledger shows this control. A live session
 
 ## More detail
 
-- [Frontend: Sessions](Frontend-Sessions.md) explains how the page is built.
+- [Frontend: sessions page](../Frontend/Sessions-Page.md) explains how the page is built.
 - `openspec/specs/web-dashboard/spec.md` holds the requirements.

@@ -1,6 +1,6 @@
-# Frontend: files
+# Frontend: files page
 
-This page explains how the Files page is built: the file-drop folder on the PC, with upload, download and delete. Read it before changing them. Remote mode is defined in the [Glossary](Glossary.md#remote-mode).
+This page explains how the Files page is built: the file-drop folder on the PC, with upload, download and delete. Read it before changing them. Remote mode is defined in the [Glossary](../Glossary.md#remote-mode).
 
 > Requirements live in the file-drop capability spec (in the `add-file-drop` change until it is archived, then in the specs folder). This page describes how the code meets them, not what it must do.
 

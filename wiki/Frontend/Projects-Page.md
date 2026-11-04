@@ -1,4 +1,4 @@
-# Frontend: projects
+# Frontend: projects page
 
 This page explains how the Projects page is built: the project list, the detail panel under it, and delete. Read it before changing them.
 
@@ -39,7 +39,7 @@ Source is a new-tab link to the repo's web page. Its click stops propagation so 
 
 The page renders `ProjectDetailPanel` under the list with `key={project.path}`. That resets its time range (`TimeRangeSelector`, default "All time") for every newly selected project, so a fresh query never shows the previous project's charts. Selecting a project scrolls the panel into view.
 
-The panel feeds `useOverview(range, {project, groupBy: "worktree"})` into `GroupDonutChart`, `GroupBarChart` (both `groupLabel="worktree"`) and `ActivityLineChart`. For an empty range it says no sessions were found. These charts are described in [Frontend overview](Frontend-Overview.md).
+The panel feeds `useOverview(range, {project, groupBy: "worktree"})` into `GroupDonutChart`, `GroupBarChart` (both `groupLabel="worktree"`) and `ActivityLineChart`. For an empty range it says no sessions were found. These charts are described in [Frontend overview](Overview-Page.md).
 
 A session counts under its worktree (`wt <name>`) when it ran in a Claude Code worktree, and otherwise under the last branch recorded in its transcript. The stat grid shows Branches and Worktrees counts.
 

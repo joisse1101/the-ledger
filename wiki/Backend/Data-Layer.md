@@ -93,7 +93,7 @@ A session whose first `cwd` is under `<repo>/<folder>/<name>` is a worktree sess
 
 `delete_project_transcripts(cwd)` removes every folder holding a member transcript. It skips a folder that also holds non-members. `delete_transcript(session_id)` removes one transcript.
 
-Both look up the affected path or paths via `queries`. Both remove the real files, tolerating one already gone. See [History store](Backend-History-Store.md). Both then delete just those rows from both `ledger.db` and `history.db`.
+Both look up the affected path or paths via `queries`. Both remove the real files, tolerating one already gone. See [History store](History-Store.md). Both then delete just those rows from both `ledger.db` and `history.db`.
 
 ## `settings_store.py`
 

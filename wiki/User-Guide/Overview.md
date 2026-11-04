@@ -40,5 +40,5 @@ Hover a longest, shortest, most expensive, cheapest, most or least figure to see
 
 ## More detail
 
-- [Frontend: Overview](Frontend-Overview.md) explains how the page and charts are built.
+- [Frontend: overview page](../Frontend/Overview-Page.md) explains how the page and charts are built.
 - `openspec/specs/web-dashboard/spec.md` holds the requirements.

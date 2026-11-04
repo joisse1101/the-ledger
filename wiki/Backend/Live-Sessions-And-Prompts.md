@@ -1,6 +1,6 @@
 # Backend: live sessions and prompts
 
-This page explains how the backend tracks running Claude Code sessions, holds their blocking prompts so the dashboard can answer them, and runs Remote mode. See the [Glossary](Glossary.md) for live session, pending decision, auto-approve, Remote mode and relay hook.
+This page explains how the backend tracks running Claude Code sessions, holds their blocking prompts so the dashboard can answer them, and runs Remote mode. See the [Glossary](../Glossary.md) for live session, pending decision, auto-approve, Remote mode and relay hook.
 
 > Requirements live in `openspec/specs/remote-session-control/spec.md`. This page describes how the code meets them, not what it must do.
 
@@ -18,7 +18,7 @@ N browsers or phones polling `/api/live` every ~2s cost about one recompute per 
 
 One session's `live_context()` raising leaves the others populated. That one session gets `context: null`.
 
-`is_live_now()` bypasses the TTL for delete decisions. See the `DELETE /api/sessions/{id}` route in [API routes](Backend-API-Routes.md).
+`is_live_now()` bypasses the TTL for delete decisions. See the `DELETE /api/sessions/{id}` route in [API routes](API-Routes.md).
 
 `cwd_for()` is used server-side only, never sent to a client. `latest_activity()` goes through the same lock and feeds the pending-prompt sweep below.
 
@@ -36,7 +36,7 @@ The 45 and 55-minute limits are constants in `compact_grade`.
 
 ### Where prompts come from
 
-The prompts come from the optional relay hook. See [Hooks](Hooks.md). A `PermissionRequest` hook fires only when Claude Code is about to show a dialog. That is a tool-permission prompt or an `AskUserQuestion`. It runs alongside the terminal dialog, not in front of it.
+The prompts come from the optional relay hook. See [Hooks](../Services/Hooks.md). A `PermissionRequest` hook fires only when Claude Code is about to show a dialog. That is a tool-permission prompt or an `AskUserQuestion`. It runs alongside the terminal dialog, not in front of it.
 
 It POSTs the prompt to `/api/sessions/{id}/decisions`. That route `register()`s the prompt, with an API-generated id, since Claude Code supplies none. It then awaits the prompt in `request_decision()`.
 

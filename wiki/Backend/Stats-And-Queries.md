@@ -1,4 +1,4 @@
-# Backend: overview and query modules
+# Backend: stats and queries
 
 This page explains the two pure modules behind the Overview numbers and the session list filters: `overview_stats.py` for `/api/overview` and `transcript_query.py` for `/api/transcripts`.
 

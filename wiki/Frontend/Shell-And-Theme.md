@@ -68,7 +68,7 @@ The package is **not** a dependency. Refresh by re-copying the variable blocks f
 
 App-only tokens with no library equivalent stay alongside:
 
-- The 8-slot categorical palette (`--cat-0`..`--cat-7`). Its slot order is fixed so a chart's `chartColors()` or `themeColors()` (see [Frontend overview](Frontend-Overview.md)) never has to duplicate a hex value.
+- The 8-slot categorical palette (`--cat-0`..`--cat-7`). Its slot order is fixed so a chart's `chartColors()` or `themeColors()` (see [Frontend overview](Overview-Page.md)) never has to duplicate a hex value.
 - `--muted-ink`.
 - `--warn-bg` and `--warn-text`.
 

@@ -6,7 +6,7 @@ This page explains the gateway, the Nginx container that lets another device on 
 
 ## What the gateway is
 
-The gateway is a containerized Nginx, started as its own third piece alongside the backend and frontend processes. See [Setup and run](Setup-And-Run.md) for those two. The backend and frontend never bind beyond loopback (the machine's own address, `127.0.0.1`), no matter what, so the gateway is the only thing that ever grants LAN access. The term is also in the [Glossary](Glossary.md#gateway).
+The gateway is a containerized Nginx, started as its own third piece alongside the backend and frontend processes. See [Setup and run](../Contributing/Setup-And-Run.md) for those two. The backend and frontend never bind beyond loopback (the machine's own address, `127.0.0.1`), no matter what, so the gateway is the only thing that ever grants LAN access. The term is also in the [Glossary](../Glossary.md#gateway).
 
 ### Requirements
 
@@ -19,13 +19,13 @@ The gateway is a containerized Nginx, started as its own third piece alongside t
 
 ### Normally: turn on Remote mode
 
-Normally you do not start the gateway yourself. Turn **Remote mode** on from the Ledger's Sessions page or the desktop widget. See the [Glossary](Glossary.md#remote-mode).
+Normally you do not start the gateway yourself. Turn **Remote mode** on from the Ledger's Sessions page or the desktop widget. See the [Glossary](../Glossary.md#remote-mode).
 
 The backend then starts Docker Desktop if needed, the frontend if it is not up, and the gateway. It then shows the sign-in QR code. In the Ledger the QR is a modal; on the widget it is a tooltip on the Ledger button. Both show `https://<address>:<port>` and never the token.
 
 Turning Remote mode off, or the 8 hours running out, runs `docker compose down`. It stops the frontend only if Remote mode started it. Docker Desktop is left running.
 
-The lifecycle is `api/app/infra/remote_gateway.py`, a state machine. It sits over `api/app/infra/remote_system.py`, which makes the real Docker, npm and port calls. See [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md).
+The lifecycle is `api/app/infra/remote_gateway.py`, a state machine. It sits over `api/app/infra/remote_system.py`, which makes the real Docker, npm and port calls. See [Live sessions and prompts](../Backend/Live-Sessions-And-Prompts.md).
 
 ### By hand
 
@@ -44,7 +44,7 @@ Windows prompts to allow Docker or the gateway through the firewall the first ti
 
 ### Script details
 
-`Start-Gateway.ps1` loads the root `.env` (see [Setup and run](Setup-And-Run.md)). It then runs `docker compose up -d --build`. `Stop-Gateway.ps1` runs `docker compose down` and touches nothing else.
+`Start-Gateway.ps1` loads the root `.env` (see [Setup and run](../Contributing/Setup-And-Run.md)). It then runs `docker compose up -d --build`. `Stop-Gateway.ps1` runs `docker compose down` and touches nothing else.
 
 ## Signing in from another device
 
@@ -52,7 +52,7 @@ Windows prompts to allow Docker or the gateway through the firewall the first ti
 
 Devices sign in with the QR code Remote mode shows. The QR encodes `https://<address>:8503/?token=<token>`.
 
-The token is the [access token](Glossary.md#access-token). It is made when Remote mode turns on and discarded when it turns off. Each Remote session therefore has its own token, and a device signed in with an earlier token is refused until it scans the new code.
+The token is the [access token](../Glossary.md#access-token). It is made when Remote mode turns on and discarded when it turns off. Each Remote session therefore has its own token, and a device signed in with an earlier token is refused until it scans the new code.
 
 Opening the link on another device signs it in. The token is stored in that browser's `localStorage` and stripped from the address bar. Every later request from that device carries `Authorization: Bearer <token>`.
 
@@ -68,7 +68,7 @@ Each new device's browser shows a one-time certificate warning on first visit. T
 
 ## Who is allowed to do what
 
-A local request is one from this machine, through `localhost` or `127.0.0.1`. A local request needs no token at all. Every other request needs the token. `SecurityMiddleware` in `api/app/core/security.py` checks it. See [Security](Backend-Security.md).
+A local request is one from this machine, through `localhost` or `127.0.0.1`. A local request needs no token at all. Every other request needs the token. `SecurityMiddleware` in `api/app/core/security.py` checks it. See [Security](../Backend/Security.md).
 
 The gateway adds no auth of its own; it only relays. Both proxy locations forward `X-Real-IP`, `X-Forwarded-For` and `Host`. So the existing "relayed by a proxy = treat as remote" rule in `api/app/core/security.py` gates gateway traffic. It gates it exactly as it always gated the old `--lan` mode.
 
@@ -76,7 +76,7 @@ The gateway adds no auth of its own; it only relays. Both proxy locations forwar
 
 - Deleting a session or project needs a *local* request outright.
 - Switching Remote mode needs a *local* request outright.
-- Answering a live session's prompts from another device needs Remote mode on. See [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md).
+- Answering a live session's prompts from another device needs Remote mode on. See [Live sessions and prompts](../Backend/Live-Sessions-And-Prompts.md).
 
 ## Port rules
 
@@ -94,7 +94,7 @@ CORS is gone entirely, since the frontend never calls the backend cross-origin a
 
 ## Large file transfers
 
-`location /api/files` is more specific than `/api/`. It turns off the 1 MB body limit and turns off request and response buffering. It allows hour-long transfers. A large file therefore streams straight to the backend. It does not fail with a 413 or spool to the container's disk. See [API routes](Backend-API-Routes.md) for the file-drop routes.
+`location /api/files` is more specific than `/api/`. It turns off the 1 MB body limit and turns off request and response buffering. It allows hour-long transfers. A large file therefore streams straight to the backend. It does not fail with a 413 or spool to the container's disk. See [API routes](../Backend/API-Routes.md) for the file-drop routes.
 
 ## How the container is built
 

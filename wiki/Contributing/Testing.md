@@ -96,4 +96,4 @@ powershell -File tests\Test-StartWidget.ps1   # Start-Widget.ps1 against a stub 
 
 The always-on-top window, the tray menu and the toast-equivalent repo window are checked by hand.
 
-There is no browser-automation/E2E harness for the React app. Responsive layout across breakpoints is verified manually, by resizing a real browser and by using a real phone through the gateway (see [Gateway](Gateway.md)).
+There is no browser-automation/E2E harness for the React app. Responsive layout across breakpoints is verified manually, by resizing a real browser and by using a real phone through the gateway (see [Gateway](../Services/Gateway.md)).
