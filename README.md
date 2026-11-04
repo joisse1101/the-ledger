@@ -56,14 +56,14 @@ Open the frontend address the summary prints (http://localhost:8502 by default),
 The docs live in [`wiki/`](wiki/Home.md) and are mirrored to the GitHub wiki on every push to
 `main`. Edit them in the repo, not on the wiki. Requirements live in `openspec/specs/`.
 
-- [Setup and run](wiki/Setup-And-Run.md): install, dev vs. build mode, ports and `.env`, the
+- [Setup and run](wiki/Contributing/Setup-And-Run.md): install, dev vs. build mode, ports and `.env`, the
   history backup task
-- [Gateway](wiki/Gateway.md): reading the dashboard from a phone or another device, the token,
+- [Gateway](wiki/Services/Gateway.md): reading the dashboard from a phone or another device, the token,
   HTTPS
-- [Testing](wiki/Testing.md): the Python and frontend suites
-- [Repository layout](wiki/Repository-Layout.md): the six folders and what each holds
-- [Hooks](wiki/Hooks.md): toast notification hooks
-- [Widget](wiki/Widget.md): the always-on-top live-sessions widget and its one-click startup
+- [Testing](wiki/Contributing/Testing.md): the Python and frontend suites
+- [Repository layout](wiki/Contributing/Repository-Layout.md): the six folders and what each holds
+- [Hooks](wiki/Services/Hooks.md): toast notification hooks
+- [Widget](wiki/Services/Widget.md): the always-on-top live-sessions widget and its one-click startup
 - [All pages](wiki/Home.md)
 
 ## A couple of things worth knowing

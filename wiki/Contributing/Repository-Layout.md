@@ -34,6 +34,12 @@ The start and stop scripts keep two gitignored state files:
 
 The three scripts are kept at root rather than inside any one service folder, since they're the tooling that spans all the services (see [Setup and run](Setup-And-Run.md)). Otherwise nothing at root runs on its own.
 
+## The wiki
+
+The docs in `wiki/` live in folders named for their section: `User-Guide/`, `Contributing/`, `Backend/`, `Frontend/`, `Services/` and `Ideas/`. `Home.md`, `Glossary.md` and `_Sidebar.md` sit directly in `wiki/`.
+
+`Home.md` and `_Sidebar.md` are handwritten, and `python scripts/check_docs.py` checks them: every page must be linked from both, and from the sidebar exactly once. The GitHub wiki has no folders, so the publish step names each page by its path with the folders joined by `-`. For example, `wiki/User-Guide/Widget.md` is published as `User-Guide-Widget`.
+
 ## Requirements
 
 The agreed requirements for each shipped capability live in `openspec/specs/` (see the OpenSpec section below). Check there for what a feature is required to do (e.g. `network-access` for the bearer-token auth and separate-origin rules) ahead of inferring it from the code alone.

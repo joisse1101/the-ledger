@@ -28,13 +28,12 @@ Start here to use the dashboard. Each page gives numbered steps for one task.
 Read these to change the code. Requirements live in `openspec/specs/`, not here.
 Docs conventions are in [Coding standards](Contributing/Coding-Standards.md).
 
-### Getting started
+### Set up
 
 - [Setup and run](Contributing/Setup-And-Run.md): install, start, ports, history backup task
 - [Testing](Contributing/Testing.md): running the Python and frontend suites
-- [Repository layout](Contributing/Repository-Layout.md): folders, gitignored state, OpenSpec
+- [Repository layout](Contributing/Repository-Layout.md): folders, gitignored state, OpenSpec, how the wiki is organized
 - [Coding standards](Contributing/Coding-Standards.md): what "human-understandable" means here
-- [Glossary](Glossary.md): plain-English meanings of terms used across the pages
 
 ### Backend
 
@@ -43,17 +42,17 @@ Docs conventions are in [Coding standards](Contributing/Coding-Standards.md).
 - [API routes](Backend/API-Routes.md): the route table and server startup
 - [Security](Backend/Security.md): access token, local vs. remote, CSRF header
 - [Live sessions and prompts](Backend/Live-Sessions-And-Prompts.md): live snapshot, pending decisions, Remote mode
-- [Overview and queries](Backend/Stats-And-Queries.md): aggregation and filter/sort modules
+- [Stats and queries](Backend/Stats-And-Queries.md): aggregation and filter/sort modules
 
 ### Frontend
 
 - [API layer](Frontend/Api-Layer.md): stack, sign-in token, fetch client, query hooks
 - [Shell and theme](Frontend/Shell-And-Theme.md): app shell, viewport classes, theme tokens, local-only Settings page
-- [Sessions](Frontend/Sessions-Page.md): Live and All pages, dialogs, prompts
-- [Overview](Frontend/Overview-Page.md): charts and summary stats
-- [Projects](Frontend/Projects-Page.md): project list, detail panel, delete
-- [Files](Frontend/Files-Page.md): file-drop page, upload, single-use download links
 - [Shared components](Frontend/Shared-Components.md): responsive list, ButtonSelector, ConfirmDialog, formatting
+- [Overview page](Frontend/Overview-Page.md): charts and summary stats
+- [Sessions page](Frontend/Sessions-Page.md): Live and All pages, dialogs, prompts
+- [Projects page](Frontend/Projects-Page.md): project list, detail panel, delete
+- [Files page](Frontend/Files-Page.md): file-drop page, upload, single-use download links
 
 ### Services
 
@@ -61,43 +60,6 @@ Docs conventions are in [Coding standards](Contributing/Coding-Standards.md).
 - [Hooks](Services/Hooks.md): toast hooks, relay hook, scheduled-task scripts
 - [Widget](Services/Widget.md): floating live-sessions widget, startup shortcut, process ownership
 
-### Ideas
+## Ideas
 
-- [Alert tiering ideas](Ideas/Alert-Tiering.md): parked plan for sorting alerts by urgency
-
-<!-- jois-init:docs begin -->
-## Pages
-
-- [Alert tiering ideas](Ideas/Alert-Tiering.md)
-- [Backend: API routes](Backend/API-Routes.md)
-- [Backend: data layer](Backend/Data-Layer.md)
-- [Backend: history store](Backend/History-Store.md)
-- [Backend: live sessions and prompts](Backend/Live-Sessions-And-Prompts.md)
-- [Backend: overview and query modules](Backend/Stats-And-Queries.md)
-- [Backend: security](Backend/Security.md)
-- [Coding standards](Contributing/Coding-Standards.md)
-- [Frontend: API layer](Frontend/Api-Layer.md)
-- [Frontend: files](Frontend/Files-Page.md)
-- [Frontend: overview](Frontend/Overview-Page.md)
-- [Frontend: projects](Frontend/Projects-Page.md)
-- [Frontend: sessions](Frontend/Sessions-Page.md)
-- [Frontend: shared components](Frontend/Shared-Components.md)
-- [Frontend: shell and theme](Frontend/Shell-And-Theme.md)
-- [Gateway](Services/Gateway.md)
-- [Glossary](Glossary.md)
-- [Guide: All sessions](User-Guide/All-Sessions.md)
-- [Guide: Files](User-Guide/Files.md)
-- [Guide: Getting started](User-Guide/Getting-Started.md)
-- [Guide: Live sessions](User-Guide/Live-Sessions.md)
-- [Guide: Notifications](User-Guide/Notifications.md)
-- [Guide: Overview](User-Guide/Overview.md)
-- [Guide: Projects](User-Guide/Projects.md)
-- [Guide: Remote access](User-Guide/Remote-Access.md)
-- [Guide: Settings](User-Guide/Settings.md)
-- [Guide: Desktop widget](User-Guide/Widget.md)
-- [Hooks](Services/Hooks.md)
-- [Repository layout](Contributing/Repository-Layout.md)
-- [Setup and run](Contributing/Setup-And-Run.md)
-- [Testing](Contributing/Testing.md)
-- [Widget](Services/Widget.md)
-<!-- jois-init:docs end -->
+- [Alert tiering](Ideas/Alert-Tiering.md): parked plan for sorting alerts by urgency
