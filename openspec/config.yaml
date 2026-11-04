@@ -40,6 +40,9 @@ operations:
   archive:
     guidance:
       - If the change alters documented behavior, update the affected page in wiki/ before archiving (the routing tables in CLAUDE.md name the page for each area)
+      # jois-init:docs begin (managed by /jois-init:docs; edits here are overwritten)
+      - "Before archiving, update the page in wiki/ that the change affects, so the docs match the new behavior. Then run python scripts/check_docs.py."
+      # jois-init:docs end
       # jois-init:opsx begin (managed by /jois-init:opsx; edits here are overwritten)
       - "Follow the jois-git-commit-hygiene rule for the archive commit: stage by explicit path, show the summary and message, name a confirmation word, and end the turn. Never commit in the turn you stage."
       # jois-init:opsx end

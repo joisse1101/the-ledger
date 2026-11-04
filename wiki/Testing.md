@@ -8,6 +8,7 @@ This page lists how to run the Python, frontend and widget tests, and what each 
 cd api
 pip install -r requirements-dev.txt  # requirements.txt + pytest + httpx
 pytest
+pytest ../scripts/tests   # the docs checker and wiki builder; a plain `pytest` does not collect them
 ```
 
 Run pytest from `api/`, because that is where `pyproject.toml` lives. It sets `pythonpath = ["."]` and `testpaths = ["tests"]`. The first means `from app import deps` and the root scripts import under pytest the same way they do under `python -m app` run from `api/`, which puts the cwd on `sys.path`.
@@ -37,7 +38,7 @@ The `isolated_db` fixture in `api/tests/conftest.py` monkeypatches `paths.db_pat
 
 ### Layering
 
-`api/tests/test_layers.py` scans the imports under `api/app/`. It fails when a layer imports one above it, or when `repositories`, `domain`, `infra` or `services` import FastAPI. `tests/services/` holds the service and error-mapping tests.
+`api/tests/test_layers.py` scans the imports under `api/app/`. It fails when a layer imports one above it, or when `repositories`, `domain`, `infra` or `services` import FastAPI. `api/tests/services/` holds the service and error-mapping tests.
 
 ### API and backend
 

@@ -8,7 +8,7 @@ This page explains how the Live and All sessions pages are built, including the 
 
 Live and All are separate pages. Each keeps its selection in the URL (`?session=<id>`), so a reload or a shared link reopens the selection.
 
-- `components/sessions/` holds the shared code.
+- `web/src/components/sessions/` holds the shared code.
 - `web/src/pages/LiveSessionsPage.tsx` is Live, at `/`.
 - `web/src/pages/SessionsPage.tsx` is All, at `/sessions`.
 

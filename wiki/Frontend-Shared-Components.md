@@ -4,7 +4,7 @@ This page explains the components and helpers shared across pages: the responsiv
 
 > Requirements live in `openspec/specs/responsive-layout/spec.md`. This page describes how the code meets them, not what it must do.
 
-## Responsive list (`components/list/`)
+## Responsive list (`web/src/components/list/`)
 
 `ResponsiveList` picks `ListTable` (medium and wide) or `ListCards` (narrow) by viewport. Only one is ever mounted, and both take the same `columns`, `rows`, `rowId` and `onSelect`, so switching layouts never changes what is shown or its order.
 

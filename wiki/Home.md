@@ -64,3 +64,40 @@ Docs conventions are in [Coding standards](Coding-Standards.md).
 ### Ideas
 
 - [Alert tiering ideas](Alert-Tiering-Ideas.md): parked plan for sorting alerts by urgency
+
+<!-- jois-init:docs begin -->
+## Pages
+
+- [Alert tiering ideas](Alert-Tiering-Ideas.md)
+- [Backend: API routes](Backend-API-Routes.md)
+- [Backend: data layer](Backend-Data-Layer.md)
+- [Backend: history store](Backend-History-Store.md)
+- [Backend: live sessions and prompts](Backend-Live-Sessions-And-Prompts.md)
+- [Backend: overview and query modules](Backend-Overview-And-Queries.md)
+- [Backend: security](Backend-Security.md)
+- [Coding standards](Coding-Standards.md)
+- [Frontend: API layer](Frontend-Api-Layer.md)
+- [Frontend: files](Frontend-Files.md)
+- [Frontend: overview](Frontend-Overview.md)
+- [Frontend: projects](Frontend-Projects.md)
+- [Frontend: sessions](Frontend-Sessions.md)
+- [Frontend: shared components](Frontend-Shared-Components.md)
+- [Frontend: shell and theme](Frontend-Shell-And-Theme.md)
+- [Gateway](Gateway.md)
+- [Glossary](Glossary.md)
+- [Guide: All sessions](Guide-All-Sessions.md)
+- [Guide: Files](Guide-Files.md)
+- [Guide: Getting started](Guide-Getting-Started.md)
+- [Guide: Live sessions](Guide-Live-Sessions.md)
+- [Guide: Notifications](Guide-Notifications.md)
+- [Guide: Overview](Guide-Overview.md)
+- [Guide: Projects](Guide-Projects.md)
+- [Guide: Remote access](Guide-Remote-Access.md)
+- [Guide: Settings](Guide-Settings.md)
+- [Guide: Desktop widget](Guide-Widget.md)
+- [Hooks](Hooks.md)
+- [Repository layout](Repository-Layout.md)
+- [Setup and run](Setup-And-Run.md)
+- [Testing](Testing.md)
+- [Widget](Widget.md)
+<!-- jois-init:docs end -->

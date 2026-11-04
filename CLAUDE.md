@@ -14,7 +14,7 @@ on the network through a containerized Nginx gateway (`gateway/`) and a shared a
 Exactly six top-level folders (four services, `widget/` and the shared `scripts/`):
 
 - `api/` — the backend: every Python module, its tests, `requirements*.txt`, `pyproject.toml`, and
-  its own gitignored `.venv`, `.ledger`, `.history`. All Python lives here.
+  its own gitignored `.venv`, `.ledger`, `.history`. All application Python lives here.
 - `web/` — the frontend.
 - `gateway/` — the Nginx reverse proxy, the only thing that grants LAN access.
 - `hooks/` — Claude Code toast hooks plus dashboard-coupled scripts.
@@ -23,7 +23,8 @@ Exactly six top-level folders (four services, `widget/` and the shared `scripts/
   from `web/`.
 - `scripts/` — `Ledger-Common.ps1`, the PowerShell helper (`.env`, ports, prerequisites, dependency
   stamps) dot-sourced by the start, install, widget and hook scripts. Its tests are
-  `api/tests/test_ledger_common.py`.
+  `api/tests/test_ledger_common.py`. It also holds the docs tooling `check_docs.py` and
+  `build_wiki.py` (Python, standard library only) with tests in `scripts/tests/`.
 
 The root holds only cross-cutting docs and tooling (`README.md`, `wiki/`, `openspec/`,
 `.env.example`) and `Install-Ledger.ps1` / `Start-Ledger.ps1` / `Stop-Ledger.ps1`.
@@ -40,11 +41,12 @@ The API and the frontend are two processes on two ports, chosen from 8501-8599 a
 .\Stop-Ledger.ps1
 
 cd api; pytest                  # Python tests, run from api/ (that's where pyproject.toml is)
+cd api; pytest ../scripts/tests   # docs tooling tests (not collected by a plain `pytest`)
 cd web; npm test                # Vitest
 cd web; npm run build           # tsc --noEmit, then vite build; a type error fails it
 cd widget; npm test; npm run build   # widget: Vitest, then tsc
 .\widget\Start-Widget.ps1       # widget + the backend it needs (no frontend, no Docker)
-cd api; python check_docs.py    # docs check: links, code paths, size budgets
+python scripts/check_docs.py    # docs check, from the repo root: links, code paths, size budgets
 ```
 
 ## Conventions
@@ -63,7 +65,7 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 |---|---|
 | Running, ports, `.env`, scheduled backup task | [Setup-And-Run](wiki/Setup-And-Run.md) |
 | Tests | [Testing](wiki/Testing.md) |
-| SQLite snapshot, `app/repositories/` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
+| SQLite snapshot, `api/app/repositories/` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
 | `history.db`, `backup_history.py` | [Backend-History-Store](wiki/Backend-History-Store.md) |
 | `/api/*` routes | [Backend-API-Routes](wiki/Backend-API-Routes.md) |
 | Auth, locality, CSRF (`security.py`) | [Backend-Security](wiki/Backend-Security.md) |
@@ -84,3 +86,18 @@ cd api; python check_docs.py    # docs check: links, code paths, size budgets
 
 The full index is [Home](wiki/Home.md). `api/`, `web/` and `hooks/` also have their own
 `CLAUDE.md` with local rules.
+
+<!-- jois-init:docs begin -->
+## Where the docs are
+
+- The docs live in `wiki/` as nested pages. They are the source of truth.
+- The GitHub wiki is a one-way copy. Never edit it; the next publish overwrites it.
+- Read the page for your topic before you change the code it describes. Update it in the same change.
+- Run `python scripts/check_docs.py` after any docs or path change.
+
+| If you work on | Read first |
+| --- | --- |
+| Anything (start here) | [Home](wiki/Home.md) |
+
+Add one row per topic folder as `wiki/` grows.
+<!-- jois-init:docs end -->

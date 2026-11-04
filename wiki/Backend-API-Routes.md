@@ -202,7 +202,7 @@ Every settings route is local requests only: 403 otherwise, token or not. The de
 
 Returns `{worktree_folders: [{path, built_in}], widget: {max_projects, afk_minutes, break_minutes}}`.
 
-- `worktree_folders` lists `.claude/worktrees` first (`built_in: true`), then the user's folders.
+- `worktree_folders` lists `.claude/worktrees` first (`built_in: true`), then the user's folders. <!-- docs-check: ignore -->
 - `max_projects` is how many projects the desktop widget's Ledger-button tooltip lists. It is 5 until set.
 - `afk_minutes` is how many minutes the widget's AFK switch stays on. It is 30 until set.
 - `break_minutes` is how many minutes of work pass before the widget's break window opens. It is 60 until set.
@@ -211,7 +211,7 @@ Returns `{worktree_folders: [{path, built_in}], widget: {max_projects, afk_minut
 
 Body is `{worktree_folders?: [...], widget?: {max_projects?: n, afk_minutes?: n, break_minutes?: n}}`. A part left out stays as it was. Local requests only.
 
-Everything is validated before anything is saved, so one bad value saves nothing. Each folder is normalised (`core/worktrees.normalize_folder`). These are a 422 whose `detail` says why:
+Everything is validated before anything is saved, so one bad value saves nothing. Each folder is normalised (`normalize_folder` in `api/app/core/worktrees.py`). These are a 422 whose `detail` says why:
 
 - an absolute path
 - a `.` or `..` part
@@ -220,7 +220,7 @@ Everything is validated before anything is saved, so one bad value saves nothing
 
 Each number has its own range check:
 
-- `max_projects` must be a whole number from 1 to 10 (`core/widget_settings.validate_max_projects`), else a 422 likewise.
+- `max_projects` must be a whole number from 1 to 10 (`validate_max_projects` in `api/app/core/widget_settings.py`), else a 422 likewise.
 - `afk_minutes` must be a whole number from 1 to 240 (`validate_afk_minutes`), else a 422.
 - `break_minutes` must be a whole number from 1 to 240 (`validate_break_minutes`), else a 422.
 
