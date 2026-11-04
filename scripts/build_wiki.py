@@ -1,14 +1,14 @@
-# jois-init:docs begin
 """Builds the GitHub wiki from the nested pages under `wiki/`.
 
 Standard library only. The repo root is the parent of this script's folder (override with `--root`).
 
-  python scripts/build_wiki.py              check the pages (flat names must be unique)
-  python scripts/build_wiki.py --write-nav  regenerate `_Sidebar.md` and the page list in `Home.md`
-  python scripts/build_wiki.py --out DIR    write the flat wiki pages to DIR
+  python scripts/build_wiki.py            check the pages (flat names must be unique)
+  python scripts/build_wiki.py --out DIR  write the flat wiki pages to DIR
 
 A page's flat name is its path under `wiki/` with the folders joined by `-` and no `.md`.
 Authors write links as relative `.md` paths; `--out` rewrites them to flat names and keeps anchors.
+`_Sidebar.md` and `Home.md` are written by hand; `check_docs.py` checks them.
+This repo owns this file; `/jois-init:docs` does not manage it.
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ WIKI_DIR = Path("wiki")
 HOME = "Home.md"
 SIDEBAR = "_Sidebar.md"
 NAV_PAGES = (HOME, SIDEBAR)
-MD_BEGIN = "<!-- jois-init:docs begin -->"
-MD_END = "<!-- jois-init:docs end -->"
 LINK_RE = re.compile(r"(\[[^\]]*\]\()([^)\s]+)(\))")
 SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
 
@@ -113,72 +111,11 @@ def build_output(wiki: Path, out: Path) -> list[str]:
     return written
 
 
-def page_title(wiki: Path, page: str) -> str:
-    """The page's first `# ` heading, else its file name spelled out."""
-    for line in (wiki / page).read_text(encoding="utf-8").splitlines():
-        if line.startswith("# "):
-            return line[2:].strip()
-    return Path(page).stem.replace("-", " ").replace("_", " ")
-
-
-def nav_lines(wiki: Path, skip: tuple[str, ...]) -> list[str]:
-    """The page list grouped by folder: top-level pages first, then one bold folder line per group."""
-    groups: dict[str, list[str]] = {}
-    for page in list_pages(wiki):
-        if page not in skip:
-            groups.setdefault(posixpath.dirname(page), []).append(page)
-    lines: list[str] = []
-    for folder in sorted(groups, key=lambda f: (f != "", f)):
-        if folder:
-            lines += ["", f"**{folder}**", ""]
-        lines += [f"- [{page_title(wiki, p)}]({p})" for p in groups[folder]]
-    return lines
-
-
-def _block(lines: list[str]) -> str:
-    return "\n".join([MD_BEGIN, *lines, MD_END])
-
-
-def render_nav(wiki: Path) -> dict[str, str]:
-    """The text `_Sidebar.md` and `Home.md` should hold, without writing anything.
-
-    `_Sidebar.md` is generated whole. In `Home.md` only the block between the markers is
-    generated; the text around it stays as it is, and a Home without the block gets one appended.
-    """
-    sidebar = _block([f"- [Home]({HOME})", *nav_lines(wiki, NAV_PAGES)]) + "\n"
-    home_path = wiki / HOME
-    home_block = _block(["## Pages", "", *nav_lines(wiki, NAV_PAGES)])
-    if not home_path.is_file():
-        home = f"# Home\n\n{home_block}\n"
-    else:
-        current = home_path.read_text(encoding="utf-8")
-        begin, end = current.find(MD_BEGIN), current.find(MD_END)
-        if begin != -1 and end > begin:
-            home = current[:begin] + home_block + current[end + len(MD_END):]
-        else:
-            home = current.rstrip("\n") + "\n\n" + home_block + "\n"
-    return {SIDEBAR: sidebar, HOME: home}
-
-
-def write_nav(wiki: Path) -> list[str]:
-    """Write the generated navigation; returns the files whose content changed."""
-    changed = []
-    for name, text in render_nav(wiki).items():
-        path = wiki / name
-        if path.is_file() and path.read_text(encoding="utf-8") == text:
-            continue
-        path.write_text(text, encoding="utf-8", newline="\n")
-        changed.append(name)
-    return changed
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the GitHub wiki from wiki/.")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent,
                         help="the repo root (default: the parent of this script's folder)")
     parser.add_argument("--out", type=Path, help="write the flat wiki pages to this folder")
-    parser.add_argument("--write-nav", action="store_true",
-                        help="regenerate _Sidebar.md and the page list in Home.md")
     args = parser.parse_args(argv)
     wiki = args.root.resolve() / WIKI_DIR
     if not wiki.is_dir():
@@ -186,9 +123,6 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         check_names(list_pages(wiki))
-        if args.write_nav:
-            for name in write_nav(wiki):
-                print(f"updated {WIKI_DIR.as_posix()}/{name}")
         if args.out:
             written = build_output(wiki, args.out)
             print(f"wrote {len(written)} page(s) to {args.out}")
@@ -200,4 +134,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# jois-init:docs end

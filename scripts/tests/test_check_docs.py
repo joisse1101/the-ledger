@@ -1,14 +1,16 @@
-# jois-init:docs begin
+"""Tests for check_docs.py. This repo owns this file; /jois-init:docs does not manage it."""
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import build_wiki  # noqa: E402
 import check_docs  # noqa: E402
 
 DEEP = "wiki/architecture/billing/refunds.md"
+SIDEBAR = "wiki/_Sidebar.md"
+SIDEBAR_TEXT = "- [Home](Home.md)\n- [Refunds](architecture/billing/refunds.md)\n- [Lifecycle](architecture/orders/lifecycle.md)\n"
+HOME_TEXT = "# Home\n\n" + SIDEBAR_TEXT
 
 
 def _file(root, relative, text="# Title\n"):
@@ -19,13 +21,13 @@ def _file(root, relative, text="# Title\n"):
 
 
 def _tree(root):
-    """A minimal passing repo: a page two folders deep, its code file, navigation written."""
-    _file(root, "wiki/Home.md", "# Home\n\nWelcome.\n")
+    """A minimal passing repo: a page two folders deep, its code file, Home and sidebar written by hand."""
+    _file(root, "wiki/Home.md", HOME_TEXT)
+    _file(root, SIDEBAR, SIDEBAR_TEXT)
     _file(root, DEEP, "# Refunds\n\nSee [states](../orders/lifecycle.md#states).\nCode: `src/billing/refund.py`.\n")
     _file(root, "wiki/architecture/orders/lifecycle.md", "# Order lifecycle\n")
     _file(root, "src/billing/refund.py", "")
     _file(root, "CLAUDE.md", "# Project\n")
-    build_wiki.write_nav(root / "wiki")
     return root
 
 
@@ -43,7 +45,6 @@ def test_minimal_tree_passes(tmp_path, capsys):
 def test_broken_link_two_folders_deep_names_page_line_and_link(tmp_path, capsys):
     _tree(tmp_path)
     _file(tmp_path, DEEP, "# Refunds\n\nSee [gone](../orders/missing.md).\n")
-    build_wiki.write_nav(tmp_path / "wiki")
     assert check_docs.main(["--root", str(tmp_path)]) == 1
     assert f"{DEEP}:3: broken link '../orders/missing.md'" in capsys.readouterr().out
 
@@ -62,7 +63,6 @@ def test_git_ignored_path_and_ignore_marker_are_exempt(tmp_path):
     assert _problems(tmp_path) == []
     (tmp_path / ".gitignore").unlink()
     _file(tmp_path, DEEP, "# Refunds\n\nSee [s](../orders/lifecycle.md). `src/billing/refund.py` <!-- docs-check: ignore -->\n")
-    build_wiki.write_nav(tmp_path / "wiki")
     assert _problems(tmp_path) == []
 
 
@@ -93,20 +93,43 @@ def test_nested_claude_md_over_budget_and_within_budget(tmp_path):
     assert any(p.startswith("src/CLAUDE.md:") and "over the 100-line limit" in p for p in _problems(tmp_path))
 
 
-def test_navigation_out_of_date_when_a_page_is_added_without_regenerating(tmp_path):
+def test_page_listed_twice_in_the_sidebar_is_reported(tmp_path):
     _tree(tmp_path)
-    _file(tmp_path, "wiki/architecture/billing/invoices.md")
+    _file(tmp_path, SIDEBAR, SIDEBAR_TEXT + "- [Again](architecture/orders/lifecycle.md)\n")
     problems = _problems(tmp_path)
-    assert any(p.startswith("wiki/_Sidebar.md:1: navigation is out of date") for p in problems)
-    assert any(p.startswith("wiki/Home.md:1: navigation is out of date") for p in problems)
+    assert "wiki/architecture/orders/lifecycle.md:1: linked 2 times in _Sidebar.md, expected once" in problems
 
 
-def test_navigation_passes_after_regenerating(tmp_path):
+def test_page_missing_from_the_sidebar_is_reported(tmp_path):
     _tree(tmp_path)
-    _file(tmp_path, "wiki/architecture/billing/invoices.md")
-    build_wiki.write_nav(tmp_path / "wiki")
+    _file(tmp_path, SIDEBAR, "- [Home](Home.md)\n- [Refunds](architecture/billing/refunds.md)\n")
+    problems = _problems(tmp_path)
+    assert "wiki/architecture/orders/lifecycle.md:1: orphan page, not linked from _Sidebar.md" in problems
+
+
+def test_broken_sidebar_link_names_line_and_link(tmp_path):
+    _tree(tmp_path)
+    _file(tmp_path, SIDEBAR, SIDEBAR_TEXT + "- [Gone](architecture/gone.md)\n")
+    assert "wiki/_Sidebar.md:4: broken link 'architecture/gone.md'" in _problems(tmp_path)
+
+
+def test_sidebar_may_link_home(tmp_path):
+    _tree(tmp_path)
+    _file(tmp_path, SIDEBAR, SIDEBAR_TEXT + "- [Home](Home.md)\n")
     assert _problems(tmp_path) == []
 
+
+def test_broken_wiki_link_in_a_nested_claude_md_names_file_and_line(tmp_path):
+    _tree(tmp_path)
+    _file(tmp_path, "src/CLAUDE.md", "# Src\n\nRead [it](../wiki/Missing.md).\n")
+    assert "src/CLAUDE.md:3: broken wiki link '../wiki/Missing.md'" in _problems(tmp_path)
+
+
+def test_existing_wiki_link_in_a_claude_md_passes(tmp_path):
+    _tree(tmp_path)
+    _file(tmp_path, "src/CLAUDE.md", "# Src\n\n[it](../wiki/Home.md#top) [web](https://e.com/wiki/x.md)\n")
+    _file(tmp_path, "CLAUDE.md", "# Project\n\n[it](wiki/Home.md)\n")
+    assert _problems(tmp_path) == []
 
 def test_image_file_is_not_published(tmp_path):
     _tree(tmp_path)
@@ -155,4 +178,3 @@ def test_absent_workflow_passes(tmp_path):
 def test_missing_wiki_folder_fails(tmp_path, capsys):
     assert check_docs.main(["--root", str(tmp_path)]) == 1
     assert "folder not found" in capsys.readouterr().out
-# jois-init:docs end
