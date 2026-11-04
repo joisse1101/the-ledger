@@ -1,25 +1,28 @@
-# jois-init:docs begin
 """Checks that the docs under `wiki/` still match the repo.
 
 Standard library only. The repo root is the parent of this script's folder (override with `--root`).
 Exits 1 and prints one `file:line: message` per problem, else prints a one-line pass.
+This repo owns this file; `/jois-init:docs` does not manage it.
 
 Checks:
   1. every relative `.md` link in a page resolves to a page
-  2. every page is linked from `_Sidebar.md` and `Home.md` (no orphans)
+  2. every page is linked from `Home.md` (no orphans)
   3. every repo path in inline code exists (a git-ignored path, or a line carrying
      `docs-check: ignore`, is exempt)
   4. the root and one-level-nested `CLAUDE.md` files stay within their line limits
-  5. the generated navigation is up to date (what `build_wiki.py --write-nav` would write)
+  5. the handwritten `_Sidebar.md` links every page except `Home.md` and itself exactly once,
+     and every link in it resolves
   6. no file under `wiki/` other than markdown (it would not reach the wiki)
   7. no two pages share one flat name
   8. `.github/workflows/wiki-publish.yml`, when present, has a non-comment line that runs
      `build_wiki.py --out` (without it `.md` links reach the wiki unrewritten)
+  9. every link in a `CLAUDE.md` that points under `wiki/` names an existing file
 """
 
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import subprocess
 import sys
@@ -75,25 +78,63 @@ def check_links(wiki: Path, pages: list[str]) -> list[str]:
     return problems
 
 
-def _linked_pages(wiki: Path, nav_page: str) -> set[str]:
+def _page_links(wiki: Path, nav_page: str) -> list[tuple[int, str, str]]:
+    """`(line number, target page, link as written)` for each page link in `nav_page`."""
     path = wiki / nav_page
     if not path.is_file():
-        return set()
-    linked = set()
-    for match in build_wiki.LINK_RE.finditer(path.read_text(encoding="utf-8")):
-        resolved = build_wiki.resolve_link(nav_page, match.group(2))
-        if resolved is not None:
-            linked.add(resolved[0])
-    return linked
+        return []
+    links = []
+    for number, line in _lines_outside_fences(path.read_text(encoding="utf-8")):
+        for match in build_wiki.LINK_RE.finditer(line):
+            resolved = build_wiki.resolve_link(nav_page, match.group(2))
+            if resolved is not None:
+                links.append((number, resolved[0], match.group(2)))
+    return links
 
 
 def check_orphans(wiki: Path, pages: list[str]) -> list[str]:
+    """Every page must be linked from `Home.md`."""
+    linked = {target for _, target, _ in _page_links(wiki, build_wiki.HOME)}
+    return [
+        f"{_wiki_rel(page)}:1: orphan page, not linked from {build_wiki.HOME}"
+        for page in pages
+        if page not in build_wiki.NAV_PAGES and page not in linked
+    ]
+
+
+def check_sidebar(wiki: Path, pages: list[str]) -> list[str]:
+    """Every page but `Home.md` and the sidebar is linked once in `_Sidebar.md`; every link resolves."""
+    problems, known, counts = [], set(pages), {}
+    for number, target, link in _page_links(wiki, build_wiki.SIDEBAR):
+        if target not in known:
+            problems.append(f"{_wiki_rel(build_wiki.SIDEBAR)}:{number}: broken link '{link}'")
+        else:
+            counts[target] = counts.get(target, 0) + 1
+    for page in pages:
+        if page in build_wiki.NAV_PAGES:
+            continue
+        if counts.get(page, 0) == 0:
+            problems.append(f"{_wiki_rel(page)}:1: orphan page, not linked from {build_wiki.SIDEBAR}")
+        elif counts[page] > 1:
+            problems.append(
+                f"{_wiki_rel(page)}:1: linked {counts[page]} times in {build_wiki.SIDEBAR}, expected once"
+            )
+    return problems
+
+
+def check_claude_wiki_links(root: Path, files: list[Path]) -> list[str]:
+    """Links in `CLAUDE.md` files that point under `wiki/` must name an existing file."""
     problems = []
-    for nav_page in build_wiki.NAV_PAGES:
-        linked = _linked_pages(wiki, nav_page)
-        for page in pages:
-            if page not in build_wiki.NAV_PAGES and page not in linked:
-                problems.append(f"{_wiki_rel(page)}:1: orphan page, not linked from {nav_page}")
+    for file in files:
+        folder = file.parent.relative_to(root).as_posix()
+        for number, line in _lines_outside_fences(file.read_text(encoding="utf-8")):
+            for match in build_wiki.LINK_RE.finditer(line):
+                link = match.group(2)
+                if build_wiki.SCHEME_RE.match(link) or link.startswith(("#", "/")):
+                    continue
+                target = posixpath.normpath(posixpath.join(folder, build_wiki.split_link(link)[0]))
+                if target.startswith(f"{build_wiki.WIKI_DIR.as_posix()}/") and not (root / target).is_file():
+                    problems.append(f"{file.relative_to(root).as_posix()}:{number}: broken wiki link '{link}'")
     return problems
 
 
@@ -128,17 +169,6 @@ def check_claude_sizes(root: Path, files: list[Path]) -> list[str]:
         count = len(file.read_text(encoding="utf-8").splitlines())
         if count > limit:
             problems.append(f"{file.relative_to(root).as_posix()}:{limit + 1}: {count} lines, over the {limit}-line limit")
-    return problems
-
-
-def check_navigation(wiki: Path) -> list[str]:
-    problems = []
-    for name, expected in build_wiki.render_nav(wiki).items():
-        path = wiki / name
-        if not path.is_file() or path.read_text(encoding="utf-8") != expected:
-            problems.append(
-                f"{_wiki_rel(name)}:1: navigation is out of date; run `python scripts/build_wiki.py --write-nav`"
-            )
     return problems
 
 
@@ -178,9 +208,10 @@ def check_docs(root: Path) -> list[str]:
         + check_orphans(wiki, pages)
         + check_paths(root, [wiki / p for p in pages] + claude)
         + check_claude_sizes(root, claude)
-        + check_navigation(wiki)
+        + check_sidebar(wiki, pages)
         + check_not_published(wiki)
         + check_publish_workflow(root)
+        + check_claude_wiki_links(root, claude)
     )
 
 
@@ -204,4 +235,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-# jois-init:docs end

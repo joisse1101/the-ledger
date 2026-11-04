@@ -63,26 +63,26 @@ python scripts/check_docs.py    # docs check, from the repo root: links, code pa
 
 | Working on | Read |
 |---|---|
-| Running, ports, `.env`, scheduled backup task | [Setup-And-Run](wiki/Setup-And-Run.md) |
-| Tests | [Testing](wiki/Testing.md) |
-| SQLite snapshot, `api/app/repositories/` modules | [Backend-Data-Layer](wiki/Backend-Data-Layer.md) |
-| `history.db`, `backup_history.py` | [Backend-History-Store](wiki/Backend-History-Store.md) |
-| `/api/*` routes | [Backend-API-Routes](wiki/Backend-API-Routes.md) |
-| Auth, locality, CSRF (`security.py`) | [Backend-Security](wiki/Backend-Security.md) |
-| Live prompts, Remote mode, open-repo | [Backend-Live-Sessions-And-Prompts](wiki/Backend-Live-Sessions-And-Prompts.md) |
-| Overview stats, transcript queries | [Backend-Overview-And-Queries](wiki/Backend-Overview-And-Queries.md) |
-| `web/src/api/` (token, client, queries) | [Frontend-Api-Layer](wiki/Frontend-Api-Layer.md) |
-| App shell, nav, theme, tokens | [Frontend-Shell-And-Theme](wiki/Frontend-Shell-And-Theme.md) |
-| Live and All session pages | [Frontend-Sessions](wiki/Frontend-Sessions.md) |
-| Overview page and charts | [Frontend-Overview](wiki/Frontend-Overview.md) |
-| Projects page | [Frontend-Projects](wiki/Frontend-Projects.md) |
-| Files page, file-drop routes | [Frontend-Files](wiki/Frontend-Files.md), [Backend-API-Routes](wiki/Backend-API-Routes.md) |
-| `ButtonSelector`, `ConfirmDialog`, formatting | [Frontend-Shared-Components](wiki/Frontend-Shared-Components.md) |
-| Nginx gateway, HTTPS, LAN access | [Gateway](wiki/Gateway.md) |
-| Toast hooks, relay hook | [Hooks](wiki/Hooks.md) |
-| Desktop widget, its startup scripts | [Widget](wiki/Widget.md) |
-| Folder layout, OpenSpec, other repo files | [Repository-Layout](wiki/Repository-Layout.md) |
-| Code style and standards | [Coding-Standards](wiki/Coding-Standards.md) |
+| Running, ports, `.env`, scheduled backup task | [Setup and run](wiki/Contributing/Setup-And-Run.md) |
+| Tests | [Testing](wiki/Contributing/Testing.md) |
+| SQLite snapshot, `api/app/repositories/` modules | [Backend: data layer](wiki/Backend/Data-Layer.md) |
+| `history.db`, `backup_history.py` | [Backend: history store](wiki/Backend/History-Store.md) |
+| `/api/*` routes | [Backend: API routes](wiki/Backend/API-Routes.md) |
+| Auth, locality, CSRF (`security.py`) | [Backend: security](wiki/Backend/Security.md) |
+| Live prompts, Remote mode, open-repo | [Backend: live sessions and prompts](wiki/Backend/Live-Sessions-And-Prompts.md) |
+| Overview stats, transcript queries | [Backend: stats and queries](wiki/Backend/Stats-And-Queries.md) |
+| `web/src/api/` (token, client, queries) | [Frontend: API layer](wiki/Frontend/Api-Layer.md) |
+| App shell, nav, theme, tokens | [Frontend: shell and theme](wiki/Frontend/Shell-And-Theme.md) |
+| Live and All session pages | [Frontend: sessions page](wiki/Frontend/Sessions-Page.md) |
+| Overview page and charts | [Frontend: overview page](wiki/Frontend/Overview-Page.md) |
+| Projects page | [Frontend: projects page](wiki/Frontend/Projects-Page.md) |
+| Files page, file-drop routes | [Frontend: files page](wiki/Frontend/Files-Page.md), [Backend: API routes](wiki/Backend/API-Routes.md) |
+| `ButtonSelector`, `ConfirmDialog`, formatting | [Frontend: shared components](wiki/Frontend/Shared-Components.md) |
+| Nginx gateway, HTTPS, LAN access | [Gateway](wiki/Services/Gateway.md) |
+| Toast hooks, relay hook | [Hooks](wiki/Services/Hooks.md) |
+| Desktop widget, its startup scripts | [Widget](wiki/Services/Widget.md) |
+| Folder layout, OpenSpec, other repo files | [Repository layout](wiki/Contributing/Repository-Layout.md) |
+| Code style and standards | [Coding standards](wiki/Contributing/Coding-Standards.md) |
 
 The full index is [Home](wiki/Home.md). `api/`, `web/` and `hooks/` also have their own
 `CLAUDE.md` with local rules.

@@ -10,7 +10,7 @@ One conversation with Claude Code, recorded as a transcript on disk. The dashboa
 
 ### Live session
 
-A session whose Claude Code process is running now, found in Claude Code's registry at `~/.claude/sessions/<pid>.json`. The Live page shows these. See [Live sessions and prompts](Backend-Live-Sessions-And-Prompts.md).
+A session whose Claude Code process is running now, found in Claude Code's registry at `~/.claude/sessions/<pid>.json`. The Live page shows these. See [Live sessions and prompts](Backend/Live-Sessions-And-Prompts.md).
 
 ### Pending decision
 
@@ -28,22 +28,22 @@ Claude Code's compaction, which summarizes a long conversation to free context s
 
 ### Remote mode
 
-A switch that lets other devices on your network see and answer live sessions. Turning it on starts Docker, the frontend and the [gateway](#gateway), then shows a sign-in QR code. It is in memory only and turns itself off after 8 hours. See [Gateway](Gateway.md).
+A switch that lets other devices on your network see and answer live sessions. Turning it on starts Docker, the frontend and the [gateway](#gateway), then shows a sign-in QR code. It is in memory only and turns itself off after 8 hours. See [Gateway](Services/Gateway.md).
 
 ### Gateway
 
-The Nginx container that is the only way another device reaches the app. It serves HTTPS with a self-signed certificate. See [Gateway](Gateway.md).
+The Nginx container that is the only way another device reaches the app. It serves HTTPS with a self-signed certificate. See [Gateway](Services/Gateway.md).
 
 ### Access token
 
-A secret that a remote device sends to prove it may use the API. It is made when Remote mode turns on, kept only in memory, and encoded in the sign-in QR code. See [Security](Backend-Security.md).
+A secret that a remote device sends to prove it may use the API. It is made when Remote mode turns on, kept only in memory, and encoded in the sign-in QR code. See [Security](Backend/Security.md).
 
 ## Data and hooks
 
 ### Relay hook
 
-An optional Claude Code `PermissionRequest` hook that sends permission prompts to the backend. Without it, the dashboard cannot show or answer pending decisions. See [Hooks](Hooks.md).
+An optional Claude Code `PermissionRequest` hook that sends permission prompts to the backend. Without it, the dashboard cannot show or answer pending decisions. See [Hooks](Services/Hooks.md).
 
 ### History store
 
-A durable SQLite file, `api/.history/history.db`, that keeps transcripts after Claude Code prunes them from disk. Unlike the snapshot database, nothing wipes it. See [History store](Backend-History-Store.md).
+A durable SQLite file, `api/.history/history.db`, that keeps transcripts after Claude Code prunes them from disk. Unlike the snapshot database, nothing wipes it. See [History store](Backend/History-Store.md).

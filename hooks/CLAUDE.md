@@ -2,9 +2,9 @@
 
 | Working on | Read |
 |---|---|
-| Toast hooks, chime script, relay hook, backup-task scripts | [Hooks](../wiki/Hooks.md) |
+| Toast hooks, chime script, relay hook, backup-task scripts | [Hooks](../wiki/Services/Hooks.md) |
 | Install, uninstall, test steps | `README.md` in this folder |
-| Prompts answered from the dashboard | [Backend-Live-Sessions-And-Prompts](../wiki/Backend-Live-Sessions-And-Prompts.md) |
+| Prompts answered from the dashboard | [Backend: live sessions and prompts](../wiki/Backend/Live-Sessions-And-Prompts.md) |
 
 ## Local rules
 

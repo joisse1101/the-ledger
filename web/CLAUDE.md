@@ -2,14 +2,14 @@
 
 | Working on | Read |
 |---|---|
-| `web/src/api/` (token, client, queries) | [Frontend-Api-Layer](../wiki/Frontend-Api-Layer.md) |
-| Shell, nav, theme, `tokens.css` | [Frontend-Shell-And-Theme](../wiki/Frontend-Shell-And-Theme.md) |
-| Live and All session pages | [Frontend-Sessions](../wiki/Frontend-Sessions.md) |
-| Overview page and charts | [Frontend-Overview](../wiki/Frontend-Overview.md) |
-| Projects page | [Frontend-Projects](../wiki/Frontend-Projects.md) |
-| Files page, `upload.ts` | [Frontend-Files](../wiki/Frontend-Files.md) |
-| `ButtonSelector`, `ConfirmDialog`, `lib/` | [Frontend-Shared-Components](../wiki/Frontend-Shared-Components.md) |
-| Test list | [Testing](../wiki/Testing.md) |
+| `web/src/api/` (token, client, queries) | [Frontend: API layer](../wiki/Frontend/Api-Layer.md) |
+| Shell, nav, theme, `tokens.css` | [Frontend: shell and theme](../wiki/Frontend/Shell-And-Theme.md) |
+| Live and All session pages | [Frontend: sessions page](../wiki/Frontend/Sessions-Page.md) |
+| Overview page and charts | [Frontend: overview page](../wiki/Frontend/Overview-Page.md) |
+| Projects page | [Frontend: projects page](../wiki/Frontend/Projects-Page.md) |
+| Files page, `upload.ts` | [Frontend: files page](../wiki/Frontend/Files-Page.md) |
+| `ButtonSelector`, `ConfirmDialog`, `lib/` | [Frontend: shared components](../wiki/Frontend/Shared-Components.md) |
+| Test list | [Testing](../wiki/Contributing/Testing.md) |
 
 ## Local rules
 
