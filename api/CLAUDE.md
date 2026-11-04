@@ -4,13 +4,13 @@ Run everything from this folder (`pyproject.toml` is here). Use `.venv\Scripts\p
 
 | Working on | Read |
 |---|---|
-| `api/app/repositories/`, SQLite snapshot | [Backend-Data-Layer](../wiki/Backend-Data-Layer.md) |
-| `history.db`, `backup_history.py` | [Backend-History-Store](../wiki/Backend-History-Store.md) |
-| Routes in `api/app/routers/` | [Backend-API-Routes](../wiki/Backend-API-Routes.md) |
-| `api/app/core/security.py`, locality, token | [Backend-Security](../wiki/Backend-Security.md) |
-| Pending prompts, Remote mode | [Backend-Live-Sessions-And-Prompts](../wiki/Backend-Live-Sessions-And-Prompts.md) |
-| `api/app/domain/overview_stats.py`, `api/app/domain/transcript_query.py` | [Backend-Overview-And-Queries](../wiki/Backend-Overview-And-Queries.md) |
-| Test layout | [Testing](../wiki/Testing.md) |
+| `api/app/repositories/`, SQLite snapshot | [Backend: data layer](../wiki/Backend/Data-Layer.md) |
+| `history.db`, `backup_history.py` | [Backend: history store](../wiki/Backend/History-Store.md) |
+| Routes in `api/app/routers/` | [Backend: API routes](../wiki/Backend/API-Routes.md) |
+| `api/app/core/security.py`, locality, token | [Backend: security](../wiki/Backend/Security.md) |
+| Pending prompts, Remote mode | [Backend: live sessions and prompts](../wiki/Backend/Live-Sessions-And-Prompts.md) |
+| `api/app/domain/overview_stats.py`, `api/app/domain/transcript_query.py` | [Backend: stats and queries](../wiki/Backend/Stats-And-Queries.md) |
+| Test layout | [Testing](../wiki/Contributing/Testing.md) |
 
 ## Local rules
 
