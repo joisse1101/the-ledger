@@ -480,6 +480,27 @@
   scroll-margin-top: calc(var(--header-h) + env(safe-area-inset-top) + 0.5rem);
 }
 
+/* The all-sessions table has many columns, so its cells are tighter than the shared default:
+   short columns get a small cap, the project and title keep a wider one, and the two time
+   columns get just enough to show a full timestamp. */
+.sessions-all .list-table th,
+.sessions-all .list-table td {
+  padding-inline: 0.4rem;
+  max-width: 12ch;
+}
+
+.sessions-all .list-table th:nth-child(-n + 2),
+.sessions-all .list-table td:nth-child(-n + 2) {
+  max-width: 18ch;
+}
+
+.sessions-all .list-table th:nth-child(3),
+.sessions-all .list-table td:nth-child(3),
+.sessions-all .list-table th:nth-child(4),
+.sessions-all .list-table td:nth-child(4) {
+  max-width: 20ch;
+}
+
 .sessions-load-more {
   display: flex;
   align-items: center;

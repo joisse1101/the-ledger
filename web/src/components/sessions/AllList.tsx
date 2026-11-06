@@ -167,7 +167,7 @@ export function AllList({ onSelect }: AllListProps) {
   };
 
   return (
-    <section aria-label="All sessions">
+    <section aria-label="All sessions" className="sessions-all">
       <div className="sessions-filters">
         <input
           type="search"
