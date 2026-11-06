@@ -50,6 +50,8 @@ Once Remote mode is `ready`, a **Show QR** button opens `RemoteQrDialog`. The di
 
 `AllList` debounces its search box (`useDebouncedValue`, 300ms). It drives `Project`, `Version`, `Branch` and `Worktree` `FilterMultiselect`s from the API's option lists. A `FilterMultiselect` is a `<details>`-based checkbox list, so no popover or portal machinery is needed. The list pages 50 at a time through `useTranscripts`'s "Load more".
 
+The table has 14 columns, so `AllList` carries a `sessions-all` class that tightens its cells: less padding, a 12ch cap on short columns, 18ch on `Project` and `Title`, and 20ch on the two time columns so a full timestamp shows. Other tables keep the shared 22ch cap. A long value ends in an ellipsis and is shown in full in the row's dialog.
+
 Its columns include `Model`, `OpenSpec` (Yes/No) and `Worktree` (`--` when none), and all of them are sortable.
 
 ## Session detail

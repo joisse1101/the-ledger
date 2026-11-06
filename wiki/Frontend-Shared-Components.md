@@ -16,6 +16,8 @@ A `ListColumn` carries these settings:
 
 Cards have no headers, so on narrow screens `AllList` offers a "Sort by" `<select>` instead.
 
+`ListTable` scrolls sideways inside its own box (`.list-table-scroll`, capped at the page width) only when its columns do not fit. The panel a row opens (`renderExpanded`) never sets the table's width: `.list-expand` uses `contain: inline-size`, so the panel fits the width the columns give it and never scrolls sideways itself.
+
 ## `ButtonSelector`
 
 Files: `web/src/components/ButtonSelector.tsx` and its `.module.css`.

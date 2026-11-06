@@ -14,6 +14,10 @@ Files: `web/src/components/AppShell.tsx`, `Nav.tsx`, `RefreshControl.tsx`, `Serv
 
 The stylesheets write `@media (--narrow)`, `(--medium-up)` and `(--wide-up)`. `web/build/mediaAliases.ts`, a PostCSS plugin wired in `vite.config.ts`, swaps those for the real queries at build time.
 
+### Page width
+
+The page area (`main.content`) is capped at 87.5rem and centred. On the table pages, `/projects` and `/sessions`, `AppShell` sets `data-full-width="true"` on it and `app.css` drops the cap, so the margins shrink to the gutter and a table only scrolls sideways when its columns truly cannot fit. The list of paths is `FULL_WIDTH_PATHS` in `AppShell.tsx`.
+
 ### Navigation
 
 `AppShell` renders `Nav` as a top bar at medium and wide, or as a fixed bottom tab bar at narrow. At narrow, `viewport !== "narrow"` puts the nav in the header instead.
