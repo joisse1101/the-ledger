@@ -12,6 +12,7 @@
   /* A wide table (the detail view's all-responses table, or this one on a narrow browser
      window in dev) scrolls sideways in its own box rather than widening the page. */
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .list-table {
@@ -428,6 +429,14 @@
   display: grid;
   grid-template-rows: 1fr;
   transition: grid-template-rows 0.5s ease;
+  /* The panel never sets the table's width: it contributes no intrinsic width, so it fits
+     whatever width the row columns give it and wide content wraps or clips inside it. */
+  contain: inline-size;
+}
+
+.list-expand-inner > * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .list-card-expanded {
