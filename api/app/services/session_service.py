@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 from app import deps, refresh
 from app.domain.context import detail, models
+from app.infra.no_window import NO_WINDOW
 from app.repositories import claude_transcripts
 from app.repositories.db import queries
 from app.services.errors import Conflict, NotFound, OperationFailed
@@ -70,4 +71,5 @@ def open_repo(session_id: str) -> None:
     subprocess.run(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(OPEN_REPO_SCRIPT), uri],
         check=False,
+        creationflags=NO_WINDOW,
     )

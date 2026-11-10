@@ -53,6 +53,10 @@ if ($Help) {
     return
 }
 
+# Names this script in the window title and output, so a window that appears anyway can be traced.
+try { $Host.UI.RawUI.WindowTitle = 'Ledger: Starting widget...' } catch { }
+Write-Host 'Ledger: Starting widget...'
+
 $widgetDir = $PSScriptRoot
 $repoRoot = Split-Path $widgetDir -Parent
 

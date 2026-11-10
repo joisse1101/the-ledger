@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.infra import banner
+from app.infra.no_window import NO_WINDOW
 from app.infra.repo_cli import OpenCounts
 from app.repositories import claude_transcripts
 from app.repositories.db import history, paths, queries, scanner, snapshot
@@ -668,7 +669,8 @@ def test_open_repo_invokes_the_script_with_the_registry_cwd(isolated_db, monkeyp
     assert command[0] == "powershell.exe"
     assert command[-2] == str(session_service.OPEN_REPO_SCRIPT)
     assert command[-1] == "claudecode://open?path=%2Fh%2Falpha"
-    assert kwargs == {"check": False}
+    assert kwargs == {"check": False, "creationflags": NO_WINDOW}
+    assert NO_WINDOW == getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def test_open_repo_is_404_for_an_unknown_or_not_live_session(isolated_db, monkeypatch):

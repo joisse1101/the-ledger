@@ -12,14 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from app.infra.no_window import NO_WINDOW
+
 logger = logging.getLogger(__name__)
 
 GIT_TIMEOUT_SECONDS = 10
 GH_TIMEOUT_SECONDS = 20
 # `gh` lists 30 items unless told otherwise; a repo past this many open items shows this many.
 LIST_LIMIT = 1000
-# No console window for anything this backend launches on the user's behalf.
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 @dataclass(frozen=True)

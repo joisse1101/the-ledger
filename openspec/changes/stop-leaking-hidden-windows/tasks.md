@@ -8,10 +8,10 @@
 
 ## 2. Open-repo and widget launch
 
-- [ ] 2.1 Move the no-window flag into one shared definition under `api/app/infra/`, point `repo_cli.py`, `remote_system.py` and `session_service.open_repo` at it, and pass it to the open-repo call. Verify `cd api; pytest` passes, including `test_layers.py`.
-- [ ] 2.2 Add a test in `api/tests/test_api_data.py` (next to the existing open-repo command check) that the open-repo call carries the no-window flag. Verify it fails without the flag.
-- [ ] 2.3 In `hooks/scripts/Open-ClaudeRepoWindow.ps1` and `widget/Start-Widget.ps1`, set the window title and print `Ledger: Opening repo in VS Code...` and `Ledger: Starting widget...`. Verify `widget/tests/Test-StartWidget.ps1` and the open-repo tests pass, and that each script still exits with its old exit code.
-- [ ] 2.4 Give the two `Start-Process powershell` commands in `Start-Ledger.ps1` the titles `Ledger: backend` and `Ledger: frontend`. Verify `.\Start-Ledger.ps1 -Help` still prints and the script parses.
+- [x] 2.1 Move the no-window flag into one shared definition under `api/app/infra/`, point `repo_cli.py`, `remote_system.py` and `session_service.open_repo` at it, and pass it to the open-repo call. Verify `cd api; pytest` passes, including `test_layers.py`.
+- [x] 2.2 Add a test in `api/tests/test_api_data.py` (next to the existing open-repo command check) that the open-repo call carries the no-window flag. Verify it fails without the flag.
+- [x] 2.3 In `hooks/scripts/Open-ClaudeRepoWindow.ps1` and `widget/Start-Widget.ps1`, set the window title and print `Ledger: Opening repo in VS Code...` and `Ledger: Starting widget...`. Verify `widget/tests/Test-StartWidget.ps1` and the open-repo tests pass, and that each script still exits with its old exit code.
+- [x] 2.4 Give the two `Start-Process powershell` commands in `Start-Ledger.ps1` the titles `Ledger: backend` and `Ledger: frontend`. Verify `.\Start-Ledger.ps1 -Help` still prints and the script parses.
 
 ## 3. Backup task has no console and logs its runs
 

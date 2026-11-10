@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
+from app.infra.no_window import NO_WINDOW
 from app.infra.remote_gateway import RemoteStartError
 
 DEFAULT_GATEWAY_PORT = 8503  # matches gateway/docker-compose.yml and .env.example
@@ -24,8 +25,6 @@ COMPOSE_TIMEOUT_SECONDS = 120
 BUILD_TIMEOUT_SECONDS = 600
 PORT_PROBE_TIMEOUT_SECONDS = 1.0
 GATEWAY_PROBE_TIMEOUT_SECONDS = 3.0
-# No console window for anything this backend launches on the user's behalf.
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def gateway_port(repo_root: Path, environ: Mapping[str, str] = os.environ) -> int:

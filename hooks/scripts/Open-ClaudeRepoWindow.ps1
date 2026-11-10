@@ -28,6 +28,10 @@ if ($Help) {
     return
 }
 
+# Names this script in the window title and output, so a window that appears anyway can be traced.
+try { $Host.UI.RawUI.WindowTitle = 'Ledger: Opening repo in VS Code...' } catch { }
+Write-Host 'Ledger: Opening repo in VS Code...'
+
 function Get-QueryParam {
     param([string]$Uri, [string]$Name)
     if ($Uri -match "[?&]$Name=([^&]+)") {
