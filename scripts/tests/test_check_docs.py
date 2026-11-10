@@ -66,6 +66,15 @@ def test_git_ignored_path_and_ignore_marker_are_exempt(tmp_path):
     assert _problems(tmp_path) == []
 
 
+def test_missing_git_ignored_folder_is_exempt(tmp_path):
+    _tree(tmp_path)
+    _file(tmp_path, DEEP, "# Refunds\n\nSee [s](../orders/lifecycle.md). `build/out`\n")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    assert _problems(tmp_path) == [f"{DEEP}:3: path 'build/out' does not exist"]
+    _file(tmp_path, ".gitignore", "build/out/\n")
+    assert _problems(tmp_path) == []
+
+
 def test_paths_inside_code_fences_are_not_checked(tmp_path):
     _tree(tmp_path)
     _file(tmp_path, DEEP, "# Refunds\n\n```\n`src/none/there.py`\n```\n")

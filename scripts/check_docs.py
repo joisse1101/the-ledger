@@ -55,15 +55,22 @@ def _lines_outside_fences(text: str) -> list[tuple[int, str]]:
 
 
 def is_git_ignored(root: Path, path: str) -> bool:
-    """True when git reports `path` as ignored. A folder that is not a git repo ignores nothing."""
-    try:
-        done = subprocess.run(
-            ["git", "-C", str(root), "check-ignore", "-q", "--", path],
-            capture_output=True, check=False,
-        )
-    except OSError:
-        return False
-    return done.returncode == 0
+    """True when git reports `path` as ignored. A folder that is not a git repo ignores nothing.
+
+    A `folder/` rule only matches a missing folder when the path ends in a slash, so a path that
+    is not on disk (a build folder in a fresh checkout) is also tried with one.
+    """
+    for candidate in (path, path.rstrip("/") + "/"):
+        try:
+            done = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "-q", "--", candidate],
+                capture_output=True, check=False,
+            )
+        except OSError:
+            return False
+        if done.returncode == 0:
+            return True
+    return False
 
 
 def check_links(wiki: Path, pages: list[str]) -> list[str]:
