@@ -14,6 +14,6 @@
   `hooks/scripts/Open-ClaudeRepoWindow.ps1`. Don't move or change it without checking `api/app/routers/sessions.py`.
 - `ledgerScripts/` is dashboard-coupled. Keep it apart from `scripts/`.
 - `hooks/chimeScripts/Play-ClaudeChime.ps1` must print nothing and exit 0 on every path. Its
-  `-DryRun`, `-IdleSeconds`, `-StateDir` and `-PlayerPath` parameters are test-only; tests never play a sound.
+  `-DryRun`, `-IdleSeconds`, `-StateDir` and `-PlayerPath` parameters are test-only; tests never play a sound. Its sound child must open no window (`CreateNoWindow`) and announces itself as `Ledger: Playing chimes...`.
 - `chimeScripts/` is standalone like `scripts/`, not dashboard-coupled. Keep it apart from `ledgerScripts/`.
 - Relay hook behavior was verified against a specific Claude Code version; re-check after upgrades.

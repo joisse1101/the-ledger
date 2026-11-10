@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -151,3 +152,36 @@ def test_a_broken_state_folder_still_plays(tmp_path):
     state_is_a_file = tmp_path / "state"
     state_is_a_file.write_text("not a folder", encoding="ascii")
     assert _decide("done", state_is_a_file) == "play"
+
+
+def _fake_player(tmp_path: Path) -> tuple[Path, Path]:
+    """A batch file that records the arguments it was started with instead of playing a sound."""
+    record = tmp_path / "player-args.txt"
+    player = tmp_path / "fake-player.bat"
+    player.write_text(f'@echo off\r\n>>"{record}" echo %*\r\n', encoding="ascii")
+    return player, record
+
+
+def _wait_for(path: Path, seconds: float = 10.0) -> str:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if path.exists() and path.read_text(encoding="ascii", errors="replace").strip():
+            return path.read_text(encoding="ascii", errors="replace")
+        time.sleep(0.1)
+    return ""
+
+
+def test_the_sound_child_announces_itself_while_the_hook_prints_nothing(tmp_path):
+    player, record = _fake_player(tmp_path)
+    result = _run("done", tmp_path / "state", "-IdleSeconds", "400", "-PlayerPath", str(player))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    child_arguments = _wait_for(record)
+    assert "Ledger: Playing chimes..." in child_arguments
+    assert "Asterisk" in child_arguments
+
+
+def test_the_sound_child_is_started_with_no_console():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "CreateNoWindow = $true" in source
+    assert "UseShellExecute = $false" in source
+    assert "Start-Process" not in source

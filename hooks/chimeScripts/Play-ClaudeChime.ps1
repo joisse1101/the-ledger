@@ -15,8 +15,9 @@ Order of decisions:
 2. Merge. Under a named mutex, one timestamp file per kind in the state folder: 'done' is skipped if
    any sound played in the last 5 seconds, 'needs-input' only if a needs-input sound did. If the mutex
    cannot be taken quickly, or the state folder is unusable, the sound plays.
-3. Play. A hidden child PowerShell plays System.Media.SystemSounds (Asterisk for done, Hand for
-   needs-input), so the hook returns at once.
+3. Play. A child PowerShell with no console (CreateNoWindow) plays System.Media.SystemSounds
+   (Asterisk for done, Hand for needs-input), so the hook returns at once. The child titles itself
+   'Ledger: Playing chimes...' so a window that slips through can be traced; the hook prints nothing.
 
 .PARAMETER Kind
 'done' or 'needs-input'. Anything else does nothing.
@@ -50,6 +51,7 @@ $MergeWindowSeconds = 5
 $MutexName = 'Local\ClaudeChimeMerge'
 $MutexWaitMilliseconds = 500
 $SoundByKind = @{ 'done' = 'Asterisk'; 'needs-input' = 'Hand' }
+$ChimeMessage = 'Ledger: Playing chimes...'
 
 # Whole seconds since the last keyboard/mouse input, or $null when Windows won't say.
 function Get-IdleSeconds {
@@ -141,10 +143,18 @@ function Test-MergedAndRecord {
 
 function Start-Sound {
     param([string]$Sound)
-    # The child waits a moment because SystemSounds.Play returns before the sound ends.
-    $command = "try { [System.Media.SystemSounds]::$Sound.Play(); Start-Sleep -Milliseconds 1500 } catch { }"
-    Start-Process -FilePath $PlayerPath -WindowStyle Hidden `
-        -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', $command) | Out-Null
+    # The child waits a moment because SystemSounds.Play returns before the sound ends. Its title and
+    # line name the source if a window ever appears anyway; the hook itself still prints nothing.
+    $command = "try { `$Host.UI.RawUI.WindowTitle = '$ChimeMessage'; Write-Host '$ChimeMessage'; " +
+        "[System.Media.SystemSounds]::$Sound.Play(); Start-Sleep -Milliseconds 1500 } catch { }"
+    # No console at all: a hidden window style is ignored when Windows Terminal is the default
+    # terminal, which is what made an empty window flash.
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $PlayerPath
+    $startInfo.Arguments = "-NoProfile -NonInteractive -Command `"$command`""
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    [void][System.Diagnostics.Process]::Start($startInfo)
 }
 
 try {
