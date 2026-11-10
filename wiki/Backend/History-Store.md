@@ -53,3 +53,5 @@ It is a standalone script, runnable independently of the backend. No server proc
 It is meant to be triggered daily by an OS-level scheduled task. See [Setup and run](../Contributing/Setup-And-Run.md). So history keeps accumulating even when the app is not running.
 
 It is safe to run repeatedly. The upsert overwrites an unchanged session's row rather than growing it.
+
+Each run also appends to `backup.log`, which sits beside `history.db`: a `Ledger: Backing up history...` line, then a success or failure line. The scheduled task has no console, so this file is the only record of a run. A failure to write the log never fails the backup.

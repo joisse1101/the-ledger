@@ -15,9 +15,9 @@
 
 ## 3. Backup task has no console and logs its runs
 
-- [ ] 3.1 In `api/backup_history.py`, append `Ledger: Backing up history...`, then a success or failure line, to a log file beside `history.db`, keeping the existing print and never letting a logging failure fail the backup. Verify with a test using the `isolated_db` fixture that a success and a failure each leave the expected lines.
-- [ ] 3.2 In `hooks/ledgerScripts/Install-HistoryBackupTask.ps1`, register the task with `pythonw.exe` from the same `.venv\Scripts` folder, falling back to `python.exe` with a printed warning when it is missing. Verify with `api/tests/test_install_ledger.py` or a new test that the action's executable is `pythonw.exe` and that the fallback warns.
-- [ ] 3.3 Document the log file and the `pythonw.exe` task in `wiki/Services/Hooks.md`, and note that existing machines need the installer re-run. Verify `python scripts/check_docs.py` passes.
+- [x] 3.1 In `api/backup_history.py`, append `Ledger: Backing up history...`, then a success or failure line, to a log file beside `history.db`, keeping the existing print and never letting a logging failure fail the backup. Verify with a test using the `isolated_db` fixture that a success and a failure each leave the expected lines.
+- [x] 3.2 In `hooks/ledgerScripts/Install-HistoryBackupTask.ps1`, register the task with `pythonw.exe` from the same `.venv\Scripts` folder, falling back to `python.exe` with a printed warning when it is missing. Verify with `api/tests/test_install_ledger.py` or a new test that the action's executable is `pythonw.exe` and that the fallback warns.
+- [x] 3.3 Document the log file and the `pythonw.exe` task in `wiki/Services/Hooks.md`, and note that existing machines need the installer re-run. Verify `python scripts/check_docs.py` passes.
 
 ## 4. Tripwire for future leaks
 

@@ -111,6 +111,8 @@ Tests cover the decisions, not the sound. Unchecked: that the two sounds differ 
 
 `Install-HistoryBackupTask.ps1` and `Uninstall-HistoryBackupTask.ps1` register and remove the Windows Scheduled Task. The task runs `api/backup_history.py` daily. See [Setup and run](../Contributing/Setup-And-Run.md).
 
+The task runs `pythonw.exe` (Python without a console) so no window flashes. Because nothing can be printed to a console, `backup_history.py` appends each run to `backup.log` beside `history.db`: a `Ledger: Backing up history...` line, then a success or failure line. A logging problem never fails the backup. If `pythonw.exe` is missing from the venv, the installer prints a warning and registers `python.exe`. A task registered earlier keeps `python.exe` until `Install-Ledger.ps1` is re-run and the backup task accepted. The installer's `-ScriptsDir` parameter is test-only.
+
 They sit alongside the relay hook in the same folder. Unlike the relay hook, they are not Claude Code hooks at all. Nothing copies them anywhere or touches `settings.json`. They run directly from this checkout.
 
 `Install-Ledger.ps1` is the install route; it offers the history backup task. The root `Start-Ledger.ps1` no longer installs it. `Stop-Ledger.ps1 -UninstallBackupTask` is the shortcut for removing the task.

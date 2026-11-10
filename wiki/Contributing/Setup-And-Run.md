@@ -142,7 +142,7 @@ A custom `BACKEND_PORT` also needs to be set in the frontend process's own envir
 
 `Install-Ledger.ps1` offers to register the daily Windows Task Scheduler entry for it (`Start-Ledger.ps1` no longer installs it). The script it calls, `hooks\ledgerScripts\Install-HistoryBackupTask.ps1`, can also be run directly, and registers or updates that same entry:
 
-- Program: `api\.venv\Scripts\python.exe backup_history.py`.
+- Program: `api\.venv\Scripts\pythonw.exe backup_history.py`. `pythonw.exe` is Python without a console, so no window flashes when the task runs. If it is missing from the venv, the script warns and uses `python.exe`.
 - "Start in": `api\`.
 - Runs as the logged-in user with no elevation, daily.
 
@@ -167,6 +167,9 @@ Trigger it manually once after creating it, with `Start-ScheduledTask -TaskName 
 
 - Inspect `api/.history/history.db`'s row count or contents before and after. Use the `sqlite3` CLI, e.g. `sqlite3 api/.history/history.db "SELECT COUNT(*) FROM transcripts"`, or Python's builtin `sqlite3` module if that CLI isn't installed.
 - Check `Get-ScheduledTaskInfo -TaskName 'Ledger History Backup'`'s `LastTaskResult` (`0` = success).
+- Read `api/.history/backup.log`. Because the task has no console, each run appends `Ledger: Backing up history...`, then `Ledger: Backup succeeded: N transcript row(s)` or `Ledger: Backup failed: <why>`.
+
+A machine that registered the task before this change keeps running `python.exe` until you re-run `Install-Ledger.ps1` and accept the backup task, which updates the task in place.
 
 ### Why daily
 
