@@ -1,5 +1,7 @@
 """Remote mode's lifecycle with a fake System: ordering, skipping, failures, cancellation, teardown."""
 
+import threading
+
 import pytest
 
 from app.infra.remote_gateway import RemoteGateway
@@ -358,3 +360,60 @@ def test_a_start_after_a_stop_is_not_followed_by_a_stale_off():
     gateway.stop()
     gateway.start()
     assert hooks.events[-2:] == ["start", "ready"]
+
+
+# ------------------------------------------------ a superseded run
+
+
+def _once(action):
+    """An `on_sleep` hook that runs `action` on the first sleep only."""
+    fired = []
+
+    def hook():
+        if not fired:
+            fired.append(True)
+            action()
+
+    return hook
+
+
+def test_a_superseded_run_leaves_the_newer_runs_gateway_and_frontend_running():
+    system = FakeSystem(frontend=False, frontend_after=1)
+    gateway, hooks = _gateway(system)
+
+    def restart():
+        gateway.stop()
+        gateway.start()  # runs to ready inside the old run's wait
+
+    system.on_sleep = _once(restart)
+    gateway.start()
+
+    assert gateway.status()["state"] == "ready"
+    assert system.gateway_running
+    assert system.calls.count("stop_frontend:frontend-handle") == 1  # only the stop() took one down
+    assert system.calls[-1] == "compose_up"  # the old run did not close the newer gateway afterwards
+
+
+class StopDuringReady(Hooks):
+    """Another thread turns Remote mode off while the ready callback is running."""
+
+    gateway = None
+    stopper = None
+
+    def on_ready(self):
+        self.stopper = threading.Thread(target=self.gateway.stop)
+        self.stopper.start()
+        self.stopper.join(timeout=0.5)  # with the fix the stop waits for the lock and this times out
+        super().on_ready()
+
+
+def test_a_stop_that_races_the_ready_callback_leaves_remote_mode_off():
+    hooks = StopDuringReady()
+    gateway, _ = _gateway(FakeSystem(), hooks)
+    hooks.gateway = gateway
+
+    gateway.start()
+    hooks.stopper.join()
+
+    assert gateway.status()["state"] == "off"
+    assert hooks.events[-3:] == ["ready", "off", "expiry-cancelled"]  # off came after ready: the prompt gate is closed
