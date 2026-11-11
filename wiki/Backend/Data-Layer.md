@@ -111,7 +111,7 @@ The file also holds `widget_afk_minutes`, how long the widget's AFK switch stays
 
 ### Saving
 
-The saves are `save_worktree_folders()`, `save_max_projects()` and `save_afk_minutes()`. Each is a read-modify-write under a lock. It sets one key and keeps the others, unknown keys too. It writes through `json_file.write_json_atomic()`, a temp file that is then renamed over the old one.
+The saves are `save_worktree_folders()`, `save_max_projects()` and `save_afk_minutes()`. Each is a read-modify-write under a lock. It sets one key and keeps the others, unknown keys too. It writes through `json_file.write_json_atomic()`, a temp file that is then renamed over the old one. A save refuses, with `SettingsUnreadable`, when the file exists but is not a readable JSON object. Saving over it would erase every other key, whereas reading such a file only falls back to the defaults.
 
 ### Who reads it
 
