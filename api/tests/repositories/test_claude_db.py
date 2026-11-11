@@ -15,6 +15,10 @@ def test_sanitize_project_path_replaces_non_alnum():
     )
 
 
+def test_sanitize_project_path_replaces_non_ascii_letters_and_digits():
+    assert paths.sanitize_project_path("C:/Users/Zoë/café²") == "C--Users-Zo--caf--"
+
+
 def test_sanitize_project_path_keeps_alnum():
     assert paths.sanitize_project_path("abc123") == "abc123"
 

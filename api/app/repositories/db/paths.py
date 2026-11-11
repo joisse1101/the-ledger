@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -25,13 +26,16 @@ def projects_dir() -> Path:
     return Path.home() / ".claude" / "projects"
 
 
+_NOT_ASCII_ALNUM = re.compile(r"[^A-Za-z0-9]")
+
+
 def sanitize_project_path(path: str) -> str:
     """Project dir path -> its ~/.claude/projects/ folder name.
 
-    - Every non-alphanumeric character becomes a dash, e.g.
-      "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log".
+    - Every character other than an ASCII letter or digit becomes a dash, as Claude Code does, e.g.
+      "C:/Users/x/Repos/the-log" -> "C--Users-x-Repos-the-log" and "café" -> "caf-".
     """
-    return "".join(ch if ch.isalnum() else "-" for ch in path)
+    return _NOT_ASCII_ALNUM.sub("-", path)
 
 
 def repo_folder_of_worktree(folder: str, worktree: str, folders: Iterable[str]) -> Optional[str]:
