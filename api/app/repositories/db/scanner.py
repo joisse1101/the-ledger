@@ -447,9 +447,20 @@ def scan_transcripts(project_by_folder: dict[str, str]) -> list[dict[str, Any]]:
     if not directory.is_dir():
         return []
     worktree_folders = settings_store.load_worktree_folders()
-    rows = []
+    rows_by_session: dict[str, dict[str, Any]] = {}
     for path in directory.glob("*/*.jsonl"):
         row = _scan_transcript_file(path, project_by_folder, worktree_folders)
-        if row is not None:
-            rows.append(row)
-    return rows
+        if row is None:
+            continue
+        # The session id comes from inside the file, so two files (a resumed or copied session) can
+        # carry the same one. The snapshot keeps one row per id: the most recently updated file.
+        kept = rows_by_session.get(row["session_id"])
+        if kept is None or _is_newer(row, kept):
+            rows_by_session[row["session_id"]] = row
+    return list(rows_by_session.values())
+
+
+def _is_newer(row: dict[str, Any], than: dict[str, Any]) -> bool:
+    if row["updated_at"] is None:
+        return False
+    return than["updated_at"] is None or row["updated_at"] > than["updated_at"]
