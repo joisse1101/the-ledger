@@ -21,13 +21,13 @@
 
 ## 4. Tripwire for future leaks
 
-- [ ] 4.1 Add a test that scans `hooks/`, `widget/`, `api/app` and the root scripts for `Start-Process`, `subprocess` and `ProcessStartInfo` starts without a no-window marker, with an explicit allow-list for the two visible `Start-Ledger.ps1` windows. Verify it passes on the fixed code and fails when an unguarded start is added to a scratch copy.
-- [ ] 4.2 Document the rule and the allow-list in `hooks/CLAUDE.md` and `wiki/Contributing/Testing.md`. Verify `python scripts/check_docs.py` passes.
+- [x] 4.1 Add a test that scans `hooks/`, `widget/`, `api/app` and the root scripts for `Start-Process`, `subprocess` and `ProcessStartInfo` starts without a no-window marker, with an explicit allow-list for the two visible `Start-Ledger.ps1` windows. Verify it passes on the fixed code and fails when an unguarded start is added to a scratch copy.
+- [x] 4.2 Document the rule and the allow-list in `hooks/CLAUDE.md` and `wiki/Contributing/Testing.md`. Verify `python scripts/check_docs.py` passes.
 
 ## 5. Final checks
 
-- [ ] 5.1 Run `cd api; pytest`, `cd api; pytest ../scripts/tests`, `cd web; npm test`, `cd web; npm run build` and `cd widget; npm test; npm run build`. Verify all pass.
-- [ ] 5.2 With a fake player, run the chime hook by hand with the AFK switch on and confirm no window opens and the hook prints nothing. Verify by watching for a `WindowsTerminal.exe -Embedding` process, which should not appear.
+- [x] 5.1 Run `cd api; pytest`, `cd api; pytest ../scripts/tests`, `cd web; npm test`, `cd web; npm run build` and `cd widget; npm test; npm run build`. Verify all pass.
+- [x] 5.2 With a fake player, run the chime hook by hand with the AFK switch on and confirm no window opens and the hook prints nothing. Verify by watching for a `WindowsTerminal.exe -Embedding` process, which should not appear.
 
 ## Workflow follow-up
 
