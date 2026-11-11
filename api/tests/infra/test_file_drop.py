@@ -60,6 +60,12 @@ def test_sanitize_name_caps_the_length_and_keeps_the_extension():
     assert name.endswith(".mp4")
 
 
+def test_sanitize_name_caps_the_length_when_the_extension_alone_is_too_long():
+    name = file_drop.sanitize_name("a." + "x" * 300)
+    assert len(name) == file_drop.MAX_NAME_LENGTH
+    assert name.startswith("a.x")
+
+
 def test_save_stream_writes_every_chunk(folder):
     entry = file_drop.save_stream(folder, "video.mp4", [b"abc", b"def"])
 

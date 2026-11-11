@@ -69,10 +69,17 @@ def sanitize_name(raw: str) -> str:
     if name.upper().split(".")[0] in _RESERVED_NAMES:
         name = f"_{name}"
     if len(name) > MAX_NAME_LENGTH:
-        stem, dot, extension = name.rpartition(".")
-        keep = MAX_NAME_LENGTH - (len(extension) + 1 if dot else 0)
-        name = f"{stem[:keep]}.{extension}" if dot else name[:MAX_NAME_LENGTH]
+        name = _cap_length(name)
     return name.strip() or FALLBACK_NAME
+
+
+def _cap_length(name: str) -> str:
+    """Cut the stem so the extension survives; when the extension alone leaves no room, cut the end."""
+    stem, dot, extension = name.rpartition(".")
+    keep = MAX_NAME_LENGTH - len(extension) - 1
+    if dot and keep > 0:
+        return f"{stem[:keep]}.{extension}"
+    return name[:MAX_NAME_LENGTH]
 
 
 def _unique_names(name: str) -> Iterable[str]:
