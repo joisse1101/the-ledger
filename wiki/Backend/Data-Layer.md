@@ -59,7 +59,7 @@ It holds the `ClaudeProject` dataclass and query and delete functions for Claude
 
 The data originally comes from `~/.claude.json`'s top-level `projects` map. That map has one entry per directory Claude Code has been run or trusted in. It reflects only that project's last session. It holds trust status, last session ID, CLI version, cost, start time, lines added and removed, and any project-scoped MCP servers.
 
-`delete_project(project_path)` edits `~/.claude.json` directly, the real source of truth. It then removes the matching row from SQLite via `queries.delete_project_row()`.
+`delete_project(project_path)` edits `~/.claude.json` directly, the real source of truth. It writes the file through `json_file.write_json_atomic()`, a temp file beside it that is then renamed over it, because a half-written file would break Claude Code's own config. It then removes the matching row from SQLite via `queries.delete_project_row()`.
 
 ## `claude_transcripts.py`
 
@@ -113,7 +113,7 @@ The file also holds `widget_afk_minutes`, how long the widget's AFK switch stays
 
 ### Saving
 
-The saves are `save_worktree_folders()`, `save_max_projects()` and `save_afk_minutes()`. Each is a read-modify-write under a lock. It sets one key and keeps the others, unknown keys too. It writes a temp file and `os.replace`s it.
+The saves are `save_worktree_folders()`, `save_max_projects()` and `save_afk_minutes()`. Each is a read-modify-write under a lock. It sets one key and keeps the others, unknown keys too. It writes through `json_file.write_json_atomic()`, a temp file that is then renamed over the old one. A save refuses, with `SettingsUnreadable`, when the file exists but is not a readable JSON object. Saving over it would erase every other key, whereas reading such a file only falls back to the defaults.
 
 ### Who reads it
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from app import refresh
@@ -9,7 +10,9 @@ from app.core.widget_settings import validate_afk_minutes, validate_break_minute
 from app.core.worktrees import BUILT_IN_FOLDER, WorktreeFolder, normalize_folder
 from app.repositories import settings_store
 from app.repositories.db import history, snapshot
-from app.services.errors import InvalidInput
+from app.services.errors import InvalidInput, OperationFailed
+
+logger = logging.getLogger(__name__)
 
 
 def get_worktree_folders() -> list[WorktreeFolder]:
@@ -92,11 +95,15 @@ def save_settings(
     max_projects = None if raw_max_projects is None else _validated_max_projects(raw_max_projects)
     afk_minutes = None if raw_afk_minutes is None else _validated_afk_minutes(raw_afk_minutes)
     break_minutes = None if raw_break_minutes is None else _validated_break_minutes(raw_break_minutes)
-    if max_projects is not None:
-        settings_store.save_max_projects(max_projects)
-    if afk_minutes is not None:
-        settings_store.save_afk_minutes(afk_minutes)
-    if break_minutes is not None:
-        settings_store.save_break_minutes(break_minutes)
-    if folders is not None:
-        _apply_worktree_folders(folders)
+    try:
+        if max_projects is not None:
+            settings_store.save_max_projects(max_projects)
+        if afk_minutes is not None:
+            settings_store.save_afk_minutes(afk_minutes)
+        if break_minutes is not None:
+            settings_store.save_break_minutes(break_minutes)
+        if folders is not None:
+            _apply_worktree_folders(folders)
+    except settings_store.SettingsUnreadable as err:
+        logger.warning("settings_save_refused error=%s", err)
+        raise OperationFailed(f"The settings file can't be read, so nothing was saved. Fix or delete it: {err}") from err

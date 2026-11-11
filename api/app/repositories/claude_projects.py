@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.repositories.db import paths, queries
+from app.repositories.json_file import write_json_atomic
 
 
 @dataclass
@@ -66,6 +67,6 @@ def delete_project(project_path: str) -> bool:
         return False
 
     del projects_data[project_path]
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    write_json_atomic(path, data)  # Claude Code's own config: never leave it half-written
     queries.delete_project_row(project_path)
     return True

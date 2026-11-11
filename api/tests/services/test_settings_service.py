@@ -5,7 +5,7 @@ import pytest
 from app.repositories import claude_transcripts, settings_store
 from app.repositories.db import history, paths, snapshot
 from app.services import settings_service
-from app.services.errors import InvalidInput
+from app.services.errors import InvalidInput, OperationFailed
 
 WORKTREE = "/home/x/the-ledger/.trees/fix-nav"
 
@@ -91,6 +91,13 @@ def test_saving_the_widget_number_leaves_the_folders_and_the_stores_alone(isolat
     assert settings_service.get_max_projects() == 3
     assert settings_store.load_worktree_folders() == (".trees",)
     assert reconciled == []
+
+
+def test_saving_over_an_unreadable_settings_file_fails_and_names_the_file(isolated_settings):
+    isolated_settings.write_text("{not json", encoding="utf-8")
+    with pytest.raises(OperationFailed, match="settings.json"):
+        settings_service.save_settings(None, 3)
+    assert isolated_settings.read_text(encoding="utf-8") == "{not json"
 
 
 def test_saving_folders_leaves_the_widget_number(isolated_db):

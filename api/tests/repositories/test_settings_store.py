@@ -30,6 +30,14 @@ def test_corrupt_json_means_no_folders(isolated_settings):
     assert settings_store.load_worktree_folders() == ()
 
 
+@pytest.mark.parametrize("content", ["{not json", json.dumps(["a"])])
+def test_saving_over_an_unreadable_file_is_refused_and_keeps_the_file(isolated_settings, content):
+    isolated_settings.write_text(content, encoding="utf-8")
+    with pytest.raises(settings_store.SettingsUnreadable):
+        settings_store.save_max_projects(3)
+    assert isolated_settings.read_text(encoding="utf-8") == content
+
+
 def test_wrong_shape_means_no_folders(isolated_settings):
     isolated_settings.write_text(json.dumps(["a"]), encoding="utf-8")
     assert settings_store.load_worktree_folders() == ()

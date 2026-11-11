@@ -19,6 +19,7 @@ from app.core.widget_settings import (
     validate_max_projects,
 )
 from app.core.worktrees import normalize_folder
+from app.repositories.json_file import write_json_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -54,16 +55,28 @@ def settings_path() -> Path:
     return Path(configured) if configured else DEFAULT_PATH
 
 
-def _read_raw(path: Path) -> dict:
+class SettingsUnreadable(Exception):
+    """The settings file exists but is not a readable JSON object; the message names the file."""
+
+
+def _parse_raw(path: Path) -> dict:
+    """The file's JSON object, or SettingsUnreadable."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as err:
-        logger.warning("settings_unreadable path=%s error=%s", path, err)
-        return {}
+        raise SettingsUnreadable(f"{path}: {err}") from err
     if not isinstance(raw, dict):
-        logger.warning("settings_unreadable path=%s error=not an object", path)
-        return {}
+        raise SettingsUnreadable(f"{path}: not a JSON object")
     return raw
+
+
+def _read_raw(path: Path) -> dict:
+    """For reading: an unreadable file logs a warning and counts as empty, so the defaults apply."""
+    try:
+        return _parse_raw(path)
+    except SettingsUnreadable as err:
+        logger.warning("settings_unreadable error=%s", err)
+        return {}
 
 
 def _folders_from(raw: dict, path: Path) -> tuple[str, ...]:
@@ -163,17 +176,16 @@ def load_break_minutes() -> int:
 def _save_key(key: str, value: object) -> None:
     """Set one key and write the whole file back, keeping every other key as it is.
 
-    Written to a temp file first, so a crash never leaves half a file.
+    Written atomically, so a crash never leaves half a file. Raises SettingsUnreadable, and writes
+    nothing, when the file exists but cannot be read: saving over it would erase every other key.
     """
     global _cache
     path = settings_path()
     with _write_lock:
-        raw = _read_raw(path) if path.exists() else {}
+        raw = _parse_raw(path) if path.exists() else {}
         raw[key] = value
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_name(f"{path.name}.tmp")
-        temp.write_text(json.dumps(raw, indent=2), encoding="utf-8")
-        os.replace(temp, path)
+        write_json_atomic(path, raw)
         _cache = None
 
 

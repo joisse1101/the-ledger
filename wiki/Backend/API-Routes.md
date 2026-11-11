@@ -224,7 +224,7 @@ Each number has its own range check:
 - `afk_minutes` must be a whole number from 1 to 240 (`validate_afk_minutes`), else a 422.
 - `break_minutes` must be a whole number from 1 to 240 (`validate_break_minutes`), else a 422.
 
-Saving folders runs `history.correct_worktree_rows()` and then `refresh()`, under the refresh lock. Saving any of the numbers does neither. It returns the same shape as `GET`, so the next read already reflects it.
+When the settings file exists but cannot be read, nothing is saved and the route returns a 500 whose `detail` names the file, so the user can fix or delete it. Saving folders runs `history.correct_worktree_rows()` and then `refresh()`, under the refresh lock. Saving any of the numbers does neither. It returns the same shape as `GET`, so the next read already reflects it.
 
 ### Widget workouts
 
