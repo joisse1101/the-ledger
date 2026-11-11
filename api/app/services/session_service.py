@@ -28,7 +28,7 @@ class SessionView:
 
 
 def _find_transcript(session_id: str) -> Optional[claude_transcripts.ClaudeTranscript]:
-    return next((t for t in claude_transcripts.load_transcripts() if t.session_id == session_id), None)
+    return next(iter(claude_transcripts.load_transcripts([session_id])), None)
 
 
 def get_session(session_id: str) -> SessionView:

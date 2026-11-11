@@ -83,9 +83,10 @@ def _row_to_transcript(row: sqlite3.Row) -> ClaudeTranscript:
     )
 
 
-def load_transcripts() -> list[ClaudeTranscript]:
-    """Every session transcript from the SQLite snapshot, newest-updated first."""
-    return [_row_to_transcript(row) for row in queries.fetch_transcripts()]
+def load_transcripts(session_ids: Optional[list[str]] = None) -> list[ClaudeTranscript]:
+    """Every session transcript from the SQLite snapshot (or only those of `session_ids`),
+    newest-updated first."""
+    return [_row_to_transcript(row) for row in queries.fetch_transcripts(session_ids)]
 
 
 def delete_project_transcripts(project_path: str) -> int:

@@ -105,8 +105,11 @@ def load_sessions(directory: Optional[Path] = None) -> list[ClaudeSession]:
     for stale_path in _cache.keys() - seen_paths:
         del _cache[stale_path]
 
+    # Only the live sessions' rows: this runs on every live poll, and the full table is every
+    # session ever recorded.
     transcript_by_session_id = {
-        transcript.session_id: transcript for transcript in load_transcripts()
+        transcript.session_id: transcript
+        for transcript in load_transcripts([session.session_id for session in sessions])
     }
     for session in sessions:
         transcript = transcript_by_session_id.get(session.session_id)
