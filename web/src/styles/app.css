@@ -240,6 +240,13 @@ textarea {
     calc(var(--gutter) + env(safe-area-inset-left));
 }
 
+/* The table pages use the whole window width, so their tables only scroll when truly too wide. */
+.content[data-full-width="true"] {
+  max-width: none;
+  padding-left: calc(var(--table-page-gutter-x) + env(safe-area-inset-left));
+  padding-right: calc(var(--table-page-gutter-x) + env(safe-area-inset-right));
+}
+
 /* Nothing on a narrow screen may sit under the fixed tab bar. */
 .app[data-viewport="narrow"] .content {
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--gutter));

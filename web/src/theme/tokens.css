@@ -260,6 +260,8 @@
 :root {
   --tap: 2.75rem; /* minimum touch target */
   --gutter: 1rem;
+  /* Left and right padding around the tables on Manage Projects and Manage Sessions. */
+  --table-page-gutter-x: 16rem;
   --radius: 0.625rem;
   --tabbar-h: 3.5rem;
   --header-h: 3.5rem;
