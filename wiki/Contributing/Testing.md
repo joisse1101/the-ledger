@@ -47,7 +47,7 @@ The `isolated_db` fixture in `api/tests/conftest.py` monkeypatches `paths.db_pat
 The markers it accepts:
 
 - Python: `creationflags=NO_WINDOW` on a `subprocess` start, or on a call through an injected starter that defaults to one.
-- PowerShell: `-NoNewWindow` on `Start-Process`, or `CreateNoWindow = $true` on a `ProcessStartInfo`. `-WindowStyle Hidden` is not a marker.
+- PowerShell: `-NoNewWindow` on `Start-Process`, `CreateNoWindow = $true` on a `ProcessStartInfo`, or `CREATE_NO_WINDOW` in a file that calls `CreateProcess`. `-WindowStyle Hidden` is not a marker.
 - VBScript: window style `0` on `.Run`. `.Exec` is always flagged.
 
 Test files, `node_modules`, `.venv` and `dist` are skipped. The `ALLOWED` list holds the windows that are visible on purpose: the `Start-Ledger.ps1` backend and frontend windows, and the widget's own Electron window. Each entry carries its reason, and a second test fails when an entry no longer matches a start. The scan reads text and syntax, so it is a tripwire rather than proof; reviewers apply the same rule (see `hooks/CLAUDE.md`).

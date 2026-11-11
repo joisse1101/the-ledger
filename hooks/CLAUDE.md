@@ -14,10 +14,10 @@
   `hooks/scripts/Open-ClaudeRepoWindow.ps1`. Don't move or change it without checking `api/app/routers/sessions.py`.
 - `ledgerScripts/` is dashboard-coupled. Keep it apart from `scripts/`.
 - `hooks/chimeScripts/Play-ClaudeChime.ps1` must print nothing and exit 0 on every path. Its
-  `-DryRun`, `-IdleSeconds`, `-StateDir` and `-PlayerPath` parameters are test-only; tests never play a sound. Its sound child must open no window (`CreateNoWindow`) and announces itself as `Ledger: Playing chimes...`.
+  `-DryRun`, `-IdleSeconds`, `-StateDir` and `-PlayerPath` parameters are test-only; tests never play a sound. Its sound child must open no window (`CREATE_NO_WINDOW`), inherit no handles (else it holds the hook's output pipe open) and announces itself as `Ledger: Playing chimes...`.
 - `chimeScripts/` is standalone like `scripts/`, not dashboard-coupled. Keep it apart from `ledgerScripts/`.
 - Every process the Ledger starts carries a no-window marker on the same call: `creationflags=NO_WINDOW`
-  in Python, `-NoNewWindow` on `Start-Process` or `CreateNoWindow = $true` on a `ProcessStartInfo`, and
+  in Python, `-NoNewWindow` on `Start-Process` or `CreateNoWindow = $true` on a `ProcessStartInfo`, `CREATE_NO_WINDOW` for a `CreateProcess` call, and
   window style `0` on a `.vbs` `Run`. `-WindowStyle Hidden` does not count; Windows Terminal ignores it.
   `api/tests/test_no_window_guard.py` enforces this over `hooks/`, `widget/`, `api/app` and the root
   scripts. Its `ALLOWED` list names the deliberate windows (the `Start-Ledger.ps1` backend and frontend

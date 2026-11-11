@@ -180,8 +180,23 @@ def test_the_sound_child_announces_itself_while_the_hook_prints_nothing(tmp_path
     assert "Asterisk" in child_arguments
 
 
+def test_the_hook_output_closes_before_a_slow_sound_child_ends(tmp_path):
+    # Claude Code reads the hook through these pipes; a child that inherits them would hold the hook open.
+    finished = tmp_path / "player-finished.txt"
+    player = tmp_path / "slow-player.bat"
+    player.write_text(f'@echo off\r\nping -n 9 127.0.0.1 >nul\r\n>"{finished}" echo done\r\n', encoding="ascii")
+    hook = subprocess.Popen(
+        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(SCRIPT),
+         "-Kind", "done", "-StateDir", str(tmp_path / "state"), "-IdleSeconds", "400", "-PlayerPath", str(player)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    stdout, stderr = hook.communicate(PAYLOAD.encode(), timeout=60)  # returns once both pipes close
+    player_ended_first = finished.exists()
+    assert (hook.returncode, stdout, stderr, player_ended_first) == (0, b"", b"", False)
+    assert _wait_for(finished, seconds=30).strip() == "done"
+
+
 def test_the_sound_child_is_started_with_no_console():
     source = SCRIPT.read_text(encoding="utf-8")
-    assert "CreateNoWindow = $true" in source
-    assert "UseShellExecute = $false" in source
+    assert "CREATE_NO_WINDOW" in source
     assert "Start-Process" not in source

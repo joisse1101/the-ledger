@@ -92,7 +92,7 @@ Add `-SkipToastHooks` for chimes alone: no toast script, no BurntToast, no `clau
 
 **Merge rule.** Alerts within 5 seconds make one sound. Each kind keeps a timestamp file in the state folder, guarded by a named mutex. `done` is skipped after any recent sound. `needs-input` is skipped only after a recent `needs-input`, so a finish never hides a request for input. If the mutex or the folder is unusable, the sound plays.
 
-**Silence contract.** The script prints nothing and exits 0 on every path, so it cannot disturb Claude Code. The sound plays from a child PowerShell started with no console (`CreateNoWindow`), so the hook returns at once and no window opens, even when Windows Terminal is the default terminal. A hidden window style is not enough there. The child sets its window title to `Ledger: Playing chimes...` and prints the same line, so a window that still slips through can be traced. The hook itself prints nothing.
+**Silence contract.** The script prints nothing and exits 0 on every path, so it cannot disturb Claude Code. The sound plays from a child PowerShell started through `CreateProcess` with no console (`CREATE_NO_WINDOW`), so no window opens, even when Windows Terminal is the default terminal. A hidden window style is not enough there. The child also inherits no handles. A child started through .NET's `Process.Start` inherits the pipes Claude Code reads the hook through, which keeps the hook looking unfinished until the sound ends. The child sets its window title to `Ledger: Playing chimes...` and prints the same line, so a window that still slips through can be traced. The hook itself prints nothing.
 
 ### Test-only parameters
 

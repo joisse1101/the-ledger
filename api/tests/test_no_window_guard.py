@@ -7,7 +7,8 @@ Markers per language:
 - Python: `creationflags=NO_WINDOW` on `subprocess.run/Popen/call/check_call/check_output`, and on a
   call through an injected starter (a parameter defaulting to one of those, or `self.<attr>` set from it).
 - PowerShell: `-NoNewWindow` on `Start-Process` (it sets `CreateNoWindow` on the child), and
-  `$info.CreateNoWindow = $true` for a `ProcessStartInfo`. `-WindowStyle Hidden` is not a marker:
+  `$info.CreateNoWindow = $true` for a `ProcessStartInfo`, and `CREATE_NO_WINDOW` in the same file for
+  a `CreateProcess` call declared through `Add-Type`. `-WindowStyle Hidden` is not a marker:
   Windows Terminal, as the default terminal, ignores it.
 - VBScript: window style `0` as the second argument of `.Run`; `.Exec` always shows a console.
 """
@@ -138,6 +139,7 @@ _START_INFO = re.compile(
     r"|\[(?:System\.)?Diagnostics\.ProcessStartInfo\]::new\b)",
     re.IGNORECASE,
 )
+_CREATE_PROCESS = re.compile(r"\bCreateProcess[AW]?\s*\(")
 
 
 def _logical_lines(source: str) -> list[tuple[int, str]]:
@@ -175,6 +177,11 @@ def scan_powershell(source: str) -> list[int]:
             )
             if not marker:
                 lines.append(number)
+    # Checked per physical line: the C# that declares and calls CreateProcess has no backticks to join.
+    has_no_window_flag = "CREATE_NO_WINDOW" in source
+    for number, raw in enumerate(source.splitlines(), start=1):
+        if _CREATE_PROCESS.search(raw) and not has_no_window_flag:
+            lines.append(number)
     return lines
 
 
@@ -253,6 +260,7 @@ def test_every_allow_list_entry_still_matches_a_start() -> None:
         ("hooks/leak.ps1", "# a start\nStart-Process notepad -WindowStyle Hidden\n", 2),
         ("hooks/leak.ps1", "Start-Process powershell `\n    -ArgumentList '-NoExit'\n", 1),
         ("widget/leak.ps1", "$i = New-Object System.Diagnostics.ProcessStartInfo\n$i.FileName = 'x'\n", 1),
+        ("hooks/leak.ps1", "Add-Type @'\nstatic extern bool CreateProcessW(string a);\n'@\n", 2),
         ("Leak.ps1", "Start-Process cmd\n", 1),
         ("scripts/Leak.ps1", "Start-Process cmd\n", 1),
         ("hooks/leak.vbs", "Set s = CreateObject(\"WScript.Shell\")\ns.Run cmd, 1, False\n", 2),
@@ -281,6 +289,10 @@ def test_scan_flags_an_unguarded_start(tmp_path: Path, relative: str, source: st
         ("hooks/ok.ps1", "Start-Process code -ArgumentList 'x' `\n    -NoNewWindow\n"),
         ("hooks/ok.ps1", "$i = New-Object System.Diagnostics.ProcessStartInfo\n$i.CreateNoWindow = $true\n"),
         ("hooks/ok.ps1", "# Start-Process is mentioned in a comment only\n"),
+        (
+            "hooks/ok.ps1",
+            "Add-Type @'\nstatic extern bool CreateProcessW(string a);\nconst uint CREATE_NO_WINDOW = 0x08000000;\n'@\n",
+        ),
         ("hooks/ok.vbs", "objShell.Run cmd, 0, False\n' objShell.Run cmd, 1\n"),
         ("hooks/tests/Test-Leak.ps1", "Start-Process cmd\n"),
         ("api/app/test_leak.py", "import subprocess\nsubprocess.run(['x'])\n"),
