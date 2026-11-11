@@ -41,4 +41,24 @@ describe('startPoller', () => {
     await vi.advanceTimersByTimeAsync(5000)
     expect(fetchLive).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps polling after a fetch or onState throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fetchLive = vi
+      .fn<() => Promise<LiveState>>()
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValue({ state: 'offline' })
+    const onState = vi.fn().mockImplementationOnce(() => {
+      throw new Error('Object has been destroyed')
+    })
+    const poller = startPoller(fetchLive, onState, 1000)
+
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(fetchLive).toHaveBeenCalledTimes(3)
+    expect(onState).toHaveBeenCalledTimes(2)
+    poller.stop()
+  })
 })
