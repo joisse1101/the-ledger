@@ -21,6 +21,8 @@ export function startPoller<T>(
       .then((state) => {
         if (!stopped) onState(state)
       })
+      // One failed poll (a fetch or onState that throws) must not end the loop: the next tick retries.
+      .catch((error: unknown) => console.error(JSON.stringify({ event: 'poll-failed', error: String(error) })))
       .finally(() => {
         inFlight = undefined
       })
