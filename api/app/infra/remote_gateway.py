@@ -132,8 +132,9 @@ class RemoteGateway:
     def start(self) -> None:
         """Begin bringing everything up in the background. A no-op while starting or ready.
 
-        `on_start` runs under the lock on the way in; `on_off` also runs under it on every way out
-        (`stop()` and a failed start), so a callback must not call back into this object."""
+        All three callbacks run under the lock: `on_start` on the way in, `on_ready` when the gateway
+        answers, and `on_off` on every way out (`stop()` and a failed start). So a stop can never land
+        between the state change and its callback, and a callback must not call back into this object."""
         with self._lock:
             if self._state in (STARTING, READY):
                 return
@@ -152,10 +153,11 @@ class RemoteGateway:
             self._cancel.set()
             self._state, self._step, self._reason = OFF, None, None
             expiry, self._expiry = self._expiry, None
+            frontend, self._frontend = self._frontend, None
             self._on_off()  # before the teardown, which can wait on Docker: revoke first
         if expiry is not None:
             expiry.cancel()
-        self._teardown()
+        self._teardown(frontend)
 
     def stop_leftovers(self) -> None:
         """At backend startup: Remote mode is off, so close a gateway an earlier backend left up.
@@ -167,15 +169,15 @@ class RemoteGateway:
 
     def _run(self, generation: int, cancel: threading.Event) -> None:
         steps = (
-            (STEP_DOCKER, self._ensure_docker),
-            (STEP_FRONTEND, self._ensure_frontend),
-            (STEP_GATEWAY, self._ensure_gateway),
+            (STEP_DOCKER, lambda: self._ensure_docker(cancel)),
+            (STEP_FRONTEND, lambda: self._ensure_frontend(generation, cancel)),
+            (STEP_GATEWAY, lambda: self._ensure_gateway(cancel)),
         )
         try:
             for name, ensure in steps:
                 if not self._set_step(generation, name):
                     return
-                ensure(cancel)
+                ensure()
             self._become_ready(generation)
         except RemoteStartError as err:
             self._fail(generation, str(err))
@@ -184,34 +186,46 @@ class RemoteGateway:
             self._fail(generation, "Remote mode failed unexpectedly; see the backend log")
 
     def _set_step(self, generation: int, step: str) -> bool:
-        """Record the step, or tear down and report False if this run was superseded."""
+        """Record the step, or stand down and report False if this run was superseded."""
         with self._lock:
             if generation == self._generation:
                 self._step = step
                 return True
-        self._teardown()
+        self._stand_down()
         return False
 
     def _become_ready(self, generation: int) -> None:
         with self._lock:
-            if generation != self._generation:
-                superseded = True
-            else:
-                superseded = False
+            if generation == self._generation:
                 self._state, self._step = READY, None
                 self._expiry = self._schedule(self._ttl, self.stop)
-        if superseded:
-            self._teardown()
-            return
-        self._on_ready()
+                self._on_ready()
+                return
+        self._stand_down()
 
     def _fail(self, generation: int, reason: str) -> None:
-        self._teardown()
         with self._lock:
             if generation == self._generation:
                 self._state, self._step, self._reason = FAILED, None, reason
                 self._failed_at = self._clock()
+                frontend, self._frontend = self._frontend, None
                 self._on_off()
+                superseded = False
+            else:
+                superseded = True
+        if superseded:
+            self._stand_down()
+        else:
+            self._teardown(frontend)
+
+    def _stand_down(self) -> None:
+        """A superseded run's exit. `stop()` already took the frontend, and a newer run that is
+        starting or ready owns the gateway now, so close the gateway only when no run owns it: this
+        run may have brought it up after `stop()` closed it."""
+        with self._lock:
+            if self._state in (STARTING, READY):
+                return
+        self._close_gateway()
 
     # ------------------------------------------------------------ steps
 
@@ -223,12 +237,21 @@ class RemoteGateway:
         self._system.start_docker_desktop()
         self._wait_until(self._system.docker_ready, self._docker_timeout, cancel, "Docker did not start in time")
 
-    def _ensure_frontend(self, cancel: threading.Event) -> None:
+    def _ensure_frontend(self, generation: int, cancel: threading.Event) -> None:
         if self._system.frontend_up():
             return
         handle = self._system.start_frontend()
         with self._lock:
-            self._frontend = handle
+            # The run that is starting or ready takes the handle: this one, or a newer run that found
+            # this web interface already up. A second handle, or one no run owns, is stopped now.
+            owned = self._state in (STARTING, READY) and self._frontend is None
+            if owned:
+                self._frontend = handle
+            superseded = generation != self._generation
+        if not owned:
+            self._system.stop_frontend(handle)
+        if superseded:
+            return  # the next step boundary stands this run down
         self._wait_until(self._system.frontend_up, self._frontend_timeout, cancel, "The web interface did not start in time")
 
     def _ensure_gateway(self, cancel: threading.Event) -> None:
@@ -247,11 +270,13 @@ class RemoteGateway:
 
     # ------------------------------------------------------------ teardown
 
-    def _teardown(self) -> None:
-        """Stop the gateway, and the web interface only if this module started it. Idempotent."""
-        with self._lock:
-            handle, self._frontend = self._frontend, None
+    def _teardown(self, frontend: Any) -> None:
+        """Close the gateway, then stop the web interface if this module started it (`frontend` is
+        its handle, already taken from the state under the lock, or None)."""
+        self._close_gateway()
+        if frontend is not None:
+            self._system.stop_frontend(frontend)
+
+    def _close_gateway(self) -> None:
         if not self._system.compose_down():
             log.warning("docker compose down for the gateway did not succeed")
-        if handle is not None:
-            self._system.stop_frontend(handle)
