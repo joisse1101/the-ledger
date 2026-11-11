@@ -15,8 +15,10 @@ Order of decisions:
 2. Merge. Under a named mutex, one timestamp file per kind in the state folder: 'done' is skipped if
    any sound played in the last 5 seconds, 'needs-input' only if a needs-input sound did. If the mutex
    cannot be taken quickly, or the state folder is unusable, the sound plays.
-3. Play. A hidden child PowerShell plays System.Media.SystemSounds (Asterisk for done, Hand for
-   needs-input), so the hook returns at once.
+3. Play. A child PowerShell with no console (CREATE_NO_WINDOW) and no inherited handles plays
+   System.Media.SystemSounds (Asterisk for done, Hand for needs-input), so the hook returns at once
+   and its output pipes close with it. The child titles itself
+   'Ledger: Playing chimes...' so a window that slips through can be traced; the hook prints nothing.
 
 .PARAMETER Kind
 'done' or 'needs-input'. Anything else does nothing.
@@ -50,6 +52,7 @@ $MergeWindowSeconds = 5
 $MutexName = 'Local\ClaudeChimeMerge'
 $MutexWaitMilliseconds = 500
 $SoundByKind = @{ 'done' = 'Asterisk'; 'needs-input' = 'Hand' }
+$ChimeMessage = 'Ledger: Playing chimes...'
 
 # Whole seconds since the last keyboard/mouse input, or $null when Windows won't say.
 function Get-IdleSeconds {
@@ -139,12 +142,58 @@ function Test-MergedAndRecord {
     }
 }
 
+# Starts a command line with no console (CREATE_NO_WINDOW) and no inherited handles. .NET's
+# Process.Start always lets the child inherit handles, and one of them keeps the pipes Claude Code reads
+# this hook through open, so the hook would look unfinished until the sound ends.
+function Start-DetachedNoWindow {
+    param([string]$CommandLine)
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class ChimeLauncher {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct STARTUPINFO {
+        public int cb; public string lpReserved; public string lpDesktop; public string lpTitle;
+        public int dwX; public int dwY; public int dwXSize; public int dwYSize; public int dwXCountChars;
+        public int dwYCountChars; public int dwFillAttribute; public int dwFlags; public short wShowWindow;
+        public short cbReserved2; public IntPtr lpReserved2; public IntPtr hStdInput; public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_INFORMATION { public IntPtr hProcess; public IntPtr hThread; public int dwProcessId; public int dwThreadId; }
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool CreateProcessW(string application, StringBuilder commandLine, IntPtr processAttributes,
+        IntPtr threadAttributes, bool inheritHandles, uint creationFlags, IntPtr environment, string directory,
+        ref STARTUPINFO startupInfo, out PROCESS_INFORMATION processInformation);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+    const uint CREATE_NO_WINDOW = 0x08000000;
+    public static void Start(string commandLine) {
+        STARTUPINFO startupInfo = new STARTUPINFO();
+        startupInfo.cb = Marshal.SizeOf(typeof(STARTUPINFO));
+        PROCESS_INFORMATION info;
+        if (!CreateProcessW(null, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, false,
+                CREATE_NO_WINDOW, IntPtr.Zero, null, ref startupInfo, out info)) {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+        CloseHandle(info.hThread);
+        CloseHandle(info.hProcess);
+    }
+}
+'@
+    [ChimeLauncher]::Start($CommandLine)
+}
+
 function Start-Sound {
     param([string]$Sound)
-    # The child waits a moment because SystemSounds.Play returns before the sound ends.
-    $command = "try { [System.Media.SystemSounds]::$Sound.Play(); Start-Sleep -Milliseconds 1500 } catch { }"
-    Start-Process -FilePath $PlayerPath -WindowStyle Hidden `
-        -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', $command) | Out-Null
+    # The child waits a moment because SystemSounds.Play returns before the sound ends. Its title and
+    # line name the source if a window ever appears anyway; the hook itself still prints nothing.
+    $command = "try { `$Host.UI.RawUI.WindowTitle = '$ChimeMessage'; Write-Host '$ChimeMessage'; " +
+        "[System.Media.SystemSounds]::$Sound.Play(); Start-Sleep -Milliseconds 1500 } catch { }"
+    # No console at all: a hidden window style is ignored when Windows Terminal is the default
+    # terminal, which is what made an empty window flash.
+    Start-DetachedNoWindow -CommandLine "`"$PlayerPath`" -NoProfile -NonInteractive -Command `"$command`""
 }
 
 try {

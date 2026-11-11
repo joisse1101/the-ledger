@@ -3,6 +3,7 @@ without any server process running (mirrors the isolated_db fixture the rest of 
 db suite uses, so this never touches the real ~/.claude.json or ~/.claude/projects/)."""
 
 import backup_history
+import pytest
 from app.repositories import settings_store
 from app.repositories.db import history, paths
 
@@ -113,3 +114,43 @@ def test_backup_attributes_a_session_in_a_configured_worktree_folder(
 
     (row,) = history.fetch_history_transcripts()
     assert (row["worktree"], row["project"]) == ("fix-nav", "the-ledger")
+
+
+def test_main_logs_a_start_line_and_a_success_line_beside_history_db(
+    isolated_db, write_config, write_transcript
+):
+    _write_one_session(isolated_db, write_config, write_transcript)
+
+    backup_history.main([])
+
+    lines = backup_history.log_path().read_text(encoding="utf-8").splitlines()
+    assert backup_history.log_path().parent == paths.history_db_path().parent
+    assert len(lines) == 2
+    assert lines[0].endswith("Ledger: Backing up history...")
+    assert lines[1].endswith("Ledger: Backup succeeded: 1 transcript row(s)")
+
+
+def test_main_logs_a_start_line_and_a_failure_line_then_still_fails(isolated_db, monkeypatch):
+    def broken_scan():
+        raise RuntimeError("disk unreadable")
+
+    monkeypatch.setattr(backup_history.scanner, "scan_projects", broken_scan)
+
+    with pytest.raises(RuntimeError, match="disk unreadable"):
+        backup_history.main([])
+
+    lines = backup_history.log_path().read_text(encoding="utf-8").splitlines()
+    assert lines[0].endswith("Ledger: Backing up history...")
+    assert lines[1].endswith("Ledger: Backup failed: RuntimeError: disk unreadable")
+
+
+def test_a_log_that_cannot_be_written_does_not_fail_the_backup(
+    isolated_db, write_config, write_transcript, monkeypatch
+):
+    _write_one_session(isolated_db, write_config, write_transcript)
+    log_path = backup_history.log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.mkdir()  # a folder where the log file should be, so opening it for append fails
+
+    assert backup_history.main([]) == 0
+    assert len(history.fetch_history_transcripts()) == 1

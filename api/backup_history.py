@@ -12,10 +12,34 @@ serialized-row shape `fetch_transcripts()` returns (ISO strings/plain paths) not
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Sequence
 
 from app.repositories.db import history, paths, scanner
+
+logger = logging.getLogger(__name__)
+
+START_MESSAGE = "Ledger: Backing up history..."
+LOG_FILE_NAME = "backup.log"
+
+
+def log_path() -> Path:
+    """The log file sits beside history.db, so it is found wherever the data folder is."""
+    return paths.history_db_path().with_name(LOG_FILE_NAME)
+
+
+def _log(message: str) -> None:
+    """Append one timestamped line. The scheduled task runs without a console, so this file is the
+    only record of a run. A logging problem must never fail the backup, so it is only reported."""
+    try:
+        path = log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"{datetime.now().astimezone().isoformat(timespec='seconds')} {message}\n")
+    except OSError:
+        logger.warning("could not write the backup log", exc_info=True)
 
 
 def backup() -> int:
@@ -35,7 +59,13 @@ def backup() -> int:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    count = backup()
+    _log(START_MESSAGE)
+    try:
+        count = backup()
+    except Exception as error:
+        _log(f"Ledger: Backup failed: {type(error).__name__}: {error}")
+        raise
+    _log(f"Ledger: Backup succeeded: {count} transcript row(s)")
     print(f"Backed up {count} transcript row(s) to {paths.history_db_path()}", flush=True)
     return 0
 

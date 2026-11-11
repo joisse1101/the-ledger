@@ -92,7 +92,7 @@ Add `-SkipToastHooks` for chimes alone: no toast script, no BurntToast, no `clau
 
 **Merge rule.** Alerts within 5 seconds make one sound. Each kind keeps a timestamp file in the state folder, guarded by a named mutex. `done` is skipped after any recent sound. `needs-input` is skipped only after a recent `needs-input`, so a finish never hides a request for input. If the mutex or the folder is unusable, the sound plays.
 
-**Silence contract.** The script prints nothing and exits 0 on every path, so it cannot disturb Claude Code. The sound plays from a hidden child PowerShell, so the hook returns at once.
+**Silence contract.** The script prints nothing and exits 0 on every path, so it cannot disturb Claude Code. The sound plays from a child PowerShell started through `CreateProcess` with no console (`CREATE_NO_WINDOW`), so no window opens, even when Windows Terminal is the default terminal. A hidden window style is not enough there. The child also inherits no handles. A child started through .NET's `Process.Start` inherits the pipes Claude Code reads the hook through, which keeps the hook looking unfinished until the sound ends. The child sets its window title to `Ledger: Playing chimes...` and prints the same line, so a window that still slips through can be traced. The hook itself prints nothing.
 
 ### Test-only parameters
 
@@ -110,6 +110,8 @@ Tests cover the decisions, not the sound. Unchecked: that the two sounds differ 
 ## History backup task scripts
 
 `Install-HistoryBackupTask.ps1` and `Uninstall-HistoryBackupTask.ps1` register and remove the Windows Scheduled Task. The task runs `api/backup_history.py` daily. See [Setup and run](../Contributing/Setup-And-Run.md).
+
+The task runs `pythonw.exe` (Python without a console) so no window flashes. Because nothing can be printed to a console, `backup_history.py` appends each run to `backup.log` beside `history.db`: a `Ledger: Backing up history...` line, then a success or failure line. A logging problem never fails the backup. If `pythonw.exe` is missing from the venv, the installer prints a warning and registers `python.exe`. A task registered earlier keeps `python.exe` until `Install-Ledger.ps1` is re-run and the backup task accepted. The installer's `-ScriptsDir` parameter is test-only.
 
 They sit alongside the relay hook in the same folder. Unlike the relay hook, they are not Claude Code hooks at all. Nothing copies them anywhere or touches `settings.json`. They run directly from this checkout.
 

@@ -186,15 +186,15 @@ if (Test-LedgerBackend -Port $BackendPort) {
 } else {
     Write-Host "Starting backend on port $BackendPort in $Mode mode (new window)..."
     $backendReloadFlag = if ($Mode -eq 'dev') { ' --reload' } else { '' }
-    $backendCommand = "Set-Location '$PSScriptRoot\api'; & '$python' -m app --port $BackendPort --frontend-port $FrontendPort$backendReloadFlag"
+    $backendCommand = "`$Host.UI.RawUI.WindowTitle = 'Ledger: backend'; Set-Location '$PSScriptRoot\api'; & '$python' -m app --port $BackendPort --frontend-port $FrontendPort$backendReloadFlag"
     $backendPid = (Start-Process powershell -ArgumentList '-NoExit', '-Command', $backendCommand -PassThru).Id
 }
 
 Write-Host "Starting frontend on port $FrontendPort in $Mode mode (new window)..."
 if ($Mode -eq 'dev') {
-    $frontendCommand = "Set-Location '$PSScriptRoot\web'; `$env:BACKEND_PORT = '$BackendPort'; npm run dev -- --port $FrontendPort"
+    $frontendCommand = "`$Host.UI.RawUI.WindowTitle = 'Ledger: frontend'; Set-Location '$PSScriptRoot\web'; `$env:BACKEND_PORT = '$BackendPort'; npm run dev -- --port $FrontendPort"
 } else {
-    $frontendCommand = "Set-Location '$PSScriptRoot\web'; `$env:BACKEND_PORT = '$BackendPort'; npm run build; if (`$LASTEXITCODE -eq 0) { npm run preview -- --port $FrontendPort } else { Read-Host 'Build failed - press Enter to close' }"
+    $frontendCommand = "`$Host.UI.RawUI.WindowTitle = 'Ledger: frontend'; Set-Location '$PSScriptRoot\web'; `$env:BACKEND_PORT = '$BackendPort'; npm run build; if (`$LASTEXITCODE -eq 0) { npm run preview -- --port $FrontendPort } else { Read-Host 'Build failed - press Enter to close' }"
 }
 $frontendProc = Start-Process powershell -ArgumentList '-NoExit', '-Command', $frontendCommand -PassThru
 
