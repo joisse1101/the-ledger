@@ -649,6 +649,25 @@ def test_refresh_populates_projects_and_transcripts(isolated_db, write_config, w
     assert transcripts[0]["project"] == "the-ledger"
 
 
+def test_refresh_keeps_the_latest_file_when_two_transcripts_share_a_session_id(
+    isolated_db, write_config, write_transcript
+):
+    tmp_path = isolated_db
+    write_config(tmp_path / "claude.json", {})
+    folder = tmp_path / "projects" / paths.sanitize_project_path("/home/x/the-ledger")
+    for stem, timestamp in (("old-file", "2024-01-01T10:00:00Z"), ("new-file", "2024-01-02T10:00:00Z")):
+        write_transcript(
+            folder / f"{stem}.jsonl",
+            [{"type": "user", "timestamp": timestamp, "cwd": "/home/x/the-ledger", "sessionId": "shared"}],
+        )
+
+    snapshot.refresh()
+
+    transcripts = queries.fetch_transcripts()
+    assert [t["session_id"] for t in transcripts] == ["shared"]
+    assert Path(transcripts[0]["path"]).stem == "new-file"
+
+
 def test_refresh_replaces_previous_contents(isolated_db, write_config):
     tmp_path = isolated_db
     write_config(tmp_path / "claude.json", {"/a": {"hasTrustDialogAccepted": False}})

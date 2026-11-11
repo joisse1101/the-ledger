@@ -67,6 +67,8 @@ The data originally comes from `~/.claude.json`'s top-level `projects` map. That
 
 It holds the `ClaudeTranscript` dataclass and query and delete functions for session transcript data. The data is originally parsed line by line from `~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl`. That covers every session that has ever run, including exited ones. The parsing itself lives in `snapshot.refresh()`.
 
+The session ID stored for a file is the `sessionId` read from its lines, not the file name. So two files can carry the same ID, for example after a session is resumed into a new file. The snapshot keeps one row per ID, from the file with the latest `updated_at`.
+
 ### What the parsing derives
 
 `started_at` and `updated_at` are the min and max line timestamp. `message_count` counts non-meta `user` and `assistant` lines.
