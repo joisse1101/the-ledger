@@ -45,12 +45,12 @@ def test_parse_session_file_malformed_json(tmp_path):
 
 
 def test_load_sessions_empty_directory_returns_empty(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     assert claude_sessions.load_sessions(tmp_path / "does-not-exist") == []
 
 
 def test_load_sessions_sorted_newest_first(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     _write_session_file(tmp_path / "1.json", sessionId="older", updatedAt=1_700_000_000_000)
     _write_session_file(tmp_path / "2.json", sessionId="newer", updatedAt=1_700_000_500_000)
 
@@ -68,14 +68,17 @@ def test_load_sessions_resolves_project_from_transcripts(tmp_path, monkeypatch):
             self.first_prompt = "Can you help me?"
             self.started_at = None
 
-    monkeypatch.setattr(
-        claude_sessions,
-        "load_transcripts",
-        lambda: [FakeTranscript("sess-1", "real-project-name")],
-    )
+    requested = []
+
+    def load_transcripts(session_ids):
+        requested.append(session_ids)
+        return [FakeTranscript("sess-1", "real-project-name")]
+
+    monkeypatch.setattr(claude_sessions, "load_transcripts", load_transcripts)
     _write_session_file(tmp_path / "1.json", sessionId="sess-1", cwd="/some/other/path")
 
     sessions = claude_sessions.load_sessions(tmp_path)
+    assert requested == [["sess-1"]]  # only the live sessions, never the whole table
     assert sessions[0].project == "real-project-name"
     assert sessions[0].title == "What we did"
     assert sessions[0].last_message == "All done."
@@ -97,14 +100,14 @@ def _transcript(session_id, started_at):
 
 def test_load_sessions_takes_the_start_from_the_transcript(tmp_path, monkeypatch):
     started = datetime(2023, 11, 14, 21, 0, tzinfo=timezone.utc)
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [_transcript("sess-1", started)])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [_transcript("sess-1", started)])
     _write_session_file(tmp_path / "1.json", sessionId="sess-1", startedAt=1_700_003_000_000)
 
     assert claude_sessions.load_sessions(tmp_path)[0].started_at == started
 
 
 def test_load_sessions_keeps_the_registry_start_without_a_transcript_start(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [_transcript("sess-1", None)])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [_transcript("sess-1", None)])
     _write_session_file(tmp_path / "1.json", sessionId="sess-1")
     _write_session_file(tmp_path / "2.json", sessionId="sess-2")
 
@@ -114,7 +117,7 @@ def test_load_sessions_keeps_the_registry_start_without_a_transcript_start(tmp_p
 
 
 def test_load_sessions_no_transcript_match_leaves_title_and_messages_blank(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     _write_session_file(tmp_path / "1.json", sessionId="sess-1")
 
     sessions = claude_sessions.load_sessions(tmp_path)
@@ -124,7 +127,7 @@ def test_load_sessions_no_transcript_match_leaves_title_and_messages_blank(tmp_p
 
 
 def test_load_sessions_falls_back_to_cwd_when_no_transcript_match(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     _write_session_file(tmp_path / "1.json", sessionId="sess-1", cwd="/home/x/brand-new")
 
     sessions = claude_sessions.load_sessions(tmp_path)
@@ -132,7 +135,7 @@ def test_load_sessions_falls_back_to_cwd_when_no_transcript_match(tmp_path, monk
 
 
 def test_load_sessions_caches_unchanged_files(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     path = tmp_path / "1.json"
     _write_session_file(path, sessionId="sess-1")
 
@@ -142,7 +145,7 @@ def test_load_sessions_caches_unchanged_files(tmp_path, monkeypatch):
 
 
 def test_load_sessions_reparses_changed_files(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     path = tmp_path / "1.json"
     _write_session_file(path, sessionId="sess-1", status="running")
 
@@ -161,7 +164,7 @@ def test_load_sessions_reparses_changed_files(tmp_path, monkeypatch):
 
 
 def test_load_sessions_drops_stale_cache_entries(tmp_path, monkeypatch):
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [])
     path = tmp_path / "1.json"
     _write_session_file(path, sessionId="sess-1")
     claude_sessions.load_sessions(tmp_path)

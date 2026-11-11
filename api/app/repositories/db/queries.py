@@ -17,13 +17,16 @@ def fetch_projects() -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def fetch_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row, live `ledger.db` rows merged with `history.db`'s durable rows by
-    `session_id` (the live row wins whenever a session exists in both - it's the fresher scan),
-    newest-updated first (NULLs last)."""
+def fetch_transcripts(session_ids: Optional[list[str]] = None) -> list[sqlite3.Row]:
+    """Every transcript row (or only those of `session_ids`), live `ledger.db` rows merged with
+    `history.db`'s durable rows by `session_id` (the live row wins whenever a session exists in
+    both - it's the fresher scan), newest-updated first (NULLs last)."""
+    if session_ids is not None and not session_ids:
+        return []
+    where, params = connection.session_id_filter(session_ids)
     with connection.connect() as conn:
-        live_rows = conn.execute("SELECT * FROM transcripts").fetchall()
-    history_rows = history.fetch_history_transcripts()
+        live_rows = conn.execute(f"SELECT * FROM transcripts{where}", params).fetchall()
+    history_rows = history.fetch_history_transcripts(session_ids)
 
     merged: dict[str, sqlite3.Row] = {row["session_id"]: row for row in history_rows}
     merged.update({row["session_id"]: row for row in live_rows})

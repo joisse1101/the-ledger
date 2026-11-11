@@ -818,6 +818,25 @@ def test_fetch_transcripts_includes_history_only_session(isolated_db, write_conf
     assert [row["session_id"] for row in transcripts] == ["history-only"]
 
 
+def test_fetch_transcripts_returns_only_the_requested_sessions(
+    isolated_db, write_config, write_transcript
+):
+    write_config(isolated_db / "claude.json", {})
+    folder = paths.sanitize_project_path("/home/x/proj")
+    for session_id in ("live-1", "live-2"):
+        write_transcript(
+            isolated_db / "projects" / folder / f"{session_id}.jsonl",
+            [{"type": "user", "timestamp": "2024-01-01T10:00:00Z", "cwd": "/home/x/proj", "sessionId": session_id}],
+        )
+    snapshot.refresh()
+    history.upsert_history_transcripts([_history_row("old-1"), _history_row("old-2")])
+
+    rows = queries.fetch_transcripts(["live-2", "old-1"])
+
+    assert {row["session_id"] for row in rows} == {"live-2", "old-1"}
+    assert queries.fetch_transcripts([]) == []
+
+
 def test_fetch_transcripts_prefers_live_row_over_history_row(
     isolated_db, write_config, write_transcript
 ):

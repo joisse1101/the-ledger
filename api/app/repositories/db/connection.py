@@ -5,12 +5,19 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Generator
+from typing import Callable, Generator, Optional
 
 from app.repositories.db import paths
 
 
 _BUSY_TIMEOUT_MS = 10_000
+
+
+def session_id_filter(session_ids: Optional[list[str]]) -> tuple[str, list[str]]:
+    """A ` WHERE session_id IN (...)` clause and its parameters; no clause when `session_ids` is None."""
+    if session_ids is None:
+        return "", []
+    return f" WHERE session_id IN ({','.join('?' * len(session_ids))})", list(session_ids)
 
 
 @contextmanager

@@ -168,7 +168,7 @@ def test_a_reopened_session_is_graded_from_its_conversations_start(tmp_path, mon
         project = title = last_message = first_prompt = ""
         started_at = conversation_start
 
-    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda: [Transcript()])
+    monkeypatch.setattr(claude_sessions, "load_transcripts", lambda *_: [Transcript()])
     (tmp_path / "1.json").write_text(
         json.dumps({"pid": 1, "sessionId": "s1", "startedAt": reopened_at.timestamp() * 1000}),
         encoding="utf-8",

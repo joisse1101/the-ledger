@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from app.core.worktrees import parse_worktree
 from app.repositories import settings_store
@@ -105,7 +105,9 @@ def correct_worktree_rows() -> None:
                 )
 
 
-def fetch_history_transcripts() -> list[sqlite3.Row]:
-    """Every transcript row ever backed up to `history.db`, including ones since pruned from disk."""
+def fetch_history_transcripts(session_ids: Optional[list[str]] = None) -> list[sqlite3.Row]:
+    """Every transcript row ever backed up to `history.db` (or only those of `session_ids`),
+    including ones since pruned from disk."""
+    where, params = connection.session_id_filter(session_ids)
     with connection.connect_history() as conn:
-        return conn.execute("SELECT * FROM transcripts").fetchall()
+        return conn.execute(f"SELECT * FROM transcripts{where}", params).fetchall()
