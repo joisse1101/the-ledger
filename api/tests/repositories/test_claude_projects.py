@@ -1,4 +1,7 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from app.repositories.db import snapshot
 from app.repositories import claude_projects
@@ -59,6 +62,26 @@ def test_delete_project_removes_entry_and_row(isolated_db, write_config):
 
     remaining_in_db = claude_projects.load_projects()
     assert [p.path for p in remaining_in_db] == ["/b"]
+
+
+def test_delete_project_leaves_the_config_whole_when_the_write_fails(isolated_db, write_config, monkeypatch):
+    config_file = isolated_db / "claude.json"
+    write_config(config_file, {"/a": {}, "/b": {}})
+    original = config_file.read_text(encoding="utf-8")
+    real_write_text = Path.write_text
+
+    def write_half_then_fail(self, text, *args, **kwargs):
+        real_write_text(self, text[: len(text) // 2], *args, **kwargs)
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_text", write_half_then_fail)
+
+    with pytest.raises(OSError):
+        claude_projects.delete_project("/a")
+
+    monkeypatch.undo()
+    assert config_file.read_text(encoding="utf-8") == original
+    assert [p.name for p in isolated_db.iterdir() if p.name.startswith("claude.json")] == ["claude.json"]
 
 
 def test_delete_project_returns_false_when_not_found(isolated_db, write_config):

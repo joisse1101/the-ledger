@@ -19,6 +19,7 @@ from app.core.widget_settings import (
     validate_max_projects,
 )
 from app.core.worktrees import normalize_folder
+from app.repositories.json_file import write_json_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,7 @@ def load_break_minutes() -> int:
 def _save_key(key: str, value: object) -> None:
     """Set one key and write the whole file back, keeping every other key as it is.
 
-    Written to a temp file first, so a crash never leaves half a file.
+    Written atomically, so a crash never leaves half a file.
     """
     global _cache
     path = settings_path()
@@ -171,9 +172,7 @@ def _save_key(key: str, value: object) -> None:
         raw = _read_raw(path) if path.exists() else {}
         raw[key] = value
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_name(f"{path.name}.tmp")
-        temp.write_text(json.dumps(raw, indent=2), encoding="utf-8")
-        os.replace(temp, path)
+        write_json_atomic(path, raw)
         _cache = None
 
 
