@@ -41,6 +41,24 @@ def gateway_port(repo_root: Path, environ: Mapping[str, str] = os.environ) -> in
     return int(value) if value.isdigit() else DEFAULT_GATEWAY_PORT
 
 
+def _newest_mtime(target: Path) -> float:
+    """The newest modification time of any file under `target`, or 0 if it does not exist."""
+    if not target.exists():
+        return 0.0
+    if not target.is_dir():
+        return target.stat().st_mtime
+    return max((_newest_mtime(child) for child in target.iterdir()), default=0.0)
+
+
+def web_build_stale(web_dir: Path) -> bool:
+    """Whether web/dist is missing or older than its sources. Same rule as the widget's
+    webBuildStale (widget/src/main/system.ts), so both launch paths rebuild alike."""
+    built_at = _newest_mtime(web_dir / "dist" / "index.html")
+    if built_at == 0:
+        return True
+    return max(_newest_mtime(web_dir / name) for name in ("src", "index.html", "package.json")) > built_at
+
+
 def _port_open(port: int) -> bool:
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=PORT_PROBE_TIMEOUT_SECONDS):
@@ -103,7 +121,7 @@ class RealSystem:
 
     def start_frontend(self) -> Any:
         env = {**self._environ, "BACKEND_PORT": str(self._backend_port)}
-        if not (self._web_dir / "dist").exists():
+        if web_build_stale(self._web_dir):
             built = self._run(
                 "npm run build",
                 cwd=self._web_dir,

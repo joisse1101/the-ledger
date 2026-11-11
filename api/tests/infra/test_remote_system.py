@@ -1,5 +1,6 @@
 """The real System with a fake `run` / `popen`: the commands it issues, not Docker itself."""
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -123,11 +124,30 @@ def test_start_frontend_builds_first_when_there_is_no_build(tmp_path):
     assert handle.pid == 4242
 
 
-def test_start_frontend_skips_the_build_when_dist_exists(tmp_path):
-    (tmp_path / "web" / "dist").mkdir(parents=True)
+def _write_web(tmp_path, source_mtime, build_mtime):
+    """A web/ folder whose source and dist/index.html have the given modification times."""
+    web = tmp_path / "web"
+    (web / "src").mkdir(parents=True)
+    (web / "dist").mkdir()
+    source, built = web / "src" / "main.tsx", web / "dist" / "index.html"
+    source.write_text("x")
+    built.write_text("x")
+    os.utime(source, (source_mtime, source_mtime))
+    os.utime(built, (build_mtime, build_mtime))
+
+
+def test_start_frontend_skips_the_build_when_dist_is_current(tmp_path):
+    _write_web(tmp_path, source_mtime=1_000, build_mtime=2_000)
     system, recorder = _system(tmp_path)
     system.start_frontend()
     assert [c[0] for c in recorder.calls] == ["npm run preview -- --port 4173"]
+
+
+def test_start_frontend_rebuilds_when_the_source_is_newer_than_dist(tmp_path):
+    _write_web(tmp_path, source_mtime=2_000, build_mtime=1_000)
+    system, recorder = _system(tmp_path)
+    system.start_frontend()
+    assert [c[0] for c in recorder.calls] == ["npm run build", "npm run preview -- --port 4173"]
 
 
 def test_start_frontend_fails_with_a_reason_when_the_build_fails(tmp_path):
