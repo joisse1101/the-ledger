@@ -91,7 +91,7 @@ def live_context(session_id: str, cwd: str) -> Optional[LiveContext]:
 def _read_tail_latest_timestamp(path: Path) -> Optional[datetime]:
     """The newest `user` line's timestamp near EOF, in a window that doubles until one is found.
 
-    Only `user` lines count (a tool result, or something the person typed): those are what appear
+    Only main-conversation `user` lines count, not sub-agent (`isSidechain`) ones (a tool result, or something the person typed): those are what appear
     once a dialog has been answered. `assistant` lines and bookkeeping lines (`attachment`,
     `system`, ...) can be written while a dialog is still open, e.g. a later tool call of the same
     parallel batch still streaming in, and must not read as "the prompt was answered".
@@ -111,8 +111,8 @@ def _read_tail_latest_timestamp(path: Path) -> Optional[datetime]:
                     entry = json.loads(line)
                 except ValueError:
                     continue
-                if not isinstance(entry, dict) or entry.get("type") != "user":
-                    continue
+                if not isinstance(entry, dict) or entry.get("type") != "user" or entry.get("isSidechain"):
+                    continue  # a sub-agent's request (sidechain) doesn't refresh the main agent's prompt cache
                 stamp = scanner.parse_iso_timestamp(entry.get("timestamp"))
                 if stamp is None:
                     continue

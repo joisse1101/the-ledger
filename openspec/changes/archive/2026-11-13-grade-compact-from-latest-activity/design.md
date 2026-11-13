@@ -12,7 +12,7 @@
 
 **Non-Goals:**
 - No change to the pill, the widget dot or their colours.
-- No change to what `latest_activity` counts, since the pending-prompt sweep depends on it.
+- No change to what `latest_activity` counts, except that it now skips `isSidechain` lines (a sub-agent's requests), which the pending-prompt sweep must not read as the main session moving on either.
 
 ## Decisions
 

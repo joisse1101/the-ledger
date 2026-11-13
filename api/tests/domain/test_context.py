@@ -310,6 +310,15 @@ def test_latest_activity_ignores_assistant_and_bookkeeping_lines(isolated_db, wr
     assert tail.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
 
 
+def test_latest_activity_ignores_sidechain_user_lines(isolated_db, write_transcript):
+    # A sub-agent's requests don't refresh the main agent's prompt cache, so they must not count.
+    _write_session(isolated_db, write_transcript, entries=[
+        {"type": "user", "timestamp": "2026-01-01T12:00:01Z"},
+        {"type": "user", "isSidechain": True, "timestamp": "2026-01-01T12:00:09Z"},
+    ])
+    assert tail.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+
+
 def test_latest_activity_is_none_when_the_transcript_has_no_user_line(isolated_db, write_transcript):
     _write_session(isolated_db, write_transcript, entries=[{"type": "assistant", "timestamp": "2026-01-01T12:00:05Z"}])
     assert tail.latest_activity("s1", "/x/proj") is None
