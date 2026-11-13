@@ -22,7 +22,7 @@ A per-session switch that answers `allow` to pending decisions automatically. It
 
 ### Compact
 
-Claude Code's compaction, which summarizes a long conversation to free context space. The dashboard grades each live session by time since the last compaction: `ok`, `should` (after 45 minutes) or `needs` (after 55 minutes).
+Claude Code's compaction, which summarizes a long conversation to free context space. The dashboard grades each live session by time since its latest activity, the newest request that reached Claude (a tool result sent back counts): `ok`, `should` (after 45 minutes) or `needs` (after 55 minutes).
 
 ## Access
 

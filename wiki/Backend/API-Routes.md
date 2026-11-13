@@ -79,7 +79,7 @@ Returns `{sessions: [...]}` from the shared `LiveSnapshot` (see `live_snapshot.p
 - `git_branch`, from `ledger.db`, `""` when unknown.
 - `compact: {state, since} | null`.
   - `ok` is under 45 minutes, `should` is 45-55, `needs` is beyond.
-  - It is measured from the later of `started_at` and the last compaction.
+  - It is measured from the later of `started_at` and the latest activity.
   - `since` is that moment in UTC.
   - It is `null` without a start time.
 - `pending_decision: {id, tool_name, tool_input} | null`.

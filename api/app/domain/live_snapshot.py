@@ -32,7 +32,6 @@ class LiveSnapshot:
         live_context: Optional[Callable[[str, str], Any]] = None,
         latest_activity: Optional[Callable[[str, str], Optional[datetime]]] = None,
         git_branches: Optional[Callable[[list[str]], dict[str, str]]] = None,
-        latest_compaction: Optional[Callable[[str, str], Optional[datetime]]] = None,
         ttl: float = LIVE_TTL_SECONDS,
         clock: Callable[[], float] = time.monotonic,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -46,9 +45,6 @@ class LiveSnapshot:
             lambda session_id, cwd: tail.latest_activity(session_id, cwd)
         )
         self._git_branches = git_branches or (lambda ids: queries.git_branches(ids))
-        self._latest_compaction = latest_compaction or (
-            lambda session_id, cwd: tail.latest_compaction(session_id, cwd)
-        )
         self._ttl = ttl
         self._clock = clock
         self._now = now
@@ -116,10 +112,10 @@ class LiveSnapshot:
     def _compact(self, session) -> Optional[dict[str, str]]:
         # A failing lookup just means the grade runs from the session's start alone.
         try:
-            last_compaction = self._latest_compaction(session.session_id, session.cwd)
+            latest_activity = self._latest_activity(session.session_id, session.cwd)
         except Exception:
-            last_compaction = None
-        grade = grade_compact(session.started_at, last_compaction, self._now())
+            latest_activity = None
+        grade = grade_compact(session.started_at, latest_activity, self._now())
         return {"state": grade.state, "since": grade.since.isoformat()} if grade else None
 
     def _branches(self, session_ids: list[str]) -> dict[str, str]:
