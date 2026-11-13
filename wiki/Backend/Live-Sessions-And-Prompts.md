@@ -24,7 +24,7 @@ One session's `live_context()` raising leaves the others populated. That one ses
 
 ### The `compact` grade
 
-Each item's `compact` grade comes from `latest_compaction()` and the pure `compact_grade.grade_compact`. `latest_compaction()` returns the newest `compact_boundary` line's timestamp. It falls back to the session's `started_at`. `started_at` is the conversation's first transcript timestamp, so reopening a session does not restart it.
+Each item's `compact` grade comes from `tail.latest_activity()` and the pure `compact_grade.grade_compact`. `latest_activity()` returns the timestamp of the newest `user` line in the main transcript, so a tool result counts and sub-agent requests do not. A compaction writes new lines, so it restarts the clock too. The grade falls back to the session's `started_at` when there is no such line or the lookup fails. `started_at` is the conversation's first transcript timestamp, so reopening a session does not restart it.
 
 The 45 and 55-minute limits are constants in `compact_grade`.
 

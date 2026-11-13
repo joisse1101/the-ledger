@@ -15,7 +15,7 @@ from app.domain.context.tail import live_context, transcript_path
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    for cache in (tail._located, tail._live_cache, tail._compaction_cache, detail_module._detail_cache):
+    for cache in (tail._located, tail._live_cache,detail_module._detail_cache):
         cache.clear()
 
 
@@ -212,44 +212,6 @@ def test_tail_reader_drops_the_first_line_of_a_window_that_starts_mid_file(tmp_p
     assert [t.context for t in turns] == [1047, 1048, 1049]
 
 
-# ---------------------------------------------------------------- latest compaction
-
-
-def _boundary_at(timestamp):
-    return {**_compact_boundary(), "timestamp": timestamp}
-
-
-def _transcript_with(isolated_db, write_transcript, entries):
-    path = isolated_db / "projects" / paths.sanitize_project_path("/x/proj") / "s1.jsonl"
-    write_transcript(path, entries)
-    return path
-
-
-def test_latest_compaction_is_none_without_a_boundary(isolated_db, write_transcript):
-    _transcript_with(isolated_db, write_transcript, [_assistant("m1", read=1)])
-    assert tail.latest_compaction("s1", "/x/proj") is None
-
-
-def test_latest_compaction_returns_the_newest_boundary(isolated_db, write_transcript):
-    _transcript_with(isolated_db, write_transcript, [
-        _boundary_at("2026-09-18T04:00:00Z"), _assistant("m1", read=1), _boundary_at("2026-09-18T05:30:00Z"),
-        _assistant("m2", read=2),
-    ])
-    assert tail.latest_compaction("s1", "/x/proj") == datetime(2026, 9, 18, 5, 30, tzinfo=timezone.utc)
-
-
-def test_latest_compaction_finds_a_boundary_beyond_the_first_window(isolated_db, write_transcript, monkeypatch):
-    monkeypatch.setattr(tail, "_TAIL_WINDOW", 700)
-    _transcript_with(isolated_db, write_transcript, [
-        _boundary_at("2026-09-18T04:00:00Z"), *[_assistant(f"m{i}", read=i + 1) for i in range(50)],
-    ])
-    assert tail.latest_compaction("s1", "/x/proj") == datetime(2026, 9, 18, 4, tzinfo=timezone.utc)
-
-
-def test_latest_compaction_is_none_for_an_unreadable_session(isolated_db):
-    assert tail.latest_compaction("nope", "/x/proj") is None
-
-
 # ---------------------------------------------------------------- transcript location
 
 
@@ -344,6 +306,15 @@ def test_latest_activity_ignores_assistant_and_bookkeeping_lines(isolated_db, wr
         {"type": "attachment", "timestamp": "2026-01-01T12:00:06Z"},
         {"type": "system", "subtype": "hook_progress", "timestamp": "2026-01-01T12:00:07Z"},
         {"type": "progress", "timestamp": "2026-01-01T12:00:08Z"},
+    ])
+    assert tail.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+
+
+def test_latest_activity_ignores_sidechain_user_lines(isolated_db, write_transcript):
+    # A sub-agent's requests don't refresh the main agent's prompt cache, so they must not count.
+    _write_session(isolated_db, write_transcript, entries=[
+        {"type": "user", "timestamp": "2026-01-01T12:00:01Z"},
+        {"type": "user", "isSidechain": True, "timestamp": "2026-01-01T12:00:09Z"},
     ])
     assert tail.latest_activity("s1", "/x/proj") == datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
 

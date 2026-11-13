@@ -109,7 +109,8 @@ def test_latest_activity_uses_the_registry_cwd_for_a_live_session():
     )
 
     assert snapshot.latest_activity("s1") == stamp
-    assert seen == [("s1", "/x/proj")]
+    # The refresh grades the session with the same lookup, so it may be called more than once.
+    assert set(seen) == {("s1", "/x/proj")}
 
 
 def test_latest_activity_is_none_for_a_session_that_is_not_live():
@@ -140,11 +141,11 @@ def test_failing_branch_lookup_leaves_the_list_intact():
     assert items[0]["git_branch"] == ""
 
 
-def _compact_snapshot(now, latest_compaction=lambda sid, cwd: None, clock=None):
+def _compact_snapshot(now, latest_activity=lambda sid, cwd: None, clock=None):
     return LiveSnapshot(
         load_sessions=lambda: [_session()],
         live_context=lambda sid, cwd: None,
-        latest_compaction=latest_compaction,
+        latest_activity=latest_activity,
         ttl=1.0,
         clock=clock or Clock(),
         now=now,
@@ -176,7 +177,7 @@ def test_a_reopened_session_is_graded_from_its_conversations_start(tmp_path, mon
     snapshot = LiveSnapshot(
         load_sessions=lambda: claude_sessions.load_sessions(tmp_path),
         live_context=lambda sid, cwd: None,
-        latest_compaction=lambda sid, cwd: None,
+        latest_activity=lambda sid, cwd: None,
         ttl=1.0,
         clock=Clock(),
         now=lambda: now,
@@ -187,19 +188,19 @@ def test_a_reopened_session_is_graded_from_its_conversations_start(tmp_path, mon
     assert item["compact"]["state"] == "should"
 
 
-def test_a_compaction_after_the_start_restarts_the_clock():
+def test_a_later_activity_restarts_the_clock():
     snapshot = _compact_snapshot(
         lambda: datetime(2026, 1, 1, 12, tzinfo=timezone.utc),
-        latest_compaction=lambda sid, cwd: datetime(2026, 1, 1, 11, 55, tzinfo=timezone.utc),
+        latest_activity=lambda sid, cwd: datetime(2026, 1, 1, 11, 55, tzinfo=timezone.utc),
     )
     assert snapshot.get()[0]["compact"]["state"] == "ok"
 
 
-def test_a_failing_compaction_lookup_falls_back_to_the_start_and_keeps_the_row():
+def test_a_failing_activity_lookup_falls_back_to_the_start_and_keeps_the_row():
     def broken(sid, cwd):
         raise RuntimeError("unreadable")
 
-    snapshot = _compact_snapshot(lambda: datetime(2026, 1, 1, 12).astimezone(), latest_compaction=broken)
+    snapshot = _compact_snapshot(lambda: datetime(2026, 1, 1, 12).astimezone(), latest_activity=broken)
     item = snapshot.get()[0]
     assert item["compact"]["state"] == "needs"
     assert item["session_id"] == "s1"
