@@ -55,3 +55,14 @@ def test_session_in_an_unlisted_folder_is_its_own_project(isolated_db, write_con
     row = _scan_one(isolated_db, write_config, write_transcript, [TREES_WORKTREE], TREES_WORKTREE)
     assert row["worktree"] == ""
     assert row["project"] == "fix-nav"
+
+
+def test_worktree_directories_are_not_listed_as_projects(isolated_db, write_config):
+    write_config(isolated_db / "claude.json", {REPO: {}, WORKTREE: {}, f"{WORKTREE}/api": {}})
+    assert [p["path"] for p in scanner.scan_projects()] == [REPO]
+
+
+def test_configured_worktree_folder_is_not_listed_as_projects(isolated_db, write_config):
+    settings_store.save_worktree_folders([".trees"])
+    write_config(isolated_db / "claude.json", {REPO: {}, TREES_WORKTREE: {}})
+    assert [p["path"] for p in scanner.scan_projects()] == [REPO]
