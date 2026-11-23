@@ -32,6 +32,14 @@ Only the PC that runs the Ledger can flip the switch. Other devices see "Remote 
 
 If a device says "This device isn't signed in", Remote mode was turned off and on again. Click **QR code** again and scan the new code.
 
+## Choose the Tailscale or LAN address
+
+Tailscale is a free service that links your own devices into a private network called a tailnet, so they can reach each other from anywhere. If the PC has a Tailscale address, the code uses it by default. A device must be on the same tailnet, with Tailscale running, to open that code. A Tailscale address starts inside the range 100.64.0.0/10 (for example 100.101.2.3) and stays the same unless the PC is removed from the tailnet and added again.
+
+The window shows a **Tailscale** / **LAN** choice only when the PC has both kinds of address. LAN is the ordinary address on your home or office network. To use it, click **LAN** above the code. A phone on the same Wi-Fi that does not have Tailscale should pick **LAN**, because it cannot reach the Tailscale address.
+
+The choice resets to Tailscale each time you open the window. The certificate warning below is the same for both addresses.
+
 ## What you can do from the other device
 
 - See live sessions and answer their prompts. See [Live sessions](Live-Sessions.md).
