@@ -19,13 +19,29 @@ export interface RemoteMode {
   reason: string | null;
 }
 
-/** The gateway's sign-in code. Local requests only: the code contains the access token. */
+export type RemoteAddressKind = "tailscale" | "lan";
+
+/** One address the gateway can be reached at, with its own sign-in code. */
+export interface RemoteQrAddress {
+  kind: RemoteAddressKind;
+  /** The gateway's address without the token. */
+  address: string;
+  /** The address for showing under the code. */
+  display_url: string;
+  /** An SVG of this address's code on an opaque white square. */
+  svg: string;
+}
+
+/** The gateway's sign-in code. Local requests only: the code contains the access token. The
+ *  top-level `svg` and `display_url` are the default address's (the first of `addresses`). */
 export interface RemoteQr {
   /** An SVG of the code on an opaque white square. */
   svg: string;
   /** The gateway's address without the token, for showing under the code. */
   display_url: string;
   expires_at: string | null;
+  /** Every reachable address, default first. */
+  addresses: RemoteQrAddress[];
 }
 
 export interface Meta {

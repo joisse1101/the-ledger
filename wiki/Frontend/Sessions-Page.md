@@ -44,7 +44,7 @@ Selecting a row renders `LiveSessionPanel` under the list, not in a dialog. The 
 
 The switch drives the whole of Remote mode through `POST /api/remote-mode`. It shows the starting step ("Starting Docker…") or the failure reason from `/api/meta.remote_mode`, and it stays checked while starting so it can cancel.
 
-Once Remote mode is `ready`, a **Show QR** button opens `RemoteQrDialog`. The dialog uses `useRemoteQr`, which fetches `/api/remote-mode/qr` only while it is open. It shows the code and the address, never the token.
+Once Remote mode is `ready`, a **Show QR** button opens `RemoteQrDialog`. The dialog uses `useRemoteQr`, which fetches `/api/remote-mode/qr` only while it is open. It shows the code and the address, never the token. When the response's `addresses` lists more than one entry (Tailscale and LAN), a `ButtonSelector` above the code switches between them, with Tailscale selected first; the image and the address under it follow the choice. With one entry there is no control. The choice lives in the dialog body's state, so it resets to Tailscale each time the dialog opens.
 
 ## All
 
