@@ -27,13 +27,13 @@ It draws its own color key as a plain HTML list (`GroupLegend`) instead of a Veg
 
 ### `GroupBarChart`
 
-Its heading is "Messages & Cost by Project", or "…by Branch / Worktree" in the Projects panel. It normalizes each measure to a percent of its own peak. This is a non-dual-axis choice, so two differently scaled measures can share one axis.
+Chart headings are 1.125rem bold, a clear step below the page title. The bars read `messages_pct` and `cost_pct` as 0 to 100 (not fractions) on a 0 to 115 axis. Its heading is "Messages & Cost by Project", or "…by Branch / Worktree" in the Projects panel. It normalizes each measure to a percent of its own peak. This is a non-dual-axis choice, so two differently scaled measures can share one axis.
 
 ### `ActivityLineChart`
 
 Its heading is "Activity by Hour of Day". It is a layered dual-axis line chart of absolute counts, in 30-minute blocks with smoothed lines. Sessions sit on the left axis and Messages on the right (`resolve.scale.y: "independent"`), with gridlines on the left only.
 
-It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The layer takes each measure as a share of its own peak, averages them, then applies a 3-block moving average. It sits on its own hidden 0-100 scale, and a caption note explains the calculation.
+It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The layer takes each measure as a share of its own peak, averages them, then applies a 3-block moving average. It sits on its own hidden 0-100 scale, and a short caption names it. The full explanation of the calculation, like the explanations of the other two charts, sits in a `Tooltip` "?" beside the heading or caption, not in a paragraph.
 
 ### Shared behavior
 
@@ -42,3 +42,5 @@ It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The l
 ## Summary tiles
 
 `SummaryStats` renders the KPI tiles. The four extreme figures are buttons that toggle an inline disclosure naming their project or session, plus a `title` attribute for hover on pointer devices. Buttons are used because a touchscreen has no hover-only affordance.
+
+At wide widths the KPI stat grid is 4 tiles across, so the 16 tiles fill whole rows.

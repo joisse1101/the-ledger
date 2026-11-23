@@ -183,6 +183,19 @@ describe("SettingsPage", () => {
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
   });
 
+  it("keeps the long explanations in tooltips beside each heading and label", async () => {
+    renderPage(world);
+
+    await screen.findByLabelText("Projects shown (1 to 10)");
+    const folders = screen.getByRole("button", { name: "About worktree folders" });
+    expect(document.getElementById(folders.getAttribute("aria-describedby")!)).toHaveTextContent(
+      "counts toward its repo",
+    );
+    for (const name of ["About projects shown", "About AFK minutes", "About break minutes"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+
   it("shows the widget's projects-shown number, 5 until set", async () => {
     renderPage(world);
 

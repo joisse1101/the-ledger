@@ -26,6 +26,8 @@ The upload control is a file input (`multiple`) styled as a button. Files go one
 
 `useFiles` lists the folder with `formatBytes` sizes. Download calls `useDownloadFile`, which asks `POST /api/files/{name}/download-link` for a single-use link. It hands the link to the browser through `startDownload` (`web/src/lib/download.ts`), so the file streams to disk instead of being held in the page. The link is fetched at click time and never kept.
 
+The file lists are capped at 48rem so a row's actions stay near its file name on a wide screen. Upload is the page's one primary action (`button-primary`); Delete is a quiet text button, red only in the confirm dialog.
+
 ## Delete
 
 Delete is shown only when `useMeta().is_local` and is confirmed with `ConfirmDialog`. The API refuses a remote delete anyway.

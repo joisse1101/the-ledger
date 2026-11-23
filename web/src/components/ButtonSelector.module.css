@@ -119,8 +119,10 @@
 
 .selected,
 .selected:hover {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--border-color);
+  background-color: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--text-on-accent);
+  text-shadow: none;
 }
 
 .option:disabled,
@@ -141,4 +143,18 @@
 .option:focus-visible {
   border-color: var(--border-focus);
   box-shadow: var(--shadow-focus-ring);
+}
+
+/* On a phone the options wrap onto extra rows, as separate rounded buttons, so none is hidden
+   behind a sideways scroll. */
+@media (--narrow) {
+  .scroller {
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .option {
+    flex: 1 0 auto;
+    border-radius: var(--radius-md);
+  }
 }

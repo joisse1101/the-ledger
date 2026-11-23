@@ -113,6 +113,13 @@ afterEach(() => {
 });
 
 describe("ProjectsPage", () => {
+  it("titles the page with its navigation label", async () => {
+    stubApi();
+    const client = renderPage();
+    expect(await screen.findByRole("heading", { level: 1, name: "Manage Projects" })).toBeInTheDocument();
+    client.clear();
+  });
+
   it("shows no panel until a project is opened, then shows that project's inline and puts it in the URL", async () => {
     stubApi();
     const client = renderPage();

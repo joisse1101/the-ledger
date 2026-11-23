@@ -12,6 +12,7 @@ A `ListColumn` carries these settings:
 
 - `priority`, the table setting: `"high"` is shown at medium and up, `"low"` only at wide.
 - `cardPriority`, set independently for the narrow card layout: `"primary"`, `"secondary"` or `"hidden"`. It defaults from `priority` when omitted.
+- `weight`, optional (default 1), the column's relative width in `ListTable`. The table uses `table-layout: fixed` with a `<colgroup>`; each visible column gets its weight divided by the sum of the visible weights, as a percentage, so hiding low-priority columns at medium width re-shares the space. Long text overflows with an ellipsis (full text in the cell's `title`) and the table never scrolls sideways. A header also ellipsizes, but its sort arrow always stays visible; give a column with a long header enough weight to show it whole.
 - `sortKey`, optional, which makes `ListTable`'s header clickable and sortable.
 
 Cards have no headers, so on narrow screens `AllList` offers a "Sort by" `<select>` instead.
@@ -24,7 +25,7 @@ Files: `web/src/components/ButtonSelector.tsx` and its `.module.css`.
 
 ### Narrow screens
 
-On a narrow screen it scrolls sideways inside its own box. `web/src/hooks/useCanSideScroll.ts` fades whichever edge has more to reveal, using a CSS mask on the scroller driven by `data-fade-start` and `data-fade-end`.
+On a phone the options wrap onto extra rows as separate rounded buttons; on wider screens one row scrolls sideways inside its own box if it must. `web/src/hooks/useCanSideScroll.ts` fades whichever edge has more to reveal, using a CSS mask on the scroller driven by `data-fade-start` and `data-fade-end`.
 
 ### Look
 
@@ -38,7 +39,7 @@ The look is the ui-library's `.btn.btn-option`: joined segments with only the ou
 
 Files: `web/src/components/ConfirmDialog.tsx` and its `.module.css`.
 
-`ConfirmDialog` is a small generic confirmation modal on a native `<dialog>`. It is kept mounted and synced to `open` (`showModal()`/`close()`), like `SessionDialog` but not full-screen on narrow viewports. Sessions' inline `DeleteControls` still confirms inline.
+The selected `ButtonSelector` option is filled with the accent colour. `ConfirmDialog` is a small generic confirmation modal on a native `<dialog>`. It is kept mounted and synced to `open` (`showModal()`/`close()`), like `SessionDialog` but not full-screen on narrow viewports. Sessions' inline `DeleteControls` still confirms inline.
 
 Its props are:
 

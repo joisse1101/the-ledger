@@ -6,7 +6,7 @@ A session is one conversation with Claude Code. See [Glossary](../Glossary.md#se
 ## Search
 
 1. Open **Manage Sessions** in the top bar. The page is titled "Sessions". On a phone the tab is called Sessions.
-2. Click the box labelled "Search sessions". Its hint reads "Search session ID, last message, or prompt".
+2. Click the box labelled "Search sessions". Its hint reads "Search sessions"; hover it to see that it searches the session ID, last message and prompt.
 3. Type text. The list updates a moment after you stop typing.
 
 ## Filter

@@ -10,12 +10,13 @@ import type { ListColumn } from "../list/types";
 import { FilterMultiselect } from "./FilterMultiselect";
 
 const columns: ListColumn<TranscriptItem>[] = [
-  { key: "project", header: "Project", priority: "high", sortKey: "project", render: (t) => formatText(t.project) },
-  { key: "title", header: "Title", priority: "high", sortKey: "title", render: (t) => formatText(t.title) },
+  { key: "project", header: "Project", priority: "high", weight: 0.85, sortKey: "project", render: (t) => formatText(t.project) },
+  { key: "title", header: "Title", priority: "high", weight: 0.9, sortKey: "title", render: (t) => formatText(t.title) },
   {
     key: "updated_at",
     header: "Updated",
     priority: "high",
+    weight: 1.1,
     sortKey: "updated_at",
     render: (t) => formatDateTime(t.updated_at),
   },
@@ -23,6 +24,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "started_at",
     header: "Started",
     priority: "low",
+    weight: 1.05,
     cardPriority: "secondary",
     sortKey: "started_at",
     render: (t) => formatDateTime(t.started_at),
@@ -31,6 +33,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "message_count",
     header: "Messages",
     priority: "high",
+    weight: 1.05,
     align: "end",
     cardPriority: "secondary",
     sortKey: "message_count",
@@ -40,6 +43,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "cost",
     header: "Cost",
     priority: "high",
+    weight: 0.95,
     align: "end",
     cardPriority: "secondary",
     sortKey: "cost",
@@ -56,6 +60,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "context",
     header: "Context",
     priority: "high",
+    weight: 0.95,
     align: "end",
     sortKey: "context",
     render: (t) => formatContext(t.context),
@@ -64,22 +69,16 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "model",
     header: "Model",
     priority: "high",
+    weight: 0.75,
     cardPriority: "secondary",
     sortKey: "model",
     render: (t) => formatText(t.model),
   },
   {
-    key: "used_openspec",
-    header: "OpenSpec",
-    priority: "high",
-    cardPriority: "secondary",
-    sortKey: "used_openspec",
-    render: (t) => (t.used_openspec ? "Yes" : "No"),
-  },
-  {
     key: "version",
     header: "Version",
     priority: "low",
+    weight: 0.8,
     cardPriority: "hidden",
     sortKey: "version",
     render: (t) => formatText(t.version),
@@ -88,6 +87,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "git_branch",
     header: "Branch",
     priority: "low",
+    weight: 0.8,
     cardPriority: "secondary",
     sortKey: "git_branch",
     render: (t) => formatText(t.git_branch),
@@ -96,6 +96,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "worktree",
     header: "Worktree",
     priority: "low",
+    weight: 0.95,
     cardPriority: "secondary",
     sortKey: "worktree",
     render: (t) => formatText(t.worktree),
@@ -104,14 +105,16 @@ const columns: ListColumn<TranscriptItem>[] = [
     key: "session_id",
     header: "Session ID",
     priority: "low",
+    weight: 0.95,
     cardPriority: "hidden",
     sortKey: "session_id",
-    render: (t) => <code>{t.session_id}</code>,
+    render: (t) => <code title={t.session_id}>{t.session_id}</code>,
   },
   {
     key: "live",
     header: "Live",
     priority: "high",
+    weight: 0.55,
     cardPriority: "hidden",
     render: (t) => (t.live ? <span className="live-badge">Live</span> : null),
   },
@@ -173,9 +176,9 @@ export function AllList({ onSelect }: AllListProps) {
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search session ID, last message, or prompt"
+          placeholder="Search sessions" title="Search by session ID, last message or prompt"
           aria-label="Search sessions"
-          className="sessions-search"
+          className="field sessions-search"
         />
         <div className="filter-multiselect-container">
           <FilterMultiselect label="Project" options={options.projects} selected={projects} onChange={setProjects} />

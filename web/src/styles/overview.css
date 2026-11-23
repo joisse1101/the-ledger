@@ -21,6 +21,13 @@
   }
 }
 
+/* At wide, 16 tiles fit exactly 4 across (or 8), so no row ends with an orphan card. */
+@media (--wide-up) {
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 .stat-tile {
   position: relative;
   display: flex;
@@ -28,11 +35,15 @@
   gap: 0.25rem;
   min-height: var(--tap);
   padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-label {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--font-sm);
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -103,7 +114,7 @@
 .donut-legend-label {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--font-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -114,15 +125,23 @@
   margin: 1.5rem 0 0;
 }
 
+/* A clear step below the 1.4rem page title and above the 0.9375rem body. */
 .chart-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0 0 0.25rem;
-  font-size: 1.05rem;
+  font-size: 1.125rem;
+  font-weight: 700;
 }
 
 .chart-caption {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0.25rem 0 0.75rem;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
 }
 
 .bar-chart {

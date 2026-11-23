@@ -9,9 +9,8 @@ export interface TimeRangeSelectorProps {
   availableRanges?: readonly string[];
 }
 
-/** The seven Overview time ranges as a segmented control. It scrolls horizontally within its
- *  own box on a narrow screen rather than wrapping (and widening) the page - every option stays
- *  reachable by swiping instead of being clipped. */
+/** The seven Overview time ranges as a segmented control. On a phone the buttons wrap onto
+ *  extra rows (see `ButtonSelector`), so every option stays visible. */
 export function TimeRangeSelector({ value, onChange, availableRanges }: TimeRangeSelectorProps) {
   const options = TIME_RANGES.map((range) => ({
     value: range,

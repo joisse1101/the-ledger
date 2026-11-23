@@ -13,6 +13,9 @@ export interface ListColumn<T> {
   key: string;
   header: string;
   priority: ColumnPriority;
+  /** Relative width in the table renderer (default 1): each visible column gets its weight's
+   *  share of the table, so short columns (numbers, badges) take less than long text ones. */
+  weight?: number;
   cardPriority?: CardPriority;
   align?: "start" | "end";
   /** Present and truthy enables a clickable, sortable header for this column. */

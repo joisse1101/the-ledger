@@ -1,6 +1,7 @@
 .hint {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
+  margin: 0 0 0.25rem;
 }
 
 .list {
@@ -15,10 +16,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
+  box-sizing: border-box;
+  min-height: calc(var(--tap) + 1.2rem + 2px); /* every row as tall as one holding a button */
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .row + .row {
@@ -32,7 +36,7 @@
 
 .badge {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--font-sm);
 }
 
 .add {
@@ -47,7 +51,58 @@
   gap: 0.5rem;
 }
 
-.addRow input {
+.addRow input[type="text"] {
   flex: 1;
   min-width: 0;
+}
+
+/* One full-width card per topic, stacked in a single column at every screen size. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.card {
+  min-width: 0;
+  padding: 1rem 1.125rem 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Number fields hold at most three digits: a narrow box on desktop, the full row beside Save on a phone. */
+.number {
+  width: 8rem;
+  flex: none;
+}
+
+@media (--narrow) {
+  .number {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+
+.folderHint {
+  margin-top: 1rem;
 }

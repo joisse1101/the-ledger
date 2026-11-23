@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLive, useMeta } from "../../api/queries";
-import { formatText, formatTime } from "../../lib/format";
+import { formatText } from "../../lib/format";
 import type { ListColumn } from "../list/types";
 import { ResponsiveList } from "../list/ResponsiveList";
 import { QUESTION_TOOL } from "../../api/types";
@@ -41,12 +41,14 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "project",
     header: "Project",
     priority: "high",
+    weight: 1.0,
     render: (s) => formatText(s.project),
   },
   {
     key: "name",
     header: "Name",
     priority: "high",
+    weight: 0.8,
     cardPriority: "hidden",
     render: (s) => formatText(s.name),
   },
@@ -54,18 +56,21 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "title",
     header: "Title",
     priority: "high",
+    weight: 1.3,
     render: (s) => formatText(s.title),
   },
   {
     key: "status",
     header: "Status",
     priority: "high",
+    weight: 0.85,
     render: (s) => formatText(s.status),
   },
   {
     key: "kind",
     header: "Kind",
     priority: "low",
+    weight: 0.7,
     cardPriority: "hidden",
     render: (s) => formatText(s.kind),
   },
@@ -73,6 +78,7 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "pid",
     header: "PID",
     priority: "low",
+    weight: 0.6,
     cardPriority: "hidden",
     align: "end",
     render: (s) => String(s.pid),
@@ -81,12 +87,14 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "context",
     header: "Context",
     priority: "high",
+    weight: 1.2,
     render: (s) => s.context?.label ?? "--",
   },
   {
     key: "compact",
     header: "Compact",
     priority: "high",
+    weight: 0.95,
     cardPriority: "hidden",
     render: (s) => <CompactBadge session={s} />,
   },
@@ -94,6 +102,7 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "pending_decision",
     header: "Decision",
     priority: "high",
+    weight: 0.9,
     cardPriority: "hidden",
     render: (s) => <PendingBadge session={s} />,
   },
@@ -101,6 +110,7 @@ const baseColumns: ListColumn<LiveSession>[] = [
     key: "session_id",
     header: "Session ID",
     priority: "low",
+    weight: 1.0,
     cardPriority: "hidden",
     render: (s) => <code>{s.session_id}</code>,
   },
@@ -110,6 +120,7 @@ const autoApproveColumn: ListColumn<LiveSession> = {
   key: "auto_approve",
   header: "Auto-approve",
   priority: "high",
+  weight: 1.2,
   cardPriority: "hidden",
   render: (s) => (s.auto_approve ? "On" : ""),
 };
@@ -127,13 +138,11 @@ export interface LiveListProps {
 }
 
 /** The Sessions page's "Live" list: polls every 2s, with an Auto-refresh switch and a
- *  frozen "last refreshed" caption while it's off. */
+ *  The "last refreshed" time lives in the top bar's RefreshControl only. */
 export function LiveList({ onSelect }: LiveListProps) {
   const [auto, setAuto] = useState(true);
   const live = useLive({ auto });
   const relayHookSeen = useMeta().data?.relay_hook_seen === true;
-
-  const lastRefreshed = live.dataUpdatedAt ? new Date(live.dataUpdatedAt).toISOString() : null;
 
   return (
     <section aria-label="Live sessions">
@@ -148,9 +157,6 @@ export function LiveList({ onSelect }: LiveListProps) {
           />
           <RemoteModeControl />
         </div>
-        <span className="muted sessions-toolbar-caption">
-          Last refreshed: <time dateTime={lastRefreshed ?? undefined}>{formatTime(lastRefreshed)}</time>
-        </span>
       </div>
       <ResponsiveList
         columns={columnsFor(relayHookSeen)}

@@ -1,6 +1,6 @@
 .hint {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
 }
 
 .pick {
@@ -19,8 +19,10 @@
   cursor: pointer;
 }
 
+/* Capped so a row's Download and Delete stay near its file name on a wide screen. */
 .uploads,
 .list {
+  max-width: 48rem;
   margin: 1rem 0 0;
   padding: 0;
   list-style: none;
@@ -37,6 +39,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .upload + .upload,
@@ -56,7 +59,7 @@
 
 .detail {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--font-sm);
 }
 
 .actions {
