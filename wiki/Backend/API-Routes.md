@@ -64,7 +64,7 @@ Turning it on makes this session's access token. Turning it off discards the tok
 
 #### `GET /api/remote-mode/qr`
 
-Returns `{svg, display_url, expires_at}`. It is the sign-in QR. The QR encodes this Remote session's token; `display_url` does not. Local only. 409 unless Remote mode is `ready`.
+Returns `{svg, display_url, expires_at, addresses}`. It is the sign-in QR. The QR encodes this Remote session's token; `display_url` does not. `addresses` holds one entry per usable IPv4 address of this machine, `{kind, address, display_url, svg}`, where `kind` is `tailscale` (inside 100.64.0.0/10) or `lan`. Tailscale addresses come first and the rest keep discovery order. Each entry has its own `svg`, because each code embeds the token. The top-level `svg` and `display_url` are the first entry's, so older readers such as the desktop widget keep working. Local only. 409 unless Remote mode is `ready`, or when the machine has no network address.
 
 #### `POST /api/refresh`
 

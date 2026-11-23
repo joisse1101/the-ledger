@@ -9,6 +9,9 @@ import sys
 from typing import Iterable, Optional
 
 
+_TAILSCALE_RANGE = ipaddress.IPv4Network("100.64.0.0/10")
+
+
 def usable_ipv4(candidates: Iterable[str]) -> list[str]:
     """The addresses another device could reach: valid IPv4 only, no loopback,
     link-local (169.254.x.x) or unspecified ones, duplicates dropped, order kept."""
@@ -42,6 +45,21 @@ def discover_ipv4() -> list[str]:
     except OSError:
         pass
     return usable_ipv4(candidates)
+
+
+def address_kind(address: str) -> str:
+    """`tailscale` for an address in 100.64.0.0/10 (the range Tailscale hands out), else `lan`."""
+    if ipaddress.IPv4Address(address) in _TAILSCALE_RANGE:
+        return "tailscale"
+    return "lan"
+
+
+def tailscale_first(addresses: Iterable[str]) -> list[str]:
+    """The addresses with the Tailscale ones first; each group keeps its own order."""
+    ordered = list(addresses)
+    return [a for a in ordered if address_kind(a) == "tailscale"] + [
+        a for a in ordered if address_kind(a) != "tailscale"
+    ]
 
 
 def render_qr(text: str) -> Optional[str]:

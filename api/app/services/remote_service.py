@@ -27,14 +27,27 @@ def sign_in_code() -> dict:
     token = deps.access_token
     if deps.remote is None or not deps.remote.is_ready() or token is None:
         raise Conflict("Remote mode is not ready")
-    addresses = banner.discover_ipv4()
-    if not addresses:
+    found = banner.tailscale_first(banner.discover_ipv4())
+    if not found:
         raise Conflict("No network address was found for this machine")
-    svg = banner.render_qr_svg(gateway_signin.signin_url(addresses[0], deps.gateway_port, token))
-    if svg is None:
-        raise Unavailable("QR codes are unavailable (the qrcode package is missing)")
+    addresses = []
+    for address in found:
+        # each code embeds the token, so each address needs its own image
+        svg = banner.render_qr_svg(gateway_signin.signin_url(address, deps.gateway_port, token))
+        if svg is None:
+            raise Unavailable("QR codes are unavailable (the qrcode package is missing)")
+        addresses.append(
+            {
+                "kind": banner.address_kind(address),
+                "address": address,
+                "display_url": gateway_signin.display_url(address, deps.gateway_port),
+                "svg": svg,
+            }
+        )
+    default = addresses[0]
     return {
-        "svg": svg,
-        "display_url": gateway_signin.display_url(addresses[0], deps.gateway_port),
+        "svg": default["svg"],
+        "display_url": default["display_url"],
         "expires_at": deps.decisions.remote_mode()["expires_at"],
+        "addresses": addresses,
     }
