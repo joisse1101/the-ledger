@@ -89,6 +89,8 @@ The session ID stored for a file is the `sessionId` read from its lines, not the
 
 A session whose first `cwd` is under `<repo>/<folder>/<name>` is a worktree session. `<folder>` is `.claude/worktrees` or any folder listed in the Settings page. `api/app/core/worktrees.py`'s `parse_worktree` recognises it, trying the longest folder first. The session stores that `<name>`. It belongs to its repo's project, instead of showing up as a project named after the worktree. <!-- docs-check: ignore -->
 
+The project list follows the same rule. Claude Code records every worktree directory as its own entry under `projects` in `~/.claude.json`, so `scanner.scan_projects` skips any path that `parse_worktree` recognises. Without that, each worktree would appear on the Projects page next to its repo. A path under a folder that is not listed is not a worktree, so it still shows as a project of its own.
+
 `ClaudeTranscript.project_folder` is the `~/.claude/projects/` folder a transcript counts under. It is the transcript's own folder. For a worktree session it is the repo's, with the sanitized `/<folder>/<name>` suffix stripped off, via `paths.repo_folder_of_worktree`.
 
 ### Deleting

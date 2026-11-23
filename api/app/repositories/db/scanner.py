@@ -36,8 +36,13 @@ def scan_projects() -> list[dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return []
 
+    worktree_folders = settings_store.load_worktree_folders()
     rows = []
     for project_path, project_info in data.get("projects", {}).items():
+        # Claude Code records each worktree directory as a project of its own; the sessions
+        # already count toward the repo, so listing the worktree too would duplicate it.
+        if parse_worktree(project_path, worktree_folders) is not None:
+            continue
         rows.append(
             {
                 "path": project_path,
