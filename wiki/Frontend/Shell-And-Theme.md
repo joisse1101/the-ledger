@@ -18,7 +18,7 @@ The stylesheets write `@media (--narrow)`, `(--medium-up)` and `(--wide-up)`. `w
 
 The page area (`main.content`) is capped at 100rem and centred on every page. The header's inner row (`.topbar-inner`) uses the same cap and the same side padding, `--page-gutter-x` in `tokens.css` (the normal `--gutter` on narrow, 1.5rem on medium, 2rem on wide), so brand, page title, tables and the right-hand controls share one left and one right edge on every page. The first and last cells of a table drop their own side padding so table text sits on that edge too.
 
-Small text has a floor: `--font-xs` is 12px and `--font-sm` about 13px, raised in rem on wide screens to cancel the 80% desktop root. Chart labels use `MIN_CHART_TEXT_PX` (12) from `lib/uiScale.ts`. `--danger-text` is the red used on its own tint (the Needs compact chip) and meets 4.5:1 in both themes. Text and number inputs share the `.field` class in `app.css`.
+Small text has a floor: `--font-xs` is 12px and `--font-sm` about 13px, raised in rem on wide screens to cancel the 80% desktop root. Chart labels use `MIN_CHART_TEXT_PX` (12) from `web/src/lib/uiScale.ts`. `--danger-text` is the red used on its own tint (the Needs compact chip) and meets 4.5:1 in both themes. Text and number inputs share the `.field` class in `app.css`.
 
 ### Navigation
 
