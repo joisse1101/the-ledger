@@ -1231,11 +1231,55 @@ def test_the_qr_for_a_local_request_carries_the_svg_and_a_token_free_address(iso
 
     body = _client().get("/api/remote-mode/qr").json()
 
-    assert encoded == [f"https://192.168.1.20:8080/?token={TOKEN}"]  # the first address, token inside the code
+    # one code per address, token inside each code
+    assert encoded == [
+        f"https://192.168.1.20:8080/?token={TOKEN}",
+        f"https://10.0.0.5:8080/?token={TOKEN}",
+    ]
     assert body["svg"] == "<svg/>"
     assert body["display_url"] == "https://192.168.1.20:8080"
     assert TOKEN not in body["display_url"]
     assert body["expires_at"]
+
+
+def test_the_qr_defaults_to_the_lan_address_when_there_is_no_tailscale_address(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    gateway.start()
+
+    body = _client().get("/api/remote-mode/qr").json()
+
+    assert [(a["kind"], a["address"]) for a in body["addresses"]] == [
+        ("lan", "192.168.1.20"),
+        ("lan", "10.0.0.5"),
+    ]
+    assert body["display_url"] == body["addresses"][0]["display_url"]
+    assert body["svg"] == body["addresses"][0]["svg"]
+
+
+def test_the_qr_defaults_to_the_tailscale_address_when_present(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20", "100.101.102.103"])
+    gateway.start()
+
+    body = _client().get("/api/remote-mode/qr").json()
+
+    assert [(a["kind"], a["address"]) for a in body["addresses"]] == [
+        ("tailscale", "100.101.102.103"),
+        ("lan", "192.168.1.20"),
+    ]
+    assert body["display_url"] == "https://100.101.102.103:8080"
+    assert body["svg"] == body["addresses"][0]["svg"]
+
+
+def test_the_qr_never_puts_the_token_in_a_display_url(isolated_db, monkeypatch):
+    gateway = _ready_remote(monkeypatch)
+    monkeypatch.setattr(banner, "discover_ipv4", lambda: ["192.168.1.20", "100.101.102.103"])
+    gateway.start()
+
+    body = _client().get("/api/remote-mode/qr").json()
+
+    assert TOKEN not in body["display_url"]
+    assert all(TOKEN not in entry["display_url"] for entry in body["addresses"])
 
 
 def test_the_qr_is_refused_when_no_token_exists_even_if_the_gateway_reads_ready(isolated_db, monkeypatch):

@@ -3,6 +3,8 @@
 import sys
 import types
 
+import pytest
+
 from app.infra import banner
 
 # ------------------------------------------------ address filter
@@ -74,6 +76,39 @@ def test_discovery_survives_a_machine_with_no_network(monkeypatch):
     monkeypatch.setattr(banner.socket, "gethostname", lambda: "box")
     monkeypatch.setattr(banner.socket, "getaddrinfo", offline)
     assert banner.discover_ipv4() == []
+
+
+# ------------------------------------------------ address kind and order
+
+
+@pytest.mark.parametrize("address", ["100.64.0.0", "100.100.1.2", "100.127.255.255"])
+def test_address_kind_is_tailscale_inside_the_100_64_range(address):
+    assert banner.address_kind(address) == "tailscale"
+
+
+@pytest.mark.parametrize("address", ["100.63.255.255", "100.128.0.0", "192.168.1.20", "10.0.0.5"])
+def test_address_kind_is_lan_outside_the_100_64_range(address):
+    assert banner.address_kind(address) == "lan"
+
+
+def test_tailscale_first_moves_the_tailscale_address_up_and_keeps_the_rest_in_order():
+    assert banner.tailscale_first(["192.168.1.20", "10.0.0.5", "100.90.1.1"]) == [
+        "100.90.1.1",
+        "192.168.1.20",
+        "10.0.0.5",
+    ]
+
+
+def test_tailscale_first_keeps_the_order_when_there_is_no_tailscale_address():
+    assert banner.tailscale_first(["192.168.1.20", "10.0.0.5"]) == ["192.168.1.20", "10.0.0.5"]
+
+
+def test_tailscale_first_keeps_several_tailscale_addresses_in_order():
+    assert banner.tailscale_first(["10.0.0.5", "100.70.0.1", "100.80.0.1"]) == [
+        "100.70.0.1",
+        "100.80.0.1",
+        "10.0.0.5",
+    ]
 
 
 # ------------------------------------------------ QR
