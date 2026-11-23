@@ -5,6 +5,7 @@ import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 import { activityTrend, TREND_WINDOW } from "../../lib/activityTrend";
+import { Tooltip } from "../Tooltip";
 import { chartColors, FONT_STACK } from "./chartTheme";
 
 /** X-axis extent in minutes after midnight, widened when everything falls in one block. */
@@ -164,19 +165,25 @@ export function ActivityLineChart({ activity, bucketMinutes = 30 }: ActivityLine
 
   return (
     <div className="overview-chart">
-      <h2 className="chart-heading">Activity by Hour of Day</h2>
+      <h2 className="chart-heading">
+        Activity by Hour of Day
+        <Tooltip
+          label="activity by hour of day"
+          tooltip={`Absolute counts per ${blockName}, by the time a session started: Sessions read against the left axis, Messages against the right. The two axes have different scales, so compare the shapes of the lines rather than their heights.`}
+        />
+      </h2>
       <p className="chart-caption">
-        Absolute counts per {blockName}, by the time a session started: Sessions read against
-        the left axis, Messages against the right. The two axes have different scales, so compare
-        the shapes of the lines rather than their heights.
+        Sessions (left axis) and Messages (right axis) per {blockName}.
       </p>
       <p className="chart-caption">
-        <strong>How the Activity trend is calculated:</strong> for each {blockName}, Sessions and Messages
-        are each turned into a share of their own busiest block (0–100%), then the two shares are
-        averaged so both count equally. That series is then smoothed with a moving average over
-        three neighbouring blocks ({trendSpan} hours). It's drawn on its own 0–100 scale, so read it as
-        "how busy this time of day is compared with the busiest, across both measures", not as a
-        count. Its value shows in the tooltip.
+        <span>
+          <strong>Activity trend</strong>: how busy each {blockName} is, on a 0–100 scale.
+        </span>
+        <Tooltip
+          label="how the activity trend is calculated"
+          size="sm"
+          tooltip={`For each ${blockName}, Sessions and Messages are each turned into a share of their own busiest block (0–100%), then the two shares are averaged so both count equally. That series is then smoothed with a moving average over three neighbouring blocks (${trendSpan} hours). It's drawn on its own 0–100 scale, so read it as "how busy this time of day is compared with the busiest, across both measures", not as a count. Its value shows in the chart tooltip.`}
+        />
       </p>
       <div ref={containerRef} className="bar-chart" role="img" aria-label="Sessions and messages by time of day" />
     </div>

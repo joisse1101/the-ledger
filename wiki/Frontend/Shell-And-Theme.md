@@ -44,7 +44,9 @@ Every add or remove sends the whole user list to `PUT /api/settings` (`useSaveSe
 
 ### Desktop widget section
 
-Below the folders, a "Desktop widget" section holds the widget's settings. Each Save sends only its own field, and the server saves it without re-filing sessions, so nothing else is reloaded. Each form is `noValidate`, so a rejected number shows the server's reason inline (same as a refused folder) and the typed value stays.
+The page is a single column of full-width cards (one per topic: Worktree folders, Desktop widget, Break workouts), the same at every screen size. Each heading or field label carries a `Tooltip` "?" with the longer explanation, so the card shows at most one short sentence. The tooltip text is plain (no inline code), with folder names in quotes.
+
+Next to the folders, a "Desktop widget" card holds the widget's settings. Each Save sends only its own field, and the server saves it without re-filing sessions, so nothing else is reloaded. Each form is `noValidate`, so a rejected number shows the server's reason inline (same as a refused folder) and the typed value stays.
 
 The fields are:
 

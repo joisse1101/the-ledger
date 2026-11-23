@@ -33,7 +33,7 @@ Chart headings are 1.125rem bold, a clear step below the page title. The bars re
 
 Its heading is "Activity by Hour of Day". It is a layered dual-axis line chart of absolute counts, in 30-minute blocks with smoothed lines. Sessions sit on the left axis and Messages on the right (`resolve.scale.y: "independent"`), with gridlines on the left only.
 
-It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The layer takes each measure as a share of its own peak, averages them, then applies a 3-block moving average. It sits on its own hidden 0-100 scale, and a caption note explains the calculation.
+It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The layer takes each measure as a share of its own peak, averages them, then applies a 3-block moving average. It sits on its own hidden 0-100 scale, and a short caption names it. The full explanation of the calculation, like the explanations of the other two charts, sits in a `Tooltip` "?" beside the heading or caption, not in a paragraph.
 
 ### Shared behavior
 

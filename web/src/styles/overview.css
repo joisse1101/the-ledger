@@ -127,13 +127,18 @@
 
 /* A clear step below the 1.4rem page title and above the 0.9375rem body. */
 .chart-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0 0 0.25rem;
   font-size: 1.125rem;
   font-weight: 700;
 }
 
 .chart-caption {
-  max-width: 75ch;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0.25rem 0 0.75rem;
   color: var(--text-muted);
   font-size: 0.9375rem;

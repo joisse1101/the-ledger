@@ -5,6 +5,7 @@ import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 import { formatCost, formatCount } from "../../lib/format";
+import { Tooltip } from "../Tooltip";
 import { capitalize, chartColors, FONT_STACK, groupNoun, type GroupLabel } from "./chartTheme";
 
 const METRICS = ["Messages", "Cost"] as const;
@@ -114,12 +115,14 @@ export function GroupBarChart({ groups, groupOrder, groupLabel }: GroupBarChartP
 
   return (
     <div className="overview-chart">
-      <h2 className="chart-heading">Messages &amp; Cost by {capitalize(noun)}</h2>
-      <p className="chart-caption">
-        Each metric is shown as a % of its own top {noun} (e.g. a Cost bar at 50% means that{" "}
-        {noun} cost half as much as the priciest {noun}) — Messages and Cost are scaled
-        independently.
-      </p>
+      <h2 className="chart-heading">
+        Messages &amp; Cost by {capitalize(noun)}
+        <Tooltip
+          label={`messages and cost by ${noun}`}
+          tooltip={`Each metric is shown as a % of its own top ${noun} (e.g. a Cost bar at 50% means that ${noun} cost half as much as the priciest ${noun}). Messages and Cost are scaled independently.`}
+        />
+      </h2>
+      <p className="chart-caption">Each metric is a % of its own top {noun}.</p>
       <div ref={containerRef} className="bar-chart" role="img" aria-label={`Messages and cost by ${noun}`} />
     </div>
   );
