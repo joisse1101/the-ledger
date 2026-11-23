@@ -50,7 +50,7 @@ Once Remote mode is `ready`, a **Show QR** button opens `RemoteQrDialog`. The di
 
 `AllList` debounces its search box (`useDebouncedValue`, 300ms). It drives `Project`, `Version`, `Branch` and `Worktree` `FilterMultiselect`s from the API's option lists. A `FilterMultiselect` is a `<details>`-based checkbox list, so no popover or portal machinery is needed. The list pages 50 at a time through `useTranscripts`'s "Load more".
 
-Its columns include `Model`, `OpenSpec` (Yes/No) and `Worktree` (`--` when none), and all of them are sortable.
+Its columns include `Model` and `Worktree` (`--` when none), and all of them are sortable.
 
 ## Session detail
 

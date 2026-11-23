@@ -69,14 +69,6 @@ const columns: ListColumn<TranscriptItem>[] = [
     render: (t) => formatText(t.model),
   },
   {
-    key: "used_openspec",
-    header: "OpenSpec",
-    priority: "high",
-    cardPriority: "secondary",
-    sortKey: "used_openspec",
-    render: (t) => (t.used_openspec ? "Yes" : "No"),
-  },
-  {
     key: "version",
     header: "Version",
     priority: "low",
