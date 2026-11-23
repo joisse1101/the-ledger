@@ -349,7 +349,6 @@ textarea {
 .nav--top .nav-link {
   min-height: max(var(--tap), 3.125rem); /* 40px even at the 80% desktop root */
   padding: 0 0.875rem;
-  border-radius: var(--radius);
   text-decoration: none;
 }
 
@@ -363,12 +362,13 @@ textarea {
   }
 }
 
+/* Plain tabs: no fill, just an underline that marks the current page. */
 .nav--top .nav-link:hover {
-  background: var(--bg-surface-hover);
+  color: var(--text-main);
+  box-shadow: inset 0 -2px 0 var(--border-subtle);
 }
 
 .nav--top .nav-link.active {
-  background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
   box-shadow: inset 0 -2px 0 var(--brand-accent);
 }
 

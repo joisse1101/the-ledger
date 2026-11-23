@@ -22,7 +22,7 @@ Small text has a floor: `--font-xs` is 12px and `--font-sm` about 13px, raised i
 
 ### Navigation
 
-`AppShell` renders `Nav` as a top bar at medium and wide, or as a fixed bottom tab bar at narrow. At narrow, `viewport !== "narrow"` puts the nav in the header instead. Below wide, links use their short labels (`labelMobile`) and the refresh caption drops its label. The active top link has a tint plus a 2px underline; the bottom bar is one row for any number of tabs.
+`AppShell` renders `Nav` as a top bar at medium and wide, or as a fixed bottom tab bar at narrow. At narrow, `viewport !== "narrow"` puts the nav in the header instead. Below wide, links use their short labels (`labelMobile`) and the refresh caption drops its label. The top links are plain tabs with no fill: the active one has a 2px accent underline and the hovered one a faint underline; the bottom bar is one row for any number of tabs.
 
 ### Server banner
 
