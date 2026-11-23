@@ -16,11 +16,13 @@ The stylesheets write `@media (--narrow)`, `(--medium-up)` and `(--wide-up)`. `w
 
 ### Page width
 
-The page area (`main.content`) is capped at 87.5rem and centred. On the table pages, `/projects` and `/sessions`, `AppShell` sets `data-full-width="true"` on it and `app.css` drops the cap, so a table only scrolls sideways when its columns truly cannot fit. The side padding on those two pages is `--table-page-gutter-x` in `tokens.css`; change that one value to adjust it. Other pages keep the normal `--gutter` padding. The list of paths is `FULL_WIDTH_PATHS` in `AppShell.tsx`.
+The page area (`main.content`) is capped at 100rem and centred on every page. The header's inner row (`.topbar-inner`) uses the same cap and the same side padding, `--page-gutter-x` in `tokens.css` (the normal `--gutter` on narrow, 1.5rem on medium, 2rem on wide), so brand, page title, tables and the right-hand controls share one left and one right edge on every page. The first and last cells of a table drop their own side padding so table text sits on that edge too.
+
+Small text has a floor: `--font-xs` is 12px and `--font-sm` about 13px, raised in rem on wide screens to cancel the 80% desktop root. Chart labels use `MIN_CHART_TEXT_PX` (12) from `lib/uiScale.ts`. `--danger-text` is the red used on its own tint (the Needs compact chip) and meets 4.5:1 in both themes. Text and number inputs share the `.field` class in `app.css`.
 
 ### Navigation
 
-`AppShell` renders `Nav` as a top bar at medium and wide, or as a fixed bottom tab bar at narrow. At narrow, `viewport !== "narrow"` puts the nav in the header instead.
+`AppShell` renders `Nav` as a top bar at medium and wide, or as a fixed bottom tab bar at narrow. At narrow, `viewport !== "narrow"` puts the nav in the header instead. Below wide, links use their short labels (`labelMobile`) and the refresh caption drops its label. The active top link has a tint plus a 2px underline; the bottom bar is one row for any number of tabs.
 
 ### Server banner
 
@@ -79,3 +81,5 @@ App-only tokens with no library equivalent stay alongside:
 ### Fonts
 
 Fonts (Figtree, Urbanist, JetBrains Mono) load from Google Fonts via `index.html`, falling back to system fonts offline. The heading, link and code rules in `app.css` mirror the library's `_core_theme.scss`.
+
+Form fields (`.field`, filter buttons, sort select) use the darker `--input-border` token, not `--border-subtle`, so their edges reach 3:1 contrast.

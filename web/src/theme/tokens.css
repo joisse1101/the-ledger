@@ -19,8 +19,9 @@
   --font-family-body: Figtree, system-ui, -apple-system, sans-serif;
   --font-family-mono: JetBrains Mono, monospace;
 
-  --font-xs: 0.625rem;
-  --font-sm: 0.75rem;
+  /* Small text floors: 12px and 13px on a phone, and still 12px and ~13px under the 80% desktop root. */
+  --font-xs: 0.75rem;
+  --font-sm: 0.8125rem;
 
   --radius-md: 0.5rem;
 }
@@ -77,6 +78,7 @@
   --shadow-text: 0 2px 3px #0000001a;
   --color-success-rgb: 3 107 77;
   --color-danger-rgb: 185 28 28;
+  --danger-text: #991b1b; /* danger text on its own 15% tint: 4.5:1 or more */
   --bg-surface-hover-rgb: 247 238 241;
   --border-subtle-rgb: 231 223 226;
   --brand-border-strong-rgb: 201 141 160;
@@ -154,6 +156,7 @@
   --shadow-text: 0 2px 3px #00000080;
   --color-success-rgb: 112 244 195;
   --color-danger-rgb: 248 113 113;
+  --danger-text: #f87171; /* danger text on its own 15% tint: 4.5:1 or more */
   --bg-surface-hover-rgb: 38 38 43;
   --border-subtle-rgb: 39 39 42;
   --brand-border-strong-rgb: 184 115 138;
@@ -232,6 +235,7 @@
     --shadow-text: 0 2px 3px #00000080;
     --color-success-rgb: 112 244 195;
     --color-danger-rgb: 248 113 113;
+  --danger-text: #f87171; /* danger text on its own 15% tint: 4.5:1 or more */
     --bg-surface-hover-rgb: 38 38 43;
     --border-subtle-rgb: 39 39 42;
     --brand-border-strong-rgb: 184 115 138;
@@ -260,9 +264,25 @@
 :root {
   --tap: 2.75rem; /* minimum touch target */
   --gutter: 1rem;
-  /* Left and right padding around the tables on Manage Projects and Manage Sessions. */
-  --table-page-gutter-x: 16rem;
+  /* Left and right page padding, shared by the header row and the page so brand, title, tables and
+     the right-hand controls sit on the same two edges: the gutter on a phone, more on medium and wide. */
+  --page-gutter-x: var(--gutter);
   --radius: 0.625rem;
   --tabbar-h: 3.5rem;
   --header-h: 3.5rem;
+}
+
+@media (--medium-up) {
+  :root {
+    --page-gutter-x: 1.5rem;
+  }
+}
+
+/* The desktop root is 80%, so the small-text floors are raised in rem to stay at 12px and ~13px. */
+@media (--wide-up) {
+  :root {
+    --page-gutter-x: 2rem;
+    --font-xs: 0.9375rem;
+    --font-sm: 1rem;
+  }
 }

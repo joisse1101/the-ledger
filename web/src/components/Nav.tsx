@@ -16,6 +16,7 @@ const PAGES = [
  *  bar fixed to the bottom of the screen where a thumb can reach it (narrow). */
 export function Nav({ viewport }: { viewport: ViewportClass }) {
   const bottom = viewport === "narrow";
+  const shortLabels = viewport !== "wide";
   const meta = useMeta();
   const remoteOn = meta.data?.remote_mode.enabled === true;
   const isLocal = meta.data?.is_local === true;
@@ -25,7 +26,7 @@ export function Nav({ viewport }: { viewport: ViewportClass }) {
       {pages.map(({ to, label, labelMobile, icon, end }) => (
         <NavLink key={to} to={to} end={end} className="nav-link">
           {bottom && icon}
-          <span>{bottom && labelMobile ? labelMobile : label}</span>
+          <span>{shortLabels && labelMobile ? labelMobile : label}</span>
         </NavLink>
       ))}
     </nav>
