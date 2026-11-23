@@ -35,7 +35,7 @@ export function SessionsPage() {
 
   return (
     <section>
-      <h1>Sessions</h1>
+      <h1>Manage Sessions</h1>
       <AllList onSelect={handleSelectAll} />
       <SessionDialog sessionId={sessionId} onClose={closeSession} />
     </section>

@@ -1,6 +1,6 @@
 .hint {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
 }
 
 .list {
@@ -15,10 +15,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
+  box-sizing: border-box;
+  min-height: calc(var(--tap) + 1.2rem + 2px); /* every row as tall as one holding a button */
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .row + .row {
@@ -32,7 +35,7 @@
 
 .badge {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--font-sm);
 }
 
 .add {
@@ -47,7 +50,40 @@
   gap: 0.5rem;
 }
 
-.addRow input {
+.addRow input[type="text"] {
   flex: 1;
   min-width: 0;
+}
+
+/* Settings is a form, not a dashboard: keep it to a readable column instead of the full page width. */
+.page {
+  max-width: 40rem;
+}
+
+.page h2 {
+  margin: 2rem 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.page p {
+  max-width: 65ch;
+}
+
+/* Number fields hold at most three digits: a narrow box on desktop, the full row beside Save on a phone. */
+.number {
+  width: 8rem;
+  flex: none;
+}
+
+@media (--narrow) {
+  .number {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.add .hint {
+  margin: 0 0 0.25rem;
 }

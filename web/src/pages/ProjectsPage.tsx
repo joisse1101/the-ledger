@@ -60,7 +60,7 @@ export function ProjectsPage() {
 
   return (
     <section>
-      <h1>Projects</h1>
+      <h1>Manage Projects</h1>
       <ProjectsList
         expandedPaths={expandedPaths}
         onToggle={toggle}

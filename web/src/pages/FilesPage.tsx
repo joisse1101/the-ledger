@@ -84,7 +84,7 @@ export function FilesPage() {
         A shared folder on the PC. Anything uploaded here lands in it; anything in it can be downloaded.
       </p>
 
-      <label className={`button ${styles.pick}`}>
+      <label className={`button button-primary ${styles.pick}`}>
         Upload files
         <input type="file" multiple className={styles.input} onChange={(event) => void onPick(event)} />
       </label>

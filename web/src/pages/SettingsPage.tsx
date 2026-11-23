@@ -70,7 +70,7 @@ export function SettingsPage() {
   }
 
   return (
-    <section>
+    <section className={styles.page}>
       <h1>Settings</h1>
 
       <h2>Worktree folders</h2>
@@ -110,6 +110,7 @@ export function SettingsPage() {
         <div className={styles.addRow}>
           <input
             id="worktree-folder"
+            className="field"
             type="text"
             value={draft}
             placeholder=".trees"
@@ -132,17 +133,19 @@ export function SettingsPage() {
       {save.isError && <p role="alert">{messageOf(save.error)}</p>}
 
       <h2>Desktop widget</h2>
-      <p className={styles.hint}>
-        How many projects the widget lists when you hover its Ledger button. It lists GitHub projects with the most
-        open issues and pull requests first, and shows how many more there are. The widget picks the change up within
-        a minute.
-      </p>
       {/* noValidate: the server's reason is shown inline, like the folder form's, not the browser's balloon. */}
       <form className={styles.add} onSubmit={onSaveWidget} noValidate>
         <label htmlFor="widget-max-projects">Projects shown (1 to 10)</label>
+        <p id="widget-max-projects-hint" className={styles.hint}>
+          How many projects the widget lists when you hover its Ledger button. It lists GitHub projects with the most
+          open issues and pull requests first, and shows how many more there are. The widget picks the change up
+          within a minute.
+        </p>
         <div className={styles.addRow}>
           <input
             id="widget-max-projects"
+            className={`field ${styles.number}`}
+            aria-describedby="widget-max-projects-hint"
             type="number"
             min={1}
             max={10}
@@ -158,15 +161,18 @@ export function SettingsPage() {
       </form>
       {saveWidget.isError && <p role="alert">{messageOf(saveWidget.error)}</p>}
 
-      <p className={styles.hint}>
-        How long the widget's AFK switch stays on after you turn it on. While it is on, the chime sounds play even if
-        you are at the keyboard. A new number applies the next time you turn the switch on, not to one already on.
-      </p>
       <form className={styles.add} onSubmit={onSaveAfk} noValidate>
         <label htmlFor="widget-afk-minutes">AFK minutes (1 to 240)</label>
+        <p id="widget-afk-minutes-hint" className={styles.hint}>
+          How long the widget's AFK switch stays on after you turn it on. While it is on, the chime sounds play even
+          if you are at the keyboard. A new number applies the next time you turn the switch on, not to one already
+          on.
+        </p>
         <div className={styles.addRow}>
           <input
             id="widget-afk-minutes"
+            className={`field ${styles.number}`}
+            aria-describedby="widget-afk-minutes-hint"
             type="number"
             min={1}
             max={240}
@@ -188,15 +194,17 @@ export function SettingsPage() {
       {saveAfk.isError && <p role="alert">{messageOf(saveAfk.error)}</p>}
 
       <h2>Break workouts</h2>
-      <p className={styles.hint}>
-        After this many minutes of work, with the AFK switch off, the widget opens a break window with a random
-        workout. A new number applies to the count already running; the widget takes it within about 30 seconds.
-      </p>
       <form className={styles.add} onSubmit={onSaveBreak} noValidate>
         <label htmlFor="widget-break-minutes">Break minutes (1 to 240)</label>
+        <p id="widget-break-minutes-hint" className={styles.hint}>
+          After this many minutes of work, with the AFK switch off, the widget opens a break window with a random
+          workout. A new number applies to the count already running; the widget takes it within about 30 seconds.
+        </p>
         <div className={styles.addRow}>
           <input
             id="widget-break-minutes"
+            className={`field ${styles.number}`}
+            aria-describedby="widget-break-minutes-hint"
             type="number"
             min={1}
             max={240}

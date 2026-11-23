@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLive, useMeta } from "../../api/queries";
-import { formatText, formatTime } from "../../lib/format";
+import { formatText } from "../../lib/format";
 import type { ListColumn } from "../list/types";
 import { ResponsiveList } from "../list/ResponsiveList";
 import { QUESTION_TOOL } from "../../api/types";
@@ -127,13 +127,11 @@ export interface LiveListProps {
 }
 
 /** The Sessions page's "Live" list: polls every 2s, with an Auto-refresh switch and a
- *  frozen "last refreshed" caption while it's off. */
+ *  The "last refreshed" time lives in the top bar's RefreshControl only. */
 export function LiveList({ onSelect }: LiveListProps) {
   const [auto, setAuto] = useState(true);
   const live = useLive({ auto });
   const relayHookSeen = useMeta().data?.relay_hook_seen === true;
-
-  const lastRefreshed = live.dataUpdatedAt ? new Date(live.dataUpdatedAt).toISOString() : null;
 
   return (
     <section aria-label="Live sessions">
@@ -148,9 +146,6 @@ export function LiveList({ onSelect }: LiveListProps) {
           />
           <RemoteModeControl />
         </div>
-        <span className="muted sessions-toolbar-caption">
-          Last refreshed: <time dateTime={lastRefreshed ?? undefined}>{formatTime(lastRefreshed)}</time>
-        </span>
       </div>
       <ResponsiveList
         columns={columnsFor(relayHookSeen)}

@@ -1,6 +1,6 @@
 # Frontend: projects page
 
-This page explains how the Projects page is built: the project list, the detail panel under it, and delete. Read it before changing them.
+This page explains how the Projects page (titled "Manage Projects", like its navigation label) is built: the project list, the detail panel under it, and delete. Read it before changing them.
 
 > Requirements live in `openspec/specs/web-dashboard/spec.md`. This page describes how the code meets them, not what it must do.
 
