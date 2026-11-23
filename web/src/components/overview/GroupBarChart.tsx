@@ -3,7 +3,7 @@ import type { GroupTotals } from "../../api/types";
 import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
-import type { Scaled } from "../../lib/uiScale";
+import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 import { formatCost, formatCount } from "../../lib/format";
 import { capitalize, chartColors, FONT_STACK, groupNoun, type GroupLabel } from "./chartTheme";
 
@@ -37,7 +37,7 @@ export function buildSpec(groups: GroupTotals[], order: string[], groupLabel: Gr
     width: "container",
     height: scaled(280),
     view: { stroke: null },
-    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: scaled(12) } },
+    config: { font: FONT_STACK, legend: { labelColor: text2, labelFontSize: Math.max(scaled(12), MIN_CHART_TEXT_PX) } },
     data: { values: records(groups) },
     // A per-bar value label has nowhere to go without
     // overlapping its neighbor once more than a couple of groups are on screen - the
@@ -53,7 +53,7 @@ export function buildSpec(groups: GroupTotals[], order: string[], groupLabel: Gr
           domain: false,
           ticks: false,
           labelColor: text2,
-          labelFontSize: scaled(11),
+          labelFontSize: Math.max(scaled(11), MIN_CHART_TEXT_PX),
           labelAngle: -25,
           labelLimit: scaled(110),
         },
@@ -68,7 +68,7 @@ export function buildSpec(groups: GroupTotals[], order: string[], groupLabel: Gr
           domain: false,
           gridColor: grid,
           labelColor: text2,
-          labelFontSize: scaled(10),
+          labelFontSize: Math.max(scaled(10), MIN_CHART_TEXT_PX),
           titleColor: text2,
           values: [0, 25, 50, 75, 100],
         },

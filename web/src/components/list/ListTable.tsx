@@ -72,8 +72,11 @@ export function ListTable<T>({
             return (
               <Fragment key={id}>
                 <tr data-row-id={id} className={rowClassName?.(row)} onClick={() => onSelect(row)}>
-                  {visible.map((column, index) => (
-                    <td key={column.key} data-align={column.align ?? "start"}>
+                  {visible.map((column, index) => {
+                    const cell = column.render(row);
+                    return (
+                    // A text cell that is cut short with an ellipsis shows its whole value on hover.
+                    <td key={column.key} data-align={column.align ?? "start"} title={typeof cell === "string" ? cell : undefined}>
                       {index === 0 ? (
                         <button
                           type="button"
@@ -86,13 +89,14 @@ export function ListTable<T>({
                             onSelect(row);
                           }}
                         >
-                          {column.render(row)}
+                          {cell}
                         </button>
                       ) : (
-                        column.render(row)
+                        cell
                       )}
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
                 {(expanded || isClosing(id)) && renderExpanded && (
                   <tr className="list-table-expanded-row">

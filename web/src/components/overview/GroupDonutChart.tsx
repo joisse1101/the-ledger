@@ -4,7 +4,7 @@ import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
 import { humanizeTokens } from "../../lib/tokens";
-import type { Scaled } from "../../lib/uiScale";
+import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 import { capitalize, chartColors, FONT_STACK, groupColorMap, groupColorScale, groupNoun, type GroupLabel } from "./chartTheme";
 
 /** Which measure sizes the arcs and the center total: session count, or summed context tokens. */
@@ -57,7 +57,7 @@ export function buildSpec(
       },
       {
         data: { values: [{ label: metric }] },
-        mark: { type: "text", dy: scaled(20), fontSize: scaled(11), color: text2 },
+        mark: { type: "text", dy: scaled(20), fontSize: Math.max(scaled(11), MIN_CHART_TEXT_PX), color: text2 },
         encoding: { text: { field: "label", type: "nominal" } },
       },
     ],

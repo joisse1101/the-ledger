@@ -21,6 +21,19 @@ describe("GroupBarChart spec", () => {
     expect(() => compile(buildSpec(groups, order, "worktree", (n) => n) as never)).not.toThrow();
   });
 
+  it("plots the API's 0-100 percentages as-is on a 0-115 axis, so bars are visible", () => {
+    // messages_pct / cost_pct are already percent (100 = the top group). A fraction (0.33) would
+    // draw bars under a pixel tall on this axis, which is how a wrong mock once showed no bars.
+    const spec = buildSpec(groups, order, "project", (n) => n) as unknown as {
+      data: { values: { group: string; metric: string; pct: number }[] };
+      encoding: { y: { scale: { domain: number[] } } };
+    };
+    expect(spec.encoding.y.scale.domain).toEqual([0, 115]);
+    const top = spec.data.values.filter((v) => v.group === "wt fix");
+    expect(top.map((v) => v.pct)).toEqual([100, 100]);
+    expect(spec.data.values.find((v) => v.group === "main" && v.metric === "Cost")?.pct).toBe(33.3);
+  });
+
   it("keeps the branch wording for a branch chart", () => {
     const spec = buildSpec(groups, order, "branch", (n) => n) as unknown as BarSpec;
     expect(spec.encoding.y.title).toBe("% of top branch");

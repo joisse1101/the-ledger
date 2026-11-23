@@ -27,7 +27,7 @@ It draws its own color key as a plain HTML list (`GroupLegend`) instead of a Veg
 
 ### `GroupBarChart`
 
-Its heading is "Messages & Cost by Project", or "…by Branch / Worktree" in the Projects panel. It normalizes each measure to a percent of its own peak. This is a non-dual-axis choice, so two differently scaled measures can share one axis.
+Chart headings are 1.125rem bold, a clear step below the page title. The bars read `messages_pct` and `cost_pct` as 0 to 100 (not fractions) on a 0 to 115 axis. Its heading is "Messages & Cost by Project", or "…by Branch / Worktree" in the Projects panel. It normalizes each measure to a percent of its own peak. This is a non-dual-axis choice, so two differently scaled measures can share one axis.
 
 ### `ActivityLineChart`
 
@@ -42,3 +42,5 @@ It adds a grey "Activity trend" layer from `web/src/lib/activityTrend.ts`. The l
 ## Summary tiles
 
 `SummaryStats` renders the KPI tiles. The four extreme figures are buttons that toggle an inline disclosure naming their project or session, plus a `title` attribute for hover on pointer devices. Buttons are used because a touchscreen has no hover-only affordance.
+
+At wide widths the KPI stat grid is 4 tiles across, so the 16 tiles fill whole rows.

@@ -15,6 +15,9 @@ export function uiScale(): number {
   return Number.isFinite(rootPx) && rootPx > 0 ? rootPx / DEFAULT_ROOT_PX : 1;
 }
 
+/** Smallest chart text, in px: axis and legend labels stay readable even under the 80% desktop root. */
+export const MIN_CHART_TEXT_PX = 12;
+
 export function scaledBy(scale: number): Scaled {
   return (px) => Math.round(px * scale * ROUNDING_STEPS_PER_PX) / ROUNDING_STEPS_PER_PX;
 }

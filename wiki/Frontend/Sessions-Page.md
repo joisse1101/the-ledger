@@ -16,7 +16,7 @@ Live and All are separate pages. Each keeps its selection in the URL (`?session=
 
 ### The list
 
-`LiveList` polls through `useLive`. It has its own "Auto-refresh" switch, and with the switch off the "Last refreshed" caption stays frozen.
+`LiveList` polls through `useLive`. It has its own "Auto-refresh" switch. The page titles match the navigation labels: "Sessions" for the Live list and "Manage Sessions" for the All list. The "Last refreshed" time is shown only in the top bar. Compact and pending chips use at least 0.78rem text.
 
 Each row can carry two badges. `LiveList` badges a row (`pending-badge`) from `/api/live`'s `pending_decision`. It shows a **Should compact** (amber) or **Needs compact** (red) pill (`compact-badge`) from the row's `compact.state`, muted while the session is `idle`.
 
@@ -96,3 +96,5 @@ The tooltip element is moved into the enclosing `<dialog>`, because a modal sits
 `Detail` then pins `ContextBreakdownPanel` under the chart. It lists every category with its tokens and its share of that response's own context, never of a model window. Startup categories are marked `~` as estimates.
 
 Categories expand to items. The panel is collapsed by default and dismissable, and it is replaced when another bar is picked. `web/src/lib/contextBreakdown.ts` holds the share, row and tooltip logic.
+
+The Session ID column is capped to about 9 characters with an ellipsis (full ID in the tooltip) so the table fits its box at 1440 and up.

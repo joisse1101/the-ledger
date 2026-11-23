@@ -106,7 +106,7 @@ const columns: ListColumn<TranscriptItem>[] = [
     priority: "low",
     cardPriority: "hidden",
     sortKey: "session_id",
-    render: (t) => <code>{t.session_id}</code>,
+    render: (t) => <code title={t.session_id}>{t.session_id}</code>,
   },
   {
     key: "live",
@@ -173,9 +173,9 @@ export function AllList({ onSelect }: AllListProps) {
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search session ID, last message, or prompt"
+          placeholder="Search sessions" title="Search by session ID, last message or prompt"
           aria-label="Search sessions"
-          className="sessions-search"
+          className="field sessions-search"
         />
         <div className="filter-multiselect-container">
           <FilterMultiselect label="Project" options={options.projects} selected={projects} onChange={setProjects} />

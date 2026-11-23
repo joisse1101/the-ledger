@@ -3,7 +3,7 @@ import type { ActivityBucket } from "../../api/types";
 import { useVegaEmbed } from "../../hooks/useVegaEmbed";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
-import type { Scaled } from "../../lib/uiScale";
+import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 import { activityTrend, TREND_WINDOW } from "../../lib/activityTrend";
 import { chartColors, FONT_STACK } from "./chartTheme";
 
@@ -45,15 +45,15 @@ export function buildSpec(activity: ActivityBucket[], scaled: Scaled) {
     datum: name,
     type: "nominal",
     scale: { domain: MEASURES, range: [sessionsColor, messagesColor, text2] },
-    legend: { title: null, orient: "top", labelColor: text2, labelFontSize: scaled(12) },
+    legend: { title: null, orient: "top", labelColor: text2, labelFontSize: Math.max(scaled(12), MIN_CHART_TEXT_PX) },
   });
 
   const axisBase = {
     domain: false,
     labelColor: text2,
-    labelFontSize: scaled(10),
+    labelFontSize: Math.max(scaled(10), MIN_CHART_TEXT_PX),
     ticks: false,
-    titleFontSize: scaled(11),
+    titleFontSize: Math.max(scaled(11), MIN_CHART_TEXT_PX),
     titleFontWeight: "bold",
   };
 
@@ -123,7 +123,7 @@ export function buildSpec(activity: ActivityBucket[], scaled: Scaled) {
           // Minutes after midnight -> "9am" (or "9:30am" off the hour).
           labelExpr:
             "(floor(datum.value / 60) % 12 || 12) + (datum.value % 60 ? ':' + (datum.value % 60 < 10 ? '0' : '') + datum.value % 60 : '') + (datum.value < 720 ? 'am' : 'pm')",
-          labelFontSize: scaled(9),
+          labelFontSize: Math.max(scaled(9), MIN_CHART_TEXT_PX),
           labelOverlap: "parity",
         },
       },

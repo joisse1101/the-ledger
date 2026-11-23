@@ -4,7 +4,7 @@ import type { Compaction, ContextBreakdown, Turn } from "../../api/types";
 import { responseRows, tooltipContent, type TooltipContent } from "../../lib/contextBreakdown";
 import { useTheme } from "../../theme/theme";
 import { useScaled } from "../../hooks/useScaled";
-import type { Scaled } from "../../lib/uiScale";
+import { MIN_CHART_TEXT_PX, type Scaled } from "../../lib/uiScale";
 
 export interface TokensChartProps {
   turns: Turn[];
@@ -124,7 +124,7 @@ export function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scal
     ticks: false,
     labelAngle: 0,
     labelColor: text2,
-    labelFontSize: scaled(10),
+    labelFontSize: Math.max(scaled(10), MIN_CHART_TEXT_PX),
     labelOverlap: "parity",
     titleColor: text2,
   };
@@ -149,7 +149,7 @@ export function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scal
           domain: false,
           gridColor: grid,
           labelColor: text2,
-          labelFontSize: scaled(10),
+          labelFontSize: Math.max(scaled(10), MIN_CHART_TEXT_PX),
           titleColor: text2,
           format: "~s",
         },
@@ -238,7 +238,7 @@ export function buildSpec(turns: Turn[], compactions: Compaction[], scaled: Scal
     view: { stroke: null },
     config: {
       font: "system-ui, -apple-system, 'Segoe UI', sans-serif",
-      legend: { labelColor: text2, labelFontSize: scaled(12) },
+      legend: { labelColor: text2, labelFontSize: Math.max(scaled(12), MIN_CHART_TEXT_PX) },
     },
     params: [{ name: SELECTED_SIGNAL, value: selected }],
     layer: layers,

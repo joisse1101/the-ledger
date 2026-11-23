@@ -24,7 +24,7 @@ Files: `web/src/components/ButtonSelector.tsx` and its `.module.css`.
 
 ### Narrow screens
 
-On a narrow screen it scrolls sideways inside its own box. `web/src/hooks/useCanSideScroll.ts` fades whichever edge has more to reveal, using a CSS mask on the scroller driven by `data-fade-start` and `data-fade-end`.
+On a phone the options wrap onto extra rows as separate rounded buttons; on wider screens one row scrolls sideways inside its own box if it must. `web/src/hooks/useCanSideScroll.ts` fades whichever edge has more to reveal, using a CSS mask on the scroller driven by `data-fade-start` and `data-fade-end`.
 
 ### Look
 
@@ -38,7 +38,7 @@ The look is the ui-library's `.btn.btn-option`: joined segments with only the ou
 
 Files: `web/src/components/ConfirmDialog.tsx` and its `.module.css`.
 
-`ConfirmDialog` is a small generic confirmation modal on a native `<dialog>`. It is kept mounted and synced to `open` (`showModal()`/`close()`), like `SessionDialog` but not full-screen on narrow viewports. Sessions' inline `DeleteControls` still confirms inline.
+The selected `ButtonSelector` option is filled with the accent colour. `ConfirmDialog` is a small generic confirmation modal on a native `<dialog>`. It is kept mounted and synced to `open` (`showModal()`/`close()`), like `SessionDialog` but not full-screen on narrow viewports. Sessions' inline `DeleteControls` still confirms inline.
 
 Its props are:
 
