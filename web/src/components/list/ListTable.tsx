@@ -1,6 +1,15 @@
 import { Fragment } from "react";
-import type { ResponsiveListProps } from "./types";
+import type { ListColumn, ResponsiveListProps } from "./types";
 import { useClosingIds } from "./useClosingIds";
+
+const DEFAULT_COLUMN_WEIGHT = 1;
+
+/** Each column's share of the table, in percent, from its relative weight. */
+export function columnWidths<T>(columns: ListColumn<T>[]): number[] {
+  const weights = columns.map((column) => column.weight ?? DEFAULT_COLUMN_WEIGHT);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  return weights.map((weight) => (weight / total) * 100);
+}
 
 export interface ListTableProps<T> extends ResponsiveListProps<T> {
   /** Wide shows every column; medium (false) hides "low" priority ones. */
@@ -25,6 +34,7 @@ export function ListTable<T>({
   showAllColumns,
 }: ListTableProps<T>) {
   const visible = columns.filter((column) => showAllColumns || column.priority === "high");
+  const widths = columnWidths(visible);
   const { isClosing, onClosed } = useClosingIds(expandedIds);
 
   if (rows.length === 0) {
@@ -32,8 +42,13 @@ export function ListTable<T>({
   }
 
   return (
-    <div className="list-table-scroll">
+    <div className="list-table-box">
       <table className="list-table" aria-label={ariaLabel}>
+        <colgroup>
+          {visible.map((column, index) => (
+            <col key={column.key} style={{ width: `${widths[index]}%` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             {visible.map((column) => (
@@ -53,9 +68,9 @@ export function ListTable<T>({
               >
                 {column.sortKey && sort ? (
                   <button type="button" className="sort-header" onClick={() => sort.onChange(column.sortKey!)}>
-                    {column.header}
+                    <span className="sort-label">{column.header}</span>
                     {sort.field === column.sortKey && (
-                      <span aria-hidden="true">{sort.dir === "asc" ? " ▲" : " ▼"}</span>
+                      <span className="sort-arrow" aria-hidden="true">{sort.dir === "asc" ? "▲" : "▼"}</span>
                     )}
                   </button>
                 ) : (

@@ -8,15 +8,23 @@
 
 /* ---- table renderer (medium/wide) */
 
-.list-table-scroll {
+/* The box around the list table: room for the live-row marker, no scrolling (the table's
+   columns shrink to fit instead). */
+.list-table-box {
   margin: 0 -0.25rem;
   padding: 0 0.25rem;
-  /* A wide table (the detail view's all-responses table, or this one on a narrow browser
-     window in dev) scrolls sideways in its own box rather than widening the page. */
+}
+
+/* The detail view's all-responses tables scroll sideways in their own box rather than widening
+   the page. */
+.list-table-scroll {
   overflow-x: auto;
 }
 
+/* Fixed layout: the <colgroup> in ListTable sets each column's share, and a long value is
+   cut with an ellipsis rather than widening its column. */
 .list-table {
+  table-layout: fixed;
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9375rem;
@@ -30,13 +38,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 18ch;
 }
 
-/* A session ID is 36 characters; cap it so the table fits its box (the full ID is in the title). */
+/* A session ID or path is longer than its column; cut it with an ellipsis (the full value is in
+   the cell's title). */
 .list-table td code {
   display: inline-block;
-  max-width: 9ch;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;
@@ -74,7 +82,21 @@
   font-weight: 600;
   padding: 0;
   cursor: pointer;
+  max-width: 100%;
+  /* The label ellipsizes; the arrow stays visible beside it. */
+  display: inline-flex;
+}
+
+.sort-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sort-arrow {
+  flex: none;
+  margin-left: 0.25rem;
 }
 
 /* The keyboard/screen-reader entry point for a row: a real button in its first cell that reads as

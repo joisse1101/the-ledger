@@ -376,4 +376,34 @@ describe("ListTable and ListCards", () => {
       expect(document.querySelector(".list-expand")).toHaveAttribute("data-collapsed", "true");
     });
   });
+
+  describe("column widths", () => {
+    const weighted: ListColumn<Row>[] = [
+      { key: "name", header: "Name", priority: "high", weight: 3, render: (r) => r.name },
+      { key: "detail", header: "Detail", priority: "low", weight: 1, render: (r) => r.detail },
+      { key: "extra", header: "Extra", priority: "high", render: (r) => r.id },
+    ];
+
+    function widthsOf(showAllColumns: boolean): number[] {
+      const { container } = render(
+        <ListTable columns={weighted} rows={rows} rowId={(r) => r.id} onSelect={vi.fn()} emptyMessage="none" ariaLabel="Rows" showAllColumns={showAllColumns} />,
+      );
+      return Array.from(container.querySelectorAll("col")).map((col) => parseFloat(col.style.width));
+    }
+
+    it("shares 100% across the visible columns by weight, defaulting a missing weight to 1", () => {
+      const widths = widthsOf(true);
+      expect(widths).toHaveLength(3);
+      expect(widths.reduce((sum, width) => sum + width, 0)).toBeCloseTo(100);
+      expect(widths[0]).toBeCloseTo(60);
+      expect(widths[2]).toBeCloseTo(20);
+    });
+
+    it("recomputes the shares over the visible columns when low-priority ones are hidden", () => {
+      const widths = widthsOf(false);
+      expect(widths).toHaveLength(2);
+      expect(widths.reduce((sum, width) => sum + width, 0)).toBeCloseTo(100);
+      expect(widths[0]).toBeCloseTo(75);
+    });
+  });
 });

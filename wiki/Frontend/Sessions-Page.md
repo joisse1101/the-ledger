@@ -97,4 +97,4 @@ The tooltip element is moved into the enclosing `<dialog>`, because a modal sits
 
 Categories expand to items. The panel is collapsed by default and dismissable, and it is replaced when another bar is picked. `web/src/lib/contextBreakdown.ts` holds the share, row and tooltip logic.
 
-The Session ID column is capped to about 9 characters with an ellipsis (full ID in the tooltip) so the table fits its box at 1440 and up.
+The table never scrolls sideways: it uses a fixed layout, so a long value (a Session ID, a title) is cut with an ellipsis and its full text is in the tooltip. Column widths come from each column's `weight` (see [Frontend: shared components](Shared-Components.md)).
